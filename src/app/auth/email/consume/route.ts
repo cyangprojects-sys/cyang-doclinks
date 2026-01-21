@@ -13,20 +13,20 @@ export async function GET(req: Request) {
 
   const tokenHash = hmacSha256Hex(token);
 
-  const rows = await sql<{
-    id: number;
-    email: string;
-    expires_at: string;
-    use_count: number;
-    max_uses: number;
-    revoked_at: string | null;
-    alias: string;
-  }>`
-    select id, email, expires_at, use_count, max_uses, revoked_at, alias
-    from login_tokens
-    where token_hash = ${tokenHash}
-    limit 1
-  `;
+const rows = (await sql`
+  select id, email, expires_at, use_count, max_uses, revoked_at, alias
+  from login_tokens
+  where token_hash = ${tokenHash}
+  limit 1
+`) as {
+  id: number;
+  email: string;
+  expires_at: string;
+  use_count: number;
+  max_uses: number;
+  revoked_at: string | null;
+  alias: string;
+}[];
 
   if (rows.length === 0) return new Response("This sign-in link is invalid or expired.", { status: 400 });
 
@@ -44,20 +44,24 @@ export async function GET(req: Request) {
   `;
 
   // Resolve alias -> doc_id
-  const docs = await sql<{ doc_id: string; is_active: boolean }>`
-    select doc_id, is_active from document_aliases where alias = ${alias} limit 1
-  `;
+ const docs = (await sql`
+  select doc_id, is_active
+  from document_aliases
+  where alias = ${alias}
+  limit 1
+`) as { doc_id: string; is_active: boolean }[];
   if (docs.length === 0 || !docs[0].is_active) return new Response("Document not found.", { status: 404 });
 
   const docId = docs[0].doc_id;
 
   // Create doc-only access grant (8 hours)
   const expiresAt = new Date(Date.now() + 8 * 60 * 60 * 1000);
-  const grantRows = await sql<{ id: number }>`
-    insert into doc_access_grants (doc_id, principal, provider, expires_at)
-    values (${docId}, ${t.email}, 'email', ${expiresAt.toISOString()})
-    returning id
-  `;
+  const grantRows = (await sql`
+  insert into doc_access_grants (doc_id, principal, provider, expires_at)
+  values (${docId}, ${t.email}, 'email', ${expiresAt.toISOString()})
+  returning id
+`) as { id: number }[];
+
 
   const grantId = grantRows[0].id;
   const expUnix = Math.floor(expiresAt.getTime() / 1000);
