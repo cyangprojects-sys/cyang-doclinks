@@ -43,20 +43,20 @@ export async function GET(req: Request) {
   }
 
   // 1) Exchange code for tokens + validate (state/nonce/PKCE)
-  const { claims } = await exchangeGoogleCode(req, {
+   const { claims } = await exchangeGoogleCode(req, {
     codeVerifier,
     state: expectedState,
     nonce: expectedNonce,
   });
 
-  const email = typeof claims.email === "string" ? claims.email.toLowerCase() : "";
-  const emailVerified =
-    typeof claims.email_verified === "boolean" ? claims.email_verified : false;
+  const email = typeof claims?.email === "string" ? claims.email.toLowerCase() : "";
+  const emailVerified = claims?.email_verified === true;
 
   if (!email || !emailVerified) {
     headers.set("Location", `/d/${encodeURIComponent(alias)}`);
     return new Response(null, { status: 302, headers });
   }
+
 
   // 2) Look up alias -> doc_id + target_url + is_active
   const rows = (await sql`
