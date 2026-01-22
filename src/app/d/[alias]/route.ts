@@ -1,3 +1,5 @@
+export const runtime = "nodejs";
+
 import { sql } from "@/lib/db";
 import { getCookie } from "@/lib/cookies";
 import { verifySignedPayload } from "@/lib/crypto";
@@ -49,17 +51,13 @@ export async function GET(req: Request, ctx: { params: Promise<{ alias: string }
   const { alias } = await ctx.params;
 
   // 1) Look up alias -> doc_id + target_url
-  const rows = await sql<{
-    doc_id: string;
-    target_url: string;
-    is_active: boolean;
-  }>`
+  const rows = (await sql`
     select a.doc_id, d.target_url, a.is_active
     from document_aliases a
     join documents d on d.id = a.doc_id
     where a.alias = ${alias}
     limit 1
-  `;
+  `) as { doc_id: string; target_url: string; is_active: boolean }[];
 
   if (rows.length === 0 || !rows[0].is_active) {
     return new Response("Not found", { status: 404 });
@@ -69,24 +67,19 @@ export async function GET(req: Request, ctx: { params: Promise<{ alias: string }
   const raw = getCookie(req, "cy_doc_session");
   if (!raw) return signInPage(alias);
 
-  const session = verifySignedPayload<DocSession>(raw);
+  const session = verifySignedPayload(raw) as DocSession | null;
   if (!session) return signInPage(alias);
 
   const now = Math.floor(Date.now() / 1000);
   if (session.exp <= now) return signInPage(alias);
 
   // 3) Validate grant in DB is valid and matches this doc
-  const grants = await sql<{
-    id: number;
-    doc_id: string;
-    expires_at: string;
-    revoked_at: string | null;
-  }>`
+  const grants = (await sql`
     select id, doc_id, expires_at, revoked_at
     from doc_access_grants
     where id = ${session.grant_id}
     limit 1
-  `;
+  `) as { id: number; doc_id: string; expires_at: string; revoked_at: string | null }[];
 
   if (grants.length === 0) return signInPage(alias);
 
