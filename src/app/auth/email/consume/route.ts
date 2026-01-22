@@ -71,7 +71,7 @@ const rows = await (sql<LoginTokenRow[]>`
   const grantId = grantRows[0].id;
   const expUnix = Math.floor(expiresAt.getTime() / 1000);
 
-  const signed = signPayload<DocSession>({ grant_id: grantId, exp: expUnix });
+  const signed = signPayload({ grant_id: grantId, exp: expUnix });
 
   const headers = new Headers();
   headers.append("Set-Cookie", cookieHeader("cy_doc_session", signed, { maxAgeSeconds: 8 * 60 * 60 }));
