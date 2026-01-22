@@ -1,24 +1,115 @@
-import { Issuer } from "openid-client";
+// src/lib/oauth-google.ts
+import * as client from "openid-client";
 
 if (!process.env.APP_URL) throw new Error("Missing APP_URL");
 if (!process.env.GOOGLE_CLIENT_ID) throw new Error("Missing GOOGLE_CLIENT_ID");
 if (!process.env.GOOGLE_CLIENT_SECRET) throw new Error("Missing GOOGLE_CLIENT_SECRET");
 
-export const REDIRECT_URI = `${process.env.APP_URL}/auth/google/callback`;
+/**
+ * Google OIDC issuer URL (issuer identifier).
+ * Discovery will fetch the OIDC metadata from the well-known endpoints.
+ */
+const GOOGLE_ISSUER = new URL("https://accounts.google.com");
 
-let cachedClient: any = null;
+let _configPromise: Promise<client.Configuration> | null = null;
 
-export async function getGoogleClient() {
-  if (cachedClient) return cachedClient;
+/**
+ * Lazily discover + cache OIDC configuration for Google.
+ */
+export async function getGoogleConfig(): Promise<client.Configuration> {
+  if (!_configPromise) {
+    _configPromise = client.discovery(
+      GOOGLE_ISSUER,
+      process.env.GOOGLE_CLIENT_ID!,
+      process.env.GOOGLE_CLIENT_SECRET!
+    );
+  }
+  return _configPromise;
+}
 
-  const google = await Issuer.discover("https://accounts.google.com");
-  const client = new google.Client({
-    client_id: process.env.GOOGLE_CLIENT_ID!,
-    client_secret: process.env.GOOGLE_CLIENT_SECRET!,
-    redirect_uris: [REDIRECT_URI],
-    response_types: ["code"],
+/**
+ * Where Google redirects back to your app after login.
+ * Update this path if your callback route differs.
+ */
+export function googleRedirectUri(): string {
+  return `${process.env.APP_URL}/auth/google/callback`;
+}
+
+export type GoogleAuthRequest = {
+  authorizationUrl: string;
+  codeVerifier: string;
+  state: string;
+  nonce: string;
+};
+
+/**
+ * Create an authorization request using Authorization Code + PKCE.
+ * You must persist codeVerifier/state/nonce until the callback.
+ */
+export async function createGoogleAuthRequest(alias: string): Promise<GoogleAuthRequest> {
+  const config = await getGoogleConfig();
+
+  const codeVerifier = client.randomPKCECodeVerifier();
+  const codeChallenge = await client.calculatePKCECodeChallenge(codeVerifier);
+
+  const state = client.randomState();
+  const nonce = client.randomNonce();
+
+  // Include alias in the round-trip using "state" or a separate cookie/db row.
+  // Here we pass alias as an extra param; you can remove if you prefer.
+  const url = client.buildAuthorizationUrl(config, {
+    redirect_uri: googleRedirectUri(),
+    scope: "openid email profile",
+    response_type: "code",
+    code_challenge: codeChallenge,
+    code_challenge_method: "S256",
+    state,
+    nonce,
+    // Optional: keep this if your routes expect it
+    // (Google will round-trip unknown params back to redirect_uri in some cases,
+    // but do not rely on it universally; best to store alias server-side.)
+    // alias,
   });
 
-  cachedClient = client;
-  return client;
+  return {
+    authorizationUrl: url.toString(),
+    codeVerifier,
+    state,
+    nonce,
+  };
+}
+
+export type GoogleCallbackChecks = {
+  codeVerifier: string;
+  state: string;
+  nonce: string;
+};
+
+/**
+ * Exchange the authorization code for tokens and validate state/nonce/PKCE.
+ * Pass the original Request from your callback route.
+ */
+export async function exchangeGoogleCode(
+  req: Request,
+  checks: GoogleCallbackChecks
+): Promise<{
+  tokens: client.TokenEndpointResponse & client.TokenEndpointResponseHelpers;
+  claims: Record<string, unknown>;
+}> {
+  const config = await getGoogleConfig();
+
+  const tokens = await client.authorizationCodeGrant(
+    config,
+    req,
+    {
+      pkceCodeVerifier: checks.codeVerifier,
+      expectedState: checks.state,
+      expectedNonce: checks.nonce,
+    }
+  );
+
+  // Helper parses/validates ID Token and returns its claims
+  const claims = tokens.claims();
+
+  return { tokens, claims };
 }
