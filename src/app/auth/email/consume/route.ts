@@ -26,7 +26,7 @@ export async function GET(req: Request) {
 
   const tokenHash = hmacSha256Hex(token);
 
-const rows = await (sql<LoginTokenRow>`
+const rows = await (sql<LoginTokenRow[]>`
   select id, email, expires_at, use_count, max_uses, revoked_at, alias
   from login_tokens
   where token_hash = ${tokenHash}
@@ -61,7 +61,7 @@ const rows = await (sql<LoginTokenRow>`
 
   // Create doc-only access grant (8 hours)
   const expiresAt = new Date(Date.now() + 8 * 60 * 60 * 1000);
- const grantRows = await (sql<GrantRow>`
+ const grantRows = await (sql<GrantRow[]>`
   insert into doc_access_grants (doc_id, principal, provider, expires_at)
   values (${docId}, ${t.email}, 'email', ${expiresAt.toISOString()})
   returning id
