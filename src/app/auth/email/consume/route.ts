@@ -26,12 +26,12 @@ export async function GET(req: Request) {
 
   const tokenHash = hmacSha256Hex(token);
 
-const rows = await (sql<LoginTokenRow[]>`
-  select id, email, expires_at, use_count, max_uses, revoked_at, alias
-  from login_tokens
-  where token_hash = ${tokenHash}
-  limit 1
-` as unknown as Promise<LoginTokenRow[]>);
+  const rows = (await sql`
+    select id, email, expires_at, use_count, max_uses, revoked_at, alias
+    from login_tokens
+    where token_hash = ${tokenHash}
+    limit 1
+  `) as LoginTokenRow[];
 
   if (rows.length === 0) return new Response("This sign-in link is invalid or expired.", { status: 400 });
 
@@ -49,24 +49,25 @@ const rows = await (sql<LoginTokenRow[]>`
   `;
 
   // Resolve alias -> doc_id
- const docs = (await sql`
-  select doc_id, is_active
-  from document_aliases
-  where alias = ${alias}
-  limit 1
-`) as { doc_id: string; is_active: boolean }[];
+  const docs = (await sql`
+    select doc_id, is_active
+    from document_aliases
+    where alias = ${alias}
+    limit 1
+  `) as DocAliasRow[];
+
   if (docs.length === 0 || !docs[0].is_active) return new Response("Document not found.", { status: 404 });
 
   const docId = docs[0].doc_id;
 
   // Create doc-only access grant (8 hours)
   const expiresAt = new Date(Date.now() + 8 * 60 * 60 * 1000);
- const grantRows = await (sql<GrantRow[]>`
-  insert into doc_access_grants (doc_id, principal, provider, expires_at)
-  values (${docId}, ${t.email}, 'email', ${expiresAt.toISOString()})
-  returning id
-` as unknown as Promise<GrantRow[]>);
 
+  const grantRows = (await sql`
+    insert into doc_access_grants (doc_id, principal, provider, expires_at)
+    values (${docId}, ${t.email}, 'email', ${expiresAt.toISOString()})
+    returning id
+  `) as GrantRow[];
 
   const grantId = grantRows[0].id;
   const expUnix = Math.floor(expiresAt.getTime() / 1000);

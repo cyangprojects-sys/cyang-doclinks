@@ -12,9 +12,12 @@ export async function POST(req: Request) {
   if (!email || !alias) return new Response("Missing email or alias", { status: 400 });
 
   // Confirm alias exists/active (respond generically either way)
-  const ok = await sql<{ alias: string; is_active: boolean }>`
-    select alias, is_active from document_aliases where alias = ${alias} limit 1
-  `;
+const ok = (await sql`
+  select alias, is_active
+  from document_aliases
+  where alias = ${alias}
+  limit 1
+`) as { alias: string; is_active: boolean }[];
 
   if (ok.length === 0 || !ok[0].is_active) {
     return new Response("If the document exists, you will receive an email shortly.", { status: 200 });
