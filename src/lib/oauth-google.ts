@@ -94,7 +94,7 @@ export async function exchangeGoogleCode(
   checks: GoogleCallbackChecks
 ): Promise<{
   tokens: client.TokenEndpointResponse & client.TokenEndpointResponseHelpers;
-  claims: Record<string, unknown>;
+  claims: client.IDToken | undefined;
 }> {
   const config = await getGoogleConfig();
 
