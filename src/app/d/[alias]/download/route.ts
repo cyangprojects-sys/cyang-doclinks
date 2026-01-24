@@ -3,6 +3,7 @@ export const runtime = "nodejs";
 import { sql } from "@/lib/db";
 import { getCookie } from "@/lib/cookies";
 import { verifySignedPayload } from "@/lib/crypto";
+import { getR2SignedGetUrl } from "@/lib/r2SignedUrl";
 
 type DocSession = { grant_id: number; exp: number };
 
@@ -53,7 +54,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ alias: string }
   // 1) Look up alias -> doc_id + target_url
   const rows = (await sql`
     select a.doc_id, d.target_url, a.is_active
-    from document_aliases a
+    from doc_aliases a
     join documents d on d.id = a.doc_id
     where a.alias = ${alias}
     limit 1
@@ -74,12 +75,14 @@ export async function GET(req: Request, ctx: { params: Promise<{ alias: string }
   if (session.exp <= now) return signInPage(alias);
 
   // 3) Validate grant in DB is valid and matches this doc
-  const grants = (await sql`
-    select id, doc_id, expires_at, revoked_at
-    from doc_access_grants
-    where id = ${session.grant_id}
-    limit 1
-  `) as { id: number; doc_id: string; expires_at: string; revoked_at: string | null }[];
+const grants = (await sql`
+  select id, doc_id, expires_at, revoked_at
+  from doc_access_grants
+  where id = ${session.grant_id}
+    and revoked_at is null
+    and expires_at > now()
+  limit 1
+`) as { id: number; doc_id: string; expires_at: string; revoked_at: string | null }[];
 
   if (grants.length === 0) return signInPage(alias);
 
@@ -89,5 +92,30 @@ export async function GET(req: Request, ctx: { params: Promise<{ alias: string }
   if (new Date(g.expires_at).getTime() <= Date.now()) return signInPage(alias);
 
   // 4) Authorized -> redirect to the doc
-  return Response.redirect(rows[0].target_url, 302);
+const target = rows[0].target_url;
+
+// If target is an R2 pointer like: r2://cyang-docs/path/to/file.pdf
+if (target.startsWith("r2://")) {
+  const rest = target.slice("r2://".length); // "bucket/key..."
+  const firstSlash = rest.indexOf("/");
+  if (firstSlash === -1) {
+    return new Response("Bad document target_url", { status: 500 });
+  }
+
+  const bucket = rest.slice(0, firstSlash);
+  const key = rest.slice(firstSlash + 1);
+
+  const signed = await getR2SignedGetUrl({
+    bucket,
+    key,
+    expiresInSeconds: 300, // 5 minutes
+    // downloadName: "document.pdf", // optional
+  });
+
+  return Response.redirect(signed, 302);
+}
+
+// Default behavior for https:// (or anything else)
+return Response.redirect(target, 302);
+
 }

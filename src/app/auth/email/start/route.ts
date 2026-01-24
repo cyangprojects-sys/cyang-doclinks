@@ -14,7 +14,7 @@ export async function POST(req: Request) {
   // Confirm alias exists/active (respond generically either way)
 const ok = (await sql`
   select alias, is_active
-  from document_aliases
+  from doc_aliases
   where alias = ${alias}
   limit 1
 `) as { alias: string; is_active: boolean }[];
