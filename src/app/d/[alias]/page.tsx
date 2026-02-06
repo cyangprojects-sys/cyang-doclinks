@@ -1,180 +1,89 @@
-import Link from "next/link";
+import "server-only";
+
+import { notFound } from "next/navigation";
 import { sql } from "@/lib/db";
-import { getDocSessionPage } from "@/lib/auth-page";
 
-export const dynamic = "force-dynamic";
+function isUuid(v: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
+}
 
-export default async function DocViewerPage({
+async function resolveDocId(alias: string): Promise<string | null> {
+  // Optional alias mapping (ignore if table doesn't exist)
+  try {
+    const rows = await sql<{ doc_id: string }[]>`
+      select doc_id::text as doc_id
+      from doc_aliases
+      where alias = ${alias}
+        and is_active = true
+      limit 1
+    `;
+    if (rows[0]?.doc_id) return rows[0].doc_id;
+  } catch {
+    // no-op
+  }
+
+  // Fallback: accept direct /d/<uuid>
+  if (isUuid(alias)) {
+    const rows = await sql<{ id: string }[]>`
+      select id::text as id
+      from documents
+      where id = ${alias}::uuid
+      limit 1
+    `;
+    if (rows[0]?.id) return rows[0].id;
+  }
+
+  return null;
+}
+
+export default async function DocPage({
   params,
 }: {
   params: Promise<{ alias: string }>;
 }) {
   const { alias } = await params;
-  const safeAlias = (alias || "").trim();
 
-  // Confirm alias exists/active
-  const rows = (await sql`
-    select is_active
-    from doc_aliases
-    where alias = ${safeAlias}
+  const docId = await resolveDocId(alias);
+  if (!docId) notFound();
+
+  // ✅ Fetch the document title for display
+  const rows = await sql<{ title: string | null }[]>`
+    select title
+    from documents
+    where id = ${docId}::uuid
     limit 1
-  `) as { is_active: boolean }[];
+  `;
+  const title = (rows[0]?.title || "").trim() || "Untitled document";
 
-  if (rows.length === 0 || !rows[0].is_active) {
-    return (
-      <main style={{ maxWidth: 640, margin: "40px auto", padding: "0 16px" }}>
-        <div
-          style={{
-            padding: 20,
-            borderRadius: 16,
-            border: "1px solid rgba(255,255,255,0.10)",
-            background: "rgba(255,255,255,0.02)",
-          }}
-        >
-          <h2>Not found</h2>
-          <p style={{ opacity: 0.7 }}>
-            This document link is invalid or inactive.
-          </p>
-        </div>
-      </main>
-    );
-  }
+  const downloadHref = `/api/doc/open?doc=${encodeURIComponent(docId)}`;
 
-  const session = await getDocSessionPage();
-
-  // NOT signed in
-  if (!session) {
-    return (
-      <main style={{ maxWidth: 720, margin: "40px auto", padding: "0 16px" }}>
-        <div
-          style={{
-            padding: 24,
-            borderRadius: 18,
-            border: "1px solid rgba(255,255,255,0.12)",
-            background: "rgba(255,255,255,0.02)",
-          }}
-        >
-          <h2>Sign in to view this document</h2>
-
-          <div style={{ margin: "16px 0" }}>
-            <a
-              href={`/auth/google/start?alias=${encodeURIComponent(safeAlias)}`}
-              style={{
-                display: "inline-block",
-                padding: "10px 14px",
-                borderRadius: 10,
-                border: "1px solid rgba(255,255,255,0.18)",
-                color: "rgba(255,255,255,0.92)",
-                textDecoration: "none",
-              }}
-            >
-              Continue with Google
-            </a>
-          </div>
-
-          <hr
-            style={{
-              borderColor: "rgba(255,255,255,0.14)",
-              margin: "18px 0",
-            }}
-          />
-
-          <form method="POST" action="/auth/email/start">
-            <input type="hidden" name="alias" value={safeAlias} />
-
-            <label style={{ display: "block", marginBottom: 6 }}>
-              Email address
-            </label>
-
-            <input
-              name="email"
-              type="email"
-              required
-              style={{
-                width: "100%",
-                padding: 10,
-                borderRadius: 10,
-                border: "1px solid rgba(255,255,255,0.18)",
-                background: "rgba(0,0,0,0.3)",
-                color: "rgba(255,255,255,0.92)",
-                marginBottom: 12,
-              }}
-            />
-
-            <button
-              type="submit"
-              style={{
-                padding: "10px 14px",
-                borderRadius: 10,
-                background: "#f3f4f6",
-                color: "#111827",
-                border: "1px solid #e5e7eb",
-                fontWeight: 600,
-                cursor: "pointer",
-              }}
-            >
-              Email me a sign-in link
-            </button>
-          </form>
-
-          <p style={{ fontSize: 12, opacity: 0.6, marginTop: 14 }}>
-            This link grants access to this document only and expires after 8
-            hours.
-          </p>
-        </div>
-      </main>
-    );
-  }
-
-  // SIGNED IN
   return (
-    <main style={{ maxWidth: 920, margin: "40px auto", padding: "0 16px" }}>
-      <div style={{ marginBottom: 20 }}>
-        <div style={{ fontSize: 18, fontWeight: 700 }}>cyang-doclinks</div>
-        <div style={{ fontSize: 12, opacity: 0.7 }}>Private document access</div>
-      </div>
+    <main className="min-h-screen bg-black text-white">
+      <div className="mx-auto max-w-4xl px-6 py-10">
+        <h1 className="text-2xl font-semibold">cyang-doclinks</h1>
+        <p className="text-sm opacity-70">Private document access</p>
 
-      <div
-        style={{
-          padding: 20,
-          borderRadius: 18,
-          border: "1px solid rgba(255,255,255,0.12)",
-          background: "rgba(255,255,255,0.02)",
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            gap: 12,
-          }}
-        >
+        <div className="mt-8 rounded-2xl border border-white/10 bg-white/5 p-6 flex items-center justify-between gap-4">
           <div>
-            <div style={{ fontSize: 14, opacity: 0.7 }}>Signed in</div>
-            <div style={{ fontWeight: 600 }}>grant #{session.grant_id}</div>
+            <div className="text-sm opacity-70">Document</div>
+
+            {/* ✅ Show title instead of UUID */}
+            <div className="mt-1 text-base font-semibold">{title}</div>
+
+            {/* Optional: keep doc id visible but subtle */}
+            <div className="mt-1 font-mono text-xs break-all opacity-50">{docId}</div>
+
+            <div className="mt-2 text-xs opacity-60">
+              Click to open the PDF (served from R2).
+            </div>
           </div>
 
-          <Link
-            href={`/api/d/${encodeURIComponent(safeAlias)}/download`}
-            style={{
-              padding: "10px 14px",
-              borderRadius: 12,
-              background: "#f3f4f6",
-              color: "#111827",
-              border: "1px solid #e5e7eb",
-              textDecoration: "none",
-              fontWeight: 700,
-              whiteSpace: "nowrap",
-            }}
+          <a
+            className="rounded-xl bg-white px-5 py-3 text-sm font-semibold text-black whitespace-nowrap"
+            href={downloadHref}
           >
             Download / Open PDF
-          </Link>
-        </div>
-
-        <div style={{ marginTop: 14, fontSize: 13, opacity: 0.7 }}>
-          This button generates a short-lived private URL. If it expires, click
-          again.
+          </a>
         </div>
       </div>
     </main>

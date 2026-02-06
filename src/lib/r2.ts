@@ -1,18 +1,40 @@
-import { S3Client } from "@aws-sdk/client-s3";
+import "server-only";
+import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 
-function must(name: string) {
+function mustEnv(name: string) {
   const v = process.env[name];
-  if (!v) throw new Error(`Missing env: ${name}`);
+  if (!v) throw new Error(`Missing env var: ${name}`);
   return v;
 }
 
-export const R2_BUCKET = must("R2_BUCKET");
+export const R2_BUCKET = mustEnv("R2_BUCKET");
 
-export const r2 = new S3Client({
-  region: "auto",
-  endpoint: must("R2_ENDPOINT"),
-  credentials: {
-    accessKeyId: must("R2_ACCESS_KEY_ID"),
-    secretAccessKey: must("R2_SECRET_ACCESS_KEY"),
-  },
-});
+export function r2Client() {
+  const accountId = mustEnv("R2_ACCOUNT_ID");
+
+  return new S3Client({
+    region: "auto",
+    endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
+    credentials: {
+      accessKeyId: mustEnv("R2_ACCESS_KEY_ID"),
+      secretAccessKey: mustEnv("R2_SECRET_ACCESS_KEY"),
+    },
+  });
+}
+
+export async function putObjectToR2(opts: {
+  key: string;
+  contentType: string;
+  body: Uint8Array;
+}) {
+  const client = r2Client();
+
+  await client.send(
+    new PutObjectCommand({
+      Bucket: R2_BUCKET,
+      Key: opts.key,
+      Body: opts.body,
+      ContentType: opts.contentType,
+    })
+  );
+}
