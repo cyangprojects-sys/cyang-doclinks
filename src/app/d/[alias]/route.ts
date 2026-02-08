@@ -92,5 +92,10 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ alias: stri
   if (new Date(g.expires_at).getTime() <= Date.now()) return signInPage(alias);
 
   // 4) Authorized -> redirect to a HTTPS serve route (NOT r2://)
-  return Response.redirect(`/serve/${encodeURIComponent(rows[0].doc_id)}`, 302);
+  const origin = new URL(req.url).origin;
+  return Response.redirect(
+    `${origin}/serve/${encodeURIComponent(rows[0].doc_id)}`,
+    302
+  );
+
 }
