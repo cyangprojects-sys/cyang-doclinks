@@ -1,116 +1,34 @@
-// src/lib/oauth-google.ts
-import * as client from "openid-client";
+// src/app/auth/google/start/route.ts
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
-// ---- ENV (trimmed + validated) ----
-const APP_URL = (process.env.APP_URL || "").trim();
-const GOOGLE_CLIENT_ID = (process.env.GOOGLE_CLIENT_ID || "").trim();
-const GOOGLE_CLIENT_SECRET = (process.env.GOOGLE_CLIENT_SECRET || "").trim();
+import { NextRequest } from "next/server";
+import { createGoogleAuthRequest } from "@/lib/oauth-google";
 
-if (!APP_URL) throw new Error("Missing APP_URL");
-if (!GOOGLE_CLIENT_ID) throw new Error("Missing GOOGLE_CLIENT_ID");
-if (!GOOGLE_CLIENT_SECRET) throw new Error("Missing GOOGLE_CLIENT_SECRET");
-
-// Guard against common misconfig that breaks redirect_uri
-if (APP_URL.includes("APP_URL=")) {
-  throw new Error(`APP_URL is malformed (contains 'APP_URL='). Value: ${APP_URL}`);
+function setCookie(headers: Headers, name: string, value: string, maxAgeSeconds: number) {
+  const secure = process.env.APP_URL?.startsWith("https://") ? "; Secure" : "";
+  headers.append(
+    "Set-Cookie",
+    `${name}=${encodeURIComponent(value)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAgeSeconds}${secure}`
+  );
 }
 
-/**
- * Google OIDC issuer URL (issuer identifier).
- * Discovery will fetch the OIDC metadata from the well-known endpoints.
- */
-const GOOGLE_ISSUER = new URL("https://accounts.google.com");
+// Note: include `ctx` with `params: Promise<{}>` even if unused.
+// This satisfies Next's route handler type validator during `next build`.
+export async function GET(req: NextRequest, _ctx: { params: Promise<{}> }) {
+  const url = new URL(req.url);
+  const alias = (url.searchParams.get("alias") || "").trim();
 
-let _configPromise: Promise<client.Configuration> | null = null;
+  if (!alias) return new Response("Missing alias", { status: 400 });
 
-/**
- * Lazily discover + cache OIDC configuration for Google.
- */
-export async function getGoogleConfig(): Promise<client.Configuration> {
-  if (!_configPromise) {
-    _configPromise = client.discovery(GOOGLE_ISSUER, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET);
-  }
-  return _configPromise;
-}
+  const { authorizationUrl, codeVerifier, state, nonce } = await createGoogleAuthRequest(alias);
 
-/**
- * Where Google redirects back to your app after login.
- * Update this path if your callback route differs.
- */
-export function googleRedirectUri(): string {
-  return `${APP_URL}/auth/google/callback`;
-}
+  const headers = new Headers();
+  setCookie(headers, "cy_oauth_alias", alias, 10 * 60);
+  setCookie(headers, "cy_oauth_cv", codeVerifier, 10 * 60);
+  setCookie(headers, "cy_oauth_state", state, 10 * 60);
+  setCookie(headers, "cy_oauth_nonce", nonce, 10 * 60);
 
-export type GoogleAuthRequest = {
-  authorizationUrl: string;
-  codeVerifier: string;
-  state: string;
-  nonce: string;
-};
-
-/**
- * Create an authorization request using Authorization Code + PKCE.
- * You must persist codeVerifier/state/nonce until the callback.
- */
-export async function createGoogleAuthRequest(_alias: string): Promise<GoogleAuthRequest> {
-  const config = await getGoogleConfig();
-
-  const codeVerifier = client.randomPKCECodeVerifier();
-  const codeChallenge = await client.calculatePKCECodeChallenge(codeVerifier);
-
-  const state = client.randomState();
-  const nonce = client.randomNonce();
-
-  // IMPORTANT: add prompt + response_mode to avoid the "SetSID hang / 400" behavior
-  // in some browsers/privacy settings, and to make the flow more deterministic.
-  const url = client.buildAuthorizationUrl(config, {
-    redirect_uri: googleRedirectUri(),
-    scope: "openid email profile",
-    response_type: "code",
-
-    // Stabilizers
-    response_mode: "query",
-    prompt: "select_account",
-
-    code_challenge: codeChallenge,
-    code_challenge_method: "S256",
-    state,
-    nonce,
-  });
-
-  return {
-    authorizationUrl: url.toString(),
-    codeVerifier,
-    state,
-    nonce,
-  };
-}
-
-export type GoogleCallbackChecks = {
-  codeVerifier: string;
-  state: string;
-  nonce: string;
-};
-
-/**
- * Exchange the authorization code for tokens and validate state/nonce/PKCE.
- * Pass the original Request from your callback route.
- */
-export async function exchangeGoogleCode(
-  req: Request,
-  checks: GoogleCallbackChecks
-): Promise<{
-  tokens: client.TokenEndpointResponse & client.TokenEndpointResponseHelpers;
-  claims: client.IDToken | undefined;
-}> {
-  const config = await getGoogleConfig();
-
-  const tokens = await client.authorizationCodeGrant(config, req, {
-    pkceCodeVerifier: checks.codeVerifier,
-    expectedState: checks.state,
-    expectedNonce: checks.nonce,
-  });
-
-  const claims = tokens.claims();
-  return { tokens, claims };
+  headers.set("Location", authorizationUrl);
+  return new Response(null, { status: 302, headers });
 }
