@@ -23,6 +23,8 @@ function fmtBytes(n: number) {
     return `${mb.toFixed(1)} MB`;
 }
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 export default async function AdminPage({
     searchParams,
 }: {
