@@ -2,7 +2,8 @@
 
 import crypto from "crypto";
 import { PutObjectCommand } from "@aws-sdk/client-s3";
-import { auth } from "@/auth";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/auth";
 import { sql } from "@/lib/db";
 import { r2Bucket, r2Client, r2Prefix } from "@/lib/r2";
 import { sendMail } from "@/lib/email";
@@ -14,7 +15,7 @@ function appUrl() {
 }
 
 async function requireUserEmail(): Promise<string> {
-    const session = await auth();
+    const session = await getServerSession(authOptions);
     const email = session?.user?.email;
     if (!email) throw new Error("Unauthorized.");
     return email;
