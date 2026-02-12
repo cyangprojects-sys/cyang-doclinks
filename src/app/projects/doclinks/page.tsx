@@ -27,7 +27,7 @@ export default function DoclinksPage() {
 
                     <div className="mt-8 flex flex-col gap-3 sm:flex-row">
                         <Link
-                            href="/admin/upload"
+                            href="/admin"
                             className="rounded-2xl bg-white px-6 py-3 text-sm font-medium text-black hover:bg-white/90"
                         >
                             Upload a PDF
@@ -104,7 +104,7 @@ export default function DoclinksPage() {
                     <Callout
                         title="Admin upload"
                         desc="Upload PDFs and generate a shareable link."
-                        href="/admin/upload"
+                        href="/admin"
                         cta="Open Admin Upload →"
                     />
                     <Callout

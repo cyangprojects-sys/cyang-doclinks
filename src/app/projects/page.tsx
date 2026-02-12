@@ -52,7 +52,7 @@ export default function ProjectsPage() {
                         <QuickLink
                             name="Upload a document"
                             desc="Create a doc and get a shareable magic link."
-                            href="/admin/upload"
+                            href="/admin"
                         />
                         <QuickLink
                             name="Open an example magic link"

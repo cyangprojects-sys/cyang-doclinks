@@ -16,7 +16,7 @@ export default function LoginPage() {
                     </p>
 
                     <button
-                        onClick={() => signIn("google", { callbackUrl: "/admin/upload" })}
+                        onClick={() => signIn("google", { callbackUrl: "/admin" })}
                         className="mt-6 w-full rounded-2xl bg-white px-5 py-3 text-sm font-medium text-black hover:bg-white/90"
                     >
                         Sign in with Google

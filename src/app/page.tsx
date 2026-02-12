@@ -72,7 +72,7 @@ export default function HomePage() {
 
               <div className="mt-4 flex gap-3">
                 <Link
-                  href="/admin/upload"
+                  href="/admin"
                   className="rounded-xl bg-white px-4 py-2 text-sm font-medium text-black hover:bg-white/90"
                 >
                   Upload
@@ -110,7 +110,7 @@ export default function HomePage() {
         <MiniCard
           title="Tools"
           desc="Useful endpoints and pages on this site."
-          href="/admin/upload"
+          href="/admin"
           cta="Open tools →"
         />
         <MiniCard
