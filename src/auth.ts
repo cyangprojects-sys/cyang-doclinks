@@ -1,10 +1,9 @@
-import NextAuth from "next-auth";
-import type { NextAuthConfig } from "next-auth";
+import NextAuth, { type NextAuthConfig } from "next-auth";
 
-// Example provider import (swap to yours)
+// If you already have providers here, keep them.
 // import GitHub from "next-auth/providers/github";
 
-const config: NextAuthConfig = {
+export const authOptions: NextAuthConfig = {
     // providers: [
     //   GitHub({
     //     clientId: process.env.GITHUB_ID!,
@@ -14,10 +13,8 @@ const config: NextAuthConfig = {
 
     session: { strategy: "jwt" },
 
-    // This is the key part: ensure session.user.email exists.
     callbacks: {
         async session({ session, token }) {
-            // token.email is usually present when provider supplies email
             if (session.user) {
                 session.user.email = (token.email as string | undefined) ?? session.user.email;
             }
@@ -26,4 +23,4 @@ const config: NextAuthConfig = {
     },
 };
 
-export const { handlers, auth, signIn, signOut } = NextAuth(config);
+export const { handlers, auth, signIn, signOut } = NextAuth(authOptions);
