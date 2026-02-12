@@ -16,7 +16,10 @@ const BodySchema = z.object({
 export async function POST(req: Request) {
     const owner = await requireOwner();
     if (!owner.ok) {
-        return NextResponse.json({ ok: false, error: owner.reason }, { status: owner.reason === "UNAUTHENTICATED" ? 401 : 403 });
+        return NextResponse.json(
+            { ok: false, error: owner.reason },
+            { status: owner.reason === "UNAUTHENTICATED" ? 401 : 403 }
+        );
     }
 
     const json = await req.json().catch(() => null);
@@ -27,16 +30,12 @@ export async function POST(req: Request) {
 
     const { docId } = parsed.data;
 
-    const rows = await sql<{
-        r2_bucket: string;
-        r2_key: string;
-        status: string;
-    }[]>`
+    const rows = (await sql`
     select r2_bucket, r2_key, status
     from docs
     where id = ${docId}::uuid
     limit 1
-  `;
+  `) as unknown as Array<{ r2_bucket: string; r2_key: string; status: string }>;
 
     const doc = rows[0];
     if (!doc) return NextResponse.json({ ok: false, error: "NOT_FOUND" }, { status: 404 });
@@ -71,8 +70,13 @@ export async function POST(req: Request) {
       where id = ${docId}::uuid
     `;
 
-        return NextResponse.json({ ok: true, doc_id: docId, size_bytes: sizeBytes, content_type: contentType });
-    } catch (e) {
+        return NextResponse.json({
+            ok: true,
+            doc_id: docId,
+            size_bytes: sizeBytes,
+            content_type: contentType,
+        });
+    } catch {
         await sql`update docs set status = 'failed' where id = ${docId}::uuid`;
         return NextResponse.json({ ok: false, error: "R2_HEAD_FAILED" }, { status: 400 });
     }
