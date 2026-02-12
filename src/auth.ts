@@ -1,29 +1,29 @@
-// src/auth.ts
-import type { NextAuthOptions } from "next-auth";
-import GoogleProvider from "next-auth/providers/google";
+import NextAuth from "next-auth";
+import type { NextAuthConfig } from "next-auth";
 
-function parseOwnerEmails() {
-    const raw = process.env.OWNER_EMAILS ?? process.env.OWNER_EMAIL ?? "";
-    return raw
-        .split(/[, \n\r\t]+/)
-        .map((s) => s.trim().toLowerCase())
-        .filter(Boolean);
-}
+// Example provider import (swap to yours)
+// import GitHub from "next-auth/providers/github";
 
-const OWNER_EMAILS = parseOwnerEmails();
+const config: NextAuthConfig = {
+    // providers: [
+    //   GitHub({
+    //     clientId: process.env.GITHUB_ID!,
+    //     clientSecret: process.env.GITHUB_SECRET!,
+    //   }),
+    // ],
 
-export const authOptions: NextAuthOptions = {
-    providers: [
-        GoogleProvider({
-            clientId: process.env.GOOGLE_CLIENT_ID || "",
-            clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
-        }),
-    ],
+    session: { strategy: "jwt" },
 
+    // This is the key part: ensure session.user.email exists.
     callbacks: {
-        async signIn({ user }) {
-            const email = (user.email || "").toLowerCase();
-            return OWNER_EMAILS.includes(email);
+        async session({ session, token }) {
+            // token.email is usually present when provider supplies email
+            if (session.user) {
+                session.user.email = (token.email as string | undefined) ?? session.user.email;
+            }
+            return session;
         },
     },
 };
+
+export const { handlers, auth, signIn, signOut } = NextAuth(config);
