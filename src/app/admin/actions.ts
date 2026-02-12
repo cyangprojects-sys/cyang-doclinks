@@ -1,237 +1,213 @@
 "use server";
 
-import crypto from "crypto";
-import { PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/auth";
+import { DeleteObjectCommand } from "@aws-sdk/client-s3";
+import { revalidatePath } from "next/cache";
+
+import { auth } from "@/auth";
 import { sql } from "@/lib/db";
 import { r2Bucket, r2Client, r2Prefix } from "@/lib/r2";
 import { sendMail } from "@/lib/email";
-import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 
-function appUrl() {
-    return process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-}
+/**
+ * Owner-only gate.
+ * Uses Auth.js v5 `auth()` (App Router friendly, typed).
+ */
+async function requireOwnerEmail(): Promise<string> {
+    const session = await auth();
+    const email = session?.user?.email || null;
 
-async function requireUserEmail(): Promise<string> {
-    const session = await getServerSession(authOptions);
-    const email = session?.user?.email;
     if (!email) throw new Error("Unauthorized.");
+
+    const owner = (process.env.OWNER_EMAIL || "").toLowerCase();
+    if (!owner) throw new Error("Missing OWNER_EMAIL");
+    if (email.toLowerCase() !== owner) throw new Error("Forbidden.");
+
     return email;
 }
 
-function assertPdf(file: File) {
-    const name = (file.name || "").toLowerCase();
-    if (file.type !== "application/pdf" && !name.endsWith(".pdf")) {
-        throw new Error("Only PDFs are allowed.");
+/**
+ * Compute your site base URL for emails.
+ * Prefers explicit BASE_URL, then Vercel URL, otherwise localhost.
+ */
+function getBaseUrl() {
+    const explicit = process.env.BASE_URL || process.env.NEXTAUTH_URL;
+    if (explicit) return explicit.replace(/\/+$/, "");
+
+    const vercel = process.env.VERCEL_URL;
+    if (vercel) return `https://${vercel}`.replace(/\/+$/, "");
+
+    return "http://localhost:3000";
+}
+
+/**
+ * Helper: resolve an R2 key for a doc by id from DB.
+ * Supports either schema:
+ * - docs.pointer = "r2://bucket/key"
+ * - docs.r2_bucket + docs.r2_key
+ */
+async function resolveR2LocationForDoc(docId: string): Promise<{ bucket: string; key: string }> {
+    // We try to read multiple possible columns; depending on your schema
+    // some may not exist. If a column doesn't exist, Neon will throw.
+    // So we do staged attempts.
+
+    // Attempt 1: pointer column
+    try {
+        const rows = await sql<{ pointer: string | null }[]>`
+      select pointer
+      from docs
+      where id = ${docId}::uuid
+      limit 1
+    `;
+        const pointer = rows[0]?.pointer || null;
+        if (!pointer) throw new Error("Doc not found.");
+        if (!pointer.startsWith(r2Prefix)) throw new Error("Invalid pointer.");
+        const key = pointer.slice(r2Prefix.length);
+        return { bucket: r2Bucket, key };
+    } catch (e: any) {
+        const msg = String(e?.message || "");
+        // If column "pointer" doesn't exist, fall through to attempt 2.
+        if (!msg.toLowerCase().includes("column") || !msg.toLowerCase().includes("pointer")) {
+            // If it's NOT a missing-column issue, rethrow (e.g. doc not found)
+            // BUT: If you want to always attempt schema2 even when doc not found in schema1,
+            // comment next line. We'll keep strict.
+            // In practice, missing doc should rethrow.
+            if (!msg.toLowerCase().includes("does not exist")) throw e;
+        }
     }
-}
 
-function cleanAlias(input: string) {
-    const a = input.trim().toLowerCase();
-    if (!/^[a-z0-9][a-z0-9_-]{2,63}$/.test(a)) {
-        throw new Error(
-            "Alias must be 3–64 chars: letters, numbers, _ or -, starting with a letter/number."
-        );
-    }
-    return a;
-}
-
-function esc(s: string) {
-    return s
-        .replaceAll("&", "&amp;")
-        .replaceAll("<", "&lt;")
-        .replaceAll(">", "&gt;")
-        .replaceAll('"', "&quot;")
-        .replaceAll("'", "&#039;");
-}
-
-export async function uploadPdfAction(formData: FormData) {
-    const createdBy = await requireUserEmail();
-
-    const title = String(formData.get("title") || "").trim();
-    const file = formData.get("file") as unknown as File | null;
-
-    if (!title) throw new Error("Title is required.");
-    if (!file) throw new Error("PDF file is required.");
-    assertPdf(file);
-
-    const bytes = Buffer.from(await file.arrayBuffer());
-    const sha256 = crypto.createHash("sha256").update(bytes).digest("hex");
-
-    const safeName = (file.name || "document.pdf").replace(/[^\w.\-]+/g, "_");
-    const key = `${r2Prefix()}/${new Date().toISOString().slice(0, 10)}/${sha256}_${safeName}`;
-
-    const bucket = r2Bucket();
-    const client = r2Client();
-
-    await client.send(
-        new PutObjectCommand({
-            Bucket: bucket,
-            Key: key,
-            Body: bytes,
-            ContentType: "application/pdf",
-        })
-    );
-
-    const rows = (await sql`
-    insert into docs (
-      title,
-      original_filename,
-      content_type,
-      byte_size,
-      sha256_hex,
-      r2_bucket,
-      r2_key,
-      created_by_email
-    )
-    values (
-      ${title},
-      ${file.name || safeName},
-      ${"application/pdf"},
-      ${bytes.length},
-      ${sha256},
-      ${bucket},
-      ${key},
-      ${createdBy}
-    )
-    returning id::text as id
-  `) as unknown as { id: string }[];
-
-    revalidatePath("/admin");
-    redirect(`/admin?uploaded=1&doc=${encodeURIComponent(rows[0].id)}`);
-}
-
-export async function createOrAssignAliasAction(formData: FormData) {
-    const createdBy = await requireUserEmail();
-
-    const docId = String(formData.get("docId") || "").trim();
-    const alias = cleanAlias(String(formData.get("alias") || ""));
-
-    if (!docId) throw new Error("Missing docId.");
-
-    const docCheck = (await sql`
-    select id::text as id
+    // Attempt 2: r2_bucket + r2_key
+    const rows2 = await sql<{ r2_bucket: string | null; r2_key: string | null }[]>`
+    select r2_bucket, r2_key
     from docs
     where id = ${docId}::uuid
-  `) as unknown as { id: string }[];
+    limit 1
+  `;
+    const r2b = rows2[0]?.r2_bucket || null;
+    const r2k = rows2[0]?.r2_key || null;
+    if (!r2b || !r2k) throw new Error("Doc not found.");
+    return { bucket: r2b, key: r2k };
+}
 
-    if (docCheck.length === 0) throw new Error("Document not found.");
+/**
+ * Back-compat export expected by ./admin/page.tsx
+ * Old flow uploaded server-side. New flow is direct-to-R2 signed URL at /admin/upload.
+ */
+export async function uploadPdfAction() {
+    await requireOwnerEmail();
+    throw new Error(
+        "uploadPdfAction is deprecated. Use /admin/upload (direct-to-R2 signed upload) instead."
+    );
+}
 
-    const existing = (await sql`
-    select alias, doc_id::text as doc_id
-    from doc_aliases
-    where alias = ${alias}
-  `) as unknown as { alias: string; doc_id: string }[];
+/**
+ * Back-compat export expected by ./admin/page.tsx
+ * Creates or reassigns an alias to a doc_id.
+ *
+ * Assumes a table like:
+ *   create table doc_aliases (alias text primary key, doc_id uuid not null, created_at timestamptz default now());
+ * If your schema differs, adjust the SQL here.
+ */
+export async function createOrAssignAliasAction(formData: FormData) {
+    await requireOwnerEmail();
 
-    if (existing.length > 0 && existing[0].doc_id !== docId) {
-        throw new Error("Alias already in use for another document.");
+    const alias = String(formData.get("alias") || "").trim();
+    const docId = String(formData.get("docId") || formData.get("doc_id") || "").trim();
+
+    if (!alias) throw new Error("Missing alias.");
+    if (!docId) throw new Error("Missing docId.");
+
+    // Basic alias hygiene (adjust as you like)
+    if (!/^[a-zA-Z0-9_-]{3,80}$/.test(alias)) {
+        throw new Error("Alias must be 3-80 chars: letters, numbers, underscore, dash.");
     }
 
+    // Upsert
     await sql`
-    insert into doc_aliases (alias, doc_id, created_by_email)
-    values (${alias}, ${docId}::uuid, ${createdBy})
+    insert into doc_aliases (alias, doc_id)
+    values (${alias}, ${docId}::uuid)
     on conflict (alias)
     do update set doc_id = excluded.doc_id
   `;
 
     revalidatePath("/admin");
-    redirect(`/admin?aliased=1&alias=${encodeURIComponent(alias)}`);
-}
-
-export async function emailMagicLinkAction(formData: FormData) {
-    const sentBy = await requireUserEmail();
-
-    const docId = String(formData.get("docId") || "").trim();
-    const alias = String(formData.get("alias") || "").trim().toLowerCase();
-    const to = String(formData.get("to") || "").trim();
-    const subject =
-        String(formData.get("subject") || "").trim() || "Document link";
-
-    if (!docId) throw new Error("Missing docId.");
-    if (!alias) throw new Error("Alias is required before emailing.");
-    if (!to || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to)) {
-        throw new Error("Valid recipient email is required.");
-    }
-
-    const docRows = (await sql`
-    select title from docs where id = ${docId}::uuid
-  `) as unknown as { title: string }[];
-
-    if (docRows.length === 0) throw new Error("Document not found.");
-
-    const title = docRows[0].title;
-    const link = `${appUrl()}/d/${alias}`;
-
-    const text = `Here is your document link:\n\n${title}\n${link}\n`;
-    const html = `
-    <div style="font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;">
-      <p>Here is your document link:</p>
-      <p style="margin: 12px 0;"><strong>${esc(title)}</strong></p>
-      <p><a href="${link}">${link}</a></p>
-    </div>
-  `;
-
-    await sendMail({ to, subject, text, html });
-
-    await sql`
-    insert into doc_share_emails (doc_id, alias, recipient_email, subject, sent_by_email)
-    values (${docId}::uuid, ${alias}, ${to}, ${subject}, ${sentBy})
-  `;
-
-    revalidatePath("/admin");
-    redirect(`/admin?emailed=1&to=${encodeURIComponent(to)}`);
+    return { ok: true, alias, doc_id: docId };
 }
 
 /**
- * DELETE: Removes the object from R2 and deletes DB rows (aliases, share logs, doc).
- * Safe order: delete dependent rows first to avoid FK failures.
+ * Back-compat export expected by ./admin/page.tsx
+ * Emails a magic link (either docId or alias).
+ *
+ * Expects FormData keys commonly used in admin UIs:
+ *  - to / email / recipient
+ *  - docId / doc_id
+ *  - alias (optional)
+ *
+ * If alias is provided, link becomes /d/<alias>, else /d/<docId>.
  */
-export async function deleteDocAction(formData: FormData) {
-    await requireUserEmail();
+export async function emailMagicLinkAction(formData: FormData) {
+    const ownerEmail = await requireOwnerEmail();
 
-    const docId = String(formData.get("docId") || "").trim();
-    if (!docId) throw new Error("Missing docId.");
+    const to =
+        String(formData.get("to") || formData.get("email") || formData.get("recipient") || "").trim();
+    const docId = String(formData.get("docId") || formData.get("doc_id") || "").trim();
+    const alias = String(formData.get("alias") || "").trim();
 
-    // Fetch R2 location
-    const rows = (await sql`
-    select
-      id::text as id,
-      r2_bucket,
-      r2_key
-    from docs
-    where id = ${docId}::uuid
-  `) as unknown as { id: string; r2_bucket: string; r2_key: string }[];
+    if (!to) throw new Error("Missing recipient email.");
+    if (!alias && !docId) throw new Error("Provide alias or docId.");
 
-    if (rows.length === 0) throw new Error("Document not found.");
+    const base = getBaseUrl();
 
-    const bucket = rows[0].r2_bucket || r2Bucket();
-    const key = rows[0].r2_key;
+    // Your system likely uses /d/<id-or-alias>
+    const token = alias || docId;
+    const url = `${base}/d/${encodeURIComponent(token)}`;
 
-    // Delete object from R2 first (so we don't orphan storage)
-    const client = r2Client();
-    try {
-        await client.send(
-            new DeleteObjectCommand({
-                Bucket: bucket,
-                Key: key,
-            })
-        );
-    } catch (e: any) {
-        // If it doesn't exist, we can still clean DB.
-        const name = String(e?.name || "");
-        const code = String(e?.Code || e?.code || "");
-        if (name !== "NoSuchKey" && code !== "NoSuchKey") {
-            throw e;
-        }
-    }
+    await sendMail({
+        to,
+        subject: "Your document link",
+        text: `Here is your secure link:\n\n${url}\n\nIf you did not expect this message, you can ignore it.`,
+    });
 
-    // Clean DB
-    await sql`delete from doc_aliases where doc_id = ${docId}::uuid`;
-    await sql`delete from doc_share_emails where doc_id = ${docId}::uuid`;
-    await sql`delete from docs where id = ${docId}::uuid`;
+    // Optional: notify owner for audit
+    await sendMail({
+        to: ownerEmail,
+        subject: "cyang.io: magic link emailed",
+        text: `Sent link to ${to}\n\n${url}`,
+    });
 
     revalidatePath("/admin");
-    redirect(`/admin?deleted=1&doc=${encodeURIComponent(docId)}`);
+    return { ok: true, to, url };
+}
+
+/**
+ * Back-compat export expected by ./admin/page.tsx
+ * Deletes the R2 object and removes the DB record.
+ */
+export async function deleteDocAction(formData: FormData) {
+    await requireOwnerEmail();
+
+    const docId = String(formData.get("docId") || formData.get("doc_id") || "").trim();
+    if (!docId) throw new Error("Missing docId.");
+
+    const { bucket, key } = await resolveR2LocationForDoc(docId);
+
+    // Delete from R2
+    await r2Client.send(
+        new DeleteObjectCommand({
+            Bucket: bucket,
+            Key: key,
+        })
+    );
+
+    // Delete DB record (adjust table name if needed)
+    await sql`delete from docs where id = ${docId}::uuid`;
+
+    // Best-effort: clean up alias rows if you have them
+    try {
+        await sql`delete from doc_aliases where doc_id = ${docId}::uuid`;
+    } catch {
+        // ignore if table doesn't exist
+    }
+
+    revalidatePath("/admin");
+    return { ok: true, doc_id: docId };
 }
