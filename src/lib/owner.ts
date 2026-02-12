@@ -1,8 +1,9 @@
-import { auth } from "@/auth";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/auth";
 
 export async function requireOwner() {
-    const session = await auth();
-    const email = session?.user?.email || null;
+    const session = (await getServerSession(authOptions)) as any;
+    const email = (session?.user?.email as string | undefined) ?? null;
 
     if (!email) return { ok: false as const, reason: "UNAUTHENTICATED" as const };
 
