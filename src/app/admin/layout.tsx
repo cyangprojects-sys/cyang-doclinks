@@ -1,27 +1,24 @@
 import { redirect } from "next/navigation";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/auth";
+import { auth } from "@/auth";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
+
 export default async function AdminLayout({
     children,
 }: {
     children: React.ReactNode;
 }) {
-    const session = await getServerSession(authOptions);
-    const email = session?.user?.email;
+    const session = await auth();
+    const email = session?.user?.email || null;
 
     if (!email) redirect("/");
 
-    return (
-        <div style={{ maxWidth: 1100, margin: "0 auto", padding: 24 }}>
-            <div style={{ marginBottom: 16 }}>
-                <div style={{ fontSize: 22, fontWeight: 700 }}>Admin</div>
-                <div style={{ opacity: 0.7, marginTop: 4 }}>Signed in as {email}</div>
-            </div>
-            {children}
-        </div>
-    );
+    // Owner-only guard (matches your new admin model)
+    const owner = (process.env.OWNER_EMAIL || "").toLowerCase();
+    if (!owner) throw new Error("Missing OWNER_EMAIL");
+    if (email.toLowerCase() !== owner) redirect("/");
+
+    return <>{children}</>;
 }
 
