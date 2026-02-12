@@ -2,15 +2,16 @@
 
 import { DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { revalidatePath } from "next/cache";
+import { getServerSession } from "next-auth";
 
-import { auth } from "@/auth";
+import { authOptions } from "@/auth";
 import { sql } from "@/lib/db";
 import { r2Bucket, r2Client, r2Prefix } from "@/lib/r2";
 import { sendMail } from "@/lib/email";
 
 async function requireOwnerEmail(): Promise<string> {
-    const session = await auth();
-    const email = session?.user?.email || null;
+    const session = (await getServerSession(authOptions)) as any;
+    const email = (session?.user?.email as string | undefined) ?? null;
 
     if (!email) throw new Error("Unauthorized.");
 
@@ -68,19 +69,13 @@ async function resolveR2LocationForDoc(docId: string): Promise<{ bucket: string;
     return { bucket: r2b, key: r2k };
 }
 
-/**
- * Old server-side upload action is deprecated.
- * Keep export so ./admin/page.tsx imports still work.
- */
+// Back-compat export expected by ./admin/page.tsx
 export async function uploadPdfAction(): Promise<void> {
     await requireOwnerEmail();
     throw new Error("uploadPdfAction is deprecated. Use /admin/upload instead.");
 }
 
-/**
- * Used as <form action={createOrAssignAliasAction}>
- * Must return void | Promise<void>
- */
+// Used as <form action={createOrAssignAliasAction}> — must return void
 export async function createOrAssignAliasAction(formData: FormData): Promise<void> {
     await requireOwnerEmail();
 
@@ -103,10 +98,7 @@ export async function createOrAssignAliasAction(formData: FormData): Promise<voi
     revalidatePath("/admin");
 }
 
-/**
- * Used as <form action={emailMagicLinkAction}>
- * Must return void | Promise<void>
- */
+// Used as <form action={emailMagicLinkAction}> — must return void
 export async function emailMagicLinkAction(formData: FormData): Promise<void> {
     const ownerEmail = await requireOwnerEmail();
 
@@ -127,6 +119,7 @@ export async function emailMagicLinkAction(formData: FormData): Promise<void> {
         text: `Here is your secure link:\n\n${url}\n\nIf you did not expect this message, you can ignore it.`,
     });
 
+    // optional audit
     await sendMail({
         to: ownerEmail,
         subject: "cyang.io: magic link emailed",
@@ -136,10 +129,7 @@ export async function emailMagicLinkAction(formData: FormData): Promise<void> {
     revalidatePath("/admin");
 }
 
-/**
- * Used as <form action={deleteDocAction}>
- * Must return void | Promise<void>
- */
+// Used as <form action={deleteDocAction}> — must return void
 export async function deleteDocAction(formData: FormData): Promise<void> {
     await requireOwnerEmail();
 
@@ -157,7 +147,6 @@ export async function deleteDocAction(formData: FormData): Promise<void> {
 
     await sql`delete from docs where id = ${docId}::uuid`;
 
-    // best-effort alias cleanup
     try {
         await sql`delete from doc_aliases where doc_id = ${docId}::uuid`;
     } catch {
