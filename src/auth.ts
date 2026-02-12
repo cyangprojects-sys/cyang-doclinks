@@ -1,27 +1,31 @@
 import type { NextAuthOptions } from "next-auth";
-
-// If you already have providers, import + use them here.
-// Example:
-// import GitHubProvider from "next-auth/providers/github";
+import GoogleProvider from "next-auth/providers/google";
 
 export const authOptions: NextAuthOptions = {
-    // ✅ Required by your installed types
     providers: [
-        // Add your real providers here.
-        // GitHubProvider({
-        //   clientId: process.env.GITHUB_ID!,
-        //   clientSecret: process.env.GITHUB_SECRET!,
-        // }),
+        GoogleProvider({
+            clientId: process.env.GOOGLE_CLIENT_ID!,
+            clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+        }),
     ],
 
     session: { strategy: "jwt" },
 
+    secret: process.env.NEXTAUTH_SECRET,
+
     callbacks: {
-        async session({ session, token }: any) {
+        async session({ session, token }) {
             if (session?.user) {
-                session.user.email = token?.email ?? session.user.email;
+                session.user.email = token.email as string;
             }
             return session;
+        },
+
+        async jwt({ token, account, profile }) {
+            if (account && profile) {
+                token.email = profile.email;
+            }
+            return token;
         },
     },
 };
