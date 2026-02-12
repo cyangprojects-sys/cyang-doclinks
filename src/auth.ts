@@ -1,9 +1,11 @@
-import NextAuth, { type NextAuthConfig } from "next-auth";
+import NextAuth from "next-auth";
 
-// If you already have providers here, keep them.
+// Keep your existing providers here (unchanged).
+// Example:
 // import GitHub from "next-auth/providers/github";
 
-export const authOptions: NextAuthConfig = {
+// Back-compat: older code imports { authOptions } from "@/auth"
+export const authOptions: any = {
     // providers: [
     //   GitHub({
     //     clientId: process.env.GITHUB_ID!,
@@ -14,13 +16,14 @@ export const authOptions: NextAuthConfig = {
     session: { strategy: "jwt" },
 
     callbacks: {
-        async session({ session, token }) {
-            if (session.user) {
-                session.user.email = (token.email as string | undefined) ?? session.user.email;
+        async session({ session, token }: any) {
+            if (session?.user) {
+                session.user.email = token?.email ?? session.user.email;
             }
             return session;
         },
     },
 };
 
+// Auth.js v5-style exports (what we're using elsewhere)
 export const { handlers, auth, signIn, signOut } = NextAuth(authOptions);
