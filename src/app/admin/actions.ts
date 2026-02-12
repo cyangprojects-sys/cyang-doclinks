@@ -74,7 +74,7 @@ export async function uploadPdfAction(formData: FormData) {
         })
     );
 
-    const rows = await sql<{ id: string }[]>`
+    const rows = (await sql`
     insert into docs (
       title,
       original_filename,
@@ -96,7 +96,7 @@ export async function uploadPdfAction(formData: FormData) {
       ${createdBy}
     )
     returning id::text as id
-  `;
+  `) as unknown as { id: string }[];
 
     revalidatePath("/admin");
     redirect(`/admin?uploaded=1&doc=${encodeURIComponent(rows[0].id)}`);
@@ -110,18 +110,20 @@ export async function createOrAssignAliasAction(formData: FormData) {
 
     if (!docId) throw new Error("Missing docId.");
 
-    const docCheck = await sql<{ id: string }[]>`
+    const docCheck = (await sql`
     select id::text as id
     from docs
     where id = ${docId}::uuid
-  `;
+  `) as unknown as { id: string }[];
+
     if (docCheck.length === 0) throw new Error("Document not found.");
 
-    const existing = await sql<{ alias: string; doc_id: string }[]>`
+    const existing = (await sql`
     select alias, doc_id::text as doc_id
     from doc_aliases
     where alias = ${alias}
-  `;
+  `) as unknown as { alias: string; doc_id: string }[];
+
     if (existing.length > 0 && existing[0].doc_id !== docId) {
         throw new Error("Alias already in use for another document.");
     }
@@ -152,9 +154,10 @@ export async function emailMagicLinkAction(formData: FormData) {
         throw new Error("Valid recipient email is required.");
     }
 
-    const docRows = await sql<{ title: string }[]>`
+    const docRows = (await sql`
     select title from docs where id = ${docId}::uuid
-  `;
+  `) as unknown as { title: string }[];
+
     if (docRows.length === 0) throw new Error("Document not found.");
 
     const title = docRows[0].title;

@@ -28,7 +28,7 @@ export default async function AdminPage({
 }: {
     searchParams: Record<string, string | string[] | undefined>;
 }) {
-    const rows = await sql<Row[]>`
+    const rows = (await sql`
     select
       d.id::text as id,
       d.title,
@@ -46,7 +46,7 @@ export default async function AdminPage({
     from docs d
     order by d.created_at desc
     limit 200
-  `;
+  `) as unknown as Row[];
 
     const uploaded = searchParams.uploaded ? "✅ Uploaded" : "";
     const aliased = searchParams.aliased ? "✅ Alias saved" : "";
@@ -143,6 +143,7 @@ export default async function AdminPage({
                                         <div style={{ opacity: 0.55, marginTop: 4 }}>
                                             {d.created_at} · {d.created_by_email}
                                         </div>
+
                                         {link ? (
                                             <div style={{ marginTop: 8 }}>
                                                 Magic link:{" "}
@@ -210,11 +211,7 @@ export default async function AdminPage({
                                             }}
                                         >
                                             <input type="hidden" name="docId" value={d.id} />
-                                            <input
-                                                type="hidden"
-                                                name="alias"
-                                                value={d.alias || ""}
-                                            />
+                                            <input type="hidden" name="alias" value={d.alias || ""} />
                                             <div style={{ fontWeight: 600 }}>Email magic link</div>
                                             <input
                                                 name="to"
