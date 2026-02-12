@@ -9,6 +9,14 @@ function required(name: string): string {
 export const R2_BUCKET = required("R2_BUCKET");
 export const R2_ACCOUNT_ID = required("R2_ACCOUNT_ID");
 
+// ✅ Backwards-compatible export for older code paths
+// Common pattern: pointers like "r2://<bucket>/<key>"
+export const r2Prefix = `r2://${R2_BUCKET}/` as const;
+
+export function r2PointerForKey(key: string) {
+  return `r2://${R2_BUCKET}/${key}`;
+}
+
 export const r2 = new S3Client({
   region: "auto",
   endpoint: `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
