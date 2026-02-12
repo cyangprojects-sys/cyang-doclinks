@@ -48,14 +48,10 @@ async function resolveR2LocationForDoc(docId: string): Promise<{ bucket: string;
         return { bucket: r2Bucket, key };
     } catch (e: any) {
         const msg = String(e?.message || "").toLowerCase();
+        const missingPointerCol =
+            msg.includes("column") && msg.includes("pointer") && msg.includes("does not exist");
 
-        // If pointer column doesn't exist, fall back to r2_bucket/r2_key.
-        // If doc not found, rethrow.
-        const missingPointerCol = msg.includes("column") && msg.includes("pointer") && msg.includes("does not exist");
-        if (!missingPointerCol) {
-            // If it failed for some other reason (like doc not found), rethrow.
-            throw e;
-        }
+        if (!missingPointerCol) throw e;
     }
 
     // Attempt 2: docs.r2_bucket + docs.r2_key
@@ -73,19 +69,19 @@ async function resolveR2LocationForDoc(docId: string): Promise<{ bucket: string;
 }
 
 /**
- * Back-compat export expected by ./admin/page.tsx
- * Old flow uploaded server-side. New flow is direct-to-R2 signed URL at /admin/upload.
+ * Old server-side upload action is deprecated.
+ * Keep export so ./admin/page.tsx imports still work.
  */
-export async function uploadPdfAction() {
+export async function uploadPdfAction(): Promise<void> {
     await requireOwnerEmail();
     throw new Error("uploadPdfAction is deprecated. Use /admin/upload instead.");
 }
 
 /**
- * Back-compat export expected by ./admin/page.tsx
- * Assumes a table: doc_aliases(alias text primary key, doc_id uuid not null)
+ * Used as <form action={createOrAssignAliasAction}>
+ * Must return void | Promise<void>
  */
-export async function createOrAssignAliasAction(formData: FormData) {
+export async function createOrAssignAliasAction(formData: FormData): Promise<void> {
     await requireOwnerEmail();
 
     const alias = String(formData.get("alias") || "").trim();
@@ -105,13 +101,13 @@ export async function createOrAssignAliasAction(formData: FormData) {
   `;
 
     revalidatePath("/admin");
-    return { ok: true, alias, doc_id: docId };
 }
 
 /**
- * Back-compat export expected by ./admin/page.tsx
+ * Used as <form action={emailMagicLinkAction}>
+ * Must return void | Promise<void>
  */
-export async function emailMagicLinkAction(formData: FormData) {
+export async function emailMagicLinkAction(formData: FormData): Promise<void> {
     const ownerEmail = await requireOwnerEmail();
 
     const to = String(formData.get("to") || formData.get("email") || formData.get("recipient") || "").trim();
@@ -138,13 +134,13 @@ export async function emailMagicLinkAction(formData: FormData) {
     });
 
     revalidatePath("/admin");
-    return { ok: true, to, url };
 }
 
 /**
- * Back-compat export expected by ./admin/page.tsx
+ * Used as <form action={deleteDocAction}>
+ * Must return void | Promise<void>
  */
-export async function deleteDocAction(formData: FormData) {
+export async function deleteDocAction(formData: FormData): Promise<void> {
     await requireOwnerEmail();
 
     const docId = String(formData.get("docId") || formData.get("doc_id") || "").trim();
@@ -169,5 +165,4 @@ export async function deleteDocAction(formData: FormData) {
     }
 
     revalidatePath("/admin");
-    return { ok: true, doc_id: docId };
 }
