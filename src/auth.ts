@@ -4,10 +4,7 @@ import Google from "next-auth/providers/google";
 
 function parseOwnerEmails() {
     // Support either OWNER_EMAIL (single) or OWNER_EMAILS (comma/space separated)
-    const raw =
-        process.env.OWNER_EMAILS ??
-        process.env.OWNER_EMAIL ??
-        "";
+    const raw = process.env.OWNER_EMAILS ?? process.env.OWNER_EMAIL ?? "";
 
     return raw
         .split(/[, \n\r\t]+/)
@@ -18,9 +15,6 @@ function parseOwnerEmails() {
 const OWNER_EMAILS = parseOwnerEmails();
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
-    // If you're on Vercel this is generally fine; helps avoid host/trust issues
-    trustHost: true,
-
     providers: [
         Google({
             clientId: process.env.GOOGLE_CLIENT_ID!,
@@ -39,7 +33,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         },
 
         async session({ session, token }) {
-            // Keep email stable
             if (session.user && token.email) {
                 session.user.email = String(token.email);
             }
