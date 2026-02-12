@@ -1,7 +1,7 @@
 "use server";
 
 import crypto from "crypto";
-import { PutObjectCommand } from "@aws-sdk/client-s3";
+import { PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import { sql } from "@/lib/db";
@@ -182,4 +182,56 @@ export async function emailMagicLinkAction(formData: FormData) {
 
     revalidatePath("/admin");
     redirect(`/admin?emailed=1&to=${encodeURIComponent(to)}`);
+}
+
+/**
+ * DELETE: Removes the object from R2 and deletes DB rows (aliases, share logs, doc).
+ * Safe order: delete dependent rows first to avoid FK failures.
+ */
+export async function deleteDocAction(formData: FormData) {
+    await requireUserEmail();
+
+    const docId = String(formData.get("docId") || "").trim();
+    if (!docId) throw new Error("Missing docId.");
+
+    // Fetch R2 location
+    const rows = (await sql`
+    select
+      id::text as id,
+      r2_bucket,
+      r2_key
+    from docs
+    where id = ${docId}::uuid
+  `) as unknown as { id: string; r2_bucket: string; r2_key: string }[];
+
+    if (rows.length === 0) throw new Error("Document not found.");
+
+    const bucket = rows[0].r2_bucket || r2Bucket();
+    const key = rows[0].r2_key;
+
+    // Delete object from R2 first (so we don't orphan storage)
+    const client = r2Client();
+    try {
+        await client.send(
+            new DeleteObjectCommand({
+                Bucket: bucket,
+                Key: key,
+            })
+        );
+    } catch (e: any) {
+        // If it doesn't exist, we can still clean DB.
+        const name = String(e?.name || "");
+        const code = String(e?.Code || e?.code || "");
+        if (name !== "NoSuchKey" && code !== "NoSuchKey") {
+            throw e;
+        }
+    }
+
+    // Clean DB
+    await sql`delete from doc_aliases where doc_id = ${docId}::uuid`;
+    await sql`delete from doc_share_emails where doc_id = ${docId}::uuid`;
+    await sql`delete from docs where id = ${docId}::uuid`;
+
+    revalidatePath("/admin");
+    redirect(`/admin?deleted=1&doc=${encodeURIComponent(docId)}`);
 }
