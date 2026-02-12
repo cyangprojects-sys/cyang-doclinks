@@ -13,11 +13,13 @@ export default async function AdminLayout({
     const session = (await getServerSession(authOptions)) as any;
     const email = (session?.user?.email as string | undefined) ?? null;
 
-    if (!email) redirect("/");
+    // Not signed in → go sign in
+    if (!email) redirect("/api/auth/signin");
 
     const owner = (process.env.OWNER_EMAIL || "").toLowerCase();
-    if (!owner) throw new Error("Missing OWNER_EMAIL");
-    if (email.toLowerCase() !== owner) redirect("/");
+
+    // Missing env or not the owner → go home (no crash)
+    if (!owner || email.toLowerCase() !== owner) redirect("/");
 
     return <>{children}</>;
 }
