@@ -1,3 +1,4 @@
+// src/app/api/admin/upload/complete/route.ts
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { HeadObjectCommand } from "@aws-sdk/client-s3";

@@ -1,3 +1,4 @@
+// src/lib/r2.ts
 import { S3Client } from "@aws-sdk/client-s3";
 
 function required(name: string): string {
@@ -9,19 +10,21 @@ function required(name: string): string {
 export const R2_BUCKET = required("R2_BUCKET");
 export const R2_ACCOUNT_ID = required("R2_ACCOUNT_ID");
 
-// ✅ New name
 export const r2 = new S3Client({
   region: "auto",
   endpoint: `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+  forcePathStyle: true,
   credentials: {
     accessKeyId: required("R2_ACCESS_KEY_ID"),
     secretAccessKey: required("R2_SECRET_ACCESS_KEY"),
   },
 });
 
-// ✅ Back-compat exports for existing code
+// Back-compat exports
 export const r2Client = r2;
 export const r2Bucket = R2_BUCKET;
+
+// Optional pointer helpers (you can ignore if not used)
 export const r2Prefix = `r2://${R2_BUCKET}/` as const;
 
 export function r2PointerForKey(key: string) {
