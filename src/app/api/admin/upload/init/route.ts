@@ -1,78 +1,124 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { randomUUID } from "crypto";
 import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 import { sql } from "@/lib/db";
-import { r2, R2_BUCKET } from "@/lib/r2";
+import { r2Client, r2Bucket } from "@/lib/r2";
 import { requireOwner } from "@/lib/owner";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const BodySchema = z.object({
-    title: z.string().trim().min(1).max(200),
-    originalName: z.string().trim().min(1).max(260),
-    contentType: z.string().trim().min(1).max(100),
-    sizeBytes: z.number().int().positive().max(250 * 1024 * 1024), // 250MB cap
-});
+const BodySchema = z
+    .object({
+        // new uploader fields
+        title: z.string().optional(),
+        filename: z.string().optional(),
+        contentType: z.string().optional(),
+        sizeBytes: z.number().int().positive().optional(),
 
-function safePdfOnly(contentType: string, originalName: string) {
-    const lower = originalName.toLowerCase();
-    const isPdfName = lower.endsWith(".pdf");
-    const isPdfType = contentType === "application/pdf";
-    return isPdfName && isPdfType;
+        // tolerate older/alt field names
+        fileName: z.string().optional(),
+        content_type: z.string().optional(),
+        size_bytes: z.number().int().positive().optional(),
+    })
+    .transform((v) => {
+        const filename = v.filename ?? v.fileName ?? "upload.pdf";
+        const contentType = v.contentType ?? v.content_type ?? "application/pdf";
+        const sizeBytes = v.sizeBytes ?? v.size_bytes ?? undefined;
+        const title = v.title ?? filename;
+        return { title, filename, contentType, sizeBytes };
+    });
+
+function safeKeyPart(name: string) {
+    return name
+        .replace(/[^a-zA-Z0-9._-]+/g, "_")
+        .replace(/_+/g, "_")
+        .slice(0, 120);
+}
+
+function getKeyPrefix() {
+    // You have R2_PREFIX in Vercel already; treat it as KEY prefix (not r2://...)
+    const p = process.env.R2_PREFIX || "docs/";
+    return p.endsWith("/") ? p : `${p}/`;
 }
 
 export async function POST(req: Request) {
     const owner = await requireOwner();
     if (!owner.ok) {
-        return NextResponse.json({ ok: false, error: owner.reason }, { status: owner.reason === "UNAUTHENTICATED" ? 401 : 403 });
+        return NextResponse.json(
+            { ok: false, error: owner.reason },
+            { status: owner.reason === "UNAUTHENTICATED" ? 401 : 403 }
+        );
     }
 
     const json = await req.json().catch(() => null);
     const parsed = BodySchema.safeParse(json);
     if (!parsed.success) {
-        return NextResponse.json({ ok: false, error: "BAD_REQUEST", details: parsed.error.flatten() }, { status: 400 });
+        return NextResponse.json(
+            { ok: false, error: "BAD_REQUEST" },
+            { status: 400 }
+        );
     }
 
-    const { title, originalName, contentType, sizeBytes } = parsed.data;
+    const { title, filename, contentType, sizeBytes } = parsed.data;
 
-    if (!safePdfOnly(contentType, originalName)) {
-        return NextResponse.json({ ok: false, error: "ONLY_PDF_ALLOWED" }, { status: 400 });
+    // Enforce PDF
+    if (contentType !== "application/pdf") {
+        return NextResponse.json({ ok: false, error: "NOT_PDF" }, { status: 400 });
     }
 
-    const docId = randomUUID();
+    // Generate ids/keys
+    const docId =
+        typeof crypto !== "undefined" && "randomUUID" in crypto
+            ? crypto.randomUUID()
+            : require("crypto").randomUUID();
 
-    // keep keys partitioned; avoids huge flat namespaces
-    const yyyy = new Date().getUTCFullYear();
-    const mm = String(new Date().getUTCMonth() + 1).padStart(2, "0");
-    const key = `docs/${yyyy}/${mm}/${docId}.pdf`;
+    const keyPrefix = getKeyPrefix();
+    const safeName = safeKeyPart(filename.toLowerCase().endsWith(".pdf") ? filename : `${filename}.pdf`);
+    const key = `${keyPrefix}${docId}_${safeName}`;
 
-    await sql`
-    insert into docs (id, title, original_name, content_type, size_bytes, r2_bucket, r2_key, status)
-    values (${docId}::uuid, ${title}, ${originalName}, ${contentType}, ${sizeBytes}::bigint, ${R2_BUCKET}, ${key}, 'uploading')
-  `;
+    // Insert DB row (attempt richer schema first, then fall back)
+    try {
+        await sql`
+      insert into docs (id, title, status, r2_bucket, r2_key, content_type, size_bytes)
+      values (
+        ${docId}::uuid,
+        ${title},
+        'uploading',
+        ${r2Bucket},
+        ${key},
+        ${contentType},
+        ${sizeBytes ?? null}
+      )
+    `;
+    } catch {
+        // fallback if your docs table doesn't have some of those columns
+        await sql`
+      insert into docs (id, status, r2_bucket, r2_key)
+      values (${docId}::uuid, 'uploading', ${r2Bucket}, ${key})
+    `;
+    }
 
-    const cmd = new PutObjectCommand({
-        Bucket: R2_BUCKET,
-        Key: key,
-        ContentType: contentType,
-        // Optional: attach metadata (handy for audits)
-        Metadata: {
-            doc_id: docId,
-            original_name: originalName,
-            uploaded_by: owner.email,
-        },
-    });
-
-    const uploadUrl = await getSignedUrl(r2, cmd, { expiresIn: 10 * 60 }); // 10 min
+    // Signed PUT URL for direct browser upload
+    const expiresIn = 10 * 60; // 10 minutes
+    const uploadUrl = await getSignedUrl(
+        r2Client,
+        new PutObjectCommand({
+            Bucket: r2Bucket,
+            Key: key,
+            ContentType: "application/pdf",
+        }),
+        { expiresIn }
+    );
 
     return NextResponse.json({
         ok: true,
         doc_id: docId,
-        key,
         upload_url: uploadUrl,
+        r2_key: key,
+        bucket: r2Bucket,
+        expires_in: expiresIn,
     });
 }
