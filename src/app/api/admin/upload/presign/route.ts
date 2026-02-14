@@ -1,4 +1,3 @@
-// src/app/api/admin/upload/presign/route.ts
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { PutObjectCommand } from "@aws-sdk/client-s3";
@@ -29,79 +28,74 @@ function getKeyPrefix() {
 }
 
 export async function POST(req: Request) {
-    const owner = await requireOwner();
-    if (!owner.ok) {
-        return NextResponse.json(
-            { ok: false, error: owner.reason },
-            { status: owner.reason === "UNAUTHENTICATED" ? 401 : 403 }
+    try {
+        const owner = await requireOwner();
+        if (!owner.ok) {
+            return NextResponse.json(
+                { ok: false, error: owner.reason },
+                { status: owner.reason === "UNAUTHENTICATED" ? 401 : 403 }
+            );
+        }
+
+        const json = await req.json().catch(() => null);
+        const parsed = BodySchema.safeParse(json);
+        if (!parsed.success) {
+            return NextResponse.json({ ok: false, error: "BAD_REQUEST" }, { status: 400 });
+        }
+
+        const { title, filename } = parsed.data;
+        const contentType = parsed.data.contentType ?? "application/pdf";
+        const sizeBytes = parsed.data.sizeBytes ?? null;
+
+        if (contentType !== "application/pdf") {
+            return NextResponse.json({ ok: false, error: "NOT_PDF" }, { status: 400 });
+        }
+
+        const docId = crypto.randomUUID();
+        const keyPrefix = getKeyPrefix();
+        const safeName = safeKeyPart(
+            filename.toLowerCase().endsWith(".pdf") ? filename : `${filename}.pdf`
         );
-    }
+        const key = `${keyPrefix}${docId}_${safeName}`;
 
-    const json = await req.json().catch(() => null);
-    const parsed = BodySchema.safeParse(json);
-    if (!parsed.success) {
-        return NextResponse.json({ ok: false, error: "BAD_REQUEST" }, { status: 400 });
-    }
+        const createdByEmail =
+            (owner as any).email ??
+            (owner as any).user?.email ??
+            process.env.OWNER_EMAIL ??
+            null;
 
-    const { title, filename } = parsed.data;
-    const contentType = parsed.data.contentType ?? "application/pdf";
-    const sizeBytes = parsed.data.sizeBytes ?? null;
+        await sql`
+      insert into docs (
+        id,
+        title,
+        original_filename,
+        content_type,
+        size_bytes,
+        r2_bucket,
+        r2_key,
+        created_by_email,
+        status
+      )
+      values (
+        ${docId}::uuid,
+        ${title ?? filename},
+        ${filename},
+        ${contentType},
+        ${sizeBytes}::bigint,
+        ${r2Bucket},
+        ${key},
+        ${createdByEmail},
+        'uploading'
+      )
+    `;
 
-    if (contentType !== "application/pdf") {
-        return NextResponse.json({ ok: false, error: "NOT_PDF" }, { status: 400 });
-    }
+        const expiresIn = 10 * 60;
 
-    const docId = crypto.randomUUID();
-    const keyPrefix = getKeyPrefix();
-    const safeName = safeKeyPart(
-        filename.toLowerCase().endsWith(".pdf") ? filename : `${filename}.pdf`
-    );
-    const key = `${keyPrefix}${docId}_${safeName}`;
-
-    await sql`
-    insert into docs (
-      id,
-      title,
-      original_filename,
-      content_type,
-      size_bytes,
-      r2_bucket,
-      r2_key,
-      created_by_email,
-      status
-    )
-    values (
-      ${docId}::uuid,
-      ${title ?? filename},
-      ${filename},
-      ${contentType},
-      ${sizeBytes}::bigint,
-      ${r2Bucket},
-      ${key},
-      ${owner.email},
-      'uploading'
-    )
-  `;
-
-    const expiresIn = 10 * 60;
-
-    // Client MUST PUT with header: Content-Type: application/pdf
-    const uploadUrl = await getSignedUrl(
-        r2Client,
-        new PutObjectCommand({
-            Bucket: r2Bucket,
-            Key: key,
-            ContentType: "application/pdf",
-        }),
-        { expiresIn }
-    );
-
-    return NextResponse.json({
-        ok: true,
-        doc_id: docId,
-        upload_url: uploadUrl,
-        r2_key: key,
-        bucket: r2Bucket,
-        expires_in: expiresIn,
-    });
-}
+        const uploadUrl = await getSignedUrl(
+            r2Client,
+            new PutObjectCommand({
+                Bucket: r2Bucket,
+                Key: key,
+                ContentType: "application/pdf",
+            }),
+            { exp
