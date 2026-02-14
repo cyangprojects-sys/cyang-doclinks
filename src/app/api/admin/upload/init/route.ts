@@ -4,7 +4,7 @@ import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 import { sql } from "@/lib/db";
-import { r2Client, r2Bucket } from "@/lib/r2";
+import { r2Client, r2Bucket, r2Prefix } from "@/lib/r2";
 import { requireOwner } from "@/lib/owner";
 
 export const runtime = "nodejs";
@@ -12,13 +12,12 @@ export const dynamic = "force-dynamic";
 
 const BodySchema = z
     .object({
-        // new uploader fields
         title: z.string().optional(),
         filename: z.string().optional(),
         contentType: z.string().optional(),
         sizeBytes: z.number().int().positive().optional(),
 
-        // tolerate older/alt field names
+        // tolerate alternates
         fileName: z.string().optional(),
         content_type: z.string().optional(),
         size_bytes: z.number().int().positive().optional(),
@@ -39,9 +38,16 @@ function safeKeyPart(name: string) {
 }
 
 function getKeyPrefix() {
-    // You have R2_PREFIX in Vercel already; treat it as KEY prefix (not r2://...)
+    // Use env R2_PREFIX if it's a key prefix; otherwise default.
+    // If your R2_PREFIX is "r2://bucket/", ignore and use "docs/".
     const p = process.env.R2_PREFIX || "docs/";
+    if (p.startsWith("r2://")) return "docs/";
     return p.endsWith("/") ? p : `${p}/`;
+}
+
+function uuid() {
+    // Node runtime on Vercel supports this
+    return crypto.randomUUID();
 }
 
 export async function POST(req: Request) {
@@ -56,53 +62,22 @@ export async function POST(req: Request) {
     const json = await req.json().catch(() => null);
     const parsed = BodySchema.safeParse(json);
     if (!parsed.success) {
-        return NextResponse.json(
-            { ok: false, error: "BAD_REQUEST" },
-            { status: 400 }
-        );
+        return NextResponse.json({ ok: false, error: "BAD_REQUEST" }, { status: 400 });
     }
 
-    const { title, filename, contentType, sizeBytes } = parsed.data;
+    const { title, filename, contentType } = parsed.data;
 
-    // Enforce PDF
     if (contentType !== "application/pdf") {
         return NextResponse.json({ ok: false, error: "NOT_PDF" }, { status: 400 });
     }
 
-    // Generate ids/keys
-    const docId =
-        typeof crypto !== "undefined" && "randomUUID" in crypto
-            ? crypto.randomUUID()
-            : require("crypto").randomUUID();
-
+    const docId = uuid();
     const keyPrefix = getKeyPrefix();
     const safeName = safeKeyPart(filename.toLowerCase().endsWith(".pdf") ? filename : `${filename}.pdf`);
     const key = `${keyPrefix}${docId}_${safeName}`;
 
-    // Insert DB row (attempt richer schema first, then fall back)
-    try {
-        await sql`
-      insert into docs (id, title, status, r2_bucket, r2_key, content_type, size_bytes)
-      values (
-        ${docId}::uuid,
-        ${title},
-        'uploading',
-        ${r2Bucket},
-        ${key},
-        ${contentType},
-        ${sizeBytes ?? null}
-      )
-    `;
-    } catch {
-        // fallback if your docs table doesn't have some of those columns
-        await sql`
-      insert into docs (id, status, r2_bucket, r2_key)
-      values (${docId}::uuid, 'uploading', ${r2Bucket}, ${key})
-    `;
-    }
-
-    // Signed PUT URL for direct browser upload
-    const expiresIn = 10 * 60; // 10 minutes
+    // Signed PUT URL
+    const expiresIn = 10 * 60;
     const uploadUrl = await getSignedUrl(
         r2Client,
         new PutObjectCommand({
@@ -112,6 +87,33 @@ export async function POST(req: Request) {
         }),
         { expiresIn }
     );
+
+    // We will store where the object lives.
+    // Prefer new columns if present; otherwise fall back to legacy pointer.
+    const pointer = `${r2Prefix}${key}`; // r2Prefix should be like "r2://<bucket>/"
+
+    // Attempt A: newer schema
+    try {
+        await sql`
+      insert into docs (id, title, r2_bucket, r2_key, content_type)
+      values (${docId}::uuid, ${title}, ${r2Bucket}, ${key}, ${contentType})
+    `;
+    } catch (e1) {
+        // Attempt B: legacy schema (pointer + optional title)
+        try {
+            // try with title first
+            await sql`
+        insert into docs (id, title, pointer)
+        values (${docId}::uuid, ${title}, ${pointer})
+      `;
+        } catch (e2) {
+            // Attempt C: absolute minimal legacy schema (id + pointer only)
+            await sql`
+        insert into docs (id, pointer)
+        values (${docId}::uuid, ${pointer})
+      `;
+        }
+    }
 
     return NextResponse.json({
         ok: true,
