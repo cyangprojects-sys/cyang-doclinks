@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 
-type InitResponse =
+type PresignResponse =
     | {
         ok: true;
         doc_id: string;
@@ -11,11 +11,11 @@ type InitResponse =
         bucket: string;
         expires_in: number;
     }
-    | { ok: false; error: string };
+    | { ok: false; error: string; message?: string };
 
 type CompleteResponse =
     | { ok: true; doc_id: string; size_bytes: number; content_type: string }
-    | { ok: false; error: string };
+    | { ok: false; error: string; message?: string };
 
 function fmtBytes(n: number) {
     if (!Number.isFinite(n)) return "";
@@ -47,32 +47,42 @@ export default function AdminUploadPage() {
             setError("Choose a PDF first.");
             return;
         }
-        if (file.type !== "application/pdf") {
+
+        const isPdf =
+            file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+        if (!isPdf) {
             setError("Only PDFs are allowed.");
             return;
         }
 
         setBusy(true);
         try {
-            // 1) Init: get docId + signed PUT URL
-            const initRes = await fetch("/api/admin/upload/init", {
+            // 1) Presign: get docId + signed PUT URL
+            const presignRes = await fetch("/api/admin/upload/presign", {
                 method: "POST",
                 headers: { "content-type": "application/json" },
                 body: JSON.stringify({
                     title: title || file.name,
                     filename: file.name,
-                    contentType: file.type,
+                    contentType: "application/pdf",
                     sizeBytes: file.size,
                 }),
             });
 
-            const initJson = (await initRes.json().catch(() => null)) as InitResponse | null;
-            if (!initRes.ok || !initJson || initJson.ok === false) {
-                throw new Error(initJson?.ok === false ? initJson.error : `Init failed (${initRes.status})`);
+            const presignJson = (await presignRes.json().catch(() => null)) as
+                | PresignResponse
+                | null;
+
+            if (!presignRes.ok || !presignJson || presignJson.ok === false) {
+                const msg =
+                    (presignJson as any)?.message ||
+                    (presignJson as any)?.error ||
+                    `Init failed (${presignRes.status})`;
+                throw new Error(msg);
             }
 
-            // 2) PUT file directly to R2
-            const putRes = await fetch(initJson.upload_url, {
+            // 2) PUT file directly to R2 (must match ContentType used in presign)
+            const putRes = await fetch(presignJson.upload_url, {
                 method: "PUT",
                 headers: {
                     "content-type": "application/pdf",
@@ -81,25 +91,31 @@ export default function AdminUploadPage() {
             });
 
             if (!putRes.ok) {
-                throw new Error(`R2 upload failed (${putRes.status}).`);
+                const txt = await putRes.text().catch(() => "");
+                throw new Error(`R2 upload failed (${putRes.status})${txt ? `: ${txt}` : ""}`);
             }
 
             // 3) Complete: server verifies HEAD + marks ready
             const completeRes = await fetch("/api/admin/upload/complete", {
                 method: "POST",
                 headers: { "content-type": "application/json" },
-                body: JSON.stringify({ docId: initJson.doc_id }),
+                body: JSON.stringify({ docId: presignJson.doc_id }),
             });
 
-            const completeJson = (await completeRes.json().catch(() => null)) as CompleteResponse | null;
+            const completeJson = (await completeRes.json().catch(() => null)) as
+                | CompleteResponse
+                | null;
+
             if (!completeRes.ok || !completeJson || completeJson.ok === false) {
-                throw new Error(
-                    completeJson?.ok === false ? completeJson.error : `Complete failed (${completeRes.status})`
-                );
+                const msg =
+                    (completeJson as any)?.message ||
+                    (completeJson as any)?.error ||
+                    `Complete failed (${completeRes.status})`;
+                throw new Error(msg);
             }
 
-            setDocId(initJson.doc_id);
-            setViewUrl(`/d/${initJson.doc_id}`);
+            setDocId(presignJson.doc_id);
+            setViewUrl(`/d/${presignJson.doc_id}`);
         } catch (e: any) {
             setError(String(e?.message || e));
         } finally {
@@ -117,8 +133,8 @@ export default function AdminUploadPage() {
             </div>
 
             <p style={{ opacity: 0.75, marginTop: 0 }}>
-                This uploads directly to R2 using a signed PUT URL. The server only creates the doc record and verifies the
-                object exists.
+                This uploads directly to R2 using a signed PUT URL. The server only creates the doc record and
+                verifies the object exists.
             </p>
 
             <div
