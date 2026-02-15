@@ -18,6 +18,13 @@ function makeToken() {
   return randomBytes(24).toString("base64url");
 }
 
+export type ShareDocToEmailInput = {
+  docId: string;
+  email: string;
+  days?: number;
+  maxViews?: number;
+};
+
 export type ShareDocToEmailResult =
   | {
       ok: true;
@@ -31,28 +38,34 @@ export type ShareDocToEmailResult =
 /**
  * Creates a share token and (optionally) emails the link.
  *
- * ShareForm.tsx imports this symbol. A previous edit likely replaced actions.ts
- * and removed this export, causing the build failure.
+ * IMPORTANT: ShareForm.tsx calls this with a single object argument:
+ *   shareDocToEmail({ docId, email })
+ * So this function signature matches that call-site.
  */
 export async function shareDocToEmail(
-  docId: string,
-  toEmail: string,
-  opts: { days?: number; maxViews?: number } = {}
+  input: ShareDocToEmailInput
 ): Promise<ShareDocToEmailResult> {
   try {
+    const docId = input?.docId;
+    const toEmail = (input?.email || "").trim().toLowerCase();
+
     if (!docId) return { ok: false, error: "bad_request", message: "Missing docId" };
     if (!toEmail) return { ok: false, error: "bad_request", message: "Missing email" };
 
     const token = makeToken();
 
-    const days = typeof opts.days === "number" && Number.isFinite(opts.days) ? opts.days : null;
+    const days =
+      typeof input.days === "number" && Number.isFinite(input.days) ? input.days : null;
+
     const maxViews =
-      typeof opts.maxViews === "number" && Number.isFinite(opts.maxViews) ? Math.floor(opts.maxViews) : null;
+      typeof input.maxViews === "number" && Number.isFinite(input.maxViews)
+        ? Math.floor(input.maxViews)
+        : null;
 
     const expiresAt =
       days != null ? new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString() : null;
 
-    // Insert token row (TEXT token). This supports /s/<token> routes.
+    // Insert token row (TEXT token). Supports /s/<token> routes.
     // If your table uses UUID tokens, switch token column to uuid + use gen_random_uuid().
     await sql`
       insert into public.share_tokens (token, doc_id, expires_at, max_views, views_count)
@@ -95,7 +108,6 @@ export async function shareDocToEmail(
       if (res.ok) {
         emailed = true;
       } else {
-        // Don't fail the share if email fails — return the URL so the admin can copy it.
         const txt = await res.text().catch(() => "");
         message = `Created link, but email failed: ${txt || res.status}`;
       }
@@ -148,7 +160,13 @@ export async function createShareToken(
 
     const url = `${siteBaseUrl()}/s/${encodeURIComponent(created.token)}`;
 
-    return { ok: true, token: created.token, url, expires_at: created.expires_at, max_views: created.max_views };
+    return {
+      ok: true,
+      token: created.token,
+      url,
+      expires_at: created.expires_at,
+      max_views: created.max_views,
+    };
   } catch (e: any) {
     return { ok: false, error: "server_error", message: e?.message || "Failed to create token" };
   }
