@@ -98,4 +98,26 @@ export async function POST(req: Request) {
                 Key: key,
                 ContentType: "application/pdf",
             }),
-            { exp
+            { expiresIn }
+        );
+
+        return NextResponse.json({
+            ok: true,
+            doc_id: docId,
+            upload_url: uploadUrl,
+            r2_key: key,
+            bucket: r2Bucket,
+            expires_in: expiresIn,
+        });
+    } catch (err: any) {
+        console.error("PRESIGN ERROR:", err);
+        return NextResponse.json(
+            {
+                ok: false,
+                error: "SERVER_ERROR",
+                message: err?.message ?? String(err),
+            },
+            { status: 500 }
+        );
+    }
+}
