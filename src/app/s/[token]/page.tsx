@@ -12,25 +12,23 @@ export default async function SharedDocPage({
 }) {
     const token = params.token;
 
-    const rows = await sql<ShareRow[]>`
+    const rows = (await sql`
     select doc_id::text as doc_id
     from doc_shares
     where token = ${token}::uuid
+      and revoked_at is null
       and (expires_at is null or expires_at > now())
     limit 1
-  `;
+  `) as ShareRow[];
 
     const docId = rows?.[0]?.doc_id;
     if (!docId) notFound();
 
-    // If you want, you can create a dedicated raw route for doc_id:
-    // e.g. /raw/doc/<docId>. For now we’ll assume you have /serve/<docId> already.
     return (
         <div style={{ padding: 24 }}>
             <h1 style={{ fontSize: 18, fontWeight: 700, marginBottom: 12 }}>
                 Shared document
             </h1>
-
             <div
                 style={{
                     border: "1px solid rgba(255,255,255,0.12)",
