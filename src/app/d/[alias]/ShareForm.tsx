@@ -5,57 +5,76 @@ import { shareDocToEmail } from "./actions";
 
 type Props = {
   docId: string;
+  alias?: string;
 };
 
-export default function ShareForm({ docId }: Props) {
+export default function ShareForm({ docId, alias }: Props) {
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
-  const [status, setStatus] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
 
-  async function onSend() {
-    setStatus(null);
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setMessage(null);
 
-    const cleaned = email.trim().toLowerCase();
-    if (!cleaned) {
-      setStatus("Enter an email.");
+    const trimmed = email.trim();
+    if (!trimmed) {
+      setMessage("Please enter an email.");
       return;
     }
 
     setBusy(true);
+
     try {
-      const res = await shareDocToEmail({ docId, email: cleaned });
-      if (!res.ok) setStatus(res.message ?? "Failed to send.");
-      else setStatus(`Sent to ${cleaned} ✅`);
-    } catch (e: any) {
-      setStatus(e?.message ?? "Failed to send.");
+      const result = await shareDocToEmail({
+        docId,
+        email: trimmed,
+        alias,
+      });
+
+      if (!result.ok) {
+        setMessage(result.message || result.error || "Failed to send.");
+      } else {
+        setMessage("Sent successfully ✅");
+        setEmail("");
+      }
+    } catch (err: any) {
+      setMessage(err?.message || "Unexpected error.");
     } finally {
       setBusy(false);
     }
   }
 
   return (
-    <div className="space-y-3">
-      <div className="text-sm font-medium">Share via email</div>
+    <form onSubmit={handleSubmit} className="mt-4 flex flex-col gap-2">
+      <label className="text-sm font-medium">
+        Send this document via email
+      </label>
 
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+      <div className="flex gap-2">
         <input
+          type="email"
+          placeholder="name@example.com"
+          className="w-full rounded-md border px-3 py-2"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          placeholder="name@domain.com"
-          className="w-full rounded-md border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm outline-none focus:border-neutral-600"
-          inputMode="email"
-          autoComplete="email"
-        />
-        <button
-          onClick={onSend}
           disabled={busy}
-          className="rounded-md bg-white px-4 py-2 text-sm font-medium text-black disabled:opacity-60"
+        />
+
+        <button
+          type="submit"
+          disabled={busy}
+          className="rounded-md bg-black px-4 py-2 text-white disabled:opacity-60"
         >
-          {busy ? "Sending…" : "Send"}
+          {busy ? "Sending..." : "Send"}
         </button>
       </div>
 
-      {status ? <div className="text-sm text-neutral-300">{status}</div> : null}
-    </div>
+      {message && (
+        <p className="text-sm opacity-80">
+          {message}
+        </p>
+      )}
+    </form>
   );
 }
