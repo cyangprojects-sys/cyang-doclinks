@@ -1,65 +1,82 @@
-import { sql } from "@/lib/db";
 import { notFound } from "next/navigation";
+import { sql } from "@/lib/db";
+import { r2Client } from "@/lib/r2";
+import { GetObjectCommand } from "@aws-sdk/client-s3";
 
+export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-type AliasRow = {
-  doc_id: string;
+type Props = {
+  params: { alias: string };
 };
 
-function normalizeAlias(input: string) {
-  // Next route params are usually already decoded, but be defensive.
-  try {
-    return decodeURIComponent(input).trim();
-  } catch {
-    return (input ?? "").trim();
+export default async function AliasPage({ params }: Props) {
+  const alias = decodeURIComponent(params.alias?.trim() || "");
+
+  if (!alias) {
+    notFound();
   }
-}
 
-export default async function AliasDocPage({
-  params,
-}: {
-  params: { alias: string };
-}) {
-  const alias = normalizeAlias(params.alias);
-  if (!alias) notFound();
-
-  // IMPORTANT:
-  // In Neon, your table lives in the `public` schema. If the DB `search_path` is not `public`,
-  // querying `doc_aliases` without schema can return 0 rows (-> Next.js 404) even though the row exists.
-  const rows = (await sql`
-    select doc_id::text as doc_id
+  // 🔥 EXPLICITLY use public.doc_aliases
+  const rows = await sql<{
+    doc_id: string;
+    revoked_at: string | null;
+    expires_at: string | null;
+  }[]>`
+    select doc_id, revoked_at, expires_at
     from public.doc_aliases
     where alias = ${alias}
-      and revoked_at is null
-      and (expires_at is null or expires_at > now())
     limit 1
-  `) as AliasRow[];
+  `;
 
-  const docId = rows?.[0]?.doc_id;
-  if (!docId) notFound();
+  if (!rows.length) {
+    notFound();
+  }
 
-  return (
-    <div style={{ padding: 24 }}>
-      <h1 style={{ fontSize: 18, fontWeight: 700, marginBottom: 12 }}>
-        Shared document
-      </h1>
+  const { doc_id, revoked_at, expires_at } = rows[0];
 
-      <div
-        style={{
-          border: "1px solid rgba(255,255,255,0.12)",
-          borderRadius: 12,
-          overflow: "hidden",
-          minHeight: "80vh",
-        }}
-      >
-        {/* IMPORTANT: load /raw so we can enforce expiry + log views there */}
-        <iframe
-          src={`/d/${encodeURIComponent(alias)}/raw`}
-          style={{ width: "100%", height: "80vh", border: 0 }}
-          title="Shared PDF"
-        />
-      </div>
-    </div>
+  if (revoked_at) {
+    notFound();
+  }
+
+  if (expires_at && new Date(expires_at) < new Date()) {
+    notFound();
+  }
+
+  const docRows = await sql<{
+    r2_bucket: string;
+    r2_key: string;
+    content_type: string;
+  }[]>`
+    select r2_bucket, r2_key, content_type
+    from public.docs
+    where id = ${doc_id}::uuid
+    limit 1
+  `;
+
+  if (!docRows.length) {
+    notFound();
+  }
+
+  const { r2_bucket, r2_key, content_type } = docRows[0];
+
+  const obj = await r2Client.send(
+    new GetObjectCommand({
+      Bucket: r2_bucket,
+      Key: r2_key,
+    })
   );
+
+  const body = await obj.Body?.transformToByteArray();
+
+  if (!body) {
+    notFound();
+  }
+
+  return new Response(body, {
+    headers: {
+      "Content-Type": content_type || "application/pdf",
+      "Content-Disposition": "inline",
+    },
+  });
 }
