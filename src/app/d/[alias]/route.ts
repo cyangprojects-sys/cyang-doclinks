@@ -3,30 +3,24 @@ import { sql } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(
-    _req: Request,
-    { params }: { params: { alias: string } }
-) {
+export async function GET(req: Request, { params }: { params: { alias: string } }) {
     const alias = decodeURIComponent(params.alias).toLowerCase();
 
-    const db = await sql`select current_database() as db, current_schema() as schema`;
-    const counts = await sql`
-    select
-      (select count(*)::int from doc_aliases) as aliases_count,
-      (select count(*)::int from documents) as documents_count
-  `;
-    const row = await sql`
-    select alias, doc_id::text as doc_id, is_active, created_at
+    const rows = (await sql`
+    select doc_id::text as doc_id, is_active
     from doc_aliases
     where alias = ${alias}
     limit 1
-  `;
+  `) as { doc_id: string; is_active: boolean }[];
 
-    return NextResponse.json({
-        ok: true,
-        alias,
-        db: db[0],
-        counts: counts[0],
-        row: row[0] ?? null,
-    });
+    if (!rows.length || !rows[0].is_active) {
+        // nice not-found page (or change to NextResponse.redirect('/'))
+        return new NextResponse("This link is invalid or inactive.", { status: 404 });
+    }
+
+    const docId = rows[0].doc_id;
+
+    // absolute URL based on current request
+    const url = new URL(`/serve/${docId}`, req.url);
+    return NextResponse.redirect(url, 302);
 }
