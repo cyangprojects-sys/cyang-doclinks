@@ -1,6 +1,5 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
-
+import Link from "next/link";
 import { sql } from "@/lib/db";
 import ShareForm from "./ShareForm";
 
@@ -9,13 +8,12 @@ export const dynamic = "force-dynamic";
 
 type AliasRow = { doc_id: string };
 
-type Props = {
+export default async function SharePage({
+  params,
+}: {
   params: { alias: string };
-};
-
-export default async function DocAliasPage({ params }: Props) {
+}) {
   const alias = decodeURIComponent(params.alias || "").trim();
-
   if (!alias) notFound();
 
   const rows = (await sql`
@@ -30,35 +28,32 @@ export default async function DocAliasPage({ params }: Props) {
   const docId = rows?.[0]?.doc_id;
   if (!docId) notFound();
 
-  const rawHref = `/d/${encodeURIComponent(alias)}/raw`;
-
   return (
-    <main className="mx-auto w-full max-w-3xl px-4 py-10">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Shared document</h1>
-        <div className="flex items-center gap-3 text-sm">
-          <Link className="underline opacity-80 hover:opacity-100" href={rawHref}>
-            Open raw
-          </Link>
-          <Link className="underline opacity-80 hover:opacity-100" href="/">
-            Home
-          </Link>
-        </div>
+    <main className="mx-auto max-w-4xl px-4 py-10">
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="text-xl font-semibold tracking-tight">Shared document</h1>
+        <Link
+          href="/"
+          className="text-sm text-neutral-400 hover:text-neutral-200 underline underline-offset-4"
+        >
+          Home
+        </Link>
       </div>
 
-      <p className="mt-2 text-sm opacity-70 break-all">Alias: {alias}</p>
+      <p className="mt-2 text-sm text-neutral-400">
+        Link: <span className="font-mono text-neutral-300">/d/{alias}</span>
+      </p>
 
-      <div className="mt-6 rounded-lg border p-4">
-        {/* ShareForm only accepts { docId } */}
+      <div className="mt-6 rounded-lg border border-neutral-800 bg-neutral-950/40 p-4">
         <ShareForm docId={docId} />
       </div>
 
-      <div className="mt-6 overflow-hidden rounded-lg border">
+      <div className="mt-6 overflow-hidden rounded-lg border border-neutral-800">
+        {/* This endpoint logs views + redirects to a signed R2 URL */}
         <iframe
-          title={alias}
-          src={rawHref}
-          className="h-[75vh] w-full"
-          referrerPolicy="no-referrer"
+          title="Document"
+          src={`/d/${encodeURIComponent(alias)}/raw`}
+          className="h-[80vh] w-full"
         />
       </div>
     </main>
