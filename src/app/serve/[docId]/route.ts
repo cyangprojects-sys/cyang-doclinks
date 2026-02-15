@@ -7,6 +7,15 @@ import { r2Client } from "@/lib/r2";
 import { GetObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
+function parseR2Url(u: string): { bucket: string; key: string } | null {
+  // r2://bucket/key...
+  if (!u || !u.startsWith("r2://")) return null;
+  const rest = u.slice("r2://".length);
+  const slash = rest.indexOf("/");
+  if (slash <= 0) return null;
+  return { bucket: rest.slice(0, slash), key: rest.slice(slash + 1) };
+}
+
 export async function GET(
   req: NextRequest,
   ctx: { params: Promise<{ docId: string }> }
@@ -14,23 +23,25 @@ export async function GET(
   const { docId } = await ctx.params;
 
   const rows = (await sql`
-    select r2_bucket, r2_key, content_type
+    select target_url
     from documents
     where id = ${docId}::uuid
     limit 1
-  `) as { r2_bucket: string; r2_key: string; content_type: string | null }[];
+  `) as { target_url: string | null }[];
 
-  if (!rows.length) return new Response("Not found", { status: 404 });
+  if (!rows.length || !rows[0].target_url) {
+    return new Response("Not found", { status: 404 });
+  }
 
-  const d = rows[0];
+  const parsed = parseR2Url(rows[0].target_url);
+  if (!parsed) return new Response("Invalid target_url", { status: 500 });
 
-  // IMPORTANT: r2Client must be an S3Client instance (not a function)
   const url = await getSignedUrl(
     r2Client,
     new GetObjectCommand({
-      Bucket: d.r2_bucket,
-      Key: d.r2_key,
-      ResponseContentType: d.content_type ?? "application/pdf",
+      Bucket: parsed.bucket,
+      Key: parsed.key,
+      ResponseContentType: "application/pdf",
       ResponseContentDisposition: "inline",
     }),
     { expiresIn: 60 * 5 }

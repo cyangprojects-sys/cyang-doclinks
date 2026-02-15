@@ -11,17 +11,17 @@ import { createUniqueAliasForDoc } from "@/lib/alias";
 type Body = {
     title?: string;
     original_filename?: string;
-    content_type?: string;
 
+    // NOTE: your presign returns `bucket` + `r2_key`
     r2_bucket: string;
     r2_key: string;
 
-    created_by_email?: string;
+    // optional if you want to keep it
+    created_by_email?: string; // not used by schema
 };
 
 export async function POST(req: NextRequest) {
-    const origin =
-        process.env.NEXT_PUBLIC_BASE_URL || new URL(req.url).origin;
+    const origin = process.env.NEXT_PUBLIC_BASE_URL || new URL(req.url).origin;
 
     let body: Body;
     try {
@@ -40,9 +40,8 @@ export async function POST(req: NextRequest) {
         "Document";
 
     const originalFilename = (body.original_filename || "").trim() || null;
-    const contentType = (body.content_type || "application/pdf").trim();
 
-    // 1) Ensure the object exists in R2 (proof the browser upload succeeded)
+    // 1) Ensure the object exists in R2
     try {
         await r2Client.send(
             new HeadObjectCommand({
@@ -54,31 +53,29 @@ export async function POST(req: NextRequest) {
         return new Response("Uploaded object not found in R2", { status: 400 });
     }
 
-    // 2) Create document row (if you already create it earlier, adjust to UPDATE instead)
+    // 2) Store pointer in documents.target_url (your schema)
+    const targetUrl = `r2://${body.r2_bucket}/${body.r2_key}`;
+
     const docRows = (await sql`
-    insert into documents (title, original_filename, content_type, r2_bucket, r2_key, created_by_email)
-    values (${title}, ${originalFilename}, ${contentType}, ${body.r2_bucket}, ${body.r2_key}, ${body.created_by_email ?? null})
+    insert into documents (title, target_url, original_filename)
+    values (${title}, ${targetUrl}, ${originalFilename})
     returning id::text as id
   `) as { id: string }[];
 
     const docId = docRows?.[0]?.id;
-    if (!docId) {
-        return new Response("Failed to create document row", { status: 500 });
-    }
+    if (!docId) return new Response("Failed to create document", { status: 500 });
 
-    // 3) Create friendly alias and return /d/<alias>
+    // 3) Create friendly alias
     const alias = await createUniqueAliasForDoc({
         docId,
         base: title || originalFilename || "document",
     });
 
-    const view_url = `${origin}/d/${encodeURIComponent(alias)}`;
-
     return Response.json({
         ok: true,
         doc_id: docId,
         alias,
-        view_url,
-        pointer: { r2_bucket: body.r2_bucket, r2_key: body.r2_key },
+        view_url: `${origin}/d/${encodeURIComponent(alias)}`,
+        target_url: targetUrl,
     });
 }
