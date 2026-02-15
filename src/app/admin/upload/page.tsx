@@ -99,7 +99,14 @@ export default function AdminUploadPage() {
             const completeRes = await fetch("/api/admin/upload/complete", {
                 method: "POST",
                 headers: { "content-type": "application/json" },
-                body: JSON.stringify({ docId: presignJson.doc_id }),
+                body: JSON.stringify({
+                    title,
+                    original_filename: file.name,
+                    content_type: file.type || "application/pdf",
+                    r2_bucket: presignJson.r2_bucket,
+                    r2_key: presignJson.r2_key,
+                }),
+
             });
 
             const completeJson = (await completeRes.json().catch(() => null)) as
