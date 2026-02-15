@@ -1,85 +1,84 @@
 // src/app/api/admin/upload/complete/route.ts
-import { NextResponse } from "next/server";
-import { z } from "zod";
-import { HeadObjectCommand } from "@aws-sdk/client-s3";
-
-import { sql } from "@/lib/db";
-import { r2Client } from "@/lib/r2";
-import { requireOwner } from "@/lib/owner";
-
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const BodySchema = z.object({
-    docId: z.string().uuid(),
-});
+import { NextRequest } from "next/server";
+import { sql } from "@/lib/db";
+import { r2Client } from "@/lib/r2";
+import { HeadObjectCommand } from "@aws-sdk/client-s3";
+import { createUniqueAliasForDoc } from "@/lib/alias";
 
-export async function POST(req: Request) {
-    const owner = await requireOwner();
-    if (!owner.ok) {
-        return NextResponse.json(
-            { ok: false, error: owner.reason },
-            { status: owner.reason === "UNAUTHENTICATED" ? 401 : 403 }
-        );
-    }
+type Body = {
+    title?: string;
+    original_filename?: string;
+    content_type?: string;
 
-    const json = await req.json().catch(() => null);
-    const parsed = BodySchema.safeParse(json);
-    if (!parsed.success) {
-        return NextResponse.json({ ok: false, error: "BAD_REQUEST" }, { status: 400 });
-    }
+    r2_bucket: string;
+    r2_key: string;
 
-    const { docId } = parsed.data;
+    created_by_email?: string;
+};
 
-    const rows = (await sql`
-    select r2_bucket, r2_key
-    from docs
-    where id = ${docId}::uuid
-    limit 1
-  `) as unknown as Array<{ r2_bucket: string | null; r2_key: string | null }>;
+export async function POST(req: NextRequest) {
+    const origin =
+        process.env.NEXT_PUBLIC_BASE_URL || new URL(req.url).origin;
 
-    const doc = rows[0];
-    if (!doc?.r2_bucket || !doc?.r2_key) {
-        return NextResponse.json({ ok: false, error: "NOT_FOUND" }, { status: 404 });
-    }
-
+    let body: Body;
     try {
-        const head = await r2Client.send(
+        body = (await req.json()) as Body;
+    } catch {
+        return new Response("Bad JSON", { status: 400 });
+    }
+
+    if (!body?.r2_bucket || !body?.r2_key) {
+        return new Response("Missing r2_bucket or r2_key", { status: 400 });
+    }
+
+    const title =
+        (body.title || "").trim() ||
+        (body.original_filename || "").trim() ||
+        "Document";
+
+    const originalFilename = (body.original_filename || "").trim() || null;
+    const contentType = (body.content_type || "application/pdf").trim();
+
+    // 1) Ensure the object exists in R2 (proof the browser upload succeeded)
+    try {
+        await r2Client.send(
             new HeadObjectCommand({
-                Bucket: doc.r2_bucket,
-                Key: doc.r2_key,
+                Bucket: body.r2_bucket,
+                Key: body.r2_key,
             })
         );
-
-        const sizeBytes = Number(head.ContentLength ?? 0);
-        const contentType = String(head.ContentType ?? "");
-
-        if (sizeBytes <= 0) {
-            await sql`update docs set status = 'failed' where id = ${docId}::uuid`;
-            return NextResponse.json({ ok: false, error: "EMPTY_OBJECT" }, { status: 400 });
-        }
-
-        if (contentType !== "application/pdf") {
-            await sql`update docs set status = 'failed' where id = ${docId}::uuid`;
-            return NextResponse.json({ ok: false, error: "NOT_PDF" }, { status: 400 });
-        }
-
-        await sql`
-      update docs
-      set status = 'ready',
-          size_bytes = ${sizeBytes}::bigint,
-          content_type = ${contentType}
-      where id = ${docId}::uuid
-    `;
-
-        return NextResponse.json({
-            ok: true,
-            doc_id: docId,
-            size_bytes: sizeBytes,
-            content_type: contentType,
-        });
     } catch {
-        await sql`update docs set status = 'failed' where id = ${docId}::uuid`;
-        return NextResponse.json({ ok: false, error: "R2_HEAD_FAILED" }, { status: 400 });
+        return new Response("Uploaded object not found in R2", { status: 400 });
     }
+
+    // 2) Create document row (if you already create it earlier, adjust to UPDATE instead)
+    const docRows = (await sql`
+    insert into documents (title, original_filename, content_type, r2_bucket, r2_key, created_by_email)
+    values (${title}, ${originalFilename}, ${contentType}, ${body.r2_bucket}, ${body.r2_key}, ${body.created_by_email ?? null})
+    returning id::text as id
+  `) as { id: string }[];
+
+    const docId = docRows?.[0]?.id;
+    if (!docId) {
+        return new Response("Failed to create document row", { status: 500 });
+    }
+
+    // 3) Create friendly alias and return /d/<alias>
+    const alias = await createUniqueAliasForDoc({
+        docId,
+        base: title || originalFilename || "document",
+    });
+
+    const view_url = `${origin}/d/${encodeURIComponent(alias)}`;
+
+    return Response.json({
+        ok: true,
+        doc_id: docId,
+        alias,
+        view_url,
+        pointer: { r2_bucket: body.r2_bucket, r2_key: body.r2_key },
+    });
 }
