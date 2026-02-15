@@ -52,24 +52,40 @@ export async function POST(req: Request) {
 
     const docId = crypto.randomUUID();
     const keyPrefix = getKeyPrefix();
-    const safeName = safeKeyPart(filename.toLowerCase().endsWith(".pdf") ? filename : `${filename}.pdf`);
+    const safeName = safeKeyPart(
+        filename.toLowerCase().endsWith(".pdf") ? filename : `${filename}.pdf`
+    );
     const key = `${keyPrefix}${docId}_${safeName}`;
 
-    // Insert doc row using the columns you just added
+    // Insert doc row
     await sql`
-    insert into docs (id, title, status, r2_bucket, r2_key, content_type, size_bytes)
+    insert into docs (
+      id,
+      title,
+      original_filename,
+      content_type,
+      size_bytes,
+      r2_bucket,
+      r2_key,
+      created_by_email,
+      status
+    )
     values (
       ${docId}::uuid,
       ${title ?? filename},
-      'uploading',
+      ${filename},
+      ${contentType},
+      ${sizeBytes}::bigint,
       ${r2Bucket},
       ${key},
-      ${contentType},
-      ${sizeBytes}
+      ${owner.email},
+      'uploading'
     )
   `;
 
     const expiresIn = 10 * 60;
+
+    // NOTE: Client MUST send Content-Type: application/pdf on PUT
     const uploadUrl = await getSignedUrl(
         r2Client,
         new PutObjectCommand({
