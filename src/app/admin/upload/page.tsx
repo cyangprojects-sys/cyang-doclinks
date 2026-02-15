@@ -103,9 +103,10 @@ export default function AdminUploadPage() {
                     title,
                     original_filename: file.name,
                     content_type: file.type || "application/pdf",
-                    r2_bucket: presignJson.r2_bucket,
+                    r2_bucket: presignJson.bucket,
                     r2_key: presignJson.r2_key,
                 }),
+
 
             });
 
