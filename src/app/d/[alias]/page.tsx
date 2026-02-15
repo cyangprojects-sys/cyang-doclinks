@@ -3,36 +3,43 @@ import { sql } from "@/lib/db";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-export default async function DocViewPage({
+export default async function DAliasDebugPage({
     params,
 }: {
     params: { alias: string };
 }) {
-    const alias = decodeURIComponent(params.alias).toLowerCase();
+    const raw = params.alias;
+    const alias = decodeURIComponent(raw).toLowerCase();
 
-    const rows = (await sql`
-    select doc_id::text as doc_id, is_active
-    from public.doc_aliases
-    where alias = ${alias}
-    limit 1
-  `) as { doc_id: string; is_active: boolean }[];
+    let row: any = null;
+    let error: any = null;
 
-    if (!rows.length || !rows[0].is_active) {
-        return (
-            <div style={{ padding: 24 }}>
-                <h1 style={{ fontSize: 20, fontWeight: 800 }}>Not found</h1>
-                <p style={{ opacity: 0.8 }}>This link is invalid or inactive.</p>
-            </div>
-        );
+    try {
+        const rows = await sql`
+      select alias, doc_id::text as doc_id, is_active, created_at
+      from public.doc_aliases
+      where alias = ${alias}
+      limit 1
+    `;
+        row = rows[0] ?? null;
+    } catch (e: any) {
+        error = e?.message ?? String(e);
     }
 
     return (
-        <div style={{ padding: 16 }}>
-            <iframe
-                src={`/d/${encodeURIComponent(alias)}/raw`}
-                style={{ width: "100%", height: "90vh", border: 0 }}
-                title="PDF"
-            />
-        </div>
+        <pre style={{ padding: 24 }}>
+            {JSON.stringify(
+                {
+                    params,
+                    raw,
+                    decoded: decodeURIComponent(raw),
+                    normalized: alias,
+                    row,
+                    error,
+                },
+                null,
+                2
+            )}
+        </pre>
     );
 }
