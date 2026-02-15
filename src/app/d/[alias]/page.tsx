@@ -3,43 +3,44 @@ import { sql } from "@/lib/db";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-export default async function DAliasDebugPage({
+export default async function DocViewPage({
     params,
 }: {
     params: Promise<{ alias: string }>;
 }) {
     const { alias: raw } = await params;
-    const decoded = decodeURIComponent(raw);
-    const normalized = decoded.toLowerCase();
+    const alias = decodeURIComponent(raw).toLowerCase();
 
-    let row: any = null;
-    let error: any = null;
+    const rows = await sql`
+    select doc_id::text as doc_id, is_active
+    from public.doc_aliases
+    where alias = ${alias}
+    limit 1
+  `;
 
-    try {
-        const rows = await sql`
-      select alias, doc_id::text as doc_id, is_active, created_at
-      from public.doc_aliases
-      where alias = ${normalized}
-      limit 1
-    `;
-        row = rows[0] ?? null;
-    } catch (e: any) {
-        error = e?.message ?? String(e);
+    if (!rows.length || !rows[0].is_active) {
+        return (
+            <div style={{ padding: 24 }}>
+                <h1 style={{ fontSize: 22, fontWeight: 800 }}>Not found</h1>
+                <p style={{ opacity: 0.8 }}>
+                    This link is invalid or inactive.
+                </p>
+            </div>
+        );
     }
 
     return (
-        <pre style={{ padding: 24 }}>
-            {JSON.stringify(
-                {
-                    raw,
-                    decoded,
-                    normalized,
-                    row,
-                    error,
-                },
-                null,
-                2
-            )}
-        </pre>
+        <div style={{ padding: 16 }}>
+            <iframe
+                src={`/d/${encodeURIComponent(alias)}/raw`}
+                style={{
+                    width: "100%",
+                    height: "92vh",
+                    border: "1px solid rgba(255,255,255,0.1)",
+                    borderRadius: 12,
+                }}
+                title="PDF Viewer"
+            />
+        </div>
     );
 }
