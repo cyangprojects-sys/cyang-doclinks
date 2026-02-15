@@ -14,7 +14,7 @@ type PresignResponse =
     | { ok: false; error: string; message?: string };
 
 type CompleteResponse =
-    | { ok: true; doc_id: string; size_bytes: number; content_type: string }
+    | { ok: true; doc_id: string; alias: string; view_url: string; target_url?: string }
     | { ok: false; error: string; message?: string };
 
 function fmtBytes(n: number) {
@@ -92,22 +92,21 @@ export default function AdminUploadPage() {
 
             if (!putRes.ok) {
                 const txt = await putRes.text().catch(() => "");
-                throw new Error(`R2 upload failed (${putRes.status})${txt ? `: ${txt}` : ""}`);
+                throw new Error(
+                    `R2 upload failed (${putRes.status})${txt ? `: ${txt}` : ""}`
+                );
             }
 
-            // 3) Complete: server verifies HEAD + marks ready
+            // 3) Complete: server verifies HEAD + creates doc + alias
             const completeRes = await fetch("/api/admin/upload/complete", {
                 method: "POST",
                 headers: { "content-type": "application/json" },
                 body: JSON.stringify({
-                    title,
+                    title: title || file.name,
                     original_filename: file.name,
-                    content_type: file.type || "application/pdf",
-                    r2_bucket: presignJson.bucket,
+                    r2_bucket: presignJson.bucket, // presign returns `bucket`
                     r2_key: presignJson.r2_key,
                 }),
-
-
             });
 
             const completeJson = (await completeRes.json().catch(() => null)) as
@@ -122,8 +121,9 @@ export default function AdminUploadPage() {
                 throw new Error(msg);
             }
 
-            setDocId(presignJson.doc_id);
-            setViewUrl(`/d/${presignJson.doc_id}`);
+            // ✅ Use complete response (friendly alias link)
+            setDocId(completeJson.doc_id);
+            setViewUrl(completeJson.view_url);
         } catch (e: any) {
             setError(String(e?.message || e));
         } finally {
@@ -133,7 +133,9 @@ export default function AdminUploadPage() {
 
     return (
         <main style={{ padding: 24, maxWidth: 900, margin: "0 auto" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+            <div
+                style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}
+            >
                 <h1 style={{ marginBottom: 6 }}>Upload New PDF</h1>
                 <a href="/admin" style={{ textDecoration: "underline", opacity: 0.85 }}>
                     Back to Admin
@@ -141,8 +143,8 @@ export default function AdminUploadPage() {
             </div>
 
             <p style={{ opacity: 0.75, marginTop: 0 }}>
-                This uploads directly to R2 using a signed PUT URL. The server only creates the doc record and
-                verifies the object exists.
+                This uploads directly to R2 using a signed PUT URL. The server verifies the object exists,
+                creates the document record, and generates a friendly magic link.
             </p>
 
             <div
