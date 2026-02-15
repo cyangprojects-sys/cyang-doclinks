@@ -3,20 +3,124 @@
 import { sql } from "@/lib/db";
 import { randomBytes } from "node:crypto";
 
+/**
+ * Base URL used to construct absolute links in emails.
+ */
+function siteBaseUrl() {
+  return (
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000")
+  );
+}
+
 function makeToken() {
-  // 24 bytes -> 32 chars-ish base64url, URL-safe
+  // URL-safe token suitable for /s/<token>
   return randomBytes(24).toString("base64url");
 }
 
+export type ShareDocToEmailResult =
+  | {
+      ok: true;
+      token: string;
+      url: string;
+      emailed: boolean;
+      message?: string;
+    }
+  | { ok: false; error: string; message?: string };
+
+/**
+ * Creates a share token and (optionally) emails the link.
+ *
+ * ShareForm.tsx imports this symbol. A previous edit likely replaced actions.ts
+ * and removed this export, causing the build failure.
+ */
+export async function shareDocToEmail(
+  docId: string,
+  toEmail: string,
+  opts: { days?: number; maxViews?: number } = {}
+): Promise<ShareDocToEmailResult> {
+  try {
+    if (!docId) return { ok: false, error: "bad_request", message: "Missing docId" };
+    if (!toEmail) return { ok: false, error: "bad_request", message: "Missing email" };
+
+    const token = makeToken();
+
+    const days = typeof opts.days === "number" && Number.isFinite(opts.days) ? opts.days : null;
+    const maxViews =
+      typeof opts.maxViews === "number" && Number.isFinite(opts.maxViews) ? Math.floor(opts.maxViews) : null;
+
+    const expiresAt =
+      days != null ? new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString() : null;
+
+    // Insert token row (TEXT token). This supports /s/<token> routes.
+    // If your table uses UUID tokens, switch token column to uuid + use gen_random_uuid().
+    await sql`
+      insert into public.share_tokens (token, doc_id, expires_at, max_views, views_count)
+      values (${token}, ${docId}::uuid, ${expiresAt}, ${maxViews}, 0)
+    `;
+
+    const url = `${siteBaseUrl()}/s/${encodeURIComponent(token)}`;
+
+    // Optional email delivery via Resend (if configured)
+    const resendKey = process.env.RESEND_API_KEY;
+    const emailFrom = process.env.EMAIL_FROM || process.env.RESEND_FROM || "Cyang Docs <no-reply@cyang.io>";
+
+    let emailed = false;
+    let message: string | undefined;
+
+    if (resendKey) {
+      const subject = "Your document link";
+      const html = `
+        <div style="font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;">
+          <p>Here is your link:</p>
+          <p><a href="${url}">${url}</a></p>
+          <p style="color:#888;font-size:12px;">If you did not expect this email, you can ignore it.</p>
+        </div>
+      `;
+
+      const res = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${resendKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          from: emailFrom,
+          to: [toEmail],
+          subject,
+          html,
+        }),
+      });
+
+      if (res.ok) {
+        emailed = true;
+      } else {
+        // Don't fail the share if email fails — return the URL so the admin can copy it.
+        const txt = await res.text().catch(() => "");
+        message = `Created link, but email failed: ${txt || res.status}`;
+      }
+    } else {
+      message = "Created link. RESEND_API_KEY not set, so no email was sent.";
+    }
+
+    return { ok: true, token, url, emailed, message };
+  } catch (e: any) {
+    return { ok: false, error: "server_error", message: e?.message || "Failed to share" };
+  }
+}
+
 export type CreateShareTokenOpts = {
-  days?: number;      // expires in N days (optional)
-  maxViews?: number;  // max views allowed (optional)
+  days?: number;
+  maxViews?: number;
 };
 
 export type CreateShareTokenResult =
   | { ok: true; token: string; url: string; expires_at: string | null; max_views: number | null }
   | { ok: false; error: string; message?: string };
 
+/**
+ * Creates a share token without emailing.
+ */
 export async function createShareToken(
   docId: string,
   opts: CreateShareTokenOpts = {}
@@ -33,30 +137,18 @@ export async function createShareToken(
     const expiresAt =
       days != null ? new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString() : null;
 
-    // Insert token (TEXT token) for this doc
     const rows = (await sql`
       insert into public.share_tokens (token, doc_id, expires_at, max_views, views_count)
       values (${token}, ${docId}::uuid, ${expiresAt}, ${maxViews}, 0)
-      returning
-        token::text as token,
-        expires_at::text as expires_at,
-        max_views
+      returning token::text as token, expires_at::text as expires_at, max_views
     `) as { token: string; expires_at: string | null; max_views: number | null }[];
 
     const created = rows?.[0];
     if (!created?.token) return { ok: false, error: "db_insert_failed" };
 
-    const base =
-      process.env.NEXT_PUBLIC_SITE_URL ||
-      (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000");
+    const url = `${siteBaseUrl()}/s/${encodeURIComponent(created.token)}`;
 
-    return {
-      ok: true,
-      token: created.token,
-      url: `${base}/s/${encodeURIComponent(created.token)}`,
-      expires_at: created.expires_at,
-      max_views: created.max_views,
-    };
+    return { ok: true, token: created.token, url, expires_at: created.expires_at, max_views: created.max_views };
   } catch (e: any) {
     return { ok: false, error: "server_error", message: e?.message || "Failed to create token" };
   }
