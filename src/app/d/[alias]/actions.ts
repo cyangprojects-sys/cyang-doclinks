@@ -1,7 +1,7 @@
 "use server";
 
 import { z } from "zod";
-import { sendEmail } from "@/lib/email";
+import { sendMail } from "@/lib/email";
 
 const ShareInput = z.object({
   docId: z.string().min(1),
@@ -14,14 +14,8 @@ export type ShareResult =
   | { ok: false; error: string; message?: string };
 
 function getBaseUrl() {
-  if (process.env.NEXT_PUBLIC_BASE_URL) {
-    return process.env.NEXT_PUBLIC_BASE_URL;
-  }
-
-  if (process.env.VERCEL_URL) {
-    return `https://${process.env.VERCEL_URL}`;
-  }
-
+  if (process.env.NEXT_PUBLIC_BASE_URL) return process.env.NEXT_PUBLIC_BASE_URL;
+  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
   return "https://www.cyang.io";
 }
 
@@ -50,7 +44,7 @@ export async function shareDocToEmail(input: {
       ? `${getBaseUrl()}/d/${encodeURIComponent(alias)}`
       : `${getBaseUrl()}/serve/${encodeURIComponent(docId)}`;
 
-    await sendEmail({
+    await sendMail({
       to: email,
       subject: "Your Cyang Docs link",
       text: `Here is your link:\n\n${url}`,
