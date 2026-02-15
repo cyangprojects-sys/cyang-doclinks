@@ -3,8 +3,12 @@ import { sql } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(req: Request, { params }: { params: { alias: string } }) {
-    const alias = decodeURIComponent(params.alias).toLowerCase();
+export async function GET(
+    req: Request,
+    context: { params: Promise<{ alias: string }> }
+) {
+    const { alias: rawAlias } = await context.params;
+    const alias = decodeURIComponent(rawAlias).toLowerCase();
 
     const rows = (await sql`
     select doc_id::text as doc_id, is_active
@@ -14,13 +18,15 @@ export async function GET(req: Request, { params }: { params: { alias: string } 
   `) as { doc_id: string; is_active: boolean }[];
 
     if (!rows.length || !rows[0].is_active) {
-        // nice not-found page (or change to NextResponse.redirect('/'))
-        return new NextResponse("This link is invalid or inactive.", { status: 404 });
+        return new NextResponse("This link is invalid or inactive.", {
+            status: 404,
+            headers: { "content-type": "text/plain; charset=utf-8" },
+        });
     }
 
     const docId = rows[0].doc_id;
 
-    // absolute URL based on current request
+    // Absolute URL based on the incoming request URL
     const url = new URL(`/serve/${docId}`, req.url);
     return NextResponse.redirect(url, 302);
 }
