@@ -1,110 +1,103 @@
-// src/app/api/admin/upload/complete/route.ts
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
-import { r2Client } from "@/lib/r2";
-import { HeadObjectCommand } from "@aws-sdk/client-s3";
-import { createUniqueAliasForDoc } from "@/lib/alias";
 import { slugify } from "@/lib/slug";
 
-type Body = {
+type CompleteRequest = {
+    doc_id: string;
     title?: string;
     original_filename?: string;
-
-    // NOTE: your presign returns `bucket` + `r2_key`
-    r2_bucket: string;
-    r2_key: string;
-
-    // optional if you want to keep it
-    created_by_email?: string; // not used by schema
 };
 
 export async function POST(req: NextRequest) {
-    const origin = process.env.NEXT_PUBLIC_BASE_URL || new URL(req.url).origin;
-
-    let body: Body;
     try {
-        body = (await req.json()) as Body;
-    } catch {
-        return new Response("Bad JSON", { status: 400 });
-    }
+        const body = (await req.json()) as CompleteRequest;
 
-    if (!body?.r2_bucket || !body?.r2_key) {
-        return new Response("Missing r2_bucket or r2_key", { status: 400 });
-    }
+        const docId = body.doc_id;
+        const title = body.title || null;
+        const originalFilename = body.original_filename || null;
 
-    const title =
-        (body.title || "").trim() ||
-        (body.original_filename || "").trim() ||
-        "Document";
-
-    const originalFilename = (body.original_filename || "").trim() || null;
-
-    // 1) Ensure the object exists in R2
-    try {
-        await r2Client.send(
-            new HeadObjectCommand({
-                Bucket: body.r2_bucket,
-                Key: body.r2_key,
-            })
-        );
-    } catch {
-        return new Response("Uploaded object not found in R2", { status: 400 });
-    }
-
-    // 2) Store pointer in documents.target_url (your schema)
-    const targetUrl = `r2://${body.r2_bucket}/${body.r2_key}`;
-
-    const docRows = (await sql`
-    insert into documents (title, target_url, original_filename)
-    values (${title}, ${targetUrl}, ${originalFilename})
-    returning id::text as id
-  `) as { id: string }[];
-
-    const docId = docRows?.[0]?.id;
-    if (!docId) return new Response("Failed to create document", { status: 500 });
-
-    // 3) Create friendly alias
-    const alias = await createUniqueAliasForDoc({
-        docId,
-        base: title || originalFilename || "document",
-    });
-
-    return Response.json({
-        ok: true,
-        doc_id: docId,
-        alias,
-        view_url: `${origin}/d/${encodeURIComponent(alias)}`,
-        target_url: targetUrl,
-    });
-
-    // --- Auto-create alias for this doc (conflict-safe) ---
-    const sourceName =
-        (original_filename || title || "document.pdf").toString();
-
-    let base = slugify(sourceName);
-    if (!base) base = `doc-${docId.slice(0, 8)}`;
-
-    let alias = base;
-
-    // Try base, then base-2, base-3...
-    for (let i = 0; i < 50; i++) {
-        if (i > 0) alias = `${base}-${i + 1}`;
-
-        try {
-            await sql`
-      insert into public.doc_aliases (alias, doc_id, is_active)
-      values (${alias}, ${docId}::uuid, true)
-    `;
-            break; // success
-        } catch (e: any) {
-            const msg = String(e?.message || e);
-            // unique violation -> try next suffix
-            if (msg.includes("duplicate") || msg.includes("unique")) continue;
-            throw e;
+        if (!docId) {
+            return NextResponse.json(
+                { ok: false, error: "missing_doc_id" },
+                { status: 400 }
+            );
         }
-    }
 
+        // 1️⃣ Ensure document exists
+        const docRows = (await sql`
+      select id::text as id
+      from public.docs
+      where id = ${docId}::uuid
+      limit 1
+    `) as { id: string }[];
+
+        if (!docRows.length) {
+            return NextResponse.json(
+                { ok: false, error: "doc_not_found" },
+                { status: 404 }
+            );
+        }
+
+        // 2️⃣ Update title if provided
+        if (title) {
+            await sql`
+        update public.docs
+        set title = ${title}
+        where id = ${docId}::uuid
+      `;
+        }
+
+        // 3️⃣ Generate base alias
+        let base = slugify(title || originalFilename || "document");
+
+        if (!base) {
+            base = `doc-${docId.slice(0, 8)}`;
+        }
+
+        // 4️⃣ Try base, then base-2, base-3...
+        let finalAlias: string | null = null;
+
+        for (let i = 0; i < 50; i++) {
+            const candidateAlias = i === 0 ? base : `${base}-${i + 1}`;
+
+            try {
+                await sql`
+          insert into public.doc_aliases (alias, doc_id)
+          values (${candidateAlias}, ${docId}::uuid)
+        `;
+
+                finalAlias = candidateAlias;
+                break;
+            } catch {
+                // collision → try next
+            }
+        }
+
+        if (!finalAlias) {
+            return NextResponse.json(
+                { ok: false, error: "alias_generation_failed" },
+                { status: 500 }
+            );
+        }
+
+        const baseUrl =
+            process.env.NEXT_PUBLIC_SITE_URL ||
+            (process.env.VERCEL_URL
+                ? `https://${process.env.VERCEL_URL}`
+                : "http://localhost:3000");
+
+        return NextResponse.json({
+            ok: true,
+            alias: finalAlias,
+            view_url: `${baseUrl}/d/${encodeURIComponent(finalAlias)}`,
+        });
+    } catch (e: any) {
+        return NextResponse.json(
+            { ok: false, error: "server_error", message: e?.message || "Unknown error" },
+            { status: 500 }
+        );
+    }
 }
