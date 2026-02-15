@@ -9,9 +9,7 @@ export async function GET() {
         const dbInfo = await sql`
       select
         current_database() as db,
-        current_schema() as schema,
-        inet_server_addr()::text as server_addr,
-        inet_server_port() as server_port
+        current_schema() as schema
     `;
 
         const counts = await sql`
@@ -20,7 +18,6 @@ export async function GET() {
         (select count(*)::int from public.documents) as documents_count
     `;
 
-        // Show columns of doc_aliases in prod
         const aliasCols = await sql`
       select column_name, data_type
       from information_schema.columns
@@ -28,7 +25,6 @@ export async function GET() {
       order by ordinal_position
     `;
 
-        // Show a few aliases without ordering by id
         const sampleAlias = await sql`
       select alias, doc_id::text as doc_id, is_active
       from public.doc_aliases
@@ -37,13 +33,13 @@ export async function GET() {
 
         return NextResponse.json({
             ok: true,
-            dbInfo: dbInfo[0],
-            counts: counts[0],
+            dbInfo: dbInfo[0] ?? null,
+            counts: counts[0] ?? null,
             aliasCols,
             sampleAlias,
             vercel: {
-                env: process.env.VERCEL_ENV,
-                commit: process.env.VERCEL_GIT_COMMIT_SHA,
+                env: process.env.VERCEL_ENV ?? null,
+                commit: process.env.VERCEL_GIT_COMMIT_SHA ?? null,
             },
         });
     } catch (e: any) {
@@ -52,3 +48,4 @@ export async function GET() {
             { status: 500 }
         );
     }
+}
