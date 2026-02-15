@@ -16,7 +16,7 @@ type PresignResponse =
   | { ok: false; error: string; message?: string };
 
 type CompleteResponse =
-  | { ok: true; alias: string; view_url: string }
+  | { ok: true; doc_id: string; alias: string; view_url: string }
   | { ok: false; error: string; message?: string };
 
 function fmtBytes(n: number) {
@@ -56,34 +56,40 @@ export default function AdminUploadPage() {
 
     setBusy(true);
     try {
-      // 1) Presign (server creates doc row and returns doc_id + signed PUT URL)
+      // 1) Presign: MUST match BodySchema in presign/route.ts
+      //    BodySchema keys are: title, filename, contentType, sizeBytes
       const presignRes = await fetch("/api/admin/upload/presign", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          content_type: "application/pdf",
+          title: title || undefined,
           filename: file.name,
-          size_bytes: file.size,
-          title: title || null,
+          contentType: "application/pdf",
+          sizeBytes: file.size,
         }),
       });
 
       const presignJson = (await presignRes.json()) as PresignResponse;
       if (!presignRes.ok || !presignJson.ok) {
-        setError(presignJson && "error" in presignJson ? presignJson.error : "Presign failed.");
+        setError(
+          presignJson && "error" in presignJson
+            ? `${presignJson.error}${presignJson.message ? `: ${presignJson.message}` : ""}`
+            : "Presign failed."
+        );
         return;
       }
 
       // IMPORTANT: doc_id must be carried into /complete
-      const { doc_id, upload_url } = presignJson;
+      const docId = presignJson.doc_id;
+      const uploadUrl = presignJson.upload_url;
 
-      if (!doc_id) {
+      if (!docId) {
         setError("Presign did not return doc_id.");
         return;
       }
 
-      // 2) Upload directly to R2 via signed PUT
-      const putRes = await fetch(upload_url, {
+      // 2) Upload directly to R2 via signed PUT URL
+      const putRes = await fetch(uploadUrl, {
         method: "PUT",
         headers: {
           "Content-Type": "application/pdf",
@@ -97,12 +103,12 @@ export default function AdminUploadPage() {
         return;
       }
 
-      // 3) Complete (tell server upload succeeded + generate alias)
+      // 3) Complete: send doc_id + metadata
       const completeRes = await fetch("/api/admin/upload/complete", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          doc_id,
+          doc_id: docId,
           title: title || null,
           original_filename: file.name,
         }),
@@ -110,13 +116,11 @@ export default function AdminUploadPage() {
 
       const completeJson = (await completeRes.json()) as CompleteResponse;
       if (!completeRes.ok || !completeJson.ok) {
-        const msg =
+        setError(
           completeJson && "error" in completeJson
-            ? completeJson.error === "missing_doc_id"
-              ? "missing_doc_id (client did not send doc_id)"
-              : completeJson.error
-            : "Complete failed.";
-        setError(msg);
+            ? `${completeJson.error}${completeJson.message ? `: ${completeJson.message}` : ""}`
+            : "Complete failed."
+        );
         return;
       }
 
@@ -138,8 +142,8 @@ export default function AdminUploadPage() {
       </div>
 
       <p style={{ opacity: 0.8, marginTop: 10, lineHeight: 1.5 }}>
-        This uploads directly to R2 using a signed PUT URL. The server verifies the object exists, creates the document
-        record, and generates a friendly magic link.
+        This uploads directly to R2 using a signed PUT URL. The server creates the doc row first (doc_id),
+        then you upload, then we finalize and generate the alias.
       </p>
 
       <div
