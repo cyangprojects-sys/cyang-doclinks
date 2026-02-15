@@ -1,37 +1,46 @@
+import { NextResponse } from "next/server";
+import { sql } from "@/lib/db";
+
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-function present(name: string) {
-    return Boolean(process.env[name]);
-}
-
 export async function GET() {
-    return Response.json({
-        ok: true,
+    try {
+        const dbInfo = await sql`
+      select
+        current_database() as db,
+        current_schema() as schema,
+        inet_server_addr()::text as server_addr,
+        inet_server_port() as server_port
+    `;
 
-        // Only booleans (no secret values)
-        has: {
-            DATABASE_URL: present("DATABASE_URL"),
+        const counts = await sql`
+      select
+        (select count(*)::int from public.doc_aliases) as aliases_count,
+        (select count(*)::int from public.documents) as documents_count
+    `;
 
-            R2_ENDPOINT: present("R2_ENDPOINT"),
-            R2_ACCESS_KEY_ID: present("R2_ACCESS_KEY_ID"),
-            R2_SECRET_ACCESS_KEY: present("R2_SECRET_ACCESS_KEY"),
-            R2_BUCKET: present("R2_BUCKET"),
-            R2_PREFIX: present("R2_PREFIX"),
+        const sampleAlias = await sql`
+      select alias, doc_id::text as doc_id, is_active
+      from public.doc_aliases
+      order by id desc
+      limit 5
+    `;
 
-            GOOGLE_CLIENT_ID: present("GOOGLE_CLIENT_ID"),
-            GOOGLE_CLIENT_SECRET: present("GOOGLE_CLIENT_SECRET"),
-            OWNER_EMAILS: present("OWNER_EMAILS"),
-            OWNER_EMAIL: present("OWNER_EMAIL"),
-
-            NEXT_PUBLIC_APP_URL: present("NEXT_PUBLIC_APP_URL"),
-        },
-
-        // Non-sensitive deployment metadata
-        vercel: {
-            env: process.env.VERCEL_ENV ?? null,
-            commit: process.env.VERCEL_GIT_COMMIT_SHA ?? null,
-        },
-    });
+        return NextResponse.json({
+            ok: true,
+            dbInfo: dbInfo[0],
+            counts: counts[0],
+            sampleAlias,
+            vercel: {
+                env: process.env.VERCEL_ENV,
+                commit: process.env.VERCEL_GIT_COMMIT_SHA,
+            },
+        });
+    } catch (e: any) {
+        return NextResponse.json(
+            { ok: false, error: e?.message ?? String(e) },
+            { status: 500 }
+        );
+    }
 }
-
