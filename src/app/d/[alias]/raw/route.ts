@@ -1,101 +1,113 @@
-// src/app/d/[alias]/route.ts
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-import { NextRequest } from "next/server";
+import { NextResponse } from "next/server";
 import { sql } from "@/lib/db";
-import { getCookie } from "@/lib/cookies";
-import { verifySignedPayload } from "@/lib/crypto";
+import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
+import type { Readable } from "node:stream";
 
-type DocSession = { grant_id: number; exp: number };
+const s3 = new S3Client({
+  region: "auto",
+  endpoint: process.env.R2_ENDPOINT, // e.g. https://<accountid>.r2.cloudflarestorage.com
+  credentials: {
+    accessKeyId: process.env.R2_ACCESS_KEY_ID!,
+    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY!,
+  },
+});
 
-function signInPage(alias: string) {
-  return new Response(
-    `<!doctype html>
-<html>
-<head>
-  <meta charset="utf-8" />
-  <title>Sign in</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-</head>
-<body style="font-family:Arial,sans-serif;max-width:640px;margin:40px auto;padding:0 16px;line-height:1.5">
-  <h2>Sign in to view this document</h2>
-
-  <div style="margin:16px 0">
-    <a href="/auth/google/start?alias=${encodeURIComponent(alias)}"
-       style="display:inline-block;padding:10px 14px;border:1px solid #ccc;border-radius:8px;text-decoration:none">
-       Continue with Google
-    </a>
-  </div>
-
-  <hr style="margin:20px 0" />
-
-  <form method="POST" action="/auth/email/start">
-    <input type="hidden" name="alias" value="${alias}" />
-    <label>Email address</label><br/>
-    <input name="email" type="email" required
-      style="width:100%;padding:10px;border:1px solid #ccc;border-radius:8px;margin:8px 0" />
-    <button type="submit"
-      style="padding:10px 14px;border:1px solid #ccc;border-radius:8px;background:#fff;cursor:pointer">
-      Email me a sign-in link
-    </button>
-  </form>
-
-  <p style="color:#666;font-size:12px;margin-top:18px">
-    Access is granted for this document only and expires after 8 hours.
-  </p>
-</body>
-</html>`,
-    { headers: { "Content-Type": "text/html; charset=utf-8" } }
-  );
-}
-
-export async function GET(req: NextRequest, ctx: { params: Promise<{ alias: string }> }) {
-  const { alias } = await ctx.params;
-
-  // 1) Look up alias -> doc_id + target_url
-  const rows = (await sql`
-    select a.doc_id, d.target_url, a.is_active
-    from document_aliases a
-    join documents d on d.id = a.doc_id
-    where a.alias = ${alias}
-    limit 1
-  `) as { doc_id: string; target_url: string; is_active: boolean }[];
-
-  if (rows.length === 0 || !rows[0].is_active) {
-    return new Response("Not found", { status: 404 });
+function parseTargetUrl(targetUrl: string): { bucket: string; key: string } {
+  // Accept: r2://bucket/key
+  if (targetUrl.startsWith("r2://")) {
+    const rest = targetUrl.slice("r2://".length);
+    const slash = rest.indexOf("/");
+    if (slash <= 0) throw new Error("Invalid r2:// url");
+    return { bucket: rest.slice(0, slash), key: rest.slice(slash + 1) };
   }
 
-  // 2) If cookie missing or invalid -> show sign-in page
-  const raw = getCookie(req, "cy_doc_session");
-  if (!raw) return signInPage(alias);
+  // Accept: https://.../bucket/key
+  if (targetUrl.startsWith("http://") || targetUrl.startsWith("https://")) {
+    const u = new URL(targetUrl);
+    const parts = u.pathname.replace(/^\/+/, "").split("/");
+    if (parts.length < 2) throw new Error("Invalid http(s) target_url");
+    return { bucket: parts[0], key: parts.slice(1).join("/") };
+  }
 
-  const session = verifySignedPayload(raw) as DocSession | null;
-  if (!session) return signInPage(alias);
+  // Accept: bucket/key
+  const parts = targetUrl.replace(/^\/+/, "").split("/");
+  if (parts.length < 2) throw new Error("Invalid target_url");
+  return { bucket: parts[0], key: parts.slice(1).join("/") };
+}
 
-  const now = Math.floor(Date.now() / 1000);
-  if (session.exp <= now) return signInPage(alias);
+export async function GET(
+  req: Request,
+  context: { params: Promise<{ alias: string }> }
+) {
+  const { alias: rawAlias } = await context.params;
+  const alias = decodeURIComponent(rawAlias).toLowerCase();
 
-  // 3) Validate grant in DB is valid and matches this doc
-  const grants = (await sql`
-    select id, doc_id, expires_at, revoked_at
-    from doc_access_grants
-    where id = ${session.grant_id}
+  // alias -> doc_id (active)
+  const aliasRows = (await sql`
+    select doc_id::text as doc_id, is_active
+    from doc_aliases
+    where alias = ${alias}
     limit 1
-  `) as { id: number; doc_id: string; expires_at: string; revoked_at: string | null }[];
+  `) as { doc_id: string; is_active: boolean }[];
 
-  if (grants.length === 0) return signInPage(alias);
+  if (!aliasRows.length || !aliasRows[0].is_active) {
+    return new NextResponse("Not found", { status: 404 });
+  }
 
-  const g = grants[0];
-  if (g.revoked_at) return signInPage(alias);
-  if (g.doc_id !== rows[0].doc_id) return signInPage(alias);
-  if (new Date(g.expires_at).getTime() <= Date.now()) return signInPage(alias);
+  const docId = aliasRows[0].doc_id;
 
-  // 4) Authorized -> redirect to a HTTPS serve route (NOT r2://)
-  const origin = new URL(req.url).origin;
-  return Response.redirect(
-    `${origin}/serve/${encodeURIComponent(rows[0].doc_id)}`,
-    302
+  // doc_id -> target_url + filename
+  const docRows = (await sql`
+    select target_url, coalesce(original_filename, title, 'document.pdf') as name
+    from documents
+    where id = ${docId}::uuid
+    limit 1
+  `) as { target_url: string; name: string }[];
+
+  if (!docRows.length || !docRows[0].target_url) {
+    return new NextResponse("Not found", { status: 404 });
+  }
+
+  const { bucket, key } = parseTargetUrl(docRows[0].target_url);
+  const range = req.headers.get("range") ?? undefined;
+
+  const obj = await s3.send(
+    new GetObjectCommand({
+      Bucket: bucket,
+      Key: key,
+      Range: range,
+    })
   );
 
+  const body = obj.Body as Readable | undefined;
+  if (!body) return new NextResponse("Not found", { status: 404 });
+
+  const url = new URL(req.url);
+  const download = url.searchParams.get("download") === "1";
+  const filename = docRows[0].name.endsWith(".pdf") ? docRows[0].name : `${docRows[0].name}.pdf`;
+
+  const headers = new Headers();
+  headers.set("Content-Type", obj.ContentType || "application/pdf");
+  headers.set("Accept-Ranges", "bytes");
+  headers.set("Cache-Control", "private, no-store");
+
+  // Range support (important for PDF seeking)
+  const contentRange = (obj as any).ContentRange as string | undefined;
+  if (contentRange) headers.set("Content-Range", contentRange);
+
+  // Content length
+  if (obj.ContentLength != null) headers.set("Content-Length", String(obj.ContentLength));
+
+  headers.set(
+    "Content-Disposition",
+    `${download ? "attachment" : "inline"}; filename="${filename.replace(/"/g, "")}"`
+  );
+
+  return new NextResponse(body as any, {
+    status: range ? 206 : 200,
+    headers,
+  });
 }
