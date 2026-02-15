@@ -1,63 +1,62 @@
 import { sql } from "@/lib/db";
-import ShareForm from "./ShareForm";
 
 export const dynamic = "force-dynamic";
 
-export default async function DocAdminPage({
+export default async function DocDebugPage({
     params,
 }: {
     params: { alias: string };
 }) {
     const alias = decodeURIComponent(params.alias).toLowerCase();
 
-    const rows = (await sql`
-    select a.doc_id, a.is_active
-    from doc_aliases a
-    where a.alias = ${alias}
-    limit 1
-  `) as { doc_id: string; is_active: boolean }[];
+    let rows: any = [];
+    let dbInfo: any = null;
+    let counts: any = null;
+    let error: any = null;
 
-    if (!rows.length || !rows[0].is_active) {
-        return (
-            <div style={{ padding: 24 }}>
-                <h1 style={{ fontSize: 18, fontWeight: 700 }}>Not found</h1>
-                <p style={{ opacity: 0.8 }}>This link is invalid or inactive.</p>
-            </div>
-        );
+    try {
+        // What database are we actually connected to?
+        dbInfo = await sql`
+      select current_database() as db, current_schema() as schema
+    `;
+
+        // Basic sanity counts
+        counts = await sql`
+      select
+        (select count(*)::int from doc_aliases) as aliases_count,
+        (select count(*)::int from documents) as documents_count
+    `;
+
+        // Actual alias lookup
+        rows = await sql`
+      select a.alias, a.doc_id::text as doc_id, a.is_active, a.created_at
+      from doc_aliases a
+      where a.alias = ${alias}
+      limit 1
+    `;
+    } catch (e: any) {
+        error = e?.message || String(e);
     }
 
-    const docId = rows[0].doc_id;
+    console.log("ALIAS PARAM:", alias);
+    console.log("DB INFO:", dbInfo);
+    console.log("COUNTS:", counts);
+    console.log("ROWS:", rows);
+    console.log("ERROR:", error);
 
     return (
-        <div style={{ padding: 24, display: "grid", gap: 16 }}>
-            <h1 style={{ fontSize: 18, fontWeight: 700 }}>Document</h1>
-
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 360px", gap: 16 }}>
-                <div
-                    style={{
-                        border: "1px solid rgba(255,255,255,0.12)",
-                        borderRadius: 12,
-                        overflow: "hidden",
-                    }}
-                >
-                    <iframe
-                        src={`/d/${encodeURIComponent(alias)}/raw`}
-                        style={{ width: "100%", height: "80vh", border: 0 }}
-                        title="PDF viewer"
-                    />
-                </div>
-
-                <div
-                    style={{
-                        border: "1px solid rgba(255,255,255,0.12)",
-                        borderRadius: 12,
-                        padding: 16,
-                        height: "fit-content",
-                    }}
-                >
-                    <ShareForm docId={docId} />
-                </div>
-            </div>
-        </div>
+        <pre style={{ padding: 24 }}>
+            {JSON.stringify(
+                {
+                    alias,
+                    dbInfo,
+                    counts,
+                    rows,
+                    error,
+                },
+                null,
+                2
+            )}
+        </pre>
     );
 }
