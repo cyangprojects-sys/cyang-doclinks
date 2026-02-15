@@ -1,113 +1,61 @@
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-import { NextResponse } from "next/server";
 import { sql } from "@/lib/db";
-import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
-import type { Readable } from "node:stream";
+import { NextRequest, NextResponse } from "next/server";
+import crypto from "crypto";
 
-const s3 = new S3Client({
-  region: "auto",
-  endpoint: process.env.R2_ENDPOINT, // e.g. https://<accountid>.r2.cloudflarestorage.com
-  credentials: {
-    accessKeyId: process.env.R2_ACCESS_KEY_ID!,
-    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY!,
-  },
-});
+type AliasRow = {
+  doc_id: string;
+};
 
-function parseTargetUrl(targetUrl: string): { bucket: string; key: string } {
-  // Accept: r2://bucket/key
-  if (targetUrl.startsWith("r2://")) {
-    const rest = targetUrl.slice("r2://".length);
-    const slash = rest.indexOf("/");
-    if (slash <= 0) throw new Error("Invalid r2:// url");
-    return { bucket: rest.slice(0, slash), key: rest.slice(slash + 1) };
-  }
-
-  // Accept: https://.../bucket/key
-  if (targetUrl.startsWith("http://") || targetUrl.startsWith("https://")) {
-    const u = new URL(targetUrl);
-    const parts = u.pathname.replace(/^\/+/, "").split("/");
-    if (parts.length < 2) throw new Error("Invalid http(s) target_url");
-    return { bucket: parts[0], key: parts.slice(1).join("/") };
-  }
-
-  // Accept: bucket/key
-  const parts = targetUrl.replace(/^\/+/, "").split("/");
-  if (parts.length < 2) throw new Error("Invalid target_url");
-  return { bucket: parts[0], key: parts.slice(1).join("/") };
+function hmacHex(key: string, value: string) {
+  return crypto.createHmac("sha256", key).update(value).digest("hex");
 }
 
-export async function GET(
-  req: Request,
-  context: { params: Promise<{ alias: string }> }
-) {
-  const { alias: rawAlias } = await context.params;
-  const alias = decodeURIComponent(rawAlias).toLowerCase();
+export async function GET(req: NextRequest, ctx: { params: { alias: string } }) {
+  const alias = ctx.params.alias;
 
-  // alias -> doc_id (active)
-  const aliasRows = (await sql`
-    select doc_id::text as doc_id, is_active
+  // 1) Resolve alias with expiration + revoke checks
+  const rows = (await sql`
+    select doc_id::text as doc_id
     from doc_aliases
     where alias = ${alias}
+      and revoked_at is null
+      and (expires_at is null or expires_at > now())
     limit 1
-  `) as { doc_id: string; is_active: boolean }[];
+  `) as AliasRow[];
 
-  if (!aliasRows.length || !aliasRows[0].is_active) {
+  const docId = rows?.[0]?.doc_id;
+  if (!docId) {
     return new NextResponse("Not found", { status: 404 });
   }
 
-  const docId = aliasRows[0].doc_id;
+  // 2) Analytics logging
+  // Vercel/Edge headers usually include x-forwarded-for
+  const xff = req.headers.get("x-forwarded-for") || "";
+  const ip = xff.split(",")[0]?.trim() || ""; // best-effort
+  const ua = req.headers.get("user-agent") || "";
+  const ref = req.headers.get("referer") || "";
 
-  // doc_id -> target_url + filename
-  const docRows = (await sql`
-    select target_url, coalesce(original_filename, title, 'document.pdf') as name
-    from documents
-    where id = ${docId}::uuid
-    limit 1
-  `) as { target_url: string; name: string }[];
+  // Hash IP for privacy (recommended) — requires VIEW_SALT
+  const salt = process.env.VIEW_SALT || "";
+  const ip_hash = salt && ip ? hmacHex(salt, ip).slice(0, 32) : null;
 
-  if (!docRows.length || !docRows[0].target_url) {
-    return new NextResponse("Not found", { status: 404 });
+  // Swallow logging errors so viewing never fails
+  try {
+    await sql`
+      insert into doc_views (doc_id, alias, ip_hash, user_agent, referer)
+      values (${docId}::uuid, ${alias}, ${ip_hash}, ${ua}, ${ref})
+    `;
+  } catch {
+    // ignore
   }
 
-  const { bucket, key } = parseTargetUrl(docRows[0].target_url);
-  const range = req.headers.get("range") ?? undefined;
-
-  const obj = await s3.send(
-    new GetObjectCommand({
-      Bucket: bucket,
-      Key: key,
-      Range: range,
-    })
-  );
-
-  const body = obj.Body as Readable | undefined;
-  if (!body) return new NextResponse("Not found", { status: 404 });
-
+  // 3) Redirect to your actual file-serving endpoint
   const url = new URL(req.url);
-  const download = url.searchParams.get("download") === "1";
-  const filename = docRows[0].name.endsWith(".pdf") ? docRows[0].name : `${docRows[0].name}.pdf`;
+  url.pathname = `/serve/${encodeURIComponent(docId)}`;
+  url.search = ""; // keep clean; if you want passthrough, remove this line
 
-  const headers = new Headers();
-  headers.set("Content-Type", obj.ContentType || "application/pdf");
-  headers.set("Accept-Ranges", "bytes");
-  headers.set("Cache-Control", "private, no-store");
-
-  // Range support (important for PDF seeking)
-  const contentRange = (obj as any).ContentRange as string | undefined;
-  if (contentRange) headers.set("Content-Range", contentRange);
-
-  // Content length
-  if (obj.ContentLength != null) headers.set("Content-Length", String(obj.ContentLength));
-
-  headers.set(
-    "Content-Disposition",
-    `${download ? "attachment" : "inline"}; filename="${filename.replace(/"/g, "")}"`
-  );
-
-  return new NextResponse(body as any, {
-    status: range ? 206 : 200,
-    headers,
-  });
+  return NextResponse.redirect(url, 307);
 }

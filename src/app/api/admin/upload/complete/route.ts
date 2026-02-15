@@ -7,6 +7,7 @@ import { sql } from "@/lib/db";
 import { r2Client } from "@/lib/r2";
 import { HeadObjectCommand } from "@aws-sdk/client-s3";
 import { createUniqueAliasForDoc } from "@/lib/alias";
+import { slugify } from "@/lib/slug";
 
 type Body = {
     title?: string;
@@ -78,4 +79,32 @@ export async function POST(req: NextRequest) {
         view_url: `${origin}/d/${encodeURIComponent(alias)}`,
         target_url: targetUrl,
     });
+
+    // --- Auto-create alias for this doc (conflict-safe) ---
+    const sourceName =
+        (original_filename || title || "document.pdf").toString();
+
+    let base = slugify(sourceName);
+    if (!base) base = `doc-${docId.slice(0, 8)}`;
+
+    let alias = base;
+
+    // Try base, then base-2, base-3...
+    for (let i = 0; i < 50; i++) {
+        if (i > 0) alias = `${base}-${i + 1}`;
+
+        try {
+            await sql`
+      insert into public.doc_aliases (alias, doc_id, is_active)
+      values (${alias}, ${docId}::uuid, true)
+    `;
+            break; // success
+        } catch (e: any) {
+            const msg = String(e?.message || e);
+            // unique violation -> try next suffix
+            if (msg.includes("duplicate") || msg.includes("unique")) continue;
+            throw e;
+        }
+    }
+
 }
