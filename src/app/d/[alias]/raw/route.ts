@@ -9,17 +9,27 @@ type AliasRow = {
   doc_id: string;
 };
 
-function hmacHex(key: string, value: string) {
-  return crypto.createHmac("sha256", key).update(value).digest("hex");
+function getClientIp(req: NextRequest) {
+  const xff = req.headers.get("x-forwarded-for") || "";
+  return xff.split(",")[0]?.trim() || "";
 }
 
-export async function GET(req: NextRequest, ctx: { params: { alias: string } }) {
-  const alias = ctx.params.alias;
+function hashIp(ip: string) {
+  const salt = process.env.VIEW_SALT || "";
+  if (!salt || !ip) return null;
+  return crypto.createHmac("sha256", salt).update(ip).digest("hex").slice(0, 32);
+}
+
+export async function GET(
+  req: NextRequest,
+  context: { params: Promise<{ alias: string }> }
+) {
+  const { alias } = await context.params;
 
   // 1) Resolve alias with expiration + revoke checks
   const rows = (await sql`
     select doc_id::text as doc_id
-    from doc_aliases
+    from public.doc_aliases
     where alias = ${alias}
       and revoked_at is null
       and (expires_at is null or expires_at > now())
@@ -27,35 +37,29 @@ export async function GET(req: NextRequest, ctx: { params: { alias: string } }) 
   `) as AliasRow[];
 
   const docId = rows?.[0]?.doc_id;
-  if (!docId) {
-    return new NextResponse("Not found", { status: 404 });
-  }
+  if (!docId) return new NextResponse("Not found", { status: 404 });
 
-  // 2) Analytics logging
-  // Vercel/Edge headers usually include x-forwarded-for
-  const xff = req.headers.get("x-forwarded-for") || "";
-  const ip = xff.split(",")[0]?.trim() || ""; // best-effort
-  const ua = req.headers.get("user-agent") || "";
-  const ref = req.headers.get("referer") || "";
-
-  // Hash IP for privacy (recommended) — requires VIEW_SALT
-  const salt = process.env.VIEW_SALT || "";
-  const ip_hash = salt && ip ? hmacHex(salt, ip).slice(0, 32) : null;
-
-  // Swallow logging errors so viewing never fails
+  // 2) Analytics logging (best-effort)
   try {
+    const ip = getClientIp(req);
+    const ipHash = hashIp(ip);
+    const ua = req.headers.get("user-agent") || null;
+    const ref = req.headers.get("referer") || null;
+
     await sql`
-      insert into doc_views (doc_id, alias, ip_hash, user_agent, referer)
-      values (${docId}::uuid, ${alias}, ${ip_hash}, ${ua}, ${ref})
+      insert into public.doc_views
+        (doc_id, alias, path, kind, user_agent, referer, ip_hash)
+      values
+        (${docId}::uuid, ${alias}, ${new URL(req.url).pathname}, 'alias_raw', ${ua}, ${ref}, ${ipHash})
     `;
   } catch {
-    // ignore
+    // ignore logging errors
   }
 
-  // 3) Redirect to your actual file-serving endpoint
+  // 3) Redirect to serve route (which returns the PDF)
   const url = new URL(req.url);
   url.pathname = `/serve/${encodeURIComponent(docId)}`;
-  url.search = ""; // keep clean; if you want passthrough, remove this line
+  url.search = ""; // keep clean
 
   return NextResponse.redirect(url, 307);
 }
