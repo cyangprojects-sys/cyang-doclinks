@@ -20,17 +20,26 @@ export async function GET() {
         (select count(*)::int from public.documents) as documents_count
     `;
 
+        // Show columns of doc_aliases in prod
+        const aliasCols = await sql`
+      select column_name, data_type
+      from information_schema.columns
+      where table_schema = 'public' and table_name = 'doc_aliases'
+      order by ordinal_position
+    `;
+
+        // Show a few aliases without ordering by id
         const sampleAlias = await sql`
       select alias, doc_id::text as doc_id, is_active
       from public.doc_aliases
-      order by id desc
-      limit 5
+      limit 10
     `;
 
         return NextResponse.json({
             ok: true,
             dbInfo: dbInfo[0],
             counts: counts[0],
+            aliasCols,
             sampleAlias,
             vercel: {
                 env: process.env.VERCEL_ENV,
@@ -43,4 +52,3 @@ export async function GET() {
             { status: 500 }
         );
     }
-}
