@@ -2,7 +2,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 import Link from "next/link";
-import { cookies, headers } from "next/headers";
+import { cookies } from "next/headers";
 
 type DebugResponse =
   | {
@@ -29,15 +29,6 @@ function Row({ k, v }: { k: string; v: any }) {
   );
 }
 
-async function getSelfBaseUrl() {
-  const h = await headers();
-
-  const proto = h.get("x-forwarded-proto") ?? "https";
-  const host = h.get("x-forwarded-host") ?? h.get("host") ?? "www.cyang.io";
-
-  return `${proto}://${host}`;
-}
-
 export default async function AdminDebugPage({
   searchParams,
 }: {
@@ -49,14 +40,10 @@ export default async function AdminDebugPage({
   let data: DebugResponse | null = null;
 
   if (alias) {
-    const base = await getSelfBaseUrl();
-    const url = new URL(`${base}/api/admin/debug`);
-    url.searchParams.set("alias", alias);
-
-    // Forward the user's cookies so /api/admin/debug can see the session
+    // ✅ Forward cookies so /api/admin/debug sees the session
     const cookieHeader = (await cookies()).toString();
 
-    const res = await fetch(url.toString(), {
+    const res = await fetch(`/api/admin/debug?alias=${encodeURIComponent(alias)}`, {
       cache: "no-store",
       headers: {
         cookie: cookieHeader,
@@ -156,4 +143,13 @@ export default async function AdminDebugPage({
           </div>
 
           <div className="rounded-lg border border-white/10 bg-black/30 p-4">
-            <div clas
+            <div className="text-sm font-semibold">R2 HEAD (best-effort)</div>
+            <div className="mt-3">
+              <Row k="head" v={data.r2_head ?? null} />
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
