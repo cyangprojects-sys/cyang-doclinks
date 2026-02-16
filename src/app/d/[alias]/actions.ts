@@ -1,8 +1,5 @@
 "use server";
 
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
-
 import { z } from "zod";
 import { sql } from "@/lib/db";
 import { sendMail } from "@/lib/email";
@@ -16,20 +13,28 @@ const ShareInput = z.object({
 
 type DocRow = { title: string | null };
 
-function baseUrl() {
-  // Prefer explicit env if set; otherwise fall back to production domain.
-  // (Server Actions don't always have a reliable request origin.)
+function getBaseUrl() {
   const site = process.env.NEXT_PUBLIC_SITE_URL?.trim();
   if (site) return site.replace(/\/+$/, "");
   return "https://www.cyang.io";
 }
 
+function escapeHtml(s: string) {
+  return s
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+// ✅ must be async export
 export async function shareDocToEmail(input: unknown) {
   await requireOwner();
 
   const { docId, email, alias } = ShareInput.parse(input);
 
-  // Fetch a friendly title (best effort)
+  // Friendly name (best-effort)
   let title: string | null = null;
   try {
     const rows = (await sql`
@@ -43,17 +48,17 @@ export async function shareDocToEmail(input: unknown) {
     // ignore
   }
 
-  const site = baseUrl();
+  const base = getBaseUrl();
 
-  // Prefer alias link if we have it; otherwise fall back to serve/<docId>
+  // Prefer readable alias link
   const href = alias
-    ? `${site}/d/${encodeURIComponent(alias)}`
-    : `${site}/serve/${encodeURIComponent(docId)}`;
+    ? `${base}/d/${encodeURIComponent(alias)}`
+    : `${base}/serve/${encodeURIComponent(docId)}`;
 
-  const niceName = (title && title.trim()) || "Shared document";
-  const linkLabel = alias ? `${niceName} (${alias})` : niceName;
+  const readableName = (title && title.trim()) || "Shared document";
+  const linkLabel = alias ? `${readableName} (${alias})` : readableName;
 
-  const subject = `Your Cyang Docs link: ${niceName}`;
+  const subject = `Your Cyang Docs link: ${readableName}`;
 
   const text = `Here is your link:\n\n${href}\n`;
 
@@ -61,7 +66,7 @@ export async function shareDocToEmail(input: unknown) {
     <div style="font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; line-height: 1.5;">
       <p style="margin:0 0 12px 0;">Here is your link:</p>
       <p style="margin:0 0 12px 0;">
-        <a href="${href}" style="color:#2563eb; text-decoration:underline;">
+        <a href="${escapeHtml(href)}" style="color:#2563eb; text-decoration:underline;">
           ${escapeHtml(linkLabel)}
         </a>
       </p>
@@ -82,13 +87,4 @@ export async function shareDocToEmail(input: unknown) {
   });
 
   return { ok: true as const, sent_to: email, href, label: linkLabel };
-}
-
-function escapeHtml(s: string) {
-  return s
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
 }
