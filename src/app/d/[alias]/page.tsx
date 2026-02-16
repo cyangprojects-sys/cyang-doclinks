@@ -27,7 +27,8 @@ export default async function SharePage({
   const alias = (params.alias || "").trim();
   if (!alias) notFound();
 
-  // ✅ Fetch row without filtering (then validate in JS)
+  // IMPORTANT: Don't filter in SQL — it can accidentally exclude rows due to type/casting nuances.
+  // Fetch row, then validate in code (matches raw-route behavior).
   const rows = (await sql`
     select
       alias::text as alias,
@@ -42,10 +43,7 @@ export default async function SharePage({
   const row = rows?.[0];
   if (!row?.doc_id) notFound();
 
-  const revoked = !!row.revoked_at;
-  const expired = isExpired(row.expires_at);
-
-  if (revoked || expired) {
+  if (row.revoked_at) {
     return (
       <main className="mx-auto max-w-3xl px-4 py-10 text-white">
         <div className="flex items-center justify-between gap-3">
@@ -63,12 +61,33 @@ export default async function SharePage({
         </p>
 
         <div className="mt-6 rounded-lg border border-neutral-800 bg-neutral-950/40 p-5">
-          <div className="text-lg font-medium">
-            {revoked ? "This link has been revoked." : "This link has expired."}
-          </div>
-          <p className="mt-2 text-sm text-neutral-400">
-            Contact the sender for a new link.
-          </p>
+          <div className="text-lg font-medium">This link has been revoked.</div>
+          <p className="mt-2 text-sm text-neutral-400">Contact the sender for a new link.</p>
+        </div>
+      </main>
+    );
+  }
+
+  if (isExpired(row.expires_at)) {
+    return (
+      <main className="mx-auto max-w-3xl px-4 py-10 text-white">
+        <div className="flex items-center justify-between gap-3">
+          <h1 className="text-xl font-semibold tracking-tight">Shared document</h1>
+          <Link
+            href="/"
+            className="text-sm text-neutral-400 hover:text-neutral-200 underline underline-offset-4"
+          >
+            Home
+          </Link>
+        </div>
+
+        <p className="mt-2 text-sm text-neutral-400">
+          Link: <span className="font-mono text-neutral-300">/d/{alias}</span>
+        </p>
+
+        <div className="mt-6 rounded-lg border border-neutral-800 bg-neutral-950/40 p-5">
+          <div className="text-lg font-medium">This link has expired.</div>
+          <p className="mt-2 text-sm text-neutral-400">Contact the sender for a new link.</p>
         </div>
       </main>
     );
