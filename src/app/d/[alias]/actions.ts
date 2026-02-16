@@ -2,6 +2,7 @@
 "use server";
 
 import crypto from "crypto";
+import { revalidatePath } from "next/cache";
 import { sql } from "@/lib/db";
 import { sendShareEmail } from "@/lib/email";
 import { requireOwnerAdmin } from "@/lib/admin";
@@ -36,7 +37,6 @@ function fmtDateLabel(d: Date) {
 }
 
 function computeViewsLeftLabel(viewCount: number, maxViews: number | null) {
-  // max_views: null or 0 => unlimited
   if (maxViews === null || maxViews === 0) return "Unlimited";
   const left = Math.max(0, maxViews - viewCount);
   return String(left);
@@ -50,6 +50,7 @@ export type CreateShareResult =
     expires_at: string | null;
     max_views: number | null;
     view_count: number;
+    views_left_label: string;
   }
   | { ok: false; error: string; message?: string };
 
@@ -83,7 +84,6 @@ export async function createAndEmailShareToken(input: {
         ? defaultMax
         : Math.max(0, Math.floor(input.max_views));
 
-    // resolve alias -> doc_id
     const arows = (await sql`
       select doc_id::text as doc_id, alias
       from doc_aliases
@@ -106,7 +106,6 @@ export async function createAndEmailShareToken(input: {
 
     const docTitle = drows?.[0]?.title || "Document";
 
-    // create share (UUID token)
     const token = crypto.randomUUID();
     const expiresAt =
       expiresHours > 0 ? new Date(Date.now() + expiresHours * 3600 * 1000) : null;
@@ -120,7 +119,11 @@ export async function createAndEmailShareToken(input: {
         ${expiresAt ? expiresAt.toISOString() : null},
         ${Number.isFinite(maxViews) ? maxViews : null}
       )
-      returning token::text as token, expires_at::text as expires_at, max_views, view_count
+      returning
+        token::text as token,
+        expires_at::text as expires_at,
+        max_views,
+        view_count
     `) as unknown as Array<{
       token: string;
       expires_at: string | null;
@@ -163,6 +166,8 @@ export async function createAndEmailShareToken(input: {
       viewsLeftLabel,
     });
 
+    revalidatePath(`/d/${alias}`);
+
     return {
       ok: true,
       share_url: shareUrl,
@@ -170,6 +175,7 @@ export async function createAndEmailShareToken(input: {
       expires_at: row?.expires_at ?? (expiresAt ? expiresAt.toISOString() : null),
       max_views: maxViewsReturned,
       view_count: currentViews,
+      views_left_label: viewsLeftLabel,
     };
   } catch (e: any) {
     const msg = String(e?.message || "");
@@ -183,6 +189,35 @@ export async function createAndEmailShareToken(input: {
       return { ok: false, error: "misconfig", message: "Missing OWNER_EMAIL env var." };
     }
     return { ok: false, error: "server_error", message: msg || "Unknown error" };
+  }
+}
+
+export async function revokeShareToken(input: {
+  alias: string;
+  token: string;
+}): Promise<{ ok: true } | { ok: false; error: string; message?: string }> {
+  try {
+    await requireOwnerAdmin();
+
+    const alias = (input.alias || "").trim();
+    const token = (input.token || "").trim();
+
+    if (!alias) return { ok: false, error: "bad_request", message: "Missing alias." };
+    if (!token) return { ok: false, error: "bad_request", message: "Missing token." };
+
+    await sql`
+      update doc_shares
+      set revoked_at = now()
+      where token = ${token}::uuid
+        and revoked_at is null
+    `;
+
+    revalidatePath(`/d/${alias}`);
+    revalidatePath(`/s/${token}`);
+
+    return { ok: true };
+  } catch (e: any) {
+    return { ok: false, error: "server_error", message: e?.message || "Unknown error" };
   }
 }
 
@@ -200,7 +235,6 @@ export async function getShareStatsByToken(token: string): Promise<
     const t = (token || "").trim();
     if (!t) return { ok: false, error: "bad_request", message: "Missing token." };
 
-    // Token is UUID in DB
     const rows = (await sql`
       select
         view_count,

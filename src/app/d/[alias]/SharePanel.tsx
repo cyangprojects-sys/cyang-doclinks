@@ -32,15 +32,22 @@ function maxLabel(n: number | null) {
     return String(n);
 }
 
-function statusFor(s: { revoked_at: string | null; expires_at: string | null; max_views: number | null; view_count: number }) {
-    if (s.revoked_at) return { label: "Revoked", cls: "bg-amber-500/10 text-amber-300 border-amber-500/20" };
-    if (s.expires_at && new Date(s.expires_at).getTime() <= Date.now()) {
+function statusFor(s: {
+    revoked_at: string | null;
+    expires_at: string | null;
+    max_views: number | null;
+    view_count: number;
+}) {
+    if (s.revoked_at)
+        return { label: "Revoked", cls: "bg-amber-500/10 text-amber-300 border-amber-500/20" };
+
+    if (s.expires_at && new Date(s.expires_at).getTime() <= Date.now())
         return { label: "Expired", cls: "bg-red-500/10 text-red-300 border-red-500/20" };
-    }
+
     const max = s.max_views;
-    if (max != null && max !== 0 && s.view_count >= max) {
+    if (max != null && max !== 0 && s.view_count >= max)
         return { label: "Maxed", cls: "bg-red-500/10 text-red-300 border-red-500/20" };
-    }
+
     return { label: "Active", cls: "bg-emerald-500/10 text-emerald-300 border-emerald-500/20" };
 }
 
@@ -74,6 +81,9 @@ export default function SharePanel(props: {
 
     const [created, setCreated] = useState<CreateShareResult | null>(null);
     const [shares, setShares] = useState<ShareRow[]>(props.initialShares);
+
+    const origin =
+        typeof window !== "undefined" && window.location?.origin ? window.location.origin : "";
 
     const createdViewsLeft = useMemo(() => {
         if (!created || !created.ok) return null;
@@ -110,7 +120,6 @@ export default function SharePanel(props: {
                 return;
             }
 
-            // Optimistically prepend share row for UI
             setShares((prev) => [
                 {
                     token: res.token,
@@ -123,6 +132,7 @@ export default function SharePanel(props: {
                 },
                 ...prev,
             ]);
+
             setToEmail("");
         });
     }
@@ -169,7 +179,9 @@ export default function SharePanel(props: {
         <section className="mt-8 rounded-xl border border-neutral-800 overflow-hidden">
             <div className="bg-neutral-950 px-4 py-3">
                 <div className="text-sm font-medium text-neutral-200">Share</div>
-                <div className="text-xs text-neutral-500">Create a limited link and email it to a recipient.</div>
+                <div className="text-xs text-neutral-500">
+                    Create a limited link and email it to a recipient.
+                </div>
             </div>
 
             <div className="p-4 space-y-4">
@@ -233,10 +245,10 @@ export default function SharePanel(props: {
                             <div>
                                 <div className="text-sm font-medium text-neutral-200">Share created</div>
                                 <div className="mt-1 text-xs text-neutral-500">
-                                    Expires: <span className="text-neutral-300">{fmtDate(created.expires_at)}</span>{" "}
-                                    · Max: <span className="text-neutral-300">{maxLabel(created.max_views)}</span>{" "}
-                                    · Views: <span className="text-neutral-300">{created.view_count}</span>{" "}
-                                    · Left: <span className="text-neutral-300">{createdViewsLeft}</span>
+                                    Expires: <span className="text-neutral-300">{fmtDate(created.expires_at)}</span> ·
+                                    Max: <span className="text-neutral-300">{maxLabel(created.max_views)}</span> ·
+                                    Views: <span className="text-neutral-300">{created.view_count}</span> ·
+                                    Left: <span className="text-neutral-300">{createdViewsLeft}</span>
                                 </div>
                             </div>
 
@@ -294,7 +306,9 @@ export default function SharePanel(props: {
                                 ) : (
                                     shares.map((s) => {
                                         const st = statusFor(s);
-                                        const link = `/s/${s.token}`;
+                                        const linkPath = `/s/${s.token}`;
+                                        const linkAbs = origin ? `${origin}${linkPath}` : linkPath;
+
                                         const tokenShort =
                                             s.token.length > 12 ? `${s.token.slice(0, 8)}…${s.token.slice(-4)}` : s.token;
 
@@ -310,7 +324,9 @@ export default function SharePanel(props: {
                                                 </td>
 
                                                 <td className="px-4 py-3">
-                                                    <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs ${st.cls}`}>
+                                                    <span
+                                                        className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs ${st.cls}`}
+                                                    >
                                                         {st.label}
                                                     </span>
                                                     <div className="mt-1 text-xs text-neutral-500">
@@ -329,14 +345,14 @@ export default function SharePanel(props: {
                                                 <td className="px-4 py-3 text-right">
                                                     <div className="inline-flex items-center gap-2">
                                                         <a
-                                                            href={link}
+                                                            href={linkPath}
                                                             target="_blank"
                                                             className="rounded-md border border-neutral-800 px-3 py-1.5 text-xs text-neutral-200 hover:bg-neutral-900"
                                                         >
                                                             Open
                                                         </a>
                                                         <button
-                                                            onClick={() => copy(`${window.location.origin}${link}`)}
+                                                            onClick={() => copy(linkAbs)}
                                                             className="rounded-md border border-neutral-800 px-3 py-1.5 text-xs text-neutral-200 hover:bg-neutral-900"
                                                         >
                                                             Copy
