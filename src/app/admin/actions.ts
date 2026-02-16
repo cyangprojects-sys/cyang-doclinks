@@ -3,6 +3,7 @@
 
 import { DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { revalidatePath } from "next/cache";
+import bcrypt from "bcryptjs";
 
 import { sql } from "@/lib/db";
 import { r2Bucket, r2Client, r2Prefix } from "@/lib/r2";
@@ -19,9 +20,7 @@ function getBaseUrl() {
     return "http://localhost:3000";
 }
 
-async function resolveR2LocationForDoc(
-    docId: string
-): Promise<{ bucket: string; key: string }> {
+async function resolveR2LocationForDoc(docId: string): Promise<{ bucket: string; key: string }> {
     // Attempt 1: docs.pointer = "r2://bucket/key"
     try {
         const rows = (await sql`
@@ -151,7 +150,12 @@ export async function deleteDocAction(formData: FormData): Promise<void> {
     revalidatePath("/admin/dashboard");
 }
 
-// NEW: Used as <form action={revokeDocShareAction}>
+/**
+ * Share admin actions
+ * Expected table: doc_shares(token text primary key, revoked_at timestamptz, password_hash text null, ...)
+ */
+
+// Used as <form action={revokeDocShareAction}>
 export async function revokeDocShareAction(formData: FormData): Promise<void> {
     await requireOwnerAdmin();
 
@@ -161,9 +165,50 @@ export async function revokeDocShareAction(formData: FormData): Promise<void> {
     await sql`
     update doc_shares
     set revoked_at = now()
-    where token = ${token}::uuid
+    where token = ${token}
       and revoked_at is null
   `;
 
     revalidatePath("/admin/dashboard");
+    revalidatePath("/admin");
+}
+
+// Used as <form action={setSharePasswordAction}>
+export async function setSharePasswordAction(formData: FormData): Promise<void> {
+    await requireOwnerAdmin();
+
+    const token = String(formData.get("token") || "").trim();
+    const password = String(formData.get("password") || "").trim();
+
+    if (!token) throw new Error("Missing token.");
+    if (password.length < 4) throw new Error("Password must be at least 4 characters.");
+
+    // bcrypt cost (12 is a good default for serverless)
+    const hash = await bcrypt.hash(password, 12);
+
+    await sql`
+    update doc_shares
+    set password_hash = ${hash}
+    where token = ${token}
+  `;
+
+    revalidatePath("/admin/dashboard");
+    revalidatePath("/admin");
+}
+
+// Used as <form action={clearSharePasswordAction}>
+export async function clearSharePasswordAction(formData: FormData): Promise<void> {
+    await requireOwnerAdmin();
+
+    const token = String(formData.get("token") || "").trim();
+    if (!token) throw new Error("Missing token.");
+
+    await sql`
+    update doc_shares
+    set password_hash = null
+    where token = ${token}
+  `;
+
+    revalidatePath("/admin/dashboard");
+    revalidatePath("/admin");
 }
