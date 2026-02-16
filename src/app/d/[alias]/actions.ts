@@ -1,24 +1,18 @@
 // src/app/d/[alias]/actions.ts
-"use server";
 
 import { z } from "zod";
 import { sql } from "@/lib/db";
 import { requireOwner } from "@/lib/owner";
 
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
-
 /**
- * NOTE:
- * - This file is used by the client SharePanel on /d/[alias]
- * - Turbopack requires that all imports exist as real exports.
- * - This file provides:
- *   - createAndEmailShareToken
- *   - getShareStatsByToken
- *   - revokeShareToken
- *   - type CreateShareResult
+ * IMPORTANT:
+ * In Next.js, a file is treated as a "use server" module only when the top-level directive exists.
+ * When that directive exists, ONLY async functions may be exported.
  *
- * It does NOT implement password hashing; your share-password feature can live elsewhere.
+ * So we DO NOT put "use server" at the top of this file.
+ * Instead, we put "use server" inside each server action function.
+ *
+ * This lets us export types + helpers safely, while still making the functions server actions.
  */
 
 function baseUrl() {
@@ -29,21 +23,15 @@ function baseUrl() {
 }
 
 function isValidEmail(email: string) {
-  // light validation; avoids pulling in heavy deps
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
 }
 
 const CreateSchema = z.object({
-  // SharePanel typically knows doc_id already; allow alias-only fallback as well.
   doc_id: z.string().uuid().optional(),
   alias: z.string().min(1).optional(),
-
-  // Optional recipient email (if provided, we try to email via Resend)
   to_email: z.string().email().optional(),
-
-  // Optional constraints
-  expires_in_hours: z.number().int().positive().max(24 * 365).optional(), // up to 1 year
-  max_views: z.number().int().positive().max(1000000).optional(),
+  expires_in_hours: z.number().int().positive().max(24 * 365).optional(),
+  max_views: z.number().int().positive().max(1_000_000).optional(),
 });
 
 export type CreateShareResult =
@@ -141,11 +129,12 @@ export async function createAndEmailShareToken(
     }
     | FormData
 ): Promise<CreateShareResult> {
+  "use server";
+
   try {
     const owner = await requireOwner();
     if (!owner.ok) return { ok: false, error: owner.reason };
 
-    // Accept FormData or plain object
     const raw =
       input instanceof FormData
         ? {
@@ -167,7 +156,6 @@ export async function createAndEmailShareToken(
     const docId = await resolveDocId({ doc_id: parsed.data.doc_id, alias: parsed.data.alias });
     if (!docId) return { ok: false, error: "DOC_NOT_FOUND", message: "doc_id or alias not found" };
 
-    // optional: verify doc exists and is ready
     const docRows = (await sql`
       select id::text as id, title::text as title
       from public.docs
@@ -191,7 +179,6 @@ export async function createAndEmailShareToken(
 
     const toEmail = to_email?.trim() ? to_email.trim() : null;
 
-    // Insert share row
     const inserted = (await sql`
       insert into public.doc_shares (
         token,
@@ -232,7 +219,6 @@ export async function createAndEmailShareToken(
     const row = inserted[0];
     const shareUrl = `${baseUrl()}/s/${encodeURIComponent(row.token)}`;
 
-    // Optional email
     if (toEmail && isValidEmail(toEmail)) {
       const title = docRows[0]?.title || "Document";
       const subject = `Shared with you: ${title}`;
@@ -252,11 +238,10 @@ export async function createAndEmailShareToken(
         </div>
       `;
 
-      // best-effort — never fail share creation if email fails
       try {
         await sendResendEmail({ to: toEmail, subject, html });
       } catch {
-        // ignore
+        // best-effort only
       }
     }
 
@@ -279,6 +264,8 @@ export async function createAndEmailShareToken(
  * Fetch share stats for UI display (owner-only).
  */
 export async function getShareStatsByToken(token: string): Promise<ShareStatsResult> {
+  "use server";
+
   try {
     const owner = await requireOwner();
     if (!owner.ok) return { ok: false, error: owner.reason };
@@ -336,6 +323,8 @@ export async function getShareStatsByToken(token: string): Promise<ShareStatsRes
  * Revoke a share token (owner-only).
  */
 export async function revokeShareToken(token: string): Promise<RevokeShareResult> {
+  "use server";
+
   try {
     const owner = await requireOwner();
     if (!owner.ok) return { ok: false, error: owner.reason };
