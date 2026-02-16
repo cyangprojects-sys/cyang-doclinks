@@ -47,7 +47,7 @@ export default async function SharePage({
       </p>
 
       <div className="mt-6 rounded-lg border border-neutral-800 bg-neutral-950/40 p-4">
-        <ShareForm docId={docId} />
+        <ShareForm docId={docId} alias={alias} />
       </div>
 
       <div className="mt-6 overflow-hidden rounded-lg border border-neutral-800">

@@ -1,7 +1,12 @@
 "use server";
 
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 import { z } from "zod";
+import { sql } from "@/lib/db";
 import { sendMail } from "@/lib/email";
+import { requireOwner } from "@/lib/auth";
 
 const ShareInput = z.object({
   docId: z.string().min(1),
@@ -9,54 +14,81 @@ const ShareInput = z.object({
   alias: z.string().min(1).optional(),
 });
 
-export type ShareResult =
-  | { ok: true }
-  | { ok: false; error: string; message?: string };
+type DocRow = { title: string | null };
 
-function getBaseUrl() {
-  if (process.env.NEXT_PUBLIC_BASE_URL) return process.env.NEXT_PUBLIC_BASE_URL;
-  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
+function baseUrl() {
+  // Prefer explicit env if set; otherwise fall back to production domain.
+  // (Server Actions don't always have a reliable request origin.)
+  const site = process.env.NEXT_PUBLIC_SITE_URL?.trim();
+  if (site) return site.replace(/\/+$/, "");
   return "https://www.cyang.io";
 }
 
-/**
- * IMPORTANT:
- * In a "use server" file, only async functions may be exported.
- */
-export async function shareDocToEmail(input: {
-  docId: string;
-  email: string;
-  alias?: string;
-}): Promise<ShareResult> {
+export async function shareDocToEmail(input: unknown) {
+  await requireOwner();
+
+  const { docId, email, alias } = ShareInput.parse(input);
+
+  // Fetch a friendly title (best effort)
+  let title: string | null = null;
   try {
-    const parsed = ShareInput.safeParse(input);
-    if (!parsed.success) {
-      return {
-        ok: false,
-        error: "bad_request",
-        message: parsed.error.message,
-      };
-    }
-
-    const { docId, email, alias } = parsed.data;
-
-    const url = alias
-      ? `${getBaseUrl()}/d/${encodeURIComponent(alias)}`
-      : `${getBaseUrl()}/serve/${encodeURIComponent(docId)}`;
-
-    await sendMail({
-      to: email,
-      subject: "Your Cyang Docs link",
-      text: `Here is your link:\n\n${url}`,
-      html: `<p>Here is your link:</p><p><a href="${url}">${url}</a></p>`,
-    });
-
-    return { ok: true };
-  } catch (err: any) {
-    return {
-      ok: false,
-      error: "internal_error",
-      message: err?.message || "Unknown error",
-    };
+    const rows = (await sql`
+      select title::text as title
+      from public.docs
+      where id = ${docId}::uuid
+      limit 1
+    `) as DocRow[];
+    title = rows?.[0]?.title ?? null;
+  } catch {
+    // ignore
   }
+
+  const site = baseUrl();
+
+  // Prefer alias link if we have it; otherwise fall back to serve/<docId>
+  const href = alias
+    ? `${site}/d/${encodeURIComponent(alias)}`
+    : `${site}/serve/${encodeURIComponent(docId)}`;
+
+  const niceName = (title && title.trim()) || "Shared document";
+  const linkLabel = alias ? `${niceName} (${alias})` : niceName;
+
+  const subject = `Your Cyang Docs link: ${niceName}`;
+
+  const text = `Here is your link:\n\n${href}\n`;
+
+  const html = `
+    <div style="font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; line-height: 1.5;">
+      <p style="margin:0 0 12px 0;">Here is your link:</p>
+      <p style="margin:0 0 12px 0;">
+        <a href="${href}" style="color:#2563eb; text-decoration:underline;">
+          ${escapeHtml(linkLabel)}
+        </a>
+      </p>
+      <p style="margin:12px 0 0 0; color:#6b7280; font-size:12px;">
+        If the link above doesn’t work, copy/paste this URL:<br/>
+        <span style="font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;">
+          ${escapeHtml(href)}
+        </span>
+      </p>
+    </div>
+  `;
+
+  await sendMail({
+    to: email,
+    subject,
+    text,
+    html,
+  });
+
+  return { ok: true as const, sent_to: email, href, label: linkLabel };
+}
+
+function escapeHtml(s: string) {
+  return s
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
 }
