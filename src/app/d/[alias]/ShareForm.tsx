@@ -2,232 +2,224 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { createAndEmailShareToken, getShareStatsByToken } from "./actions";
+import { createAndEmailShareToken, getShareStatsByToken } from "./actions.server";
 
 function fmtIso(iso: string | null) {
   if (!iso) return "—";
   const d = new Date(iso);
-  if (!Number.isFinite(d.getTime())) return "—";
-  return d.toLocaleString("en-US", {
-    year: "numeric",
-    month: "short",
-    day: "2-digit",
-    hour: "numeric",
-    minute: "2-digit",
-  });
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleString();
 }
 
-export default function ShareForm({ alias }: { alias: string }) {
+export default function ShareForm(props: { docId: string; alias: string }) {
   const [toEmail, setToEmail] = useState("");
-  const [expiresHours, setExpiresHours] = useState<number>(72);
-  const [maxViews, setMaxViews] = useState<number>(3);
+  const [expiresInHours, setExpiresInHours] = useState<string>("");
+  const [maxViews, setMaxViews] = useState<string>("");
 
-  const [busy, setBusy] = useState(false);
-  const [result, setResult] = useState<
-    | null
-    | {
-      share_url: string;
-      token: string;
-      expires_at: string | null;
-      max_views: number | null;
-      view_count: number;
+  const [token, setToken] = useState("");
+  const [shareUrl, setShareUrl] = useState<string | null>(null);
+
+  const [status, setStatus] = useState<
+    | { kind: "idle" }
+    | { kind: "busy" }
+    | { kind: "error"; message: string }
+    | { kind: "ok"; message: string }
+  >({ kind: "idle" });
+
+  const [stats, setStats] = useState<null | {
+    created_at: string;
+    expires_at: string | null;
+    to_email: string | null;
+    max_views: number | null;
+    view_count: number;
+    revoked_at: string | null;
+    has_password: boolean;
+  }>(null);
+
+  const canCreate = useMemo(() => {
+    if (status.kind === "busy") return false;
+    if (!props.docId) return false;
+    return true;
+  }, [status.kind, props.docId]);
+
+  async function onCreate() {
+    setStatus({ kind: "busy" });
+    setShareUrl(null);
+    setStats(null);
+
+    const exp = expiresInHours.trim() ? Number(expiresInHours) : undefined;
+    const mv = maxViews.trim() ? Number(maxViews) : undefined;
+
+    const res = await createAndEmailShareToken({
+      doc_id: props.docId,
+      alias: props.alias,
+      to_email: toEmail.trim() || undefined,
+      expires_in_hours: Number.isFinite(exp as any) ? (exp as number) : undefined,
+      max_views: Number.isFinite(mv as any) ? (mv as number) : undefined,
+    });
+
+    if (!res.ok) {
+      setStatus({ kind: "error", message: res.message || res.error });
+      return;
     }
-  >(null);
 
-  const [error, setError] = useState<string | null>(null);
+    setToken(res.token);
+    setShareUrl(res.share_url);
+    setStatus({ kind: "ok", message: "Share token created." });
 
-  const expiresLabel = useMemo(() => {
-    if (!expiresHours || expiresHours <= 0) return "No expiration";
-    const d = new Date(Date.now() + expiresHours * 3600 * 1000);
-    return fmtIso(d.toISOString());
-  }, [expiresHours]);
-
-  async function onSend() {
-    setError(null);
-    setResult(null);
-    setBusy(true);
-    try {
-      const res = await createAndEmailShareToken({
-        alias,
-        to_email: toEmail,
-        expires_hours: expiresHours <= 0 ? 0 : expiresHours,
-        max_views: maxViews <= 0 ? 0 : maxViews,
+    // Fetch stats for immediate display
+    const st = await getShareStatsByToken(res.token);
+    if (st.ok) {
+      setStats({
+        created_at: st.created_at,
+        expires_at: st.expires_at,
+        to_email: st.to_email,
+        max_views: st.max_views,
+        view_count: st.view_count,
+        revoked_at: st.revoked_at,
+        has_password: st.has_password,
       });
-
-      if (!res.ok) {
-        setError(res.message || res.error);
-        return;
-      }
-
-      setResult({
-        share_url: res.share_url,
-        token: res.token,
-        expires_at: res.expires_at,
-        max_views: res.max_views,
-        view_count: res.view_count,
-      });
-    } finally {
-      setBusy(false);
     }
   }
 
-  async function onRefreshStats() {
-    if (!result?.token) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const res = await getShareStatsByToken(result.token);
-      if (!res.ok) {
-        setError(res.message || res.error);
-        return;
-      }
-      setResult((prev) =>
-        prev
-          ? {
-            ...prev,
-            view_count: res.view_count,
-            max_views: res.max_views,
-            expires_at: res.expires_at,
-          }
-          : prev
-      );
-    } finally {
-      setBusy(false);
+  async function onLookup() {
+    const t = token.trim();
+    if (!t) {
+      setStatus({ kind: "error", message: "Enter a token first." });
+      return;
     }
-  }
 
-  async function copyLink() {
-    if (!result?.share_url) return;
-    await navigator.clipboard.writeText(result.share_url);
+    setStatus({ kind: "busy" });
+    setStats(null);
+
+    const st = await getShareStatsByToken(t);
+    if (!st.ok) {
+      setStatus({ kind: "error", message: st.message || st.error });
+      return;
+    }
+
+    setStats({
+      created_at: st.created_at,
+      expires_at: st.expires_at,
+      to_email: st.to_email,
+      max_views: st.max_views,
+      view_count: st.view_count,
+      revoked_at: st.revoked_at,
+      has_password: st.has_password,
+    });
+
+    setStatus({ kind: "ok", message: "Loaded stats." });
   }
 
   return (
-    <div style={{ border: "1px solid #E6E8EC", borderRadius: 16, padding: 16, background: "#FFFFFF" }}>
-      <div style={{ fontWeight: 800, fontSize: 16, marginBottom: 10 }}>Share via secure token email</div>
+    <div className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
+      <div className="text-lg font-semibold">Create share token</div>
+      <div className="mt-1 text-sm text-neutral-600">
+        Generates a /s/&lt;token&gt; link (optional email, expiration, view limit).
+      </div>
 
-      <div style={{ display: "grid", gap: 10 }}>
-        <label style={{ display: "grid", gap: 6 }}>
-          <div style={{ fontSize: 12, color: "#6B7280" }}>Recipient email</div>
-          <input
-            value={toEmail}
-            onChange={(e) => setToEmail(e.target.value)}
-            placeholder="name@company.com"
-            style={{
-              padding: "10px 12px",
-              borderRadius: 12,
-              border: "1px solid #D1D5DB",
-              outline: "none",
-              fontSize: 14,
-            }}
-          />
-        </label>
-
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-          <label style={{ display: "grid", gap: 6 }}>
-            <div style={{ fontSize: 12, color: "#6B7280" }}>Expiration (hours)</div>
+      <div className="mt-4 grid gap-3">
+        <div className="grid gap-2 md:grid-cols-3">
+          <div className="grid gap-1">
+            <label className="text-xs font-medium text-neutral-700">To email (optional)</label>
             <input
-              type="number"
-              min={0}
-              value={expiresHours}
-              onChange={(e) => setExpiresHours(Number(e.target.value))}
-              style={{
-                padding: "10px 12px",
-                borderRadius: 12,
-                border: "1px solid #D1D5DB",
-                outline: "none",
-                fontSize: 14,
-              }}
+              value={toEmail}
+              onChange={(e) => setToEmail(e.target.value)}
+              className="w-full rounded-xl border border-neutral-300 px-3 py-2 text-sm"
+              placeholder="someone@example.com"
             />
-            <div style={{ fontSize: 12, color: "#9CA3AF" }}>Email will show: {expiresLabel}</div>
-          </label>
+          </div>
 
-          <label style={{ display: "grid", gap: 6 }}>
-            <div style={{ fontSize: 12, color: "#6B7280" }}>Max views</div>
+          <div className="grid gap-1">
+            <label className="text-xs font-medium text-neutral-700">Expires in hours (optional)</label>
             <input
-              type="number"
-              min={0}
+              value={expiresInHours}
+              onChange={(e) => setExpiresInHours(e.target.value)}
+              className="w-full rounded-xl border border-neutral-300 px-3 py-2 text-sm"
+              placeholder="72"
+              inputMode="numeric"
+            />
+          </div>
+
+          <div className="grid gap-1">
+            <label className="text-xs font-medium text-neutral-700">Max views (optional)</label>
+            <input
               value={maxViews}
-              onChange={(e) => setMaxViews(Number(e.target.value))}
-              style={{
-                padding: "10px 12px",
-                borderRadius: 12,
-                border: "1px solid #D1D5DB",
-                outline: "none",
-                fontSize: 14,
-              }}
+              onChange={(e) => setMaxViews(e.target.value)}
+              className="w-full rounded-xl border border-neutral-300 px-3 py-2 text-sm"
+              placeholder="10"
+              inputMode="numeric"
             />
-            <div style={{ fontSize: 12, color: "#9CA3AF" }}>0 = “Unlimited” (if you want that)</div>
-          </label>
+          </div>
         </div>
 
-        <button
-          onClick={onSend}
-          disabled={busy}
-          style={{
-            borderRadius: 12,
-            padding: "10px 12px",
-            border: "1px solid #0B2A4A",
-            background: busy ? "#0B2A4A" : "#0B2A4A",
-            color: "#fff",
-            fontWeight: 800,
-            cursor: busy ? "not-allowed" : "pointer",
-          }}
-        >
-          {busy ? "Sending…" : "Send share email"}
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            disabled={!canCreate}
+            onClick={onCreate}
+            className="rounded-xl bg-black px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+          >
+            {status.kind === "busy" ? "Working…" : "Create token"}
+          </button>
 
-        {error ? (
-          <div style={{ color: "#B91C1C", fontSize: 13, lineHeight: "18px" }}>{error}</div>
+          {status.kind === "error" ? (
+            <div className="text-sm text-red-600">{status.message}</div>
+          ) : status.kind === "ok" ? (
+            <div className="text-sm text-green-700">{status.message}</div>
+          ) : null}
+        </div>
+
+        <div className="grid gap-2 md:grid-cols-[1fr_auto] md:items-end">
+          <div className="grid gap-1">
+            <label className="text-xs font-medium text-neutral-700">Token</label>
+            <input
+              value={token}
+              onChange={(e) => setToken(e.target.value)}
+              className="w-full rounded-xl border border-neutral-300 px-3 py-2 text-sm"
+              placeholder="uuid token"
+            />
+          </div>
+          <button
+            disabled={status.kind === "busy"}
+            onClick={onLookup}
+            className="rounded-xl border border-neutral-300 bg-white px-4 py-2 text-sm font-medium disabled:opacity-50"
+          >
+            Lookup stats
+          </button>
+        </div>
+
+        {shareUrl ? (
+          <div className="text-sm text-neutral-700">
+            Share URL:{" "}
+            <a className="underline" href={shareUrl} target="_blank" rel="noreferrer">
+              {shareUrl}
+            </a>
+          </div>
         ) : null}
 
-        {result ? (
-          <div style={{ marginTop: 6, padding: 12, borderRadius: 12, background: "#F9FAFB", border: "1px solid #E5E7EB" }}>
-            <div style={{ fontWeight: 800, marginBottom: 6 }}>Share created</div>
-
-            <div style={{ display: "grid", gap: 6, fontSize: 13, color: "#374151" }}>
+        {stats ? (
+          <div className="mt-2 rounded-xl border border-neutral-200 bg-neutral-50 p-3 text-sm">
+            <div className="grid gap-1 md:grid-cols-2">
               <div>
-                <span style={{ color: "#6B7280" }}>Link:</span>{" "}
-                <a href={result.share_url} target="_blank" rel="noreferrer" style={{ textDecoration: "underline" }}>
-                  {result.share_url}
-                </a>{" "}
-                <button
-                  onClick={copyLink}
-                  style={{
-                    marginLeft: 8,
-                    padding: "4px 8px",
-                    borderRadius: 10,
-                    border: "1px solid #D1D5DB",
-                    background: "#fff",
-                    cursor: "pointer",
-                    fontWeight: 700,
-                  }}
-                >
-                  Copy
-                </button>
+                <span className="font-medium">Created:</span> {fmtIso(stats.created_at)}
               </div>
-
               <div>
-                <span style={{ color: "#6B7280" }}>Expires:</span> {result.expires_at ? fmtIso(result.expires_at) : "No expiration"}
+                <span className="font-medium">To:</span> {stats.to_email || "—"}
               </div>
-
               <div>
-                <span style={{ color: "#6B7280" }}>Views:</span> {result.view_count}
-                {result.max_views ? ` / ${result.max_views}` : ""}
-                <button
-                  onClick={onRefreshStats}
-                  disabled={busy}
-                  style={{
-                    marginLeft: 10,
-                    padding: "4px 8px",
-                    borderRadius: 10,
-                    border: "1px solid #D1D5DB",
-                    background: "#fff",
-                    cursor: busy ? "not-allowed" : "pointer",
-                    fontWeight: 700,
-                  }}
-                >
-                  Refresh
-                </button>
+                <span className="font-medium">Expires:</span> {fmtIso(stats.expires_at)}
+              </div>
+              <div>
+                <span className="font-medium">Max views:</span> {stats.max_views ?? "—"}
+              </div>
+              <div>
+                <span className="font-medium">Views:</span> {stats.view_count}
+              </div>
+              <div>
+                <span className="font-medium">Revoked:</span> {fmtIso(stats.revoked_at)}
+              </div>
+              <div>
+                <span className="font-medium">Password:</span> {stats.has_password ? "Yes" : "No"}
               </div>
             </div>
           </div>
