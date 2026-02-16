@@ -2,8 +2,12 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { createAndEmailShareToken, getShareStatsByToken, revokeShareToken } from "./actions.server";
-import type { CreateShareResult } from "./actions.types";
+import ShareForm from "./ShareForm";
+import {
+    createAndEmailShareToken,
+    getShareStatsByToken,
+    revokeShareToken,
+} from "./actions.server";
 
 type ShareRow = {
     token: string;
@@ -13,240 +17,246 @@ type ShareRow = {
     max_views: number | null;
     view_count: number;
     revoked_at: string | null;
-    has_password: boolean;
 };
 
-function fmtDate(s: string | null) {
-    if (!s) return "—";
-    const d = new Date(s);
-    if (Number.isNaN(d.getTime())) return s;
+function fmtIso(iso: string | null) {
+    if (!iso) return "—";
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return iso;
     return d.toLocaleString();
 }
 
-export default function SharePanel(props: { docId: string; alias: string }) {
-    const [toEmail, setToEmail] = useState("");
-    const [expiresInHours, setExpiresInHours] = useState<string>("");
-    const [maxViews, setMaxViews] = useState<string>("");
-    const [busy, startTransition] = useTransition();
+export default function SharePanel(props: {
+    docId?: string;
+    alias: string;
 
-    const [created, setCreated] = useState<CreateShareResult | null>(null);
-    const [error, setError] = useState<string | null>(null);
+    // Optional niceties (page.tsx currently passes these)
+    docTitle?: string;
+    initialShares?: ShareRow[];
+}) {
+    const [pending, startTransition] = useTransition();
 
+    const [shares, setShares] = useState<ShareRow[]>(props.initialShares ?? []);
     const [lookupToken, setLookupToken] = useState("");
-    const [stats, setStats] = useState<ShareRow | null>(null);
-    const [statsErr, setStatsErr] = useState<string | null>(null);
+    const [lookupResult, setLookupResult] = useState<null | {
+        ok: boolean;
+        error?: string;
+        message?: string;
+        created_at?: string;
+        expires_at?: string | null;
+        to_email?: string | null;
+        max_views?: number | null;
+        view_count?: number;
+        revoked_at?: string | null;
+        has_password?: boolean;
+    }>(null);
 
-    const canCreate = useMemo(() => {
-        if (busy) return false;
-        if (!props.docId) return false;
-        return true;
-    }, [busy, props.docId]);
+    const title = props.docTitle || "Document";
 
-    function onCreate() {
-        setError(null);
-        setCreated(null);
+    const canUseCreate = useMemo(() => {
+        return !!props.docId && !pending;
+    }, [props.docId, pending]);
 
-        const exp = expiresInHours.trim() ? Number(expiresInHours) : undefined;
-        const mv = maxViews.trim() ? Number(maxViews) : undefined;
-
+    async function onRevoke(token: string) {
         startTransition(async () => {
-            const res = await createAndEmailShareToken({
-                doc_id: props.docId,
-                alias: props.alias,
-                to_email: toEmail.trim() || undefined,
-                expires_in_hours: Number.isFinite(exp as any) ? (exp as number) : undefined,
-                max_views: Number.isFinite(mv as any) ? (mv as number) : undefined,
-            });
-
-            setCreated(res);
-            if (!res.ok) setError(res.message || res.error);
-            if (res.ok) setLookupToken(res.token);
+            const res = await revokeShareToken(token);
+            if (!res.ok) {
+                setLookupResult(res);
+                return;
+            }
+            // Optimistically mark revoked in local table
+            setShares((prev) =>
+                prev.map((r) => (r.token === token ? { ...r, revoked_at: new Date().toISOString() } : r))
+            );
         });
     }
 
-    function onLookup() {
-        setStats(null);
-        setStatsErr(null);
-
+    async function onLookup() {
         const t = lookupToken.trim();
         if (!t) {
-            setStatsErr("Enter a token.");
+            setLookupResult({ ok: false, error: "missing_token", message: "Enter a token first." });
             return;
         }
 
         startTransition(async () => {
             const res = await getShareStatsByToken(t);
-            if (!res.ok) {
-                setStatsErr(res.message || res.error);
-                return;
-            }
-            setStats({
-                token: res.token,
-                to_email: res.to_email,
-                created_at: res.created_at,
-                expires_at: res.expires_at,
-                max_views: res.max_views,
-                view_count: res.view_count,
-                revoked_at: res.revoked_at,
-                has_password: res.has_password,
-            });
+            setLookupResult(res);
         });
     }
 
-    function onRevoke() {
-        setStatsErr(null);
-
-        const t = lookupToken.trim();
-        if (!t) {
-            setStatsErr("Enter a token.");
-            return;
-        }
+    // Optional helper: quick-create token without emailing (kept here in case you use it elsewhere)
+    async function quickCreateForMe() {
+        if (!props.docId) return;
 
         startTransition(async () => {
-            const res = await revokeShareToken(t);
+            const res = await createAndEmailShareToken({
+                doc_id: props.docId!,
+                alias: props.alias,
+            });
+
             if (!res.ok) {
-                setStatsErr(res.message || res.error);
+                setLookupResult(res);
                 return;
             }
-            // refresh stats after revoke
-            const after = await getShareStatsByToken(t);
-            if (after.ok) {
-                setStats({
-                    token: after.token,
-                    to_email: after.to_email,
-                    created_at: after.created_at,
-                    expires_at: after.expires_at,
-                    max_views: after.max_views,
-                    view_count: after.view_count,
-                    revoked_at: after.revoked_at,
-                    has_password: after.has_password,
-                });
-            }
+
+            // Add row to the table (best-effort; page still loads initialShares from server)
+            setShares((prev) => [
+                {
+                    token: res.token,
+                    to_email: res.to_email ?? null,
+                    created_at: new Date().toISOString(),
+                    expires_at: res.expires_at ?? null,
+                    max_views: res.max_views ?? null,
+                    view_count: 0,
+                    revoked_at: null,
+                },
+                ...prev,
+            ]);
+
+            setLookupToken(res.token);
+            const st = await getShareStatsByToken(res.token);
+            setLookupResult(st);
         });
     }
 
     return (
-        <div className="mt-6 rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
-            <div className="text-lg font-semibold">Share Tokens</div>
-            <div className="mt-1 text-sm text-neutral-600">
-                Create emailable share links with expiration / view limits, and revoke them.
+        <section className="mt-6 rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                    <div className="text-lg font-semibold">Owner share controls</div>
+                    <div className="text-sm text-neutral-600">
+                        {title} • <span className="font-mono">/d/{props.alias}</span>
+                    </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                    <button
+                        type="button"
+                        disabled={!canUseCreate}
+                        onClick={quickCreateForMe}
+                        className="rounded-xl bg-black px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+                        title={props.docId ? "Create a token (no email)" : "docId not provided"}
+                    >
+                        {pending ? "Working…" : "Quick token"}
+                    </button>
+                </div>
             </div>
 
-            <div className="mt-4 grid gap-3">
-                <div className="grid gap-2 md:grid-cols-3">
-                    <div className="grid gap-1">
-                        <label className="text-xs font-medium text-neutral-700">To email (optional)</label>
-                        <input
-                            value={toEmail}
-                            onChange={(e) => setToEmail(e.target.value)}
-                            className="w-full rounded-xl border border-neutral-300 px-3 py-2 text-sm"
-                            placeholder="someone@example.com"
-                        />
+            <div className="mt-4">
+                {props.docId ? (
+                    <ShareForm docId={props.docId} alias={props.alias} />
+                ) : (
+                    <div className="rounded-xl border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-900">
+                        Share creation is disabled because <span className="font-mono">docId</span> was not provided to
+                        <span className="font-mono"> SharePanel</span>. (Your page can pass it as{" "}
+                        <span className="font-mono">doc.id</span>.)
                     </div>
+                )}
+            </div>
 
-                    <div className="grid gap-1">
-                        <label className="text-xs font-medium text-neutral-700">Expires in hours (optional)</label>
-                        <input
-                            value={expiresInHours}
-                            onChange={(e) => setExpiresInHours(e.target.value)}
-                            className="w-full rounded-xl border border-neutral-300 px-3 py-2 text-sm"
-                            placeholder="72"
-                            inputMode="numeric"
-                        />
-                    </div>
-
-                    <div className="grid gap-1">
-                        <label className="text-xs font-medium text-neutral-700">Max views (optional)</label>
-                        <input
-                            value={maxViews}
-                            onChange={(e) => setMaxViews(e.target.value)}
-                            className="w-full rounded-xl border border-neutral-300 px-3 py-2 text-sm"
-                            placeholder="10"
-                            inputMode="numeric"
-                        />
-                    </div>
+            <div className="mt-6 grid gap-2 md:grid-cols-[1fr_auto] md:items-end">
+                <div className="grid gap-1">
+                    <label className="text-xs font-medium text-neutral-700">Lookup token stats</label>
+                    <input
+                        value={lookupToken}
+                        onChange={(e) => setLookupToken(e.target.value)}
+                        className="w-full rounded-xl border border-neutral-300 px-3 py-2 text-sm"
+                        placeholder="token"
+                    />
                 </div>
+                <button
+                    type="button"
+                    onClick={onLookup}
+                    disabled={pending}
+                    className="rounded-xl border border-neutral-300 bg-white px-4 py-2 text-sm font-medium disabled:opacity-50"
+                >
+                    {pending ? "Loading…" : "Lookup"}
+                </button>
+            </div>
 
-                <div className="flex flex-wrap items-center gap-2">
-                    <button
-                        disabled={!canCreate}
-                        onClick={onCreate}
-                        className="rounded-xl bg-black px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-                    >
-                        {busy ? "Working…" : "Create token"}
-                    </button>
-
-                    {error ? <div className="text-sm text-red-600">{error}</div> : null}
-                    {created?.ok ? (
-                        <div className="text-sm text-neutral-700">
-                            Created:{" "}
-                            <a className="underline" href={created.share_url} target="_blank" rel="noreferrer">
-                                {created.share_url}
-                            </a>
-                        </div>
-                    ) : null}
-                </div>
-
-                <hr className="my-2 border-neutral-200" />
-
-                <div className="grid gap-2 md:grid-cols-[1fr_auto_auto] md:items-end">
-                    <div className="grid gap-1">
-                        <label className="text-xs font-medium text-neutral-700">Token</label>
-                        <input
-                            value={lookupToken}
-                            onChange={(e) => setLookupToken(e.target.value)}
-                            className="w-full rounded-xl border border-neutral-300 px-3 py-2 text-sm"
-                            placeholder="uuid token"
-                        />
-                    </div>
-
-                    <button
-                        disabled={busy}
-                        onClick={onLookup}
-                        className="rounded-xl border border-neutral-300 bg-white px-4 py-2 text-sm font-medium disabled:opacity-50"
-                    >
-                        Lookup
-                    </button>
-
-                    <button
-                        disabled={busy}
-                        onClick={onRevoke}
-                        className="rounded-xl border border-red-300 bg-white px-4 py-2 text-sm font-medium text-red-700 disabled:opacity-50"
-                    >
-                        Revoke
-                    </button>
-                </div>
-
-                {statsErr ? <div className="text-sm text-red-600">{statsErr}</div> : null}
-
-                {stats ? (
-                    <div className="mt-2 rounded-xl border border-neutral-200 bg-neutral-50 p-3 text-sm">
+            {lookupResult ? (
+                <div className="mt-3 rounded-xl border border-neutral-200 bg-neutral-50 p-3 text-sm">
+                    {lookupResult.ok ? (
                         <div className="grid gap-1 md:grid-cols-2">
                             <div>
-                                <span className="font-medium">Created:</span> {fmtDate(stats.created_at)}
+                                <span className="font-medium">Created:</span> {fmtIso(lookupResult.created_at ?? null)}
                             </div>
                             <div>
-                                <span className="font-medium">To:</span> {stats.to_email || "—"}
+                                <span className="font-medium">To:</span> {lookupResult.to_email ?? "—"}
                             </div>
                             <div>
-                                <span className="font-medium">Expires:</span> {fmtDate(stats.expires_at)}
+                                <span className="font-medium">Expires:</span> {fmtIso(lookupResult.expires_at ?? null)}
                             </div>
                             <div>
-                                <span className="font-medium">Max views:</span> {stats.max_views ?? "—"}
+                                <span className="font-medium">Max views:</span> {lookupResult.max_views ?? "—"}
                             </div>
                             <div>
-                                <span className="font-medium">Views:</span> {stats.view_count}
+                                <span className="font-medium">Views:</span> {lookupResult.view_count ?? 0}
                             </div>
                             <div>
-                                <span className="font-medium">Revoked:</span> {fmtDate(stats.revoked_at)}
+                                <span className="font-medium">Revoked:</span> {fmtIso(lookupResult.revoked_at ?? null)}
                             </div>
                             <div>
-                                <span className="font-medium">Password:</span> {stats.has_password ? "Yes" : "No"}
+                                <span className="font-medium">Password:</span>{" "}
+                                {lookupResult.has_password ? "Yes" : "No"}
                             </div>
                         </div>
+                    ) : (
+                        <div className="text-red-700">{lookupResult.message || lookupResult.error || "Error"}</div>
+                    )}
+                </div>
+            ) : null}
+
+            <div className="mt-6">
+                <div className="text-sm font-semibold">Existing share tokens</div>
+
+                {shares.length === 0 ? (
+                    <div className="mt-2 text-sm text-neutral-600">No share tokens yet.</div>
+                ) : (
+                    <div className="mt-2 overflow-x-auto">
+                        <table className="w-full border-collapse text-sm">
+                            <thead>
+                                <tr className="border-b border-neutral-200 text-left text-neutral-600">
+                                    <th className="py-2 pr-3">Token</th>
+                                    <th className="py-2 pr-3">To</th>
+                                    <th className="py-2 pr-3">Created</th>
+                                    <th className="py-2 pr-3">Expires</th>
+                                    <th className="py-2 pr-3">Max</th>
+                                    <th className="py-2 pr-3">Views</th>
+                                    <th className="py-2 pr-3">Revoked</th>
+                                    <th className="py-2 pr-0"></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {shares.map((r) => {
+                                    const revoked = !!r.revoked_at;
+                                    return (
+                                        <tr key={r.token} className="border-b border-neutral-100">
+                                            <td className="py-2 pr-3 font-mono text-xs">{r.token}</td>
+                                            <td className="py-2 pr-3">{r.to_email || "—"}</td>
+                                            <td className="py-2 pr-3">{fmtIso(r.created_at)}</td>
+                                            <td className="py-2 pr-3">{fmtIso(r.expires_at)}</td>
+                                            <td className="py-2 pr-3">{r.max_views ?? "—"}</td>
+                                            <td className="py-2 pr-3">{r.view_count}</td>
+                                            <td className="py-2 pr-3">{fmtIso(r.revoked_at)}</td>
+                                            <td className="py-2 pr-0 text-right">
+                                                <button
+                                                    type="button"
+                                                    disabled={pending || revoked}
+                                                    onClick={() => onRevoke(r.token)}
+                                                    className="rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-xs font-medium disabled:opacity-50"
+                                                >
+                                                    {revoked ? "Revoked" : "Revoke"}
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
                     </div>
-                ) : null}
+                )}
             </div>
-        </div>
+        </section>
     );
 }
