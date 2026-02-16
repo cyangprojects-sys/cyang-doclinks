@@ -93,10 +93,7 @@ export async function emailMagicLinkAction(formData: FormData): Promise<void> {
     const ownerEmail = await requireOwnerAdmin();
 
     const to = String(
-        formData.get("to") ||
-        formData.get("email") ||
-        formData.get("recipient") ||
-        ""
+        formData.get("to") || formData.get("email") || formData.get("recipient") || ""
     ).trim();
 
     const docId = String(formData.get("docId") || formData.get("doc_id") || "").trim();
@@ -151,5 +148,22 @@ export async function deleteDocAction(formData: FormData): Promise<void> {
     }
 
     revalidatePath("/admin");
+    revalidatePath("/admin/dashboard");
+}
+
+// NEW: Used as <form action={revokeDocShareAction}>
+export async function revokeDocShareAction(formData: FormData): Promise<void> {
+    await requireOwnerAdmin();
+
+    const token = String(formData.get("token") || "").trim();
+    if (!token) throw new Error("Missing token.");
+
+    await sql`
+    update doc_shares
+    set revoked_at = now()
+    where token = ${token}::uuid
+      and revoked_at is null
+  `;
+
     revalidatePath("/admin/dashboard");
 }
