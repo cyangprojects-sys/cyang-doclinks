@@ -28,13 +28,12 @@ function escapeHtml(s: string) {
     .replaceAll("'", "&#039;");
 }
 
-// ✅ must be async export
 export async function shareDocToEmail(input: unknown) {
   await requireOwner();
 
   const { docId, email, alias } = ShareInput.parse(input);
 
-  // Friendly name (best-effort)
+  // Fetch friendly title (best-effort)
   let title: string | null = null;
   try {
     const rows = (await sql`
@@ -43,6 +42,7 @@ export async function shareDocToEmail(input: unknown) {
       where id = ${docId}::uuid
       limit 1
     `) as DocRow[];
+
     title = rows?.[0]?.title ?? null;
   } catch {
     // ignore
@@ -50,7 +50,6 @@ export async function shareDocToEmail(input: unknown) {
 
   const base = getBaseUrl();
 
-  // Prefer readable alias link
   const href = alias
     ? `${base}/d/${encodeURIComponent(alias)}`
     : `${base}/serve/${encodeURIComponent(docId)}`;
@@ -59,7 +58,6 @@ export async function shareDocToEmail(input: unknown) {
   const linkLabel = alias ? `${readableName} (${alias})` : readableName;
 
   const subject = `Your Cyang Docs link: ${readableName}`;
-
   const text = `Here is your link:\n\n${href}\n`;
 
   const html = `
@@ -72,7 +70,7 @@ export async function shareDocToEmail(input: unknown) {
       </p>
       <p style="margin:12px 0 0 0; color:#6b7280; font-size:12px;">
         If the link above doesn’t work, copy/paste this URL:<br/>
-        <span style="font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;">
+        <span style="font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas;">
           ${escapeHtml(href)}
         </span>
       </p>
@@ -86,5 +84,5 @@ export async function shareDocToEmail(input: unknown) {
     html,
   });
 
-  return { ok: true as const, sent_to: email, href, label: linkLabel };
+  return { ok: true as const, sent_to: email };
 }
