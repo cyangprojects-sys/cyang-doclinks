@@ -11,6 +11,7 @@ import {
     clearSharePasswordAction,
 } from "../actions";
 import SharesTableClient, { type ShareRow as ShareRowClient } from "./SharesTableClient";
+import UploadPanel from "./UploadPanel";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -100,6 +101,9 @@ export default async function AdminDashboardPage() {
                     Back to Admin
                 </Link>
             </div>
+
+            {/* ✅ UPLOAD */}
+            <UploadPanel />
 
             {/* DOCS */}
             <div className="mt-8 overflow-hidden rounded-lg border border-neutral-800">
