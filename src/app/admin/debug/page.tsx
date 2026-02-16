@@ -2,9 +2,20 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 import Link from "next/link";
+import { cookies, headers } from "next/headers";
 
 type DebugResponse =
-  | { ok: true; now: string; tables: Record<string, boolean>; env: Record<string, boolean>; alias?: string; alias_row?: any; doc_row?: any; r2_head?: any; notes?: string[] }
+  | {
+    ok: true;
+    now: string;
+    tables: Record<string, boolean>;
+    env: Record<string, boolean>;
+    alias?: string;
+    alias_row?: any;
+    doc_row?: any;
+    r2_head?: any;
+    notes?: string[];
+  }
   | { ok: false; error: string; message?: string };
 
 function Row({ k, v }: { k: string; v: any }) {
@@ -18,6 +29,13 @@ function Row({ k, v }: { k: string; v: any }) {
   );
 }
 
+function getSelfBaseUrl() {
+  const h = headers();
+  const proto = h.get("x-forwarded-proto") ?? "https";
+  const host = h.get("x-forwarded-host") ?? h.get("host") ?? "www.cyang.io";
+  return `${proto}://${host}`;
+}
+
 export default async function AdminDebugPage({
   searchParams,
 }: {
@@ -27,12 +45,23 @@ export default async function AdminDebugPage({
   const alias = (sp.alias || "").trim();
 
   let data: DebugResponse | null = null;
+
   if (alias) {
-    const url = new URL(process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000");
-    url.pathname = "/api/admin/debug";
+    const base = getSelfBaseUrl();
+    const url = new URL(`${base}/api/admin/debug`);
     url.searchParams.set("alias", alias);
 
-    const res = await fetch(url.toString(), { cache: "no-store" });
+    // ✅ Forward the user's cookies so /api/admin/debug can see the session
+    const cookieHeader = cookies().toString();
+
+    const res = await fetch(url.toString(), {
+      cache: "no-store",
+      headers: {
+        cookie: cookieHeader,
+        accept: "application/json",
+      },
+    });
+
     data = (await res.json().catch(() => null)) as DebugResponse | null;
   }
 
