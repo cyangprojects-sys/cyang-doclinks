@@ -2,8 +2,8 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { createAndEmailShareToken, getShareStatsByToken, revokeShareToken } from "./actions";
-import type { CreateShareResult } from "./actions";
+import { createAndEmailShareToken, getShareStatsByToken, revokeShareToken } from "./actions.server";
+import type { CreateShareResult } from "./actions.types";
 
 type ShareRow = {
     token: string;
@@ -13,6 +13,7 @@ type ShareRow = {
     max_views: number | null;
     view_count: number;
     revoked_at: string | null;
+    has_password: boolean;
 };
 
 function fmtDate(s: string | null) {
@@ -22,367 +23,230 @@ function fmtDate(s: string | null) {
     return d.toLocaleString();
 }
 
-function maxLabel(n: number | null) {
-    if (n === null) return "—";
-    if (n === 0) return "∞";
-    return String(n);
-}
-
-function statusFor(s: {
-    revoked_at: string | null;
-    expires_at: string | null;
-    max_views: number | null;
-    view_count: number;
-}) {
-    if (s.revoked_at)
-        return { label: "Revoked", cls: "bg-amber-500/10 text-amber-300 border-amber-500/20" };
-
-    if (s.expires_at && new Date(s.expires_at).getTime() <= Date.now())
-        return { label: "Expired", cls: "bg-red-500/10 text-red-300 border-red-500/20" };
-
-    const max = s.max_views;
-    if (max != null && max !== 0 && s.view_count >= max)
-        return { label: "Maxed", cls: "bg-red-500/10 text-red-300 border-red-500/20" };
-
-    return { label: "Active", cls: "bg-emerald-500/10 text-emerald-300 border-emerald-500/20" };
-}
-
-function viewsLeft(viewCount: number, maxViews: number | null) {
-    if (maxViews === null || maxViews === 0) return "Unlimited";
-    return String(Math.max(0, maxViews - viewCount));
-}
-
-async function copy(text: string) {
-    try {
-        await navigator.clipboard.writeText(text);
-        return true;
-    } catch {
-        return false;
-    }
-}
-
-export default function SharePanel(props: {
-    alias: string;
-    docTitle: string;
-    initialShares: ShareRow[];
-}) {
-    const { alias, docTitle } = props;
-
+export default function SharePanel(props: { docId: string; alias: string }) {
     const [toEmail, setToEmail] = useState("");
-    const [expiresHours, setExpiresHours] = useState<string>("72");
-    const [maxViews, setMaxViews] = useState<string>("3");
-
+    const [expiresInHours, setExpiresInHours] = useState<string>("");
+    const [maxViews, setMaxViews] = useState<string>("");
     const [busy, startTransition] = useTransition();
-    const [error, setError] = useState<string | null>(null);
 
     const [created, setCreated] = useState<CreateShareResult | null>(null);
-    const [shares, setShares] = useState<ShareRow[]>(props.initialShares);
+    const [error, setError] = useState<string | null>(null);
 
-    const origin =
-        typeof window !== "undefined" && window.location?.origin ? window.location.origin : "";
+    const [lookupToken, setLookupToken] = useState("");
+    const [stats, setStats] = useState<ShareRow | null>(null);
+    const [statsErr, setStatsErr] = useState<string | null>(null);
 
-    const createdViewsLeft = useMemo(() => {
-        if (!created || !created.ok) return null;
-        return viewsLeft(created.view_count, created.max_views);
-    }, [created]);
-
-    function normalizeNum(s: string) {
-        const t = s.trim();
-        if (t === "") return null;
-        const n = Number(t);
-        if (!Number.isFinite(n)) return null;
-        return Math.max(0, Math.floor(n));
-    }
+    const canCreate = useMemo(() => {
+        if (busy) return false;
+        if (!props.docId) return false;
+        return true;
+    }, [busy, props.docId]);
 
     function onCreate() {
         setError(null);
         setCreated(null);
 
-        const exp = normalizeNum(expiresHours);
-        const max = normalizeNum(maxViews);
+        const exp = expiresInHours.trim() ? Number(expiresInHours) : undefined;
+        const mv = maxViews.trim() ? Number(maxViews) : undefined;
 
         startTransition(async () => {
             const res = await createAndEmailShareToken({
-                alias,
-                to_email: toEmail,
-                expires_hours: exp,
-                max_views: max,
+                doc_id: props.docId,
+                alias: props.alias,
+                to_email: toEmail.trim() || undefined,
+                expires_in_hours: Number.isFinite(exp as any) ? (exp as number) : undefined,
+                max_views: Number.isFinite(mv as any) ? (mv as number) : undefined,
             });
 
             setCreated(res);
-
-            if (!res.ok) {
-                setError(res.message || res.error);
-                return;
-            }
-
-            setShares((prev) => [
-                {
-                    token: res.token,
-                    to_email: toEmail.trim().toLowerCase(),
-                    created_at: new Date().toISOString(),
-                    expires_at: res.expires_at,
-                    max_views: res.max_views,
-                    view_count: res.view_count,
-                    revoked_at: null,
-                },
-                ...prev,
-            ]);
-
-            setToEmail("");
+            if (!res.ok) setError(res.message || res.error);
+            if (res.ok) setLookupToken(res.token);
         });
     }
 
-    function onRevoke(token: string) {
-        setError(null);
+    function onLookup() {
+        setStats(null);
+        setStatsErr(null);
+
+        const t = lookupToken.trim();
+        if (!t) {
+            setStatsErr("Enter a token.");
+            return;
+        }
+
         startTransition(async () => {
-            const res = await revokeShareToken({ alias, token });
+            const res = await getShareStatsByToken(t);
             if (!res.ok) {
-                setError(res.message || res.error);
+                setStatsErr(res.message || res.error);
                 return;
             }
-            setShares((prev) =>
-                prev.map((s) => (s.token === token ? { ...s, revoked_at: new Date().toISOString() } : s))
-            );
+            setStats({
+                token: res.token,
+                to_email: res.to_email,
+                created_at: res.created_at,
+                expires_at: res.expires_at,
+                max_views: res.max_views,
+                view_count: res.view_count,
+                revoked_at: res.revoked_at,
+                has_password: res.has_password,
+            });
         });
     }
 
-    function onRefreshStats(token: string) {
-        setError(null);
+    function onRevoke() {
+        setStatsErr(null);
+
+        const t = lookupToken.trim();
+        if (!t) {
+            setStatsErr("Enter a token.");
+            return;
+        }
+
         startTransition(async () => {
-            const res = await getShareStatsByToken(token);
+            const res = await revokeShareToken(t);
             if (!res.ok) {
-                setError(res.message || res.error);
+                setStatsErr(res.message || res.error);
                 return;
             }
-            setShares((prev) =>
-                prev.map((s) =>
-                    s.token === token
-                        ? {
-                            ...s,
-                            view_count: res.view_count,
-                            max_views: res.max_views,
-                            expires_at: res.expires_at,
-                            revoked_at: res.revoked_at,
-                        }
-                        : s
-                )
-            );
+            // refresh stats after revoke
+            const after = await getShareStatsByToken(t);
+            if (after.ok) {
+                setStats({
+                    token: after.token,
+                    to_email: after.to_email,
+                    created_at: after.created_at,
+                    expires_at: after.expires_at,
+                    max_views: after.max_views,
+                    view_count: after.view_count,
+                    revoked_at: after.revoked_at,
+                    has_password: after.has_password,
+                });
+            }
         });
     }
 
     return (
-        <section className="mt-8 rounded-xl border border-neutral-800 overflow-hidden">
-            <div className="bg-neutral-950 px-4 py-3">
-                <div className="text-sm font-medium text-neutral-200">Share</div>
-                <div className="text-xs text-neutral-500">
-                    Create a limited link and email it to a recipient.
-                </div>
+        <div className="mt-6 rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
+            <div className="text-lg font-semibold">Share Tokens</div>
+            <div className="mt-1 text-sm text-neutral-600">
+                Create emailable share links with expiration / view limits, and revoke them.
             </div>
 
-            <div className="p-4 space-y-4">
-                {error ? (
-                    <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-200">
-                        {error}
-                    </div>
-                ) : null}
-
-                <div className="grid gap-3 md:grid-cols-4">
-                    <div className="md:col-span-2">
-                        <label className="block text-xs text-neutral-400">Recipient email</label>
+            <div className="mt-4 grid gap-3">
+                <div className="grid gap-2 md:grid-cols-3">
+                    <div className="grid gap-1">
+                        <label className="text-xs font-medium text-neutral-700">To email (optional)</label>
                         <input
                             value={toEmail}
                             onChange={(e) => setToEmail(e.target.value)}
-                            placeholder="name@example.com"
-                            className="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm text-neutral-200 outline-none focus:border-neutral-600"
+                            className="w-full rounded-xl border border-neutral-300 px-3 py-2 text-sm"
+                            placeholder="someone@example.com"
                         />
                     </div>
 
-                    <div>
-                        <label className="block text-xs text-neutral-400">Expires (hours)</label>
+                    <div className="grid gap-1">
+                        <label className="text-xs font-medium text-neutral-700">Expires in hours (optional)</label>
                         <input
-                            value={expiresHours}
-                            onChange={(e) => setExpiresHours(e.target.value)}
+                            value={expiresInHours}
+                            onChange={(e) => setExpiresInHours(e.target.value)}
+                            className="w-full rounded-xl border border-neutral-300 px-3 py-2 text-sm"
                             placeholder="72"
-                            className="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm text-neutral-200 outline-none focus:border-neutral-600"
+                            inputMode="numeric"
                         />
-                        <div className="mt-1 text-[11px] text-neutral-500">0 = no expiration</div>
                     </div>
 
-                    <div>
-                        <label className="block text-xs text-neutral-400">Max views</label>
+                    <div className="grid gap-1">
+                        <label className="text-xs font-medium text-neutral-700">Max views (optional)</label>
                         <input
                             value={maxViews}
                             onChange={(e) => setMaxViews(e.target.value)}
-                            placeholder="3"
-                            className="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm text-neutral-200 outline-none focus:border-neutral-600"
+                            className="w-full rounded-xl border border-neutral-300 px-3 py-2 text-sm"
+                            placeholder="10"
+                            inputMode="numeric"
                         />
-                        <div className="mt-1 text-[11px] text-neutral-500">0 = unlimited</div>
                     </div>
                 </div>
 
-                <div className="flex items-center justify-between gap-3">
-                    <div className="text-xs text-neutral-500">
-                        Document: <span className="text-neutral-300">{docTitle}</span>
+                <div className="flex flex-wrap items-center gap-2">
+                    <button
+                        disabled={!canCreate}
+                        onClick={onCreate}
+                        className="rounded-xl bg-black px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                    >
+                        {busy ? "Working…" : "Create token"}
+                    </button>
+
+                    {error ? <div className="text-sm text-red-600">{error}</div> : null}
+                    {created?.ok ? (
+                        <div className="text-sm text-neutral-700">
+                            Created:{" "}
+                            <a className="underline" href={created.share_url} target="_blank" rel="noreferrer">
+                                {created.share_url}
+                            </a>
+                        </div>
+                    ) : null}
+                </div>
+
+                <hr className="my-2 border-neutral-200" />
+
+                <div className="grid gap-2 md:grid-cols-[1fr_auto_auto] md:items-end">
+                    <div className="grid gap-1">
+                        <label className="text-xs font-medium text-neutral-700">Token</label>
+                        <input
+                            value={lookupToken}
+                            onChange={(e) => setLookupToken(e.target.value)}
+                            className="w-full rounded-xl border border-neutral-300 px-3 py-2 text-sm"
+                            placeholder="uuid token"
+                        />
                     </div>
 
                     <button
-                        onClick={onCreate}
-                        disabled={busy || !toEmail.trim()}
-                        className="rounded-lg border border-neutral-700 bg-neutral-900 px-4 py-2 text-sm text-neutral-100 hover:bg-neutral-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                        disabled={busy}
+                        onClick={onLookup}
+                        className="rounded-xl border border-neutral-300 bg-white px-4 py-2 text-sm font-medium disabled:opacity-50"
                     >
-                        {busy ? "Creating…" : "Create & Email"}
+                        Lookup
+                    </button>
+
+                    <button
+                        disabled={busy}
+                        onClick={onRevoke}
+                        className="rounded-xl border border-red-300 bg-white px-4 py-2 text-sm font-medium text-red-700 disabled:opacity-50"
+                    >
+                        Revoke
                     </button>
                 </div>
 
-                {created && created.ok ? (
-                    <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-4">
-                        <div className="flex flex-wrap items-center justify-between gap-3">
+                {statsErr ? <div className="text-sm text-red-600">{statsErr}</div> : null}
+
+                {stats ? (
+                    <div className="mt-2 rounded-xl border border-neutral-200 bg-neutral-50 p-3 text-sm">
+                        <div className="grid gap-1 md:grid-cols-2">
                             <div>
-                                <div className="text-sm font-medium text-neutral-200">Share created</div>
-                                <div className="mt-1 text-xs text-neutral-500">
-                                    Expires: <span className="text-neutral-300">{fmtDate(created.expires_at)}</span> ·
-                                    Max: <span className="text-neutral-300">{maxLabel(created.max_views)}</span> ·
-                                    Views: <span className="text-neutral-300">{created.view_count}</span> ·
-                                    Left: <span className="text-neutral-300">{createdViewsLeft}</span>
-                                </div>
+                                <span className="font-medium">Created:</span> {fmtDate(stats.created_at)}
                             </div>
-
-                            <div className="flex items-center gap-2">
-                                <a
-                                    href={created.share_url}
-                                    target="_blank"
-                                    className="rounded-md border border-neutral-800 px-3 py-1.5 text-xs text-neutral-200 hover:bg-neutral-900"
-                                >
-                                    Open
-                                </a>
-                                <button
-                                    onClick={() => copy(created.share_url)}
-                                    className="rounded-md border border-neutral-800 px-3 py-1.5 text-xs text-neutral-200 hover:bg-neutral-900"
-                                >
-                                    Copy link
-                                </button>
-                                <button
-                                    onClick={() => copy(created.token)}
-                                    className="rounded-md border border-neutral-800 px-3 py-1.5 text-xs text-neutral-200 hover:bg-neutral-900"
-                                >
-                                    Copy token
-                                </button>
+                            <div>
+                                <span className="font-medium">To:</span> {stats.to_email || "—"}
                             </div>
-                        </div>
-
-                        <div className="mt-3 rounded-lg border border-neutral-800 bg-black/20 px-3 py-2 font-mono text-xs text-neutral-200 break-all">
-                            {created.share_url}
+                            <div>
+                                <span className="font-medium">Expires:</span> {fmtDate(stats.expires_at)}
+                            </div>
+                            <div>
+                                <span className="font-medium">Max views:</span> {stats.max_views ?? "—"}
+                            </div>
+                            <div>
+                                <span className="font-medium">Views:</span> {stats.view_count}
+                            </div>
+                            <div>
+                                <span className="font-medium">Revoked:</span> {fmtDate(stats.revoked_at)}
+                            </div>
+                            <div>
+                                <span className="font-medium">Password:</span> {stats.has_password ? "Yes" : "No"}
+                            </div>
                         </div>
                     </div>
                 ) : null}
-
-                <div className="pt-2">
-                    <div className="text-sm font-medium text-neutral-200">Recent shares</div>
-                    <div className="mt-2 overflow-hidden rounded-lg border border-neutral-800">
-                        <table className="w-full text-sm">
-                            <thead className="bg-neutral-900 text-neutral-300">
-                                <tr>
-                                    <th className="px-4 py-3 text-left">Recipient</th>
-                                    <th className="px-4 py-3 text-left">Token</th>
-                                    <th className="px-4 py-3 text-left">Status</th>
-                                    <th className="px-4 py-3 text-left">Expires</th>
-                                    <th className="px-4 py-3 text-right">Max</th>
-                                    <th className="px-4 py-3 text-right">Views</th>
-                                    <th className="px-4 py-3 text-right">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {shares.length === 0 ? (
-                                    <tr>
-                                        <td colSpan={7} className="px-4 py-6 text-neutral-400">
-                                            No shares yet.
-                                        </td>
-                                    </tr>
-                                ) : (
-                                    shares.map((s) => {
-                                        const st = statusFor(s);
-                                        const linkPath = `/s/${s.token}`;
-                                        const linkAbs = origin ? `${origin}${linkPath}` : linkPath;
-
-                                        const tokenShort =
-                                            s.token.length > 12 ? `${s.token.slice(0, 8)}…${s.token.slice(-4)}` : s.token;
-
-                                        return (
-                                            <tr key={s.token} className="border-t border-neutral-800">
-                                                <td className="px-4 py-3 text-neutral-200">{s.to_email || "—"}</td>
-
-                                                <td className="px-4 py-3">
-                                                    <div className="font-mono text-xs text-neutral-200">{tokenShort}</div>
-                                                    <div className="mt-1 text-xs text-neutral-500">
-                                                        Created: {fmtDate(s.created_at)}
-                                                    </div>
-                                                </td>
-
-                                                <td className="px-4 py-3">
-                                                    <span
-                                                        className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs ${st.cls}`}
-                                                    >
-                                                        {st.label}
-                                                    </span>
-                                                    <div className="mt-1 text-xs text-neutral-500">
-                                                        Left: {viewsLeft(s.view_count, s.max_views)}
-                                                    </div>
-                                                </td>
-
-                                                <td className="px-4 py-3 text-neutral-400">{fmtDate(s.expires_at)}</td>
-
-                                                <td className="px-4 py-3 text-right text-neutral-200">
-                                                    {maxLabel(s.max_views)}
-                                                </td>
-
-                                                <td className="px-4 py-3 text-right text-neutral-200">{s.view_count}</td>
-
-                                                <td className="px-4 py-3 text-right">
-                                                    <div className="inline-flex items-center gap-2">
-                                                        <a
-                                                            href={linkPath}
-                                                            target="_blank"
-                                                            className="rounded-md border border-neutral-800 px-3 py-1.5 text-xs text-neutral-200 hover:bg-neutral-900"
-                                                        >
-                                                            Open
-                                                        </a>
-                                                        <button
-                                                            onClick={() => copy(linkAbs)}
-                                                            className="rounded-md border border-neutral-800 px-3 py-1.5 text-xs text-neutral-200 hover:bg-neutral-900"
-                                                        >
-                                                            Copy
-                                                        </button>
-                                                        <button
-                                                            onClick={() => onRefreshStats(s.token)}
-                                                            disabled={busy}
-                                                            className="rounded-md border border-neutral-800 px-3 py-1.5 text-xs text-neutral-200 hover:bg-neutral-900 disabled:opacity-50"
-                                                        >
-                                                            Refresh
-                                                        </button>
-                                                        <button
-                                                            onClick={() => onRevoke(s.token)}
-                                                            disabled={busy || Boolean(s.revoked_at)}
-                                                            className="rounded-md border border-neutral-800 px-3 py-1.5 text-xs text-neutral-200 hover:bg-neutral-900 disabled:opacity-50 disabled:cursor-not-allowed"
-                                                            title={s.revoked_at ? "Already revoked" : "Revoke this share"}
-                                                        >
-                                                            Revoke
-                                                        </button>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        );
-                                    })
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <div className="mt-2 text-xs text-neutral-500">
-                        Note: “Max = ∞” means unlimited. “Expires = —” means no expiration.
-                    </div>
-                </div>
             </div>
-        </section>
+        </div>
     );
 }
