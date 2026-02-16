@@ -16,8 +16,7 @@ type AliasRow = {
 function isExpired(expiresAt: string | null) {
   if (!expiresAt) return false;
   const t = Date.parse(expiresAt);
-  if (!Number.isFinite(t)) return false;
-  return t <= Date.now();
+  return Number.isFinite(t) && t <= Date.now();
 }
 
 export default async function SharePage({
@@ -28,7 +27,7 @@ export default async function SharePage({
   const alias = (params.alias || "").trim();
   if (!alias) notFound();
 
-  // Fetch the row without relying on date filtering in SQL (more robust across schema tweaks)
+  // ✅ Fetch row without filtering (then validate in JS)
   const rows = (await sql`
     select
       alias::text as alias,
@@ -46,7 +45,6 @@ export default async function SharePage({
   const revoked = !!row.revoked_at;
   const expired = isExpired(row.expires_at);
 
-  // If revoked or expired, show a friendly page (no hard 404)
   if (revoked || expired) {
     return (
       <main className="mx-auto max-w-3xl px-4 py-10 text-white">
@@ -69,7 +67,7 @@ export default async function SharePage({
             {revoked ? "This link has been revoked." : "This link has expired."}
           </div>
           <p className="mt-2 text-sm text-neutral-400">
-            If you believe this is a mistake, contact the sender for a new link.
+            Contact the sender for a new link.
           </p>
         </div>
       </main>
@@ -99,7 +97,6 @@ export default async function SharePage({
       </div>
 
       <div className="mt-6 overflow-hidden rounded-lg border border-neutral-800">
-        {/* This endpoint logs views + redirects to a signed R2 URL */}
         <iframe
           title="Document"
           src={`/d/${encodeURIComponent(alias)}/raw`}
