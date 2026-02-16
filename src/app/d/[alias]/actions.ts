@@ -16,14 +16,6 @@ type AliasRow = {
   alias: string;
 };
 
-function base64url(buf: Buffer) {
-  return buf
-    .toString("base64")
-    .replaceAll("+", "-")
-    .replaceAll("/", "_")
-    .replaceAll("=", "");
-}
-
 function envStr(name: string, fallback: string) {
   return process.env[name] || fallback;
 }
@@ -44,6 +36,7 @@ function fmtDateLabel(d: Date) {
 }
 
 function computeViewsLeftLabel(viewCount: number, maxViews: number | null) {
+  // max_views: null or 0 => unlimited
   if (maxViews === null || maxViews === 0) return "Unlimited";
   const left = Math.max(0, maxViews - viewCount);
   return String(left);
@@ -53,7 +46,7 @@ export type CreateShareResult =
   | {
     ok: true;
     share_url: string;
-    token: string;
+    token: string; // uuid string
     expires_at: string | null;
     max_views: number | null;
     view_count: number;
@@ -113,34 +106,32 @@ export async function createAndEmailShareToken(input: {
 
     const docTitle = drows?.[0]?.title || "Document";
 
-    // create share
-    const token = base64url(crypto.randomBytes(24));
+    // create share (UUID token)
+    const token = crypto.randomUUID();
     const expiresAt =
       expiresHours > 0 ? new Date(Date.now() + expiresHours * 3600 * 1000) : null;
 
     const inserted = (await sql`
-      insert into doc_shares (doc_id, recipient_email, token, expires_at, max_views)
+      insert into doc_shares (doc_id, to_email, token, expires_at, max_views)
       values (
         ${docId}::uuid,
         ${to},
-        ${token},
+        ${token}::uuid,
         ${expiresAt ? expiresAt.toISOString() : null},
         ${Number.isFinite(maxViews) ? maxViews : null}
       )
-      returning token, expires_at::text as expires_at, max_views, view_count
+      returning token::text as token, expires_at::text as expires_at, max_views, view_count
     `) as unknown as Array<{
       token: string;
       expires_at: string | null;
       max_views: number | null;
-      view_count: number;
+      view_count: number | null;
     }>;
 
     const row = inserted?.[0];
     const currentViews = Number(row?.view_count ?? 0);
     const maxViewsReturned =
-      row?.max_views === null || row?.max_views === undefined
-        ? null
-        : Number(row.max_views);
+      row?.max_views === null || row?.max_views === undefined ? null : Number(row.max_views);
 
     const site = envStr("NEXT_PUBLIC_SITE_URL", "https://www.cyang.io");
     const shareUrl = `${site.replace(/\/$/, "")}/s/${token}`;
@@ -196,13 +187,20 @@ export async function createAndEmailShareToken(input: {
 }
 
 export async function getShareStatsByToken(token: string): Promise<
-  | { ok: true; view_count: number; max_views: number | null; expires_at: string | null; revoked_at: string | null }
+  | {
+    ok: true;
+    view_count: number;
+    max_views: number | null;
+    expires_at: string | null;
+    revoked_at: string | null;
+  }
   | { ok: false; error: string; message?: string }
 > {
   try {
     const t = (token || "").trim();
     if (!t) return { ok: false, error: "bad_request", message: "Missing token." };
 
+    // Token is UUID in DB
     const rows = (await sql`
       select
         view_count,
@@ -210,10 +208,10 @@ export async function getShareStatsByToken(token: string): Promise<
         expires_at::text as expires_at,
         revoked_at::text as revoked_at
       from doc_shares
-      where token = ${t}
+      where token = ${t}::uuid
       limit 1
     `) as unknown as Array<{
-      view_count: number;
+      view_count: number | null;
       max_views: number | null;
       expires_at: string | null;
       revoked_at: string | null;
@@ -221,7 +219,13 @@ export async function getShareStatsByToken(token: string): Promise<
 
     if (!rows?.length) return { ok: false, error: "not_found", message: "Share not found." };
 
-    return { ok: true, ...rows[0] };
+    return {
+      ok: true,
+      view_count: Number(rows[0].view_count ?? 0),
+      max_views: rows[0].max_views ?? null,
+      expires_at: rows[0].expires_at ?? null,
+      revoked_at: rows[0].revoked_at ?? null,
+    };
   } catch (e: any) {
     return { ok: false, error: "server_error", message: e?.message || "Unknown error" };
   }
