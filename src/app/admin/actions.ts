@@ -1,26 +1,13 @@
+// src/app/admin/actions.ts
 "use server";
 
 import { DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { revalidatePath } from "next/cache";
-import { getServerSession } from "next-auth";
 
-import { authOptions } from "@/auth";
 import { sql } from "@/lib/db";
 import { r2Bucket, r2Client, r2Prefix } from "@/lib/r2";
 import { sendMail } from "@/lib/email";
-
-async function requireOwnerEmail(): Promise<string> {
-    const session = (await getServerSession(authOptions)) as any;
-    const email = (session?.user?.email as string | undefined) ?? null;
-
-    if (!email) throw new Error("Unauthorized.");
-
-    const owner = (process.env.OWNER_EMAIL || "").toLowerCase();
-    if (!owner) throw new Error("Missing OWNER_EMAIL");
-    if (email.toLowerCase() !== owner) throw new Error("Forbidden.");
-
-    return email;
-}
+import { requireOwnerAdmin } from "@/lib/admin";
 
 function getBaseUrl() {
     const explicit = process.env.BASE_URL || process.env.NEXTAUTH_URL;
@@ -32,7 +19,9 @@ function getBaseUrl() {
     return "http://localhost:3000";
 }
 
-async function resolveR2LocationForDoc(docId: string): Promise<{ bucket: string; key: string }> {
+async function resolveR2LocationForDoc(
+    docId: string
+): Promise<{ bucket: string; key: string }> {
     // Attempt 1: docs.pointer = "r2://bucket/key"
     try {
         const rows = (await sql`
@@ -69,15 +58,15 @@ async function resolveR2LocationForDoc(docId: string): Promise<{ bucket: string;
     return { bucket: r2b, key: r2k };
 }
 
-// Back-compat export expected by ./admin/page.tsx
+// Back-compat export expected by older admin UI
 export async function uploadPdfAction(): Promise<void> {
-    await requireOwnerEmail();
+    await requireOwnerAdmin();
     throw new Error("uploadPdfAction is deprecated. Use /admin/upload instead.");
 }
 
 // Used as <form action={createOrAssignAliasAction}> — must return void
 export async function createOrAssignAliasAction(formData: FormData): Promise<void> {
-    await requireOwnerEmail();
+    await requireOwnerAdmin();
 
     const alias = String(formData.get("alias") || "").trim();
     const docId = String(formData.get("docId") || formData.get("doc_id") || "").trim();
@@ -96,13 +85,20 @@ export async function createOrAssignAliasAction(formData: FormData): Promise<voi
   `;
 
     revalidatePath("/admin");
+    revalidatePath("/admin/dashboard");
 }
 
 // Used as <form action={emailMagicLinkAction}> — must return void
 export async function emailMagicLinkAction(formData: FormData): Promise<void> {
-    const ownerEmail = await requireOwnerEmail();
+    const ownerEmail = await requireOwnerAdmin();
 
-    const to = String(formData.get("to") || formData.get("email") || formData.get("recipient") || "").trim();
+    const to = String(
+        formData.get("to") ||
+        formData.get("email") ||
+        formData.get("recipient") ||
+        ""
+    ).trim();
+
     const docId = String(formData.get("docId") || formData.get("doc_id") || "").trim();
     const alias = String(formData.get("alias") || "").trim();
 
@@ -119,7 +115,7 @@ export async function emailMagicLinkAction(formData: FormData): Promise<void> {
         text: `Here is your secure link:\n\n${url}\n\nIf you did not expect this message, you can ignore it.`,
     });
 
-    // optional audit
+    // Optional audit
     await sendMail({
         to: ownerEmail,
         subject: "cyang.io: magic link emailed",
@@ -127,11 +123,12 @@ export async function emailMagicLinkAction(formData: FormData): Promise<void> {
     });
 
     revalidatePath("/admin");
+    revalidatePath("/admin/dashboard");
 }
 
 // Used as <form action={deleteDocAction}> — must return void
 export async function deleteDocAction(formData: FormData): Promise<void> {
-    await requireOwnerEmail();
+    await requireOwnerAdmin();
 
     const docId = String(formData.get("docId") || formData.get("doc_id") || "").trim();
     if (!docId) throw new Error("Missing docId.");
@@ -154,4 +151,5 @@ export async function deleteDocAction(formData: FormData): Promise<void> {
     }
 
     revalidatePath("/admin");
+    revalidatePath("/admin/dashboard");
 }

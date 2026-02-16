@@ -1,222 +1,97 @@
-"use client";
+// src/app/admin/page.tsx
+import Link from "next/link";
+import { isOwnerAdmin } from "@/lib/admin";
 
-import { useMemo, useState } from "react";
-
+export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-type PresignResponse =
-  | {
-      ok: true;
-      doc_id: string;
-      upload_url: string;
-      r2_key: string;
-      bucket: string;
-      expires_in: number;
-    }
-  | { ok: false; error: string; message?: string };
+export default async function AdminPage() {
+  const ok = await isOwnerAdmin();
 
-type CompleteResponse =
-  | { ok: true; doc_id: string; alias: string; view_url: string }
-  | { ok: false; error: string; message?: string };
+  if (!ok) {
+    return (
+      <main className="mx-auto max-w-3xl px-4 py-12">
+        <div className="flex items-center justify-between">
+          <h1 className="text-xl font-semibold tracking-tight">Admin</h1>
+          <Link
+            href="/"
+            className="text-sm text-neutral-400 hover:text-neutral-200 underline underline-offset-4"
+          >
+            Home
+          </Link>
+        </div>
 
-function fmtBytes(n: number) {
-  if (!Number.isFinite(n)) return "";
-  if (n < 1024) return `${n} B`;
-  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
-  return `${(n / (1024 * 1024)).toFixed(2)} MB`;
-}
+        <p className="mt-3 text-sm text-neutral-300">Owner access required.</p>
 
-export default function AdminUploadPage() {
-  const [title, setTitle] = useState("");
-  const [file, setFile] = useState<File | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<{ alias: string; view_url: string } | null>(null);
+        <div className="mt-6 flex flex-wrap gap-3">
+          <Link
+            href="/api/auth/signin"
+            className="inline-block rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm font-semibold text-neutral-100 hover:bg-neutral-800"
+          >
+            Sign in
+          </Link>
 
-  const fileLabel = useMemo(() => {
-    if (!file) return "Choose a PDF";
-    return `${file.name} (${fmtBytes(file.size)})`;
-  }, [file]);
+          <Link
+            href="/"
+            className="inline-block rounded-lg border border-neutral-800 bg-neutral-950/40 px-3 py-2 text-sm font-semibold text-neutral-200 hover:bg-neutral-900"
+          >
+            Back home
+          </Link>
+        </div>
 
-  async function onUpload() {
-    setError(null);
-    setResult(null);
-
-    if (!file) {
-      setError("Choose a PDF first.");
-      return;
-    }
-
-    const nameLower = (file.name || "").toLowerCase();
-    const isPdf = file.type === "application/pdf" || nameLower.endsWith(".pdf");
-    if (!isPdf) {
-      setError("Only PDF files are supported.");
-      return;
-    }
-
-    setBusy(true);
-    try {
-      // 1) Presign: MUST match BodySchema in presign/route.ts
-      //    BodySchema keys are: title, filename, contentType, sizeBytes
-      const presignRes = await fetch("/api/admin/upload/presign", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: title || undefined,
-          filename: file.name,
-          contentType: "application/pdf",
-          sizeBytes: file.size,
-        }),
-      });
-
-      const presignJson = (await presignRes.json()) as PresignResponse;
-      if (!presignRes.ok || !presignJson.ok) {
-        setError(
-          presignJson && "error" in presignJson
-            ? `${presignJson.error}${presignJson.message ? `: ${presignJson.message}` : ""}`
-            : "Presign failed."
-        );
-        return;
-      }
-
-      // IMPORTANT: doc_id must be carried into /complete
-      const docId = presignJson.doc_id;
-      const uploadUrl = presignJson.upload_url;
-
-      if (!docId) {
-        setError("Presign did not return doc_id.");
-        return;
-      }
-
-      // 2) Upload directly to R2 via signed PUT URL
-      const putRes = await fetch(uploadUrl, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/pdf",
-        },
-        body: file,
-      });
-
-      if (!putRes.ok) {
-        const txt = await putRes.text().catch(() => "");
-        setError(`Upload failed (${putRes.status}). ${txt}`);
-        return;
-      }
-
-      // 3) Complete: send doc_id + metadata
-      const completeRes = await fetch("/api/admin/upload/complete", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          doc_id: docId,
-          title: title || null,
-          original_filename: file.name,
-        }),
-      });
-
-      const completeJson = (await completeRes.json()) as CompleteResponse;
-      if (!completeRes.ok || !completeJson.ok) {
-        setError(
-          completeJson && "error" in completeJson
-            ? `${completeJson.error}${completeJson.message ? `: ${completeJson.message}` : ""}`
-            : "Complete failed."
-        );
-        return;
-      }
-
-      setResult({ alias: completeJson.alias, view_url: completeJson.view_url });
-    } catch (e: any) {
-      setError(e?.message || "Upload failed.");
-    } finally {
-      setBusy(false);
-    }
+        <div className="mt-4 text-xs text-neutral-500">
+          Make sure <span className="font-mono">OWNER_EMAIL</span> is set in env.
+        </div>
+      </main>
+    );
   }
 
   return (
-    <div style={{ padding: 24, maxWidth: 920, margin: "0 auto" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-        <h1 style={{ fontSize: 22, fontWeight: 800, margin: 0 }}>Upload New PDF</h1>
-        <a href="/admin" style={{ color: "inherit", opacity: 0.8, textDecoration: "none" }}>
-          Back to Admin
-        </a>
-      </div>
-
-      <p style={{ opacity: 0.8, marginTop: 10, lineHeight: 1.5 }}>
-        This uploads directly to R2 using a signed PUT URL. The server creates the doc row first (doc_id),
-        then you upload, then we finalize and generate the alias.
-      </p>
-
-      <div
-        style={{
-          border: "1px solid rgba(255,255,255,0.12)",
-          borderRadius: 14,
-          padding: 16,
-          marginTop: 16,
-        }}
-      >
-        <div style={{ marginBottom: 10 }}>
-          <div style={{ fontSize: 13, opacity: 0.8, marginBottom: 6 }}>Title (optional)</div>
-          <input
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="Shown in admin list / emails"
-            style={{
-              width: "100%",
-              padding: "10px 12px",
-              borderRadius: 12,
-              border: "1px solid rgba(255,255,255,0.12)",
-              background: "transparent",
-              color: "inherit",
-              outline: "none",
-            }}
-          />
+    <main className="mx-auto max-w-5xl px-4 py-12">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-semibold tracking-tight">Admin</h1>
+          <p className="mt-1 text-sm text-neutral-400">You’re signed in as the owner.</p>
         </div>
 
-        <div style={{ marginBottom: 10 }}>
-          <div style={{ fontSize: 13, opacity: 0.8, marginBottom: 6 }}>PDF file</div>
-          <input
-            type="file"
-            accept="application/pdf,.pdf"
-            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-          />
-          <div style={{ marginTop: 6, fontSize: 13, opacity: 0.8 }}>{fileLabel}</div>
-        </div>
-
-        <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 12 }}>
-          <button
-            onClick={onUpload}
-            disabled={busy}
-            style={{
-              padding: "10px 14px",
-              borderRadius: 12,
-              border: "1px solid rgba(255,255,255,0.18)",
-              background: "rgba(255,255,255,0.06)",
-              color: "inherit",
-              fontWeight: 700,
-              cursor: busy ? "not-allowed" : "pointer",
-            }}
+        <div className="flex items-center gap-3">
+          <Link
+            href="/"
+            className="text-sm text-neutral-400 hover:text-neutral-200 underline underline-offset-4"
           >
-            {busy ? "Uploading..." : "Upload"}
-          </button>
+            Home
+          </Link>
 
-          {error ? <div style={{ color: "#ff6b6b", fontWeight: 700 }}>{error}</div> : null}
+          <Link
+            href="/api/auth/signout"
+            className="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm font-semibold text-neutral-100 hover:bg-neutral-800"
+          >
+            Sign out
+          </Link>
+        </div>
+      </div>
+
+      <div className="mt-8 rounded-lg border border-neutral-800 bg-neutral-950/40 p-4">
+        <div className="flex flex-wrap items-center gap-3">
+          <Link
+            href="/admin/dashboard"
+            className="inline-block rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm font-semibold text-neutral-100 hover:bg-neutral-800"
+          >
+            Open dashboard
+          </Link>
+
+          <Link
+            href="/api/auth/signin"
+            className="text-sm text-neutral-400 hover:text-neutral-200 underline underline-offset-4"
+          >
+            Switch account
+          </Link>
         </div>
 
-        {result ? (
-          <div style={{ marginTop: 16 }}>
-            <div style={{ fontWeight: 800, marginBottom: 8 }}>Done ✅</div>
-            <div style={{ opacity: 0.9, marginBottom: 6 }}>
-              Alias: <code>{result.alias}</code>
-            </div>
-            <div style={{ opacity: 0.9 }}>
-              Link:{" "}
-              <a href={result.view_url} target="_blank" rel="noreferrer">
-                {result.view_url}
-              </a>
-            </div>
-          </div>
-        ) : null}
+        <div className="mt-3 text-sm text-neutral-300">
+          Manage documents, shares, and cleanup from the dashboard.
+        </div>
       </div>
-    </div>
+    </main>
   );
 }
