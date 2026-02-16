@@ -2,6 +2,7 @@
 "use server";
 
 import crypto from "crypto";
+import bcrypt from "bcryptjs";
 import { revalidatePath } from "next/cache";
 import { sql } from "@/lib/db";
 import { sendShareEmail } from "@/lib/email";
@@ -51,6 +52,7 @@ export type CreateShareResult =
     max_views: number | null;
     view_count: number;
     views_left_label: string;
+    password_required: boolean;
   }
   | { ok: false; error: string; message?: string };
 
@@ -59,12 +61,14 @@ export async function createAndEmailShareToken(input: {
   to_email: string;
   expires_hours?: number | null;
   max_views?: number | null;
+  password?: string | null; // NEW
 }): Promise<CreateShareResult> {
   try {
     await requireOwnerAdmin();
 
     const alias = (input.alias || "").trim();
     const to = (input.to_email || "").trim().toLowerCase();
+    const password = (input.password ?? "").toString();
 
     if (!alias) return { ok: false, error: "bad_request", message: "Missing alias." };
     if (!to || !to.includes("@")) {
@@ -110,14 +114,19 @@ export async function createAndEmailShareToken(input: {
     const expiresAt =
       expiresHours > 0 ? new Date(Date.now() + expiresHours * 3600 * 1000) : null;
 
+    const passwordRequired = password.trim().length > 0;
+    const passwordHash = passwordRequired ? await bcrypt.hash(password, 10) : null;
+
     const inserted = (await sql`
-      insert into doc_shares (doc_id, to_email, token, expires_at, max_views)
+      insert into doc_shares (doc_id, to_email, token, expires_at, max_views, password_hash, password_set_at)
       values (
         ${docId}::uuid,
         ${to},
         ${token}::uuid,
         ${expiresAt ? expiresAt.toISOString() : null},
-        ${Number.isFinite(maxViews) ? maxViews : null}
+        ${Number.isFinite(maxViews) ? maxViews : null},
+        ${passwordHash},
+        ${passwordRequired ? new Date().toISOString() : null}
       )
       returning
         token::text as token,
@@ -144,9 +153,7 @@ export async function createAndEmailShareToken(input: {
     const brandLogoUrl = process.env.BRAND_LOGO_URL || null;
 
     const maxViewsLabel =
-      maxViewsReturned === null || maxViewsReturned === 0
-        ? "Unlimited"
-        : String(maxViewsReturned);
+      maxViewsReturned === null || maxViewsReturned === 0 ? "Unlimited" : String(maxViewsReturned);
 
     const viewsLeftLabel = computeViewsLeftLabel(currentViews, maxViewsReturned);
 
@@ -164,6 +171,9 @@ export async function createAndEmailShareToken(input: {
       maxViewsLabel,
       currentViewsLabel: String(currentViews),
       viewsLeftLabel,
+
+      // Optional: you could add a “Password required” line in your email template
+      // but we won't email the actual password.
     });
 
     revalidatePath(`/d/${alias}`);
@@ -176,91 +186,10 @@ export async function createAndEmailShareToken(input: {
       max_views: maxViewsReturned,
       view_count: currentViews,
       views_left_label: viewsLeftLabel,
+      password_required: passwordRequired,
     };
   } catch (e: any) {
     const msg = String(e?.message || "");
-    if (msg.includes("Unauthorized")) {
-      return { ok: false, error: "unauthorized", message: "Please sign in first." };
-    }
-    if (msg.includes("Forbidden")) {
-      return { ok: false, error: "forbidden", message: "Owner access required." };
-    }
-    if (msg.includes("Missing OWNER_EMAIL")) {
-      return { ok: false, error: "misconfig", message: "Missing OWNER_EMAIL env var." };
-    }
     return { ok: false, error: "server_error", message: msg || "Unknown error" };
-  }
-}
-
-export async function revokeShareToken(input: {
-  alias: string;
-  token: string;
-}): Promise<{ ok: true } | { ok: false; error: string; message?: string }> {
-  try {
-    await requireOwnerAdmin();
-
-    const alias = (input.alias || "").trim();
-    const token = (input.token || "").trim();
-
-    if (!alias) return { ok: false, error: "bad_request", message: "Missing alias." };
-    if (!token) return { ok: false, error: "bad_request", message: "Missing token." };
-
-    await sql`
-      update doc_shares
-      set revoked_at = now()
-      where token = ${token}::uuid
-        and revoked_at is null
-    `;
-
-    revalidatePath(`/d/${alias}`);
-    revalidatePath(`/s/${token}`);
-
-    return { ok: true };
-  } catch (e: any) {
-    return { ok: false, error: "server_error", message: e?.message || "Unknown error" };
-  }
-}
-
-export async function getShareStatsByToken(token: string): Promise<
-  | {
-    ok: true;
-    view_count: number;
-    max_views: number | null;
-    expires_at: string | null;
-    revoked_at: string | null;
-  }
-  | { ok: false; error: string; message?: string }
-> {
-  try {
-    const t = (token || "").trim();
-    if (!t) return { ok: false, error: "bad_request", message: "Missing token." };
-
-    const rows = (await sql`
-      select
-        view_count,
-        max_views,
-        expires_at::text as expires_at,
-        revoked_at::text as revoked_at
-      from doc_shares
-      where token = ${t}::uuid
-      limit 1
-    `) as unknown as Array<{
-      view_count: number | null;
-      max_views: number | null;
-      expires_at: string | null;
-      revoked_at: string | null;
-    }>;
-
-    if (!rows?.length) return { ok: false, error: "not_found", message: "Share not found." };
-
-    return {
-      ok: true,
-      view_count: Number(rows[0].view_count ?? 0),
-      max_views: rows[0].max_views ?? null,
-      expires_at: rows[0].expires_at ?? null,
-      revoked_at: rows[0].revoked_at ?? null,
-    };
-  } catch (e: any) {
-    return { ok: false, error: "server_error", message: e?.message || "Unknown error" };
   }
 }

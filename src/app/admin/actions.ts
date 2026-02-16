@@ -11,143 +11,143 @@ import { sendMail } from "@/lib/email";
 import { requireOwnerAdmin } from "@/lib/admin";
 
 function getBaseUrl() {
-    const explicit = process.env.BASE_URL || process.env.NEXTAUTH_URL;
-    if (explicit) return explicit.replace(/\/+$/, "");
+  const explicit = process.env.BASE_URL || process.env.NEXTAUTH_URL;
+  if (explicit) return explicit.replace(/\/+$/, "");
 
-    const vercel = process.env.VERCEL_URL;
-    if (vercel) return `https://${vercel}`.replace(/\/+$/, "");
+  const vercel = process.env.VERCEL_URL;
+  if (vercel) return `https://${vercel}`.replace(/\/+$/, "");
 
-    return "http://localhost:3000";
+  return "http://localhost:3000";
 }
 
 async function resolveR2LocationForDoc(docId: string): Promise<{ bucket: string; key: string }> {
-    // Attempt 1: docs.pointer = "r2://bucket/key"
-    try {
-        const rows = (await sql`
+  // Attempt 1: docs.pointer = "r2://bucket/key"
+  try {
+    const rows = (await sql`
       select pointer
       from docs
       where id = ${docId}::uuid
       limit 1
     `) as unknown as Array<{ pointer: string | null }>;
 
-        const pointer = rows[0]?.pointer ?? null;
-        if (!pointer) throw new Error("Doc not found.");
-        if (!pointer.startsWith(r2Prefix)) throw new Error("Invalid pointer.");
-        const key = pointer.slice(r2Prefix.length);
-        return { bucket: r2Bucket, key };
-    } catch (e: any) {
-        const msg = String(e?.message || "").toLowerCase();
-        const missingPointerCol =
-            msg.includes("column") && msg.includes("pointer") && msg.includes("does not exist");
+    const pointer = rows[0]?.pointer ?? null;
+    if (!pointer) throw new Error("Doc not found.");
+    if (!pointer.startsWith(r2Prefix)) throw new Error("Invalid pointer.");
+    const key = pointer.slice(r2Prefix.length);
+    return { bucket: r2Bucket, key };
+  } catch (e: any) {
+    const msg = String(e?.message || "").toLowerCase();
+    const missingPointerCol =
+      msg.includes("column") && msg.includes("pointer") && msg.includes("does not exist");
 
-        if (!missingPointerCol) throw e;
-    }
+    if (!missingPointerCol) throw e;
+  }
 
-    // Attempt 2: docs.r2_bucket + docs.r2_key
-    const rows2 = (await sql`
+  // Attempt 2: docs.r2_bucket + docs.r2_key
+  const rows2 = (await sql`
     select r2_bucket, r2_key
     from docs
     where id = ${docId}::uuid
     limit 1
   `) as unknown as Array<{ r2_bucket: string | null; r2_key: string | null }>;
 
-    const r2b = rows2[0]?.r2_bucket ?? null;
-    const r2k = rows2[0]?.r2_key ?? null;
-    if (!r2b || !r2k) throw new Error("Doc not found.");
-    return { bucket: r2b, key: r2k };
+  const r2b = rows2[0]?.r2_bucket ?? null;
+  const r2k = rows2[0]?.r2_key ?? null;
+  if (!r2b || !r2k) throw new Error("Doc not found.");
+  return { bucket: r2b, key: r2k };
 }
 
 // Back-compat export expected by older admin UI
 export async function uploadPdfAction(): Promise<void> {
-    await requireOwnerAdmin();
-    throw new Error("uploadPdfAction is deprecated. Use /admin/upload instead.");
+  await requireOwnerAdmin();
+  throw new Error("uploadPdfAction is deprecated. Use /admin/upload instead.");
 }
 
 // Used as <form action={createOrAssignAliasAction}> — must return void
 export async function createOrAssignAliasAction(formData: FormData): Promise<void> {
-    await requireOwnerAdmin();
+  await requireOwnerAdmin();
 
-    const alias = String(formData.get("alias") || "").trim();
-    const docId = String(formData.get("docId") || formData.get("doc_id") || "").trim();
+  const alias = String(formData.get("alias") || "").trim();
+  const docId = String(formData.get("docId") || formData.get("doc_id") || "").trim();
 
-    if (!alias) throw new Error("Missing alias.");
-    if (!docId) throw new Error("Missing docId.");
-    if (!/^[a-zA-Z0-9_-]{3,80}$/.test(alias)) {
-        throw new Error("Alias must be 3-80 chars: letters, numbers, underscore, dash.");
-    }
+  if (!alias) throw new Error("Missing alias.");
+  if (!docId) throw new Error("Missing docId.");
+  if (!/^[a-zA-Z0-9_-]{3,80}$/.test(alias)) {
+    throw new Error("Alias must be 3-80 chars: letters, numbers, underscore, dash.");
+  }
 
-    await sql`
+  await sql`
     insert into doc_aliases (alias, doc_id)
     values (${alias}, ${docId}::uuid)
     on conflict (alias)
     do update set doc_id = excluded.doc_id
   `;
 
-    revalidatePath("/admin");
-    revalidatePath("/admin/dashboard");
+  revalidatePath("/admin");
+  revalidatePath("/admin/dashboard");
 }
 
 // Used as <form action={emailMagicLinkAction}> — must return void
 export async function emailMagicLinkAction(formData: FormData): Promise<void> {
-    const ownerEmail = await requireOwnerAdmin();
+  const ownerEmail = await requireOwnerAdmin();
 
-    const to = String(
-        formData.get("to") || formData.get("email") || formData.get("recipient") || ""
-    ).trim();
+  const to = String(
+    formData.get("to") || formData.get("email") || formData.get("recipient") || ""
+  ).trim();
 
-    const docId = String(formData.get("docId") || formData.get("doc_id") || "").trim();
-    const alias = String(formData.get("alias") || "").trim();
+  const docId = String(formData.get("docId") || formData.get("doc_id") || "").trim();
+  const alias = String(formData.get("alias") || "").trim();
 
-    if (!to) throw new Error("Missing recipient email.");
-    if (!alias && !docId) throw new Error("Provide alias or docId.");
+  if (!to) throw new Error("Missing recipient email.");
+  if (!alias && !docId) throw new Error("Provide alias or docId.");
 
-    const base = getBaseUrl();
-    const token = alias || docId;
-    const url = `${base}/d/${encodeURIComponent(token)}`;
+  const base = getBaseUrl();
+  const token = alias || docId;
+  const url = `${base}/d/${encodeURIComponent(token)}`;
 
-    await sendMail({
-        to,
-        subject: "Your document link",
-        text: `Here is your secure link:\n\n${url}\n\nIf you did not expect this message, you can ignore it.`,
-    });
+  await sendMail({
+    to,
+    subject: "Your document link",
+    text: `Here is your secure link:\n\n${url}\n\nIf you did not expect this message, you can ignore it.`,
+  });
 
-    // Optional audit
-    await sendMail({
-        to: ownerEmail,
-        subject: "cyang.io: magic link emailed",
-        text: `Sent link to ${to}\n\n${url}`,
-    });
+  // Optional audit
+  await sendMail({
+    to: ownerEmail,
+    subject: "cyang.io: magic link emailed",
+    text: `Sent link to ${to}\n\n${url}`,
+  });
 
-    revalidatePath("/admin");
-    revalidatePath("/admin/dashboard");
+  revalidatePath("/admin");
+  revalidatePath("/admin/dashboard");
 }
 
 // Used as <form action={deleteDocAction}> — must return void
 export async function deleteDocAction(formData: FormData): Promise<void> {
-    await requireOwnerAdmin();
+  await requireOwnerAdmin();
 
-    const docId = String(formData.get("docId") || formData.get("doc_id") || "").trim();
-    if (!docId) throw new Error("Missing docId.");
+  const docId = String(formData.get("docId") || formData.get("doc_id") || "").trim();
+  if (!docId) throw new Error("Missing docId.");
 
-    const { bucket, key } = await resolveR2LocationForDoc(docId);
+  const { bucket, key } = await resolveR2LocationForDoc(docId);
 
-    await r2Client.send(
-        new DeleteObjectCommand({
-            Bucket: bucket,
-            Key: key,
-        })
-    );
+  await r2Client.send(
+    new DeleteObjectCommand({
+      Bucket: bucket,
+      Key: key,
+    })
+  );
 
-    await sql`delete from docs where id = ${docId}::uuid`;
+  await sql`delete from docs where id = ${docId}::uuid`;
 
-    try {
-        await sql`delete from doc_aliases where doc_id = ${docId}::uuid`;
-    } catch {
-        // ignore if table doesn't exist
-    }
+  try {
+    await sql`delete from doc_aliases where doc_id = ${docId}::uuid`;
+  } catch {
+    // ignore if table doesn't exist
+  }
 
-    revalidatePath("/admin");
-    revalidatePath("/admin/dashboard");
+  revalidatePath("/admin");
+  revalidatePath("/admin/dashboard");
 }
 
 /**
@@ -157,58 +157,58 @@ export async function deleteDocAction(formData: FormData): Promise<void> {
 
 // Used as <form action={revokeDocShareAction}>
 export async function revokeDocShareAction(formData: FormData): Promise<void> {
-    await requireOwnerAdmin();
+  await requireOwnerAdmin();
 
-    const token = String(formData.get("token") || "").trim();
-    if (!token) throw new Error("Missing token.");
+  const token = String(formData.get("token") || "").trim();
+  if (!token) throw new Error("Missing token.");
 
-    await sql`
+  await sql`
     update doc_shares
     set revoked_at = now()
     where token = ${token}
       and revoked_at is null
   `;
 
-    revalidatePath("/admin/dashboard");
-    revalidatePath("/admin");
+  revalidatePath("/admin/dashboard");
+  revalidatePath("/admin");
 }
 
 // Used as <form action={setSharePasswordAction}>
 export async function setSharePasswordAction(formData: FormData): Promise<void> {
-    await requireOwnerAdmin();
+  await requireOwnerAdmin();
 
-    const token = String(formData.get("token") || "").trim();
-    const password = String(formData.get("password") || "").trim();
+  const token = String(formData.get("token") || "").trim();
+  const password = String(formData.get("password") || "").trim();
 
-    if (!token) throw new Error("Missing token.");
-    if (password.length < 4) throw new Error("Password must be at least 4 characters.");
+  if (!token) throw new Error("Missing token.");
+  if (password.length < 4) throw new Error("Password must be at least 4 characters.");
 
-    // bcrypt cost (12 is a good default for serverless)
-    const hash = await bcrypt.hash(password, 12);
+  // bcrypt cost (12 is a good default for serverless)
+  const hash = await bcrypt.hash(password, 12);
 
-    await sql`
+  await sql`
     update doc_shares
     set password_hash = ${hash}
     where token = ${token}
   `;
 
-    revalidatePath("/admin/dashboard");
-    revalidatePath("/admin");
+  revalidatePath("/admin/dashboard");
+  revalidatePath("/admin");
 }
 
 // Used as <form action={clearSharePasswordAction}>
 export async function clearSharePasswordAction(formData: FormData): Promise<void> {
-    await requireOwnerAdmin();
+  await requireOwnerAdmin();
 
-    const token = String(formData.get("token") || "").trim();
-    if (!token) throw new Error("Missing token.");
+  const token = String(formData.get("token") || "").trim();
+  if (!token) throw new Error("Missing token.");
 
-    await sql`
+  await sql`
     update doc_shares
     set password_hash = null
     where token = ${token}
   `;
 
-    revalidatePath("/admin/dashboard");
-    revalidatePath("/admin");
+  revalidatePath("/admin/dashboard");
+  revalidatePath("/admin");
 }
