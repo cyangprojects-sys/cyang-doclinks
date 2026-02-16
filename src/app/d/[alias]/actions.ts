@@ -1,195 +1,362 @@
 // src/app/d/[alias]/actions.ts
 "use server";
 
-import crypto from "crypto";
-import bcrypt from "bcryptjs";
-import { revalidatePath } from "next/cache";
+import { z } from "zod";
 import { sql } from "@/lib/db";
-import { sendShareEmail } from "@/lib/email";
-import { requireOwnerAdmin } from "@/lib/admin";
+import { requireOwner } from "@/lib/owner";
 
-type DocRow = {
-  id: string;
-  title: string | null;
-};
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
-type AliasRow = {
-  doc_id: string;
-  alias: string;
-};
+/**
+ * NOTE:
+ * - This file is used by the client SharePanel on /d/[alias]
+ * - Turbopack requires that all imports exist as real exports.
+ * - This file provides:
+ *   - createAndEmailShareToken
+ *   - getShareStatsByToken
+ *   - revokeShareToken
+ *   - type CreateShareResult
+ *
+ * It does NOT implement password hashing; your share-password feature can live elsewhere.
+ */
 
-function envStr(name: string, fallback: string) {
-  return process.env[name] || fallback;
+function baseUrl() {
+  return (
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000")
+  );
 }
 
-function toInt(v: string | null | undefined, fallback: number) {
-  const n = Number(v);
-  return Number.isFinite(n) ? Math.floor(n) : fallback;
+function isValidEmail(email: string) {
+  // light validation; avoids pulling in heavy deps
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
 }
 
-function fmtDateLabel(d: Date) {
-  return d.toLocaleString("en-US", {
-    year: "numeric",
-    month: "short",
-    day: "2-digit",
-    hour: "numeric",
-    minute: "2-digit",
-  });
-}
+const CreateSchema = z.object({
+  // SharePanel typically knows doc_id already; allow alias-only fallback as well.
+  doc_id: z.string().uuid().optional(),
+  alias: z.string().min(1).optional(),
 
-function computeViewsLeftLabel(viewCount: number, maxViews: number | null) {
-  if (maxViews === null || maxViews === 0) return "Unlimited";
-  const left = Math.max(0, maxViews - viewCount);
-  return String(left);
-}
+  // Optional recipient email (if provided, we try to email via Resend)
+  to_email: z.string().email().optional(),
+
+  // Optional constraints
+  expires_in_hours: z.number().int().positive().max(24 * 365).optional(), // up to 1 year
+  max_views: z.number().int().positive().max(1000000).optional(),
+});
 
 export type CreateShareResult =
   | {
     ok: true;
+    token: string;
+    doc_id: string;
+    to_email: string | null;
     share_url: string;
-    token: string; // uuid string
+    created_at: string;
     expires_at: string | null;
     max_views: number | null;
-    view_count: number;
-    views_left_label: string;
-    password_required: boolean;
   }
   | { ok: false; error: string; message?: string };
 
-export async function createAndEmailShareToken(input: {
-  alias: string;
-  to_email: string;
-  expires_hours?: number | null;
-  max_views?: number | null;
-  password?: string | null; // NEW
-}): Promise<CreateShareResult> {
+export type ShareStatsResult =
+  | {
+    ok: true;
+    token: string;
+    doc_id: string;
+    to_email: string | null;
+    created_at: string;
+    expires_at: string | null;
+    max_views: number | null;
+    view_count: number;
+    revoked_at: string | null;
+    has_password: boolean;
+  }
+  | { ok: false; error: string; message?: string };
+
+export type RevokeShareResult =
+  | { ok: true; token: string; revoked_at: string }
+  | { ok: false; error: string; message?: string };
+
+async function resolveDocId(input: { doc_id?: string; alias?: string }) {
+  if (input.doc_id) return input.doc_id;
+
+  const alias = input.alias?.trim();
+  if (!alias) return null;
+
+  const rows = (await sql`
+    select a.doc_id::text as doc_id
+    from public.doc_aliases a
+    where a.alias = ${alias}
+    limit 1
+  `) as unknown as Array<{ doc_id: string }>;
+
+  return rows?.[0]?.doc_id ?? null;
+}
+
+async function sendResendEmail(opts: { to: string; subject: string; html: string }) {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) return { ok: false as const, error: "NO_RESEND_API_KEY" };
+
+  const from =
+    process.env.EMAIL_FROM ||
+    process.env.RESEND_FROM ||
+    process.env.MAIL_FROM ||
+    "Cyang Docs <no-reply@cyang.io>";
+
+  const res = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      from,
+      to: [opts.to],
+      subject: opts.subject,
+      html: opts.html,
+    }),
+  });
+
+  if (!res.ok) {
+    const txt = await res.text().catch(() => "");
+    return { ok: false as const, error: "RESEND_FAILED", message: txt || `HTTP ${res.status}` };
+  }
+
+  return { ok: true as const };
+}
+
+/**
+ * Create a share token row and (optionally) email it.
+ * Owner-only.
+ */
+export async function createAndEmailShareToken(
+  input:
+    | {
+      doc_id?: string;
+      alias?: string;
+      to_email?: string;
+      expires_in_hours?: number;
+      max_views?: number;
+    }
+    | FormData
+): Promise<CreateShareResult> {
   try {
-    await requireOwnerAdmin();
+    const owner = await requireOwner();
+    if (!owner.ok) return { ok: false, error: owner.reason };
 
-    const alias = (input.alias || "").trim();
-    const to = (input.to_email || "").trim().toLowerCase();
-    const password = (input.password ?? "").toString();
+    // Accept FormData or plain object
+    const raw =
+      input instanceof FormData
+        ? {
+          doc_id: (input.get("doc_id") as string | null) ?? undefined,
+          alias: (input.get("alias") as string | null) ?? undefined,
+          to_email: (input.get("to_email") as string | null) ?? undefined,
+          expires_in_hours: input.get("expires_in_hours")
+            ? Number(input.get("expires_in_hours"))
+            : undefined,
+          max_views: input.get("max_views") ? Number(input.get("max_views")) : undefined,
+        }
+        : input;
 
-    if (!alias) return { ok: false, error: "bad_request", message: "Missing alias." };
-    if (!to || !to.includes("@")) {
-      return { ok: false, error: "bad_request", message: "Enter a valid email." };
-    }
+    const parsed = CreateSchema.safeParse(raw);
+    if (!parsed.success) return { ok: false, error: "BAD_REQUEST" };
 
-    const defaultExp = toInt(process.env.DEFAULT_SHARE_EXPIRES_HOURS, 72);
-    const defaultMax = toInt(process.env.DEFAULT_SHARE_MAX_VIEWS, 3);
+    const { to_email, expires_in_hours, max_views } = parsed.data;
 
-    const expiresHours =
-      input.expires_hours === null || input.expires_hours === undefined
-        ? defaultExp
-        : Math.max(0, Math.floor(input.expires_hours));
+    const docId = await resolveDocId({ doc_id: parsed.data.doc_id, alias: parsed.data.alias });
+    if (!docId) return { ok: false, error: "DOC_NOT_FOUND", message: "doc_id or alias not found" };
 
-    const maxViews =
-      input.max_views === null || input.max_views === undefined
-        ? defaultMax
-        : Math.max(0, Math.floor(input.max_views));
-
-    const arows = (await sql`
-      select doc_id::text as doc_id, alias
-      from doc_aliases
-      where alias = ${alias}
-      limit 1
-    `) as unknown as AliasRow[];
-
-    if (!arows?.length) {
-      return { ok: false, error: "not_found", message: "Alias not found." };
-    }
-
-    const docId = arows[0].doc_id;
-
-    const drows = (await sql`
-      select id::text as id, title
-      from docs
+    // optional: verify doc exists and is ready
+    const docRows = (await sql`
+      select id::text as id, title::text as title
+      from public.docs
       where id = ${docId}::uuid
       limit 1
-    `) as unknown as DocRow[];
+    `) as unknown as Array<{ id: string; title: string | null }>;
 
-    const docTitle = drows?.[0]?.title || "Document";
+    if (!docRows.length) return { ok: false, error: "DOC_NOT_FOUND" };
 
     const token = crypto.randomUUID();
+
     const expiresAt =
-      expiresHours > 0 ? new Date(Date.now() + expiresHours * 3600 * 1000) : null;
+      typeof expires_in_hours === "number" && Number.isFinite(expires_in_hours) && expires_in_hours > 0
+        ? new Date(Date.now() + expires_in_hours * 60 * 60 * 1000).toISOString()
+        : null;
 
-    const passwordRequired = password.trim().length > 0;
-    const passwordHash = passwordRequired ? await bcrypt.hash(password, 10) : null;
+    const mv =
+      typeof max_views === "number" && Number.isFinite(max_views) && max_views > 0
+        ? Math.trunc(max_views)
+        : null;
 
+    const toEmail = to_email?.trim() ? to_email.trim() : null;
+
+    // Insert share row
     const inserted = (await sql`
-      insert into doc_shares (doc_id, to_email, token, expires_at, max_views, password_hash, password_set_at)
+      insert into public.doc_shares (
+        token,
+        doc_id,
+        to_email,
+        expires_at,
+        max_views,
+        view_count,
+        revoked_at,
+        password_hash
+      )
       values (
-        ${docId}::uuid,
-        ${to},
         ${token}::uuid,
-        ${expiresAt ? expiresAt.toISOString() : null},
-        ${Number.isFinite(maxViews) ? maxViews : null},
-        ${passwordHash},
-        ${passwordRequired ? new Date().toISOString() : null}
+        ${docId}::uuid,
+        ${toEmail},
+        ${expiresAt}::timestamptz,
+        ${mv},
+        0,
+        null,
+        null
       )
       returning
         token::text as token,
+        doc_id::text as doc_id,
+        to_email,
+        created_at::text as created_at,
         expires_at::text as expires_at,
-        max_views,
-        view_count
+        max_views
     `) as unknown as Array<{
       token: string;
+      doc_id: string;
+      to_email: string | null;
+      created_at: string;
       expires_at: string | null;
       max_views: number | null;
-      view_count: number | null;
     }>;
 
-    const row = inserted?.[0];
-    const currentViews = Number(row?.view_count ?? 0);
-    const maxViewsReturned =
-      row?.max_views === null || row?.max_views === undefined ? null : Number(row.max_views);
+    const row = inserted[0];
+    const shareUrl = `${baseUrl()}/s/${encodeURIComponent(row.token)}`;
 
-    const site = envStr("NEXT_PUBLIC_SITE_URL", "https://www.cyang.io");
-    const shareUrl = `${site.replace(/\/$/, "")}/s/${token}`;
+    // Optional email
+    if (toEmail && isValidEmail(toEmail)) {
+      const title = docRows[0]?.title || "Document";
+      const subject = `Shared with you: ${title}`;
+      const html = `
+        <div style="font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; line-height: 1.5;">
+          <h2 style="margin: 0 0 10px 0;">${title}</h2>
+          <p style="margin: 0 0 14px 0;">A document has been shared with you.</p>
+          <p style="margin: 0 0 18px 0;">
+            <a href="${shareUrl}" style="display:inline-block; padding:10px 14px; border-radius:10px; background:#111; color:#fff; text-decoration:none;">
+              Open shared link
+            </a>
+          </p>
+          <div style="color:#666; font-size:12px;">
+            ${expiresAt ? `Expires: ${new Date(expiresAt).toLocaleString()}` : "No expiration"}
+            ${mv ? ` • Max views: ${mv}` : ""}
+          </div>
+        </div>
+      `;
 
-    const brandName = envStr("BRAND_NAME", "Cyang Docs");
-    const brandColor = envStr("BRAND_PRIMARY_COLOR", "#0B2A4A");
-    const brandLogoUrl = process.env.BRAND_LOGO_URL || null;
-
-    const maxViewsLabel =
-      maxViewsReturned === null || maxViewsReturned === 0 ? "Unlimited" : String(maxViewsReturned);
-
-    const viewsLeftLabel = computeViewsLeftLabel(currentViews, maxViewsReturned);
-
-    await sendShareEmail({
-      to,
-      subject: `${brandName}: ${docTitle}`,
-      brandName,
-      brandColor,
-      brandLogoUrl,
-
-      docTitle,
-      shareUrl,
-
-      expiresAtLabel: expiresAt ? fmtDateLabel(expiresAt) : "No expiration",
-      maxViewsLabel,
-      currentViewsLabel: String(currentViews),
-      viewsLeftLabel,
-
-      // Optional: you could add a “Password required” line in your email template
-      // but we won't email the actual password.
-    });
-
-    revalidatePath(`/d/${alias}`);
+      // best-effort — never fail share creation if email fails
+      try {
+        await sendResendEmail({ to: toEmail, subject, html });
+      } catch {
+        // ignore
+      }
+    }
 
     return {
       ok: true,
+      token: row.token,
+      doc_id: row.doc_id,
+      to_email: row.to_email,
       share_url: shareUrl,
-      token,
-      expires_at: row?.expires_at ?? (expiresAt ? expiresAt.toISOString() : null),
-      max_views: maxViewsReturned,
-      view_count: currentViews,
-      views_left_label: viewsLeftLabel,
-      password_required: passwordRequired,
+      created_at: row.created_at,
+      expires_at: row.expires_at,
+      max_views: row.max_views,
     };
-  } catch (e: any) {
-    const msg = String(e?.message || "");
-    return { ok: false, error: "server_error", message: msg || "Unknown error" };
+  } catch (err: any) {
+    return { ok: false, error: "SERVER_ERROR", message: err?.message ?? String(err) };
+  }
+}
+
+/**
+ * Fetch share stats for UI display (owner-only).
+ */
+export async function getShareStatsByToken(token: string): Promise<ShareStatsResult> {
+  try {
+    const owner = await requireOwner();
+    if (!owner.ok) return { ok: false, error: owner.reason };
+
+    const parsed = z.string().uuid().safeParse(token);
+    if (!parsed.success) return { ok: false, error: "BAD_TOKEN" };
+
+    const rows = (await sql`
+      select
+        token::text as token,
+        doc_id::text as doc_id,
+        to_email,
+        created_at::text as created_at,
+        expires_at::text as expires_at,
+        max_views,
+        view_count,
+        revoked_at::text as revoked_at,
+        (password_hash is not null) as has_password
+      from public.doc_shares
+      where token = ${parsed.data}::uuid
+      limit 1
+    `) as unknown as Array<{
+      token: string;
+      doc_id: string;
+      to_email: string | null;
+      created_at: string;
+      expires_at: string | null;
+      max_views: number | null;
+      view_count: number | null;
+      revoked_at: string | null;
+      has_password: boolean;
+    }>;
+
+    if (!rows.length) return { ok: false, error: "NOT_FOUND" };
+
+    const r = rows[0];
+    return {
+      ok: true,
+      token: r.token,
+      doc_id: r.doc_id,
+      to_email: r.to_email,
+      created_at: r.created_at,
+      expires_at: r.expires_at,
+      max_views: r.max_views,
+      view_count: Number(r.view_count ?? 0),
+      revoked_at: r.revoked_at,
+      has_password: Boolean(r.has_password),
+    };
+  } catch (err: any) {
+    return { ok: false, error: "SERVER_ERROR", message: err?.message ?? String(err) };
+  }
+}
+
+/**
+ * Revoke a share token (owner-only).
+ */
+export async function revokeShareToken(token: string): Promise<RevokeShareResult> {
+  try {
+    const owner = await requireOwner();
+    if (!owner.ok) return { ok: false, error: owner.reason };
+
+    const parsed = z.string().uuid().safeParse(token);
+    if (!parsed.success) return { ok: false, error: "BAD_TOKEN" };
+
+    const rows = (await sql`
+      update public.doc_shares
+      set revoked_at = now()
+      where token = ${parsed.data}::uuid
+        and revoked_at is null
+      returning token::text as token, revoked_at::text as revoked_at
+    `) as unknown as Array<{ token: string; revoked_at: string }>;
+
+    if (!rows.length) {
+      return { ok: false, error: "NOT_FOUND_OR_ALREADY_REVOKED" };
+    }
+
+    return { ok: true, token: rows[0].token, revoked_at: rows[0].revoked_at };
+  } catch (err: any) {
+    return { ok: false, error: "SERVER_ERROR", message: err?.message ?? String(err) };
   }
 }
