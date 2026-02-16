@@ -5,7 +5,7 @@ import { sql } from "@/lib/db";
 import { isOwnerAdmin } from "@/lib/admin";
 import DeleteDocForm from "../DeleteDocForm";
 import { deleteDocAction, revokeDocShareAction } from "../actions";
-import RevokeShareForm from "./RevokeShareForm";
+import SharesTableClient, { type ShareRow as ShareRowClient } from "./SharesTableClient";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -29,38 +29,6 @@ type ShareRow = {
     doc_title: string | null;
     alias: string | null;
 };
-
-function fmtDate(s: string | null) {
-    if (!s) return "—";
-    const d = new Date(s);
-    if (Number.isNaN(d.getTime())) return s;
-    return d.toLocaleString();
-}
-
-function maxLabel(n: number | null) {
-    if (n === null) return "—";
-    if (n === 0) return "∞";
-    return String(n);
-}
-
-function statusFor(s: {
-    revoked_at: string | null;
-    expires_at: string | null;
-    max_views: number | null;
-    view_count: number;
-}) {
-    if (s.revoked_at)
-        return { label: "Revoked", cls: "bg-amber-500/10 text-amber-300 border-amber-500/20" };
-
-    if (s.expires_at && new Date(s.expires_at).getTime() <= Date.now())
-        return { label: "Expired", cls: "bg-red-500/10 text-red-300 border-red-500/20" };
-
-    const max = s.max_views;
-    if (max != null && max !== 0 && s.view_count >= max)
-        return { label: "Maxed", cls: "bg-red-500/10 text-red-300 border-red-500/20" };
-
-    return { label: "Active", cls: "bg-emerald-500/10 text-emerald-300 border-emerald-500/20" };
-}
 
 export default async function AdminDashboardPage() {
     const ok = await isOwnerAdmin();
@@ -93,8 +61,21 @@ export default async function AdminDashboardPage() {
     join docs d on d.id = s.doc_id
     left join doc_aliases a on a.doc_id = s.doc_id
     order by s.created_at desc
-    limit 200
+    limit 500
   `) as unknown as ShareRow[];
+
+    const sharesClient: ShareRowClient[] = shares.map((s) => ({
+        token: s.token,
+        doc_id: s.doc_id,
+        to_email: s.to_email,
+        created_at: s.created_at,
+        expires_at: s.expires_at,
+        max_views: s.max_views,
+        view_count: Number(s.view_count ?? 0),
+        revoked_at: s.revoked_at,
+        doc_title: s.doc_title,
+        alias: s.alias,
+    }));
 
     return (
         <main className="mx-auto max-w-6xl px-4 py-12">
@@ -179,105 +160,10 @@ export default async function AdminDashboardPage() {
                             Token, recipient, expiration, max views, views, revoke.
                         </p>
                     </div>
-                    <div className="text-xs text-neutral-500">Showing latest {Math.min(shares.length, 200)}</div>
+                    <div className="text-xs text-neutral-500">Showing latest {Math.min(sharesClient.length, 500)}</div>
                 </div>
 
-                <div className="mt-4 overflow-hidden rounded-lg border border-neutral-800">
-                    <table className="w-full text-sm">
-                        <thead className="bg-neutral-900 text-neutral-300">
-                            <tr>
-                                <th className="px-4 py-3 text-left">Recipient</th>
-                                <th className="px-4 py-3 text-left">Token</th>
-                                <th className="px-4 py-3 text-left">Doc</th>
-                                <th className="px-4 py-3 text-left">Status</th>
-                                <th className="px-4 py-3 text-left">Expires</th>
-                                <th className="px-4 py-3 text-right">Max</th>
-                                <th className="px-4 py-3 text-right">Views</th>
-                                <th className="px-4 py-3 text-right">Action</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {shares.length === 0 ? (
-                                <tr>
-                                    <td colSpan={8} className="px-4 py-6 text-neutral-400">
-                                        No shares found.
-                                    </td>
-                                </tr>
-                            ) : (
-                                shares.map((s) => {
-                                    const viewCount = Number(s.view_count ?? 0);
-                                    const st = statusFor({
-                                        revoked_at: s.revoked_at,
-                                        expires_at: s.expires_at,
-                                        max_views: s.max_views,
-                                        view_count: viewCount,
-                                    });
-
-                                    const tokenShort =
-                                        s.token.length > 16 ? `${s.token.slice(0, 8)}…${s.token.slice(-4)}` : s.token;
-
-                                    return (
-                                        <tr key={s.token} className="border-t border-neutral-800">
-                                            <td className="px-4 py-3 text-neutral-200">{s.to_email || "—"}</td>
-
-                                            <td className="px-4 py-3">
-                                                <div className="font-mono text-xs text-neutral-200">{tokenShort}</div>
-                                                <div className="mt-1 text-xs text-neutral-500">
-                                                    <Link
-                                                        href={`/s/${s.token}`}
-                                                        target="_blank"
-                                                        className="text-blue-400 hover:underline"
-                                                    >
-                                                        Open
-                                                    </Link>
-                                                    <span className="text-neutral-700"> · </span>
-                                                    <span className="text-neutral-500">Created: {fmtDate(s.created_at)}</span>
-                                                </div>
-                                            </td>
-
-                                            <td className="px-4 py-3">
-                                                <div className="text-neutral-200">{s.doc_title || "Untitled"}</div>
-                                                <div className="mt-1 text-xs text-neutral-500">
-                                                    {s.alias ? (
-                                                        <Link
-                                                            href={`/d/${s.alias}`}
-                                                            target="_blank"
-                                                            className="text-blue-400 hover:underline"
-                                                        >
-                                                            /d/{s.alias}
-                                                        </Link>
-                                                    ) : (
-                                                        <span className="text-neutral-500 font-mono">{s.doc_id}</span>
-                                                    )}
-                                                </div>
-                                            </td>
-
-                                            <td className="px-4 py-3">
-                                                <span
-                                                    className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs ${st.cls}`}
-                                                >
-                                                    {st.label}
-                                                </span>
-                                            </td>
-
-                                            <td className="px-4 py-3 text-neutral-400">{fmtDate(s.expires_at)}</td>
-                                            <td className="px-4 py-3 text-right text-neutral-200">{maxLabel(s.max_views)}</td>
-                                            <td className="px-4 py-3 text-right text-neutral-200">{viewCount}</td>
-
-                                            <td className="px-4 py-3 text-right">
-                                                <RevokeShareForm
-                                                    token={s.token}
-                                                    revoked={Boolean(s.revoked_at)}
-                                                    action={revokeDocShareAction}
-                                                />
-                                            </td>
-                                        </tr>
-                                    );
-                                })
-                            )}
-                        </tbody>
-                    </table>
-                </div>
+                <SharesTableClient shares={sharesClient} revokeAction={revokeDocShareAction} />
             </div>
         </main>
     );
