@@ -1,120 +1,238 @@
 // src/app/s/[token]/page.tsx
+import Link from "next/link";
+import { redirect } from "next/navigation";
+import { sql } from "@/lib/db";
+import { isShareUnlockedAction, verifySharePasswordAction } from "./actions";
+
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-import { redirect } from "next/navigation";
-import { cookies, headers } from "next/headers";
-import crypto from "crypto";
-import { sql } from "@/lib/db";
-
-type ShareRow = {
-    id: string;
-    doc_id: string;
-    token: string;
-    expires_at: string | null;
-    max_views: number | null;
-    view_count: number;
-    revoked_at: string | null;
-    alias: string;
-    doc_title: string | null;
-};
-
-function sha256Hex(input: string) {
-    return crypto.createHash("sha256").update(input).digest("hex");
-}
-
-export default async function ShareTokenPage({
-    params,
-}: {
-    params: { token: string };
-}) {
-    const token = params.token;
-
-    // 1) Load share + resolve alias + title
-    const rows = (await sql`
-    select
-      s.id::text as id,
-      s.doc_id::text as doc_id,
-      s.token,
-      s.expires_at::text as expires_at,
-      s.max_views,
-      s.view_count,
-      s.revoked_at::text as revoked_at,
-      a.alias as alias,
-      d.title as doc_title
-    from doc_shares s
-    join docs d on d.id = s.doc_id
-    join doc_aliases a on a.doc_id = s.doc_id
-    where s.token = ${token}
-    limit 1
-  `) as unknown as ShareRow[];
-
-    if (!rows?.length) {
-        return renderDenied("This share link is invalid.");
-    }
-
-    const s = rows[0];
-
-    if (s.revoked_at) {
-        return renderDenied("This share link has been revoked.");
-    }
-
-    const now = Date.now();
-    if (s.expires_at) {
-        const exp = Date.parse(s.expires_at);
-        if (Number.isFinite(exp) && now > exp) {
-            return renderDenied("This share link has expired.");
-        }
-    }
-
-    // NOTE:
-    // We do NOT increment view_count here anymore.
-    // Raw download route is the source of truth for view counting & max_views enforcement.
-
-    // Optional: lightweight click log (best-effort)
+async function getShareMeta(token: string) {
+    // Prefer doc_shares; fallback to share_tokens
     try {
-        const h = await headers();
-        const ip =
-            h.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-            h.get("x-real-ip") ||
-            "";
-        const ua = h.get("user-agent") || "";
-
-        const ipHash = ip ? sha256Hex(ip) : null;
-
-        await sql`
-      insert into doc_share_views (share_id, ip_hash, user_agent)
-      values (${s.id}::uuid, ${ipHash}, ${ua})
-    `;
+        const rows = (await sql`
+      select
+        token::text as token,
+        to_email,
+        created_at::text as created_at,
+        expires_at::text as expires_at,
+        max_views,
+        view_count,
+        revoked_at::text as revoked_at,
+        (password_hash is not null) as has_password
+      from public.doc_shares
+      where token = ${token}
+      limit 1
+    `) as unknown as Array<{
+            token: string;
+            to_email: string | null;
+            created_at: string;
+            expires_at: string | null;
+            max_views: number | null;
+            view_count: number | null;
+            revoked_at: string | null;
+            has_password: boolean;
+        }>;
+        if (rows?.length) return { ok: true as const, table: "doc_shares" as const, ...rows[0] };
     } catch {
-        // ignore logging failures
+        // ignore
     }
 
-    // 3) Set cookie so /d/[alias]/raw can authorize without token in URL
-    const cookieStore = await cookies();
-    cookieStore.set("cyang_share", token, {
-        httpOnly: true,
-        secure: true,
-        sameSite: "lax",
-        path: "/",
-        // Let cookie live up to expiration if present; otherwise 7 days
-        maxAge: s.expires_at
-            ? Math.max(60, Math.floor((Date.parse(s.expires_at) - now) / 1000))
-            : 60 * 60 * 24 * 7,
-    });
+    try {
+        const rows = (await sql`
+      select
+        token::text as token,
+        to_email,
+        created_at::text as created_at,
+        expires_at::text as expires_at,
+        max_views,
+        views_count,
+        revoked_at::text as revoked_at,
+        (password_hash is not null) as has_password
+      from public.share_tokens
+      where token::text = ${token}
+         or token = ${token}
+      limit 1
+    `) as unknown as Array<{
+            token: string;
+            to_email: string | null;
+            created_at: string;
+            expires_at: string | null;
+            max_views: number | null;
+            views_count: number | null;
+            revoked_at: string | null;
+            has_password: boolean;
+        }>;
+        if (rows?.length) {
+            const r = rows[0];
+            return {
+                ok: true as const,
+                table: "share_tokens" as const,
+                token: r.token,
+                to_email: r.to_email,
+                created_at: r.created_at,
+                expires_at: r.expires_at,
+                max_views: r.max_views,
+                view_count: Number(r.views_count ?? 0),
+                revoked_at: r.revoked_at,
+                has_password: r.has_password,
+            };
+        }
+    } catch {
+        // ignore
+    }
 
-    redirect(`/d/${encodeURIComponent(s.alias)}`);
+    return { ok: false as const };
 }
 
-function renderDenied(message: string) {
+function fmtDate(s: string | null) {
+    if (!s) return "—";
+    const d = new Date(s);
+    if (Number.isNaN(d.getTime())) return s;
+    return d.toLocaleString();
+}
+
+function isExpired(expires_at: string | null) {
+    if (!expires_at) return false;
+    return new Date(expires_at).getTime() <= Date.now();
+}
+
+function isMaxed(view_count: number, max_views: number | null) {
+    if (max_views === null) return false;
+    if (max_views === 0) return false;
+    return view_count >= max_views;
+}
+
+export default async function ShareTokenPage(props: { params: Promise<{ token: string }> }) {
+    const { token } = await props.params;
+    const t = (token || "").trim();
+    if (!t) redirect("/");
+
+    const meta = await getShareMeta(t);
+    if (!meta.ok) {
+        return (
+            <main className="mx-auto max-w-lg px-4 py-12">
+                <h1 className="text-xl font-semibold">Not found</h1>
+                <p className="mt-2 text-sm text-neutral-400">This share link doesn’t exist.</p>
+                <div className="mt-6">
+                    <Link href="/" className="text-blue-400 hover:underline">
+                        Go home
+                    </Link>
+                </div>
+            </main>
+        );
+    }
+
+    if (meta.revoked_at) {
+        return (
+            <main className="mx-auto max-w-lg px-4 py-12">
+                <h1 className="text-xl font-semibold">Link revoked</h1>
+                <p className="mt-2 text-sm text-neutral-400">This share link has been revoked.</p>
+            </main>
+        );
+    }
+
+    if (isExpired(meta.expires_at)) {
+        return (
+            <main className="mx-auto max-w-lg px-4 py-12">
+                <h1 className="text-xl font-semibold">Link expired</h1>
+                <p className="mt-2 text-sm text-neutral-400">This share link has expired.</p>
+            </main>
+        );
+    }
+
+    if (isMaxed(meta.view_count ?? 0, meta.max_views)) {
+        return (
+            <main className="mx-auto max-w-lg px-4 py-12">
+                <h1 className="text-xl font-semibold">View limit reached</h1>
+                <p className="mt-2 text-sm text-neutral-400">This share link has reached its max views.</p>
+            </main>
+        );
+    }
+
+    // If already unlocked, go straight to raw stream
+    const unlocked = await isShareUnlockedAction(t);
+    if (unlocked) redirect(`/s/${encodeURIComponent(t)}/raw`);
+
+    // If no password is set, we still want to create an unlock session + cookie so /raw gating is consistent.
+    if (!meta.has_password) {
+        // POST via Server Action to set cookie + DB, then redirect.
+        // Easiest: render a tiny auto-submit form.
+        return (
+            <main className="mx-auto max-w-lg px-4 py-12">
+                <h1 className="text-xl font-semibold">Opening…</h1>
+                <p className="mt-2 text-sm text-neutral-400">Just a moment.</p>
+
+                <form
+                    action={async (fd) => {
+                        "use server";
+                        fd.set("token", t);
+                        fd.set("password", "");
+                        await verifySharePasswordAction(fd);
+                        redirect(`/s/${encodeURIComponent(t)}/raw`);
+                    }}
+                >
+                    <input type="hidden" name="token" value={t} />
+                    <input type="hidden" name="password" value="" />
+                    <button className="mt-6 rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm text-neutral-200">
+                        Continue
+                    </button>
+                </form>
+            </main>
+        );
+    }
+
     return (
-        <div style={{ padding: 24, fontFamily: "system-ui,Segoe UI,Roboto,Arial" }}>
-            <div style={{ maxWidth: 640, margin: "0 auto" }}>
-                <h1 style={{ fontSize: 22, margin: "0 0 10px 0" }}>Access denied</h1>
-                <p style={{ margin: 0, color: "#374151", lineHeight: "22px" }}>
-                    {message}
+        <main className="mx-auto max-w-lg px-4 py-12">
+            <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-6">
+                <h1 className="text-xl font-semibold tracking-tight">Password required</h1>
+                <p className="mt-2 text-sm text-neutral-400">
+                    Enter the password to view this document. Once unlocked, it stays unlocked for 8 hours on this browser.
                 </p>
+
+                <div className="mt-5 grid grid-cols-2 gap-3 text-xs text-neutral-400">
+                    <div className="rounded-lg border border-neutral-800 bg-neutral-950 p-3">
+                        <div className="text-neutral-500">Created</div>
+                        <div className="mt-1 text-neutral-200">{fmtDate(meta.created_at)}</div>
+                    </div>
+                    <div className="rounded-lg border border-neutral-800 bg-neutral-950 p-3">
+                        <div className="text-neutral-500">Expires</div>
+                        <div className="mt-1 text-neutral-200">{fmtDate(meta.expires_at)}</div>
+                    </div>
+                </div>
+
+                <form
+                    action={async (fd) => {
+                        "use server";
+                        const res = await verifySharePasswordAction(fd);
+                        if (res.ok) redirect(`/s/${encodeURIComponent(t)}/raw`);
+                        // If bad password / rate limited, we re-render by throwing message into query string:
+                        redirect(`/s/${encodeURIComponent(t)}?e=${encodeURIComponent(res.message)}`);
+                    }}
+                    className="mt-6"
+                >
+                    <input type="hidden" name="token" value={t} />
+                    <label className="block text-xs text-neutral-400">Password</label>
+                    <input
+                        name="password"
+                        type="password"
+                        autoFocus
+                        className="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm text-neutral-200 outline-none focus:border-neutral-600"
+                        placeholder="Enter password"
+                    />
+
+                    <button
+                        type="submit"
+                        className="mt-3 w-full rounded-lg border border-neutral-800 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 hover:bg-neutral-800"
+                    >
+                        Unlock
+                    </button>
+
+                    <p className="mt-3 text-xs text-neutral-500">
+                        Having trouble? Ask the sender to resend the link or confirm the password.
+                    </p>
+                </form>
             </div>
-        </div>
+        </main>
     );
 }
