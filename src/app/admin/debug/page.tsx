@@ -29,10 +29,12 @@ function Row({ k, v }: { k: string; v: any }) {
   );
 }
 
-function getSelfBaseUrl() {
-  const h = headers();
+async function getSelfBaseUrl() {
+  const h = await headers();
+
   const proto = h.get("x-forwarded-proto") ?? "https";
   const host = h.get("x-forwarded-host") ?? h.get("host") ?? "www.cyang.io";
+
   return `${proto}://${host}`;
 }
 
@@ -47,12 +49,12 @@ export default async function AdminDebugPage({
   let data: DebugResponse | null = null;
 
   if (alias) {
-    const base = getSelfBaseUrl();
+    const base = await getSelfBaseUrl();
     const url = new URL(`${base}/api/admin/debug`);
     url.searchParams.set("alias", alias);
 
-    // ✅ Forward the user's cookies so /api/admin/debug can see the session
-    const cookieHeader = cookies().toString();
+    // Forward the user's cookies so /api/admin/debug can see the session
+    const cookieHeader = (await cookies()).toString();
 
     const res = await fetch(url.toString(), {
       cache: "no-store",
@@ -154,13 +156,4 @@ export default async function AdminDebugPage({
           </div>
 
           <div className="rounded-lg border border-white/10 bg-black/30 p-4">
-            <div className="text-sm font-semibold">R2 HEAD (best-effort)</div>
-            <div className="mt-3">
-              <Row k="head" v={data.r2_head ?? null} />
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
+            <div clas
