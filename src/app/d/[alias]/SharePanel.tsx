@@ -2,12 +2,8 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import {
-    createAndEmailShareToken,
-    getShareStatsByToken,
-    revokeShareToken,
-    type CreateShareResult,
-} from "./actions";
+import { createAndEmailShareToken, getShareStatsByToken, revokeShareToken } from "./actions";
+import type { CreateShareResult } from "./actions";
 
 type ShareRow = {
     token: string;
