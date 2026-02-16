@@ -4,6 +4,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import RevokeShareForm from "./RevokeShareForm";
+import SharePasswordForm from "./SharePasswordForm";
 
 export type ShareRow = {
     token: string;
@@ -16,6 +17,8 @@ export type ShareRow = {
     revoked_at: string | null;
     doc_title: string | null;
     alias: string | null;
+
+    has_password: boolean;
 };
 
 function fmtDate(s: string | null) {
@@ -56,6 +59,8 @@ function statusBadge(status: Exclude<Status, "all">) {
 export default function SharesTableClient(props: {
     shares: ShareRow[];
     revokeAction: (formData: FormData) => Promise<void>;
+    setPasswordAction: (formData: FormData) => Promise<void>;
+    clearPasswordAction: (formData: FormData) => Promise<void>;
 }) {
     const [q, setQ] = useState("");
     const [status, setStatus] = useState<Status>("all");
@@ -76,6 +81,7 @@ export default function SharesTableClient(props: {
                 s.doc_title ?? "",
                 s.alias ?? "",
                 s.doc_id,
+                s.has_password ? "password protected" : "no password",
             ]
                 .join(" ")
                 .toLowerCase();
@@ -152,13 +158,15 @@ export default function SharesTableClient(props: {
                             <th className="px-4 py-3 text-left">Expires</th>
                             <th className="px-4 py-3 text-right">Max</th>
                             <th className="px-4 py-3 text-right">Views</th>
+                            <th className="px-4 py-3 text-right">Password</th>
                             <th className="px-4 py-3 text-right">Action</th>
                         </tr>
                     </thead>
+
                     <tbody>
                         {filtered.length === 0 ? (
                             <tr>
-                                <td colSpan={8} className="px-4 py-6 text-neutral-400">
+                                <td colSpan={9} className="px-4 py-6 text-neutral-400">
                                     No shares match your filters.
                                 </td>
                             </tr>
@@ -177,11 +185,7 @@ export default function SharesTableClient(props: {
                                         <td className="px-4 py-3">
                                             <div className="font-mono text-xs text-neutral-200">{tokenShort}</div>
                                             <div className="mt-1 text-xs text-neutral-500">
-                                                <Link
-                                                    href={`/s/${s.token}`}
-                                                    target="_blank"
-                                                    className="text-blue-400 hover:underline"
-                                                >
+                                                <Link href={`/s/${s.token}`} target="_blank" className="text-blue-400 hover:underline">
                                                     Open
                                                 </Link>
                                                 <span className="text-neutral-700"> · </span>
@@ -193,11 +197,7 @@ export default function SharesTableClient(props: {
                                             <div className="text-neutral-200">{s.doc_title || "Untitled"}</div>
                                             <div className="mt-1 text-xs text-neutral-500">
                                                 {s.alias ? (
-                                                    <Link
-                                                        href={`/d/${s.alias}`}
-                                                        target="_blank"
-                                                        className="text-blue-400 hover:underline"
-                                                    >
+                                                    <Link href={`/d/${s.alias}`} target="_blank" className="text-blue-400 hover:underline">
                                                         /d/{s.alias}
                                                     </Link>
                                                 ) : (
@@ -217,6 +217,15 @@ export default function SharesTableClient(props: {
                                         <td className="px-4 py-3 text-neutral-400">{fmtDate(s.expires_at)}</td>
                                         <td className="px-4 py-3 text-right text-neutral-200">{maxLabel(s.max_views)}</td>
                                         <td className="px-4 py-3 text-right text-neutral-200">{s.view_count}</td>
+
+                                        <td className="px-4 py-3 text-right">
+                                            <SharePasswordForm
+                                                token={s.token}
+                                                hasPassword={Boolean(s.has_password)}
+                                                setAction={props.setPasswordAction}
+                                                clearAction={props.clearPasswordAction}
+                                            />
+                                        </td>
 
                                         <td className="px-4 py-3 text-right">
                                             <RevokeShareForm

@@ -4,7 +4,12 @@ import { redirect } from "next/navigation";
 import { sql } from "@/lib/db";
 import { isOwnerAdmin } from "@/lib/admin";
 import DeleteDocForm from "../DeleteDocForm";
-import { deleteDocAction, revokeDocShareAction } from "../actions";
+import {
+    deleteDocAction,
+    revokeDocShareAction,
+    setSharePasswordAction,
+    clearSharePasswordAction,
+} from "../actions";
 import SharesTableClient, { type ShareRow as ShareRowClient } from "./SharesTableClient";
 
 export const runtime = "nodejs";
@@ -28,6 +33,7 @@ type ShareRow = {
     revoked_at: string | null;
     doc_title: string | null;
     alias: string | null;
+    has_password: boolean;
 };
 
 export default async function AdminDashboardPage() {
@@ -55,6 +61,7 @@ export default async function AdminDashboardPage() {
       s.max_views,
       s.view_count,
       s.revoked_at::text as revoked_at,
+      (s.password_hash is not null) as has_password,
       d.title as doc_title,
       a.alias
     from doc_shares s
@@ -75,6 +82,7 @@ export default async function AdminDashboardPage() {
         revoked_at: s.revoked_at,
         doc_title: s.doc_title,
         alias: s.alias,
+        has_password: Boolean((s as any).has_password),
     }));
 
     return (
@@ -157,13 +165,20 @@ export default async function AdminDashboardPage() {
                     <div>
                         <h2 className="text-lg font-semibold tracking-tight">Shares</h2>
                         <p className="mt-1 text-sm text-neutral-400">
-                            Token, recipient, expiration, max views, views, revoke.
+                            Token, recipient, expiration, max views, views, password, revoke.
                         </p>
                     </div>
-                    <div className="text-xs text-neutral-500">Showing latest {Math.min(sharesClient.length, 500)}</div>
+                    <div className="text-xs text-neutral-500">
+                        Showing latest {Math.min(sharesClient.length, 500)}
+                    </div>
                 </div>
 
-                <SharesTableClient shares={sharesClient} revokeAction={revokeDocShareAction} />
+                <SharesTableClient
+                    shares={sharesClient}
+                    revokeAction={revokeDocShareAction}
+                    setPasswordAction={setSharePasswordAction}
+                    clearPasswordAction={clearSharePasswordAction}
+                />
             </div>
         </main>
     );
