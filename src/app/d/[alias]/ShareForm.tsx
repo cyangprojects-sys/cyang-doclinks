@@ -1,4 +1,3 @@
-// src/app/d/[alias]/ShareForm.tsx
 "use client";
 
 import { useMemo, useState } from "react";
@@ -8,234 +7,146 @@ function fmtIso(iso: string | null) {
   if (!iso) return "—";
   try {
     const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) return "—";
     return d.toLocaleString();
   } catch {
-    return "—";
+    return iso;
   }
 }
 
-type Props = {
-  docId: string;
-  alias: string;
-};
-
-export default function ShareForm({ docId, alias }: Props) {
+export default function ShareForm({ docId }: { docId: string }) {
   const [toEmail, setToEmail] = useState("");
-  const [expiresAt, setExpiresAt] = useState(""); // datetime-local value
-  const [maxViews, setMaxViews] = useState(""); // number as string
   const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [token, setToken] = useState<string | null>(null);
+  const [stats, setStats] = useState<any>(null);
 
-  const [resultUrl, setResultUrl] = useState<string | null>(null);
-  const [resultToken, setResultToken] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  const [lookupToken, setLookupToken] = useState("");
-  const [lookupBusy, setLookupBusy] = useState(false);
-  const [lookup, setLookup] = useState<
-    | null
-    | {
-      token: string;
-      to_email: string | null;
-      created_at: string;
-      expires_at: string | null;
-      max_views: number | null;
-      view_count: number;
-      revoked_at: string | null;
-    }
-  >(null);
-
-  const canCreate = useMemo(() => {
-    return Boolean(docId);
-  }, [docId]);
+  const shareUrl = useMemo(() => {
+    if (!token) return null;
+    return `${typeof window !== "undefined" ? window.location.origin : ""}${window.location.pathname}?t=${token}`;
+  }, [token]);
 
   async function onCreate() {
-    setError(null);
-    setResultUrl(null);
-    setResultToken(null);
-
-    if (!docId) {
-      setError("Missing docId.");
-      return;
-    }
-
+    setErr(null);
+    setStats(null);
     setBusy(true);
     try {
       const fd = new FormData();
       fd.set("docId", docId);
-      fd.set("alias", alias || "");
+      fd.set("toEmail", toEmail.trim() ? toEmail.trim() : "");
+      fd.set("expiresAt", "");
+      fd.set("maxViews", "");
+      // fd.set("password", "");
 
-      const email = toEmail.trim();
-      if (email) fd.set("toEmail", email);
-
-      // expiresAt: convert datetime-local -> ISO if provided
-      const exp = expiresAt.trim();
-      if (exp) {
-        // datetime-local is in local time; Date() will interpret it as local
-        const d = new Date(exp);
-        if (!Number.isNaN(d.getTime())) {
-          fd.set("expiresAt", d.toISOString());
-        }
-      }
-
-      const mv = maxViews.trim();
-      if (mv) {
-        const n = Number(mv);
-        if (Number.isFinite(n) && n >= 0) fd.set("maxViews", String(Math.floor(n)));
-      }
-
-      const res = await createAndEmailShareToken(fd);
-
+      const res: any = await createAndEmailShareToken(fd);
       if (!res.ok) {
-        setError(res.message || res.error || "Failed to create share token.");
+        setErr(res.message || res.error || "Failed to create token.");
         return;
       }
-
-      setResultToken(res.token);
-      setResultUrl(res.url);
+      setToken(res.token);
     } catch (e: any) {
-      setError(e?.message || "Failed to create token.");
+      setErr(e?.message || "Unexpected error.");
     } finally {
       setBusy(false);
     }
   }
 
-  async function onLookup() {
-    setError(null);
-    setLookup(null);
-
-    const t = lookupToken.trim();
-    if (!t) return;
-
-    setLookupBusy(true);
+  async function onStats() {
+    if (!token) return;
+    setErr(null);
+    setBusy(true);
     try {
-      const res = await getShareStatsByToken(t);
+      const res: any = await getShareStatsByToken(token);
       if (!res.ok) {
-        setError(res.message || res.error || "Token not found.");
+        setErr(res.message || res.error || "Failed to load stats.");
         return;
       }
-      setLookup(res.row);
+      setStats(res);
     } catch (e: any) {
-      setError(e?.message || "Lookup failed.");
+      setErr(e?.message || "Unexpected error.");
     } finally {
-      setLookupBusy(false);
+      setBusy(false);
     }
   }
 
   return (
-    <div className="space-y-4">
-      {!canCreate ? (
-        <div className="rounded-md border border-yellow-300/40 bg-yellow-200/10 p-3 text-sm text-yellow-100">
-          Share creation is disabled because <code>docId</code> was not provided.
-        </div>
-      ) : null}
+    <div className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
+      <div className="flex flex-col gap-2">
+        <label className="text-sm font-medium">Email (optional)</label>
+        <input
+          value={toEmail}
+          onChange={(e) => setToEmail(e.target.value)}
+          placeholder="recipient@example.com"
+          className="rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+        />
 
-      {error ? (
-        <div className="rounded-md border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-100">
-          {error}
-        </div>
-      ) : null}
-
-      <div className="grid gap-3 md:grid-cols-3">
-        <div className="md:col-span-1">
-          <label className="block text-xs text-white/70">Email (optional)</label>
-          <input
-            value={toEmail}
-            onChange={(e) => setToEmail(e.target.value)}
-            placeholder="someone@domain.com"
-            className="mt-1 w-full rounded-md border border-white/10 bg-black/40 px-3 py-2 text-sm text-white outline-none focus:border-white/20"
-          />
-        </div>
-
-        <div className="md:col-span-1">
-          <label className="block text-xs text-white/70">Expires at (optional)</label>
-          <input
-            type="datetime-local"
-            value={expiresAt}
-            onChange={(e) => setExpiresAt(e.target.value)}
-            className="mt-1 w-full rounded-md border border-white/10 bg-black/40 px-3 py-2 text-sm text-white outline-none focus:border-white/20"
-          />
-        </div>
-
-        <div className="md:col-span-1">
-          <label className="block text-xs text-white/70">Max views (optional)</label>
-          <input
-            inputMode="numeric"
-            value={maxViews}
-            onChange={(e) => setMaxViews(e.target.value)}
-            placeholder="e.g. 10"
-            className="mt-1 w-full rounded-md border border-white/10 bg-black/40 px-3 py-2 text-sm text-white outline-none focus:border-white/20"
-          />
-        </div>
-      </div>
-
-      <div className="flex items-center gap-2">
-        <button
-          onClick={onCreate}
-          disabled={!canCreate || busy}
-          className="rounded-md border border-white/10 bg-white/10 px-3 py-2 text-sm text-white hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {busy ? "Creating..." : "Create share token"}
-        </button>
-
-        {resultUrl ? (
-          <a
-            href={resultUrl}
-            className="text-sm text-white/80 underline hover:text-white"
-            target="_blank"
-            rel="noreferrer"
-          >
-            Open share link
-          </a>
-        ) : null}
-
-        {resultToken ? (
-          <span className="text-xs text-white/60">
-            token: <code className="text-white/80">{resultToken}</code>
-          </span>
-        ) : null}
-      </div>
-
-      <div className="pt-2">
-        <div className="text-sm text-white/80">Lookup token stats</div>
-        <div className="mt-2 flex gap-2">
-          <input
-            value={lookupToken}
-            onChange={(e) => setLookupToken(e.target.value)}
-            placeholder="token"
-            className="w-full rounded-md border border-white/10 bg-black/40 px-3 py-2 text-sm text-white outline-none focus:border-white/20"
-          />
+        <div className="flex gap-2">
           <button
-            onClick={onLookup}
-            disabled={lookupBusy}
-            className="rounded-md border border-white/10 bg-white/10 px-3 py-2 text-sm text-white hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-60"
+            onClick={onCreate}
+            disabled={busy || !docId}
+            className="rounded-lg bg-black px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
           >
-            {lookupBusy ? "..." : "Lookup"}
+            {busy ? "Working…" : "Create token"}
+          </button>
+
+          <button
+            onClick={onStats}
+            disabled={busy || !token}
+            className="rounded-lg border border-neutral-300 px-3 py-2 text-sm disabled:opacity-50"
+          >
+            Stats
           </button>
         </div>
 
-        {lookup ? (
-          <div className="mt-3 rounded-md border border-white/10 bg-white/5 p-3 text-sm text-white/80">
+        {err ? (
+          <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+            {err}
+          </div>
+        ) : null}
+
+        {shareUrl ? (
+          <div className="rounded-lg bg-neutral-50 p-3">
+            <div className="text-xs text-neutral-600 mb-1">Share URL</div>
+            <div className="flex gap-2">
+              <input
+                readOnly
+                value={shareUrl}
+                className="w-full rounded-md border border-neutral-200 bg-white px-2 py-1 font-mono text-xs"
+              />
+              <button
+                type="button"
+                className="rounded-md bg-black px-2 py-1 text-xs text-white"
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(shareUrl);
+                  } catch { }
+                }}
+              >
+                Copy
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        {stats?.ok ? (
+          <div className="rounded-lg border border-neutral-200 p-3 text-sm">
             <div>
-              <b>Token:</b> <code>{lookup.token}</code>
+              <span className="text-neutral-600">Views:</span> {stats.view_count}
             </div>
             <div>
-              <b>To:</b> {lookup.to_email || "—"}
+              <span className="text-neutral-600">Last viewed:</span>{" "}
+              {fmtIso(stats.last_viewed_at ?? null)}
             </div>
             <div>
-              <b>Created:</b> {fmtIso(lookup.created_at)}
+              <span className="text-neutral-600">Revoked:</span>{" "}
+              {stats.revoked_at ? fmtIso(stats.revoked_at) : "No"}
             </div>
             <div>
-              <b>Expires:</b> {fmtIso(lookup.expires_at)}
+              <span className="text-neutral-600">Expires:</span>{" "}
+              {stats.expires_at ? fmtIso(stats.expires_at) : "No"}
             </div>
             <div>
-              <b>Max views:</b> {lookup.max_views ?? "—"}
-            </div>
-            <div>
-              <b>Views:</b> {lookup.view_count}
-            </div>
-            <div>
-              <b>Revoked:</b> {fmtIso(lookup.revoked_at)}
+              <span className="text-neutral-600">Max views:</span>{" "}
+              {stats.max_views ?? "—"}
             </div>
           </div>
         ) : null}
