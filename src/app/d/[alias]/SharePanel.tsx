@@ -61,7 +61,7 @@ export default function SharePanel({
     function makeFormData(args: { toEmail?: string; expiresAt?: string; maxViews?: string }) {
         const fd = new FormData();
         fd.set("docId", docId);
-        fd.set("alias", alias); // nice to include for email copy
+        fd.set("alias", alias);
         fd.set("toEmail", args.toEmail ?? "");
         fd.set("expiresAt", args.expiresAt ?? "");
         fd.set("maxViews", args.maxViews ?? "");
@@ -79,6 +79,7 @@ export default function SharePanel({
             max_views: null,
             view_count: 0,
             revoked_at: null,
+            last_viewed_at: null, // ✅ FIX
         };
     }
 
@@ -117,7 +118,7 @@ export default function SharePanel({
                     return;
                 }
                 setStats(res);
-                upsertRow(res.row); // keep list fresh (view_count/revoked/expires)
+                upsertRow(res.row);
             } catch (e: unknown) {
                 setErr(e instanceof Error ? e.message : "Unexpected error loading stats.");
                 setStats(null);
@@ -215,6 +216,7 @@ export default function SharePanel({
                                                     {r.max_views != null ? ` / ${r.max_views}` : ""}
                                                     {r.expires_at ? ` · expires ${fmtIso(r.expires_at)}` : ""}
                                                     {revoked ? ` · revoked ${fmtIso(r.revoked_at)}` : ""}
+                                                    {r.last_viewed_at ? ` · last ${fmtIso(r.last_viewed_at)}` : ""}
                                                     {r.to_email ? ` · to ${r.to_email}` : ""}
                                                 </div>
                                             </button>
@@ -292,6 +294,10 @@ export default function SharePanel({
                                     {selectedRow.max_views != null ? ` / ${selectedRow.max_views}` : ""}
                                 </div>
                                 <div>
+                                    <span className="text-neutral-600">Last viewed:</span>{" "}
+                                    {selectedRow.last_viewed_at ? fmtIso(selectedRow.last_viewed_at) : "Never"}
+                                </div>
+                                <div>
                                     <span className="text-neutral-600">Expires:</span>{" "}
                                     {selectedRow.expires_at ? fmtIso(selectedRow.expires_at) : "No"}
                                 </div>
@@ -309,6 +315,10 @@ export default function SharePanel({
                                         <div>
                                             <span className="text-neutral-600">Views:</span>{" "}
                                             {stats.row.view_count}
+                                        </div>
+                                        <div>
+                                            <span className="text-neutral-600">Last viewed:</span>{" "}
+                                            {stats.row.last_viewed_at ? fmtIso(stats.row.last_viewed_at) : "Never"}
                                         </div>
                                         <div>
                                             <span className="text-neutral-600">Expires:</span>{" "}
