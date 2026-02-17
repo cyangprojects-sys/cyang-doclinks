@@ -1,4 +1,3 @@
-// src/app/d/[alias]/actions.ts
 "use server";
 
 import { sql } from "@/lib/db";
@@ -13,6 +12,7 @@ export type ShareRow = {
     max_views: number | null;
     view_count: number;
     revoked_at: string | null;
+    last_viewed_at: string | null;
 };
 
 export type CreateShareResult =
@@ -28,7 +28,6 @@ export type RevokeShareResult =
     | { ok: false; error: string; message?: string };
 
 function newToken(): string {
-    // 32 hex chars, URL-safe enough for path segments
     return randomBytes(16).toString("hex");
 }
 
@@ -38,6 +37,7 @@ function baseUrlFromEnv(): string {
         process.env.NEXT_PUBLIC_BASE_URL ||
         process.env.VERCEL_URL ||
         "http://localhost:3000";
+
     if (u.startsWith("http")) return u;
     return `https://${u}`;
 }
@@ -79,22 +79,13 @@ async function trySendResendEmail(opts: {
             const txt = await r.text();
             return { ok: false, message: `Resend error: ${r.status} ${txt}` };
         }
+
         return { ok: true };
     } catch (e: any) {
         return { ok: false, message: e?.message || "Failed to send email" };
     }
 }
 
-/**
- * Creates a share token for a doc + optionally emails it.
- *
- * Expects FormData keys (strings):
- * - docId (required)
- * - alias (optional; used only to render nicer email copy)
- * - toEmail (optional)
- * - expiresAt (optional ISO string)
- * - maxViews (optional number)
- */
 export async function createAndEmailShareToken(
     form: FormData
 ): Promise<CreateShareResult> {
@@ -107,7 +98,8 @@ export async function createAndEmailShareToken(
         const expiresAtRaw = String(form.get("expiresAt") || "").trim();
         const maxViewsRaw = String(form.get("maxViews") || "").trim();
 
-        if (!docId) return { ok: false, error: "bad_request", message: "Missing docId" };
+        if (!docId)
+            return { ok: false, error: "bad_request", message: "Missing docId" };
 
         const toEmail = toEmailRaw ? toEmailRaw : null;
 
@@ -117,15 +109,16 @@ export async function createAndEmailShareToken(
                 : null;
 
         const maxViews =
-            maxViewsRaw && /^\d+$/.test(maxViewsRaw) ? Number(maxViewsRaw) : null;
+            maxViewsRaw && /^\d+$/.test(maxViewsRaw)
+                ? Number(maxViewsRaw)
+                : null;
 
-        // Ensure doc exists (no generics on sql — cast instead)
         const docRows = (await sql`
-      select id::text as id, title::text as title
-      from docs
-      where id = ${docId}::uuid
-      limit 1
-    `) as unknown as { id: string; title: string | null }[];
+            select id::text as id, title::text as title
+            from docs
+            where id = ${docId}::uuid
+            limit 1
+        `) as unknown as { id: string; title: string | null }[];
 
         if (!docRows || docRows.length === 0) {
             return { ok: false, error: "not_found", message: "Document not found" };
@@ -133,12 +126,11 @@ export async function createAndEmailShareToken(
 
         const token = newToken();
 
-        // Create token row (if table doesn't exist, return a clear error)
         try {
             await sql`
-        insert into share_tokens (token, doc_id, to_email, expires_at, max_views)
-        values (${token}, ${docId}::uuid, ${toEmail}, ${expiresAt}, ${maxViews})
-      `;
+                insert into share_tokens (token, doc_id, to_email, expires_at, max_views)
+                values (${token}, ${docId}::uuid, ${toEmail}, ${expiresAt}, ${maxViews})
+            `;
         } catch (e: any) {
             return {
                 ok: false,
@@ -151,7 +143,6 @@ export async function createAndEmailShareToken(
 
         const url = buildShareUrl(token);
 
-        // If no email requested, we're done.
         if (!toEmail) return { ok: true, token, url };
 
         const title = docRows[0]?.title || "Document";
@@ -159,23 +150,18 @@ export async function createAndEmailShareToken(
 
         const subject = `Cyang Docs: ${title}`;
         const html = `
-      <div style="font-family: ui-sans-serif, system-ui; line-height:1.4;">
-        <h2 style="margin:0 0 8px 0;">${title}</h2>
-        <p style="margin:0 0 16px 0;">You’ve been sent a private link to view: <b>${pretty}</b></p>
-        <p style="margin:0 0 16px 0;">
-          <a href="${url}" style="display:inline-block;padding:10px 14px;border-radius:10px;text-decoration:none;border:1px solid #ddd;">
-            Open document
-          </a>
-        </p>
-        <p style="margin:0;color:#666;font-size:12px;">If you weren’t expecting this, you can ignore this email.</p>
-      </div>
-    `;
+            <div style="font-family: ui-sans-serif, system-ui; line-height:1.4;">
+                <h2>${title}</h2>
+                <p>You’ve been sent a private link to view: <b>${pretty}</b></p>
+                <p>
+                    <a href="${url}" style="padding:10px 14px;border-radius:10px;text-decoration:none;border:1px solid #ddd;">
+                        Open document
+                    </a>
+                </p>
+            </div>
+        `;
 
         const sent = await trySendResendEmail({ to: toEmail, subject, html });
-        if (!sent.ok) {
-            // Token is created; email failed — still return ok true with message
-            return { ok: true, token, url };
-        }
 
         return { ok: true, token, url };
     } catch (e: any) {
@@ -190,22 +176,30 @@ export async function getShareStatsByToken(
         await requireOwner();
 
         const rows = (await sql`
-      select
-        st.token::text as token,
-        st.to_email::text as to_email,
-        st.created_at::text as created_at,
-        st.expires_at::text as expires_at,
-        st.max_views::int as max_views,
-        st.revoked_at::text as revoked_at,
-        coalesce((
-          select count(*)::int
-          from share_views sv
-          where sv.token = st.token
-        ), 0) as view_count
-      from share_tokens st
-      where st.token = ${token}
-      limit 1
-    `) as unknown as ShareRow[];
+            select
+                st.token::text as token,
+                st.to_email::text as to_email,
+                st.created_at::text as created_at,
+                st.expires_at::text as expires_at,
+                st.max_views::int as max_views,
+                st.revoked_at::text as revoked_at,
+
+                coalesce((
+                    select count(*)::int
+                    from doc_views dv
+                    where dv.token = st.token
+                ), 0) as view_count,
+
+                (
+                    select max(dv.viewed_at)::text
+                    from doc_views dv
+                    where dv.token = st.token
+                ) as last_viewed_at
+
+            from share_tokens st
+            where st.token = ${token}
+            limit 1
+        `) as unknown as ShareRow[];
 
         if (!rows || rows.length === 0) {
             return { ok: false, error: "not_found", message: "Token not found" };
@@ -224,18 +218,13 @@ export async function revokeShareToken(
         await requireOwner();
 
         const r = (await sql`
-      update share_tokens
-      set revoked_at = now()
-      where token = ${token}
-        and revoked_at is null
-      returning token::text as token
-    `) as unknown as { token: string }[];
+            update share_tokens
+            set revoked_at = now()
+            where token = ${token}
+            returning token::text as token
+        `) as unknown as { token: string }[];
 
-        if (!r || r.length === 0) {
-            // Either missing, or already revoked
-            return { ok: true, token };
-        }
-        return { ok: true, token: r[0].token };
+        return { ok: true, token };
     } catch (e: any) {
         return { ok: false, error: "exception", message: e?.message || "Error" };
     }

@@ -6,7 +6,7 @@ import {
     getShareStatsByToken,
     revokeShareToken,
 } from "./actions";
-import type { ShareRow } from "./actions";
+import type { ShareRow, ShareStatsResult } from "./actions";
 
 type Props = {
     docId: string;
@@ -14,19 +14,6 @@ type Props = {
     docTitle?: string;
     initialShares?: ShareRow[];
 };
-
-type StatsOk = {
-    ok: true;
-    token: string;
-    view_count: number;
-    last_viewed_at: string | null;
-    revoked_at: string | null;
-    expires_at: string | null;
-    max_views: number | null;
-};
-
-type StatsErr = { ok: false; error: string; message?: string };
-type ShareStatsResult = StatsOk | StatsErr;
 
 function fmtIso(iso: string | null) {
     if (!iso) return "—";
@@ -63,7 +50,7 @@ export default function SharePanel({
         return `${origin}/d/${alias}?t=${selectedToken}`;
     }, [alias, selectedToken]);
 
-    function appendOrPrependRow(row: ShareRow) {
+    function upsertRow(row: ShareRow) {
         setShares((prev) => {
             const exists = prev.some((r) => r.token === row.token);
             if (exists) return prev.map((r) => (r.token === row.token ? row : r));
@@ -71,19 +58,28 @@ export default function SharePanel({
         });
     }
 
-    function makeFormData(args: {
-        toEmail?: string;
-        expiresAt?: string;
-        maxViews?: string;
-        password?: string;
-    }) {
+    function makeFormData(args: { toEmail?: string; expiresAt?: string; maxViews?: string }) {
         const fd = new FormData();
         fd.set("docId", docId);
+        fd.set("alias", alias); // nice to include for email copy
         fd.set("toEmail", args.toEmail ?? "");
         fd.set("expiresAt", args.expiresAt ?? "");
         fd.set("maxViews", args.maxViews ?? "");
-        if (args.password != null) fd.set("password", args.password);
         return fd;
+    }
+
+    function buildRowFromCreateResult(res: { token: string } & Record<string, unknown>): ShareRow {
+        // createAndEmailShareToken currently returns {ok, token, url}
+        // so we synthesize a row for UI. (Stats will hydrate real counts.)
+        return {
+            token: String(res.token),
+            to_email: null,
+            created_at: new Date().toISOString(),
+            expires_at: null,
+            max_views: null,
+            view_count: 0,
+            revoked_at: null,
+        };
     }
 
     async function onCreateToken() {
@@ -92,36 +88,20 @@ export default function SharePanel({
 
         startTransition(async () => {
             try {
-                const fd = makeFormData({
-                    toEmail: "",
-                    expiresAt: "",
-                    maxViews: "",
-                });
+                const fd = makeFormData({ toEmail: "", expiresAt: "", maxViews: "" });
 
-                const res: any = await createAndEmailShareToken(fd);
+                const res = await createAndEmailShareToken(fd);
 
-                if (!res?.ok) {
-                    setErr(res?.message || res?.error || "Failed to create share token.");
+                if (!res.ok) {
+                    setErr(res.message || res.error || "Failed to create share token.");
                     return;
                 }
 
-                // Prefer server-provided row if present; otherwise build a minimal one.
-                const newRow: ShareRow =
-                    res.share ??
-                    res.row ?? {
-                        token: res.token,
-                        to_email: res.to_email ?? null,
-                        created_at: res.created_at ?? new Date().toISOString(),
-                        expires_at: res.expires_at ?? null,
-                        max_views: res.max_views ?? null,
-                        view_count: res.view_count ?? 0,
-                        revoked_at: res.revoked_at ?? null,
-                    };
-
-                appendOrPrependRow(newRow);
+                const newRow = buildRowFromCreateResult(res);
+                upsertRow(newRow);
                 setSelectedToken(newRow.token);
-            } catch (e: any) {
-                setErr(e?.message || "Unexpected error creating share token.");
+            } catch (e: unknown) {
+                setErr(e instanceof Error ? e.message : "Unexpected error creating share token.");
             }
         });
     }
@@ -130,15 +110,16 @@ export default function SharePanel({
         setErr(null);
         startTransition(async () => {
             try {
-                const res: ShareStatsResult = await getShareStatsByToken(token);
+                const res = await getShareStatsByToken(token);
                 if (!res.ok) {
                     setErr(res.message || res.error || "Failed to load stats.");
                     setStats(null);
                     return;
                 }
                 setStats(res);
-            } catch (e: any) {
-                setErr(e?.message || "Unexpected error loading stats.");
+                upsertRow(res.row); // keep list fresh (view_count/revoked/expires)
+            } catch (e: unknown) {
+                setErr(e instanceof Error ? e.message : "Unexpected error loading stats.");
                 setStats(null);
             }
         });
@@ -148,27 +129,25 @@ export default function SharePanel({
         setErr(null);
         startTransition(async () => {
             try {
-                const res: any = await revokeShareToken(token);
-                if (!res?.ok) {
-                    setErr(res?.message || res?.error || "Failed to revoke token.");
+                const res = await revokeShareToken(token);
+                if (!res.ok) {
+                    setErr(res.message || res.error || "Failed to revoke token.");
                     return;
                 }
 
-                // Mark revoked locally
+                const nowIso = new Date().toISOString();
+
                 setShares((prev) =>
-                    prev.map((r) =>
-                        r.token === token ? { ...r, revoked_at: new Date().toISOString() } : r
-                    )
+                    prev.map((r) => (r.token === token ? { ...r, revoked_at: nowIso } : r))
                 );
 
-                // If stats are for the token we revoked, reflect it
                 setStats((prev) => {
                     if (!prev?.ok) return prev;
-                    if (prev.token !== token) return prev;
-                    return { ...prev, revoked_at: new Date().toISOString() };
+                    if (prev.row.token !== token) return prev;
+                    return { ...prev, row: { ...prev.row, revoked_at: nowIso } };
                 });
-            } catch (e: any) {
-                setErr(e?.message || "Unexpected error revoking token.");
+            } catch (e: unknown) {
+                setErr(e instanceof Error ? e.message : "Unexpected error revoking token.");
             }
         });
     }
@@ -212,6 +191,7 @@ export default function SharePanel({
                             {shares.map((r) => {
                                 const isSelected = r.token === selectedToken;
                                 const revoked = !!r.revoked_at;
+
                                 return (
                                     <li
                                         key={r.token}
@@ -308,8 +288,7 @@ export default function SharePanel({
                                     {fmtIso(selectedRow.created_at)}
                                 </div>
                                 <div>
-                                    <span className="text-neutral-600">Views:</span>{" "}
-                                    {selectedRow.view_count}
+                                    <span className="text-neutral-600">Views:</span> {selectedRow.view_count}
                                     {selectedRow.max_views != null ? ` / ${selectedRow.max_views}` : ""}
                                 </div>
                                 <div>
@@ -324,27 +303,24 @@ export default function SharePanel({
 
                             <div className="rounded-md border border-neutral-200 p-2">
                                 <div className="mb-1 text-sm font-medium">Stats (server)</div>
+
                                 {stats?.ok ? (
                                     <div className="space-y-1">
                                         <div>
                                             <span className="text-neutral-600">Views:</span>{" "}
-                                            {stats.view_count}
-                                        </div>
-                                        <div>
-                                            <span className="text-neutral-600">Last viewed:</span>{" "}
-                                            {fmtIso(stats.last_viewed_at)}
+                                            {stats.row.view_count}
                                         </div>
                                         <div>
                                             <span className="text-neutral-600">Expires:</span>{" "}
-                                            {stats.expires_at ? fmtIso(stats.expires_at) : "No"}
+                                            {stats.row.expires_at ? fmtIso(stats.row.expires_at) : "No"}
                                         </div>
                                         <div>
                                             <span className="text-neutral-600">Revoked:</span>{" "}
-                                            {stats.revoked_at ? fmtIso(stats.revoked_at) : "No"}
+                                            {stats.row.revoked_at ? fmtIso(stats.row.revoked_at) : "No"}
                                         </div>
                                         <div>
                                             <span className="text-neutral-600">Max views:</span>{" "}
-                                            {stats.max_views ?? "—"}
+                                            {stats.row.max_views ?? "—"}
                                         </div>
                                     </div>
                                 ) : (
