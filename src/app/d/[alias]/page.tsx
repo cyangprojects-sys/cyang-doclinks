@@ -16,7 +16,7 @@ export default async function SharePage({
 }: {
   params: { alias: string };
 }) {
-  // absolutely prevent caching (including cached 404s)
+  // Prevent cached 404s / cached alias misses
   noStore();
 
   const alias = decodeURIComponent(params.alias || "").trim();
@@ -34,5 +34,6 @@ export default async function SharePage({
   const docId = rows?.[0]?.doc_id;
   if (!docId) notFound();
 
-  return <ShareForm alias={alias} docId={docId} />;
+  // ShareForm currently expects only { docId: string }
+  return <ShareForm docId={docId} />;
 }
