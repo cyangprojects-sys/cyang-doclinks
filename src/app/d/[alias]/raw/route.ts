@@ -1,88 +1,93 @@
-// src/app/d/[alias]/raw/route.ts
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { sql } from "@/lib/db";
-import crypto from "crypto";
+import { r2Client } from "@/lib/r2";
+import { GetObjectCommand } from "@aws-sdk/client-s3";
+import { getOwnerOrNull } from "@/lib/owner";
 
-type ResolvedRow = {
-  doc_id: string;
-  is_public: boolean;
-};
+export async function GET(req: Request, ctx: { params: Promise<{ alias: string }> }) {
+  const { alias } = await ctx.params;
+  const url = new URL(req.url);
+  const token = url.searchParams.get("t");
 
-type ShareConsumeRow = { ok: boolean };
-
-function getClientIp(req: NextRequest) {
-  const xff = req.headers.get("x-forwarded-for") || "";
-  return xff.split(",")[0]?.trim() || "";
-}
-
-function hashIp(ip: string) {
-  const salt = process.env.VIEW_SALT || "";
-  if (!salt || !ip) return null;
-  return crypto.createHmac("sha256", salt).update(ip).digest("hex").slice(0, 32);
-}
-
-async function resolveDoc(alias: string): Promise<ResolvedRow | null> {
-  const rows = (await sql`
+  // Resolve alias -> doc pointer
+  const rows = await sql<{
+    id: string;
+    title: string | null;
+    bucket: string;
+    r2_key: string;
+    content_type: string | null;
+  }[]>`
     select
-      d.id::text as doc_id,
-      d.is_public as is_public
-    from public.doc_aliases a
-    join public.docs d on d.id = a.doc_id
-    where a.alias = ${alias}
-      and a.revoked_at is null
-      and (a.expires_at is null or a.expires_at > now())
+      d.id::text as id,
+      d.title,
+      d.bucket,
+      d.r2_key,
+      d.content_type
+    from doc_aliases da
+    join docs d on d.id = da.doc_id
+    where da.alias = ${alias}
     limit 1
-  `) as ResolvedRow[];
+  `;
 
-  return rows?.[0] || null;
-}
+  const doc = (rows as any)[0];
+  if (!doc) {
+    return new NextResponse("Not found", { status: 404 });
+  }
 
-// Atomically increments view_count only if still allowed.
-// max_views semantics:
-// - NULL => unlimited
-// - 0    => unlimited
-// - N>0  => allow N total views; we increment only if view_count < N
-async function consumeViewIfAllowed(docId: string, token: string): Promise<boolean> {
-  const rows = (await sql`
-    update public.doc_shares s
-    set view_count = s.view_count + 1
-    where s.doc_id = ${docId}::uuid
-      and s.token = ${token}
-      and s.revoked_at is null
-      and (s.expires_at is null or s.expires_at > now())
-      and (
-        s.max_views is null
-        or s.max_views = 0
-        or s.view_count < s.max_views
-      )
-    returning true as ok
-  `) as ShareConsumeRow[];
+  // Allow if owner
+  const owner = await getOwnerOrNull();
+  let allowed = !!owner;
 
-  return !!rows?.[0]?.ok;
-}
+  // Or allow if token is valid
+  if (!allowed && token) {
+    const tRows = await sql<{
+      token: string;
+      expires_at: string | null;
+      max_views: number | null;
+      view_count: number;
+      revoked_at: string | null;
+    }[]>`
+      select
+        token,
+        expires_at::text as expires_at,
+        max_views,
+        view_count,
+        revoked_at::text as revoked_at
+      from share_tokens
+      where token = ${token}
+        and doc_id = ${doc.id}::uuid
+      limit 1
+    `;
 
-export async function GET(
-  req: NextRequest,
-  context: { params: Promise<{ alias: string }> }
-) {
-  const { alias: rawAlias } = await context.params;
-  const alias = decodeURIComponent(rawAlias || "").trim();
-  if (!alias) return new NextResponse("Not found", { status: 404 });
+    const t = (tRows as any)[0];
+    if (t) {
+      const now = Date.now();
+      const expOk = !t.expires_at || new Date(t.expires_at).getTime() > now;
+      const notRevoked = !t.revoked_at;
+      const viewsOk = t.max_views == null || t.view_count < t.max_views;
 
-  const resolved = await resolveDoc(alias);
-  const docId = resolved?.doc_id;
-  if (!docId) return new NextResponse("Not found", { status: 404 });
+      allowed = expOk && notRevoked && viewsOk;
 
-  // Gate: allow public docs, otherwise require valid share token cookie
-  let allowed = !!resolved?.is_public;
+      if (allowed) {
+        // increment view_count and record a view (best-effort)
+        try {
+          await sql`
+            update share_tokens
+            set view_count = view_count + 1
+            where token = ${token}
+          `;
+        } catch { }
 
-  if (!allowed) {
-    const token = req.cookies.get("cyang_share")?.value || "";
-    if (token) {
-      allowed = await consumeViewIfAllowed(docId, token);
+        try {
+          await sql`
+            insert into share_views (token, viewed_at, ip)
+            values (${token}, now(), ${req.headers.get("x-forwarded-for") || null})
+          `;
+        } catch { }
+      }
     }
   }
 
@@ -90,27 +95,24 @@ export async function GET(
     return new NextResponse("Forbidden", { status: 403 });
   }
 
-  // Analytics (best-effort)
-  try {
-    const ip = getClientIp(req);
-    const ipHash = hashIp(ip);
-    const ua = req.headers.get("user-agent") || null;
-    const ref = req.headers.get("referer") || null;
+  // Fetch from R2
+  const client = r2Client;
+  const obj = await client.send(
+    new GetObjectCommand({
+      Bucket: doc.bucket,
+      Key: doc.r2_key,
+    })
+  );
 
-    await sql`
-      insert into public.doc_views
-        (doc_id, alias, path, kind, user_agent, referer, ip_hash)
-      values
-        (${docId}::uuid, ${alias}, ${new URL(req.url).pathname}, 'alias_raw', ${ua}, ${ref}, ${ipHash})
-    `;
-  } catch {
-    // ignore logging errors
-  }
+  const stream = obj.Body as any; // Readable
+  const contentType = doc.content_type || "application/pdf";
 
-  // Redirect to serve route
-  const url = new URL(req.url);
-  url.pathname = `/serve/${encodeURIComponent(docId)}`;
-  url.search = "";
-
-  return NextResponse.redirect(url, 307);
+  return new NextResponse(stream, {
+    headers: {
+      "Content-Type": contentType,
+      // inline lets the iframe preview work
+      "Content-Disposition": `inline; filename="${(doc.title || alias).replace(/"/g, "")}.pdf"`,
+      "Cache-Control": "private, max-age=0, must-revalidate",
+    },
+  });
 }
