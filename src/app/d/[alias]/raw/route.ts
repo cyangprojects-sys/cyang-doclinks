@@ -1,22 +1,23 @@
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+import type { NextRequest } from "next/server";
 import { sql } from "@/lib/db";
 import { r2Client } from "@/lib/r2";
 import { GetObjectCommand } from "@aws-sdk/client-s3";
 
-type RouteCtx = {
-  params: { alias: string };
-};
-
 function pickFilename(title: string | null, fallback: string) {
   const base = (title || fallback).trim() || fallback;
-  // very light sanitize
   return base.replace(/[^\w.\- ]+/g, "_");
 }
 
-export async function GET(_req: Request, ctx: RouteCtx) {
-  const alias = String(ctx.params.alias || "").trim();
+export async function GET(
+  _req: NextRequest,
+  ctx: { params: Promise<{ alias: string }> }
+): Promise<Response> {
+  const { alias: rawAlias } = await ctx.params;
+  const alias = String(rawAlias || "").trim();
+
   if (!alias) {
     return new Response("Missing alias", { status: 400 });
   }
@@ -67,14 +68,11 @@ export async function GET(_req: Request, ctx: RouteCtx) {
   const filename = pickFilename(doc.title, alias) + ".pdf";
   const contentType = doc.content_type || "application/pdf";
 
-  // Stream the body back
   return new Response(obj.Body as any, {
     status: 200,
     headers: {
       "Content-Type": contentType,
-      // Inline: show in browser
       "Content-Disposition": `inline; filename="${filename}"`,
-      // Optional caching; tune later
       "Cache-Control": "private, max-age=0, must-revalidate",
     },
   });
