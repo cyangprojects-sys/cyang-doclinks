@@ -4,7 +4,7 @@ export const runtime = "nodejs";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { sql } from "@/lib/db";
-import { getOwnerOrNull } from "@/lib/owner";
+import { requireOwner } from "@/lib/owner";
 import SharePanel from "./SharePanel";
 import type { ShareRow } from "./actions";
 
@@ -12,6 +12,14 @@ type PageProps = {
   params: Promise<{ alias: string }>;
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };
+
+async function getOwnerOptional() {
+  try {
+    return await requireOwner();
+  } catch {
+    return null;
+  }
+}
 
 export default async function DocAliasPage({ params }: PageProps) {
   const { alias } = await params;
@@ -23,13 +31,15 @@ export default async function DocAliasPage({ params }: PageProps) {
     created_at: string;
     bucket: string | null;
     r2_key: string | null;
+    content_type: string | null;
   }[]>`
     select
       d.id::text as id,
       d.title,
       d.created_at::text as created_at,
       d.bucket,
-      d.r2_key
+      d.r2_key,
+      d.content_type
     from doc_aliases da
     join docs d on d.id = da.doc_id
     where da.alias = ${alias}
@@ -39,7 +49,7 @@ export default async function DocAliasPage({ params }: PageProps) {
   const doc = (docRows as any)[0];
   if (!doc) return notFound();
 
-  const owner = await getOwnerOrNull();
+  const owner = await getOwnerOptional();
 
   // Owner-only: load existing tokens (best-effort)
   let initialShares: ShareRow[] = [];
@@ -70,9 +80,7 @@ export default async function DocAliasPage({ params }: PageProps) {
       <div className="flex items-start justify-between gap-6">
         <div>
           <h1 className="text-2xl font-semibold text-white">{doc.title || `${alias}.pdf`}</h1>
-          <div className="mt-1 text-sm text-white/60">
-            {doc.id}
-          </div>
+          <div className="mt-1 text-sm text-white/60">{doc.id}</div>
           <div className="mt-1 text-sm text-white/60">
             Created: {new Date(doc.created_at).toLocaleString()}
           </div>
@@ -100,11 +108,7 @@ export default async function DocAliasPage({ params }: PageProps) {
         </div>
 
         <div className="aspect-[16/10] w-full overflow-hidden rounded-xl border border-white/10">
-          <iframe
-            title="preview"
-            className="h-full w-full"
-            src={`/d/${alias}/raw`}
-          />
+          <iframe title="preview" className="h-full w-full" src={`/d/${alias}/raw`} />
         </div>
       </div>
 

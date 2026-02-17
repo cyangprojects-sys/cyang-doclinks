@@ -5,7 +5,16 @@ import { NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { r2Client } from "@/lib/r2";
 import { GetObjectCommand } from "@aws-sdk/client-s3";
-import { getOwnerOrNull } from "@/lib/owner";
+import { requireOwner } from "@/lib/owner";
+
+async function isOwner() {
+  try {
+    await requireOwner();
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 export async function GET(req: Request, ctx: { params: Promise<{ alias: string }> }) {
   const { alias } = await ctx.params;
@@ -33,13 +42,10 @@ export async function GET(req: Request, ctx: { params: Promise<{ alias: string }
   `;
 
   const doc = (rows as any)[0];
-  if (!doc) {
-    return new NextResponse("Not found", { status: 404 });
-  }
+  if (!doc) return new NextResponse("Not found", { status: 404 });
 
   // Allow if owner
-  const owner = await getOwnerOrNull();
-  let allowed = !!owner;
+  let allowed = await isOwner();
 
   // Or allow if token is valid
   if (!allowed && token) {
@@ -91,9 +97,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ alias: string }
     }
   }
 
-  if (!allowed) {
-    return new NextResponse("Forbidden", { status: 403 });
-  }
+  if (!allowed) return new NextResponse("Forbidden", { status: 403 });
 
   // Fetch from R2
   const client = r2Client;
@@ -104,13 +108,12 @@ export async function GET(req: Request, ctx: { params: Promise<{ alias: string }
     })
   );
 
-  const stream = obj.Body as any; // Readable
+  const stream = obj.Body as any;
   const contentType = doc.content_type || "application/pdf";
 
   return new NextResponse(stream, {
     headers: {
       "Content-Type": contentType,
-      // inline lets the iframe preview work
       "Content-Disposition": `inline; filename="${(doc.title || alias).replace(/"/g, "")}.pdf"`,
       "Cache-Control": "private, max-age=0, must-revalidate",
     },
