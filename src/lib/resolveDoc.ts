@@ -53,9 +53,16 @@ export type ShareMeta =
     }
     | { ok: false };
 
+function norm(s: string): string {
+    return decodeURIComponent(String(s || "")).trim().toLowerCase();
+}
+
 function isExpired(expiresAt: string | Date | null): boolean {
     if (!expiresAt) return false;
-    const t = typeof expiresAt === "string" ? new Date(expiresAt).getTime() : expiresAt.getTime();
+    const t =
+        typeof expiresAt === "string"
+            ? new Date(expiresAt).getTime()
+            : expiresAt.getTime();
     return Number.isFinite(t) && t <= Date.now();
 }
 
@@ -65,7 +72,9 @@ function isMaxed(viewCount: number, maxViews: number | null): boolean {
     return viewCount >= maxViews;
 }
 
-async function getDocPointer(docId: string): Promise<
+async function getDocPointer(
+    docId: string
+): Promise<
     | {
         ok: true;
         docId: string;
@@ -78,19 +87,21 @@ async function getDocPointer(docId: string): Promise<
     }
     | { ok: false }
 > {
-    // Prefer r2_bucket/r2_key; tolerate older bucket/key shapes.
+    const id = String(docId || "").trim();
+    if (!id) return { ok: false };
+
     const rows = (await sql`
     select
       d.id::text as id,
       coalesce(d.r2_bucket::text, d.bucket::text, ${R2_BUCKET}) as bucket,
-      coalesce(d.r2_key::text, d.r2_key::text) as r2_key,
+      d.r2_key::text as r2_key,
       d.title::text as title,
       d.original_filename::text as original_filename,
       d.content_type::text as content_type,
       d.size_bytes::bigint as size_bytes,
       coalesce(d.status::text, '') as status
     from public.docs d
-    where d.id = ${docId}::uuid
+    where d.id = ${id}::uuid
     limit 1
   `) as unknown as Array<{
         id: string;
@@ -106,9 +117,7 @@ async function getDocPointer(docId: string): Promise<
     const r = rows?.[0];
     if (!r?.id) return { ok: false };
 
-    // honor "deleted" status if present (serve route already did this)
     if ((r.status || "").toLowerCase() === "deleted") return { ok: false };
-
     if (!r.bucket || !r.r2_key) return { ok: false };
 
     return {
@@ -123,7 +132,7 @@ async function getDocPointer(docId: string): Promise<
     };
 }
 
-async function resolveAliasToDocId(alias: string): Promise<
+async function resolveAliasToDocId(aliasInput: string): Promise<
     | {
         ok: true;
         docId: string;
@@ -133,8 +142,11 @@ async function resolveAliasToDocId(alias: string): Promise<
     }
     | { ok: false }
 > {
-    // 1) Preferred table: public.doc_aliases
-    // Some environments may not have password_hash on alias rows.
+    const alias = norm(aliasInput);
+    if (!alias) return { ok: false };
+
+    // Preferred: doc_aliases (case-insensitive + require is_active if present)
+    // Try with password_hash first (some envs have it, some don't)
     try {
         const rows = (await sql`
       select
@@ -143,7 +155,8 @@ async function resolveAliasToDocId(alias: string): Promise<
         a.expires_at::text as expires_at,
         a.password_hash::text as password_hash
       from public.doc_aliases a
-      where a.alias = ${alias}
+      where lower(a.alias) = ${alias}
+        and coalesce(a.is_active, true) = true
       limit 1
     `) as unknown as Array<{
             doc_id: string;
@@ -166,7 +179,7 @@ async function resolveAliasToDocId(alias: string): Promise<
         // fall through
     }
 
-    // 1b) doc_aliases without password_hash
+    // doc_aliases without password_hash
     try {
         const rows = (await sql`
       select
@@ -174,7 +187,8 @@ async function resolveAliasToDocId(alias: string): Promise<
         a.revoked_at::text as revoked_at,
         a.expires_at::text as expires_at
       from public.doc_aliases a
-      where a.alias = ${alias}
+      where lower(a.alias) = ${alias}
+        and coalesce(a.is_active, true) = true
       limit 1
     `) as unknown as Array<{
             doc_id: string;
@@ -196,7 +210,7 @@ async function resolveAliasToDocId(alias: string): Promise<
         // fall through
     }
 
-    // 2) Legacy table: document_aliases (used by older email auth flow)
+    // Legacy: document_aliases (case-insensitive)
     try {
         const rows = (await sql`
       select
@@ -205,7 +219,7 @@ async function resolveAliasToDocId(alias: string): Promise<
         a.expires_at::text as expires_at,
         a.password_hash::text as password_hash
       from public.document_aliases a
-      where a.alias = ${alias}
+      where lower(a.alias) = ${alias}
       limit 1
     `) as unknown as Array<{
             doc_id: string;
@@ -234,7 +248,10 @@ async function resolveAliasToDocId(alias: string): Promise<
 /**
  * Read-only share meta (NO increment). Used by /s/[token] page and password verify.
  */
-export async function resolveShareMeta(token: string): Promise<ShareMeta> {
+export async function resolveShareMeta(tokenInput: string): Promise<ShareMeta> {
+    const token = String(tokenInput || "").trim();
+    if (!token) return { ok: false };
+
     // Prefer doc_shares
     try {
         const rows = (await sql`
@@ -341,7 +358,9 @@ export async function resolveShareMeta(token: string): Promise<ShareMeta> {
  * Token resolution for /raw: increments views atomically while enforcing revoked/expired/max_views.
  * Keeps your current behavior: increments even if password-gated.
  */
-async function resolveTokenAndIncrement(token: string): Promise<
+async function resolveTokenAndIncrement(
+    tokenInput: string
+): Promise<
     | {
         ok: true;
         docId: string;
@@ -350,6 +369,9 @@ async function resolveTokenAndIncrement(token: string): Promise<
     }
     | { ok: false; error: "NOT_FOUND" | "REVOKED" | "EXPIRED" | "MAXED" }
 > {
+    const token = String(tokenInput || "").trim();
+    if (!token) return { ok: false, error: "NOT_FOUND" };
+
     // doc_shares
     try {
         const rows = (await sql`
@@ -363,7 +385,12 @@ async function resolveTokenAndIncrement(token: string): Promise<
     `) as unknown as Array<{ doc_id: string; password_hash: string | null }>;
 
         if (rows?.length) {
-            return { ok: true, docId: rows[0].doc_id, passwordHash: rows[0].password_hash ?? null, table: "doc_shares" };
+            return {
+                ok: true,
+                docId: rows[0].doc_id,
+                passwordHash: rows[0].password_hash ?? null,
+                table: "doc_shares",
+            };
         }
     } catch {
         // ignore table missing
@@ -382,13 +409,17 @@ async function resolveTokenAndIncrement(token: string): Promise<
     `) as unknown as Array<{ doc_id: string; password_hash: string | null }>;
 
         if (rows?.length) {
-            return { ok: true, docId: rows[0].doc_id, passwordHash: rows[0].password_hash ?? null, table: "share_tokens" };
+            return {
+                ok: true,
+                docId: rows[0].doc_id,
+                passwordHash: rows[0].password_hash ?? null,
+                table: "share_tokens",
+            };
         }
     } catch {
         // ignore
     }
 
-    // Distinguish *why* it failed (best-effort read-only check)
     const meta = await resolveShareMeta(token);
     if (!meta.ok) return { ok: false, error: "NOT_FOUND" };
     if (meta.revokedAt) return { ok: false, error: "REVOKED" };
@@ -445,7 +476,7 @@ export async function resolveDoc(input: ResolveInput): Promise<ResolvedDoc> {
         };
     }
 
-    // TOKEN (raw behavior = increment + enforce max/revoked/expired)
+    // TOKEN
     if ("token" in input) {
         const token = String(input.token || "").trim();
         if (!token) return { ok: false, error: "NOT_FOUND" };
