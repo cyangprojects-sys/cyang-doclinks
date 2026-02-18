@@ -5,24 +5,26 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(
-    _req: Request,
-    context: { params: Promise<{ alias: string }> }
+  _req: Request,
+  context: { params: Promise<{ alias: string }> }
 ) {
-    const { alias: rawAlias } = await context.params;
-    const alias = decodeURIComponent(rawAlias || "").trim().toLowerCase();
+  const { alias: rawAlias } = await context.params;
+  const alias = decodeURIComponent(rawAlias || "").trim().toLowerCase();
 
-    if (!alias) {
-        return NextResponse.json(
-            { ok: false, error: "missing_alias" },
-            { status: 400 }
-        );
-    }
+  if (!alias) {
+    return NextResponse.json(
+      { ok: false, error: "missing_alias" },
+      { status: 400 }
+    );
+  }
 
-    const dbInfo = await sql`
+  const dbInfo = await sql`
     select current_database() as db, current_schema() as schema
   `;
 
-    const rowDocAliases = await sql`
+  let rowDocAliases: any[] = [];
+  try {
+    rowDocAliases = await sql`
     select
       'doc_aliases'::text as source_table,
       alias,
@@ -35,8 +37,13 @@ export async function GET(
     where lower(alias) = ${alias}
     limit 1
   `;
+  } catch {
+    rowDocAliases = [];
+  }
 
-    const rowDocumentAliases = await sql`
+  let rowDocumentAliases: any[] = [];
+  try {
+    rowDocumentAliases = await sql`
     select
       'document_aliases'::text as source_table,
       alias,
@@ -49,15 +56,19 @@ export async function GET(
     where lower(alias) = ${alias}
     limit 1
   `;
+  } catch {
+    // table may not exist in some environments; ignore
+    rowDocumentAliases = [];
 
-    const row = rowDocAliases?.[0] ?? rowDocumentAliases?.[0] ?? null;
+  }
 
-    return NextResponse.json({
-        ok: true,
-        alias,
-        db: dbInfo?.[0] ?? null,
-        found: !!row,
-        row,
-    });
+  const row = rowDocAliases?.[0] ?? rowDocumentAliases?.[0] ?? null;
+
+  return NextResponse.json({
+    ok: true,
+    alias,
+    db: dbInfo?.[0] ?? null,
+    found: !!row,
+    row,
+  });
 }
-``
