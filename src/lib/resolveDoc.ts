@@ -93,7 +93,7 @@ async function getDocPointer(
     const rows = (await sql`
     select
       d.id::text as id,
-      coalesce(d.r2_bucket::text, d.bucket::text, ${R2_BUCKET}) as bucket,
+      coalesce(d.r2_bucket::text, ${R2_BUCKET}) as bucket,
       d.r2_key::text as r2_key,
       d.title::text as title,
       d.original_filename::text as original_filename,
