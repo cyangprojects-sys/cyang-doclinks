@@ -88,6 +88,30 @@ function isMaxed(viewCount: number, maxViews: number | null): boolean {
     return viewCount >= maxViews;
 }
 
+// Email link tokens can be 32-hex-without-dashes while DB stores UUID w/ dashes.
+// Generate both variants and query using both.
+function tokenVariants(tokenInput: string): { raw: string; dashed: string | null } {
+    const raw = String(tokenInput || "").trim();
+    if (!raw) return { raw: "", dashed: null };
+
+    // Already dashed UUID?
+    const isDashedUuid = /^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$/.test(
+        raw
+    );
+    if (isDashedUuid) return { raw: raw.toLowerCase(), dashed: raw.toLowerCase() };
+
+    // 32-hex => dashed UUID
+    const isHex32 = /^[a-fA-F0-9]{32}$/.test(raw);
+    if (!isHex32) return { raw, dashed: null };
+
+    const lower = raw.toLowerCase();
+    const dashed = `${lower.slice(0, 8)}-${lower.slice(8, 12)}-${lower.slice(
+        12,
+        16
+    )}-${lower.slice(16, 20)}-${lower.slice(20)}`;
+    return { raw: lower, dashed };
+}
+
 async function getDocPointer(
     docId: string
 ): Promise<
@@ -265,15 +289,30 @@ async function resolveAliasToDocId(
 
 /**
  * Read-only share meta (NO increment). Used by /s/[token] page and password verify.
- * ✅ Includes shareId + allowedEmail + allowDownload.
- * ✅ Handles schema drift across environments:
- *    - share_tokens counter column can be `views_count` OR `view_count` OR derived from `doc_views`
+ *
+ * Robustness goals:
+ * - token in email may be 32-hex (no dashes) while DB stores UUID (dashed)
+ * - doc_shares/share_tokens primary key column may NOT be `id` in your DB (your screenshot proves `id` doesn't exist)
+ * - share_tokens view counter may be `views_count`, `view_count`, or derived from doc_views
  */
 export async function resolveShareMeta(tokenInput: string): Promise<ShareMeta> {
-    const token = String(tokenInput || "").trim();
+    const { raw: token, dashed } = tokenVariants(tokenInput);
     if (!token) return { ok: false };
 
-    // Prefer doc_shares (try with new columns first; fallback if columns don't exist)
+    // helper: WHERE token matches either raw or dashed
+    const whereToken = sql`
+      (
+        token = ${token}
+        or token::text = ${token}
+        ${dashed ? sql`or token = ${dashed} or token::text = ${dashed}` : sql``}
+      )
+    `;
+
+    // -------------------------
+    // doc_shares: try different PK column names
+    // -------------------------
+
+    // doc_shares w/ new cols + pk = id
     try {
         const rows = (await sql`
       select
@@ -290,7 +329,7 @@ export async function resolveShareMeta(tokenInput: string): Promise<ShareMeta> {
         allowed_email,
         allow_download
       from public.doc_shares
-      where token = ${token}
+      where ${whereToken}
       limit 1
     `) as unknown as Array<{
             share_id: string;
@@ -331,10 +370,71 @@ export async function resolveShareMeta(tokenInput: string): Promise<ShareMeta> {
             };
         }
     } catch {
-        // ignore (table missing or columns missing)
+        // ignore
     }
 
-    // doc_shares fallback without new columns
+    // doc_shares w/ new cols + pk = share_id
+    try {
+        const rows = (await sql`
+      select
+        share_id::text as share_id,
+        token::text as token,
+        doc_id::text as doc_id,
+        to_email,
+        created_at::text as created_at,
+        expires_at::text as expires_at,
+        max_views,
+        view_count,
+        revoked_at::text as revoked_at,
+        password_hash,
+        allowed_email,
+        allow_download
+      from public.doc_shares
+      where ${whereToken}
+      limit 1
+    `) as unknown as Array<{
+            share_id: string;
+            token: string;
+            doc_id: string;
+            to_email: string | null;
+            created_at: string;
+            expires_at: string | null;
+            max_views: number | null;
+            view_count: number | null;
+            revoked_at: string | null;
+            password_hash: string | null;
+            allowed_email: string | null;
+            allow_download: boolean | null;
+        }>;
+
+        if (rows?.length) {
+            const r = rows[0];
+            return {
+                ok: true,
+                table: "doc_shares",
+                shareId: r.share_id,
+                token: r.token,
+                docId: r.doc_id,
+
+                allowedEmail:
+                    normEmail(r.allowed_email ?? null) ?? normEmail(r.to_email ?? null),
+                allowDownload: Boolean(r.allow_download),
+
+                toEmail: r.to_email ?? null,
+                createdAt: r.created_at,
+                expiresAt: r.expires_at ?? null,
+                maxViews: r.max_views,
+                viewCount: Number(r.view_count ?? 0),
+                revokedAt: r.revoked_at ?? null,
+                hasPassword: Boolean(r.password_hash),
+                passwordHash: r.password_hash ?? null,
+            };
+        }
+    } catch {
+        // ignore
+    }
+
+    // doc_shares fallback without new cols + pk = id
     try {
         const rows = (await sql`
       select
@@ -349,7 +449,7 @@ export async function resolveShareMeta(tokenInput: string): Promise<ShareMeta> {
         revoked_at::text as revoked_at,
         password_hash
       from public.doc_shares
-      where token = ${token}
+      where ${whereToken}
       limit 1
     `) as unknown as Array<{
             share_id: string;
@@ -390,8 +490,67 @@ export async function resolveShareMeta(tokenInput: string): Promise<ShareMeta> {
         // ignore
     }
 
-    // Fallback share_tokens (try with new columns first; fallback if columns don't exist)
-    // Some envs use `views_count`, others use `view_count`, and some derive from doc_views.
+    // doc_shares fallback without new cols + pk = share_id
+    try {
+        const rows = (await sql`
+      select
+        share_id::text as share_id,
+        token::text as token,
+        doc_id::text as doc_id,
+        to_email,
+        created_at::text as created_at,
+        expires_at::text as expires_at,
+        max_views,
+        view_count,
+        revoked_at::text as revoked_at,
+        password_hash
+      from public.doc_shares
+      where ${whereToken}
+      limit 1
+    `) as unknown as Array<{
+            share_id: string;
+            token: string;
+            doc_id: string;
+            to_email: string | null;
+            created_at: string;
+            expires_at: string | null;
+            max_views: number | null;
+            view_count: number | null;
+            revoked_at: string | null;
+            password_hash: string | null;
+        }>;
+
+        if (rows?.length) {
+            const r = rows[0];
+            return {
+                ok: true,
+                table: "doc_shares",
+                shareId: r.share_id,
+                token: r.token,
+                docId: r.doc_id,
+
+                allowedEmail: normEmail(r.to_email ?? null),
+                allowDownload: false,
+
+                toEmail: r.to_email ?? null,
+                createdAt: r.created_at,
+                expiresAt: r.expires_at ?? null,
+                maxViews: r.max_views,
+                viewCount: Number(r.view_count ?? 0),
+                revokedAt: r.revoked_at ?? null,
+                hasPassword: Boolean(r.password_hash),
+                passwordHash: r.password_hash ?? null,
+            };
+        }
+    } catch {
+        // ignore
+    }
+
+    // -------------------------
+    // share_tokens: try different PK + different view counter columns
+    // -------------------------
+
+    // share_tokens w/ new cols + pk=id + counter=views_count
     try {
         const rows = (await sql`
       select
@@ -408,8 +567,7 @@ export async function resolveShareMeta(tokenInput: string): Promise<ShareMeta> {
         allowed_email,
         allow_download
       from public.share_tokens
-      where token::text = ${token}
-         or token = ${token}
+      where ${whereToken}
       limit 1
     `) as unknown as Array<{
             share_id: string;
@@ -453,7 +611,68 @@ export async function resolveShareMeta(tokenInput: string): Promise<ShareMeta> {
         // ignore
     }
 
-    // share_tokens variant where the counter column is `view_count`
+    // share_tokens w/ new cols + pk=share_id + counter=views_count
+    try {
+        const rows = (await sql`
+      select
+        share_id::text as share_id,
+        token::text as token,
+        doc_id::text as doc_id,
+        to_email,
+        created_at::text as created_at,
+        expires_at::text as expires_at,
+        max_views,
+        views_count,
+        revoked_at::text as revoked_at,
+        password_hash,
+        allowed_email,
+        allow_download
+      from public.share_tokens
+      where ${whereToken}
+      limit 1
+    `) as unknown as Array<{
+            share_id: string;
+            token: string;
+            doc_id: string;
+            to_email: string | null;
+            created_at: string;
+            expires_at: string | null;
+            max_views: number | null;
+            views_count: number | null;
+            revoked_at: string | null;
+            password_hash: string | null;
+            allowed_email: string | null;
+            allow_download: boolean | null;
+        }>;
+
+        if (rows?.length) {
+            const r = rows[0];
+            return {
+                ok: true,
+                table: "share_tokens",
+                shareId: r.share_id,
+                token: r.token,
+                docId: r.doc_id,
+
+                allowedEmail:
+                    normEmail(r.allowed_email ?? null) ?? normEmail(r.to_email ?? null),
+                allowDownload: Boolean(r.allow_download),
+
+                toEmail: r.to_email ?? null,
+                createdAt: r.created_at,
+                expiresAt: r.expires_at ?? null,
+                maxViews: r.max_views,
+                viewCount: Number(r.views_count ?? 0),
+                revokedAt: r.revoked_at ?? null,
+                hasPassword: Boolean(r.password_hash),
+                passwordHash: r.password_hash ?? null,
+            };
+        }
+    } catch {
+        // ignore
+    }
+
+    // share_tokens w/ new cols + pk=id + counter=view_count
     try {
         const rows = (await sql`
       select
@@ -470,8 +689,7 @@ export async function resolveShareMeta(tokenInput: string): Promise<ShareMeta> {
         allowed_email,
         allow_download
       from public.share_tokens
-      where token::text = ${token}
-         or token = ${token}
+      where ${whereToken}
       limit 1
     `) as unknown as Array<{
             share_id: string;
@@ -515,7 +733,68 @@ export async function resolveShareMeta(tokenInput: string): Promise<ShareMeta> {
         // ignore
     }
 
-    // share_tokens fallback without new columns
+    // share_tokens w/ new cols + pk=share_id + counter=view_count
+    try {
+        const rows = (await sql`
+      select
+        share_id::text as share_id,
+        token::text as token,
+        doc_id::text as doc_id,
+        to_email,
+        created_at::text as created_at,
+        expires_at::text as expires_at,
+        max_views,
+        view_count,
+        revoked_at::text as revoked_at,
+        password_hash,
+        allowed_email,
+        allow_download
+      from public.share_tokens
+      where ${whereToken}
+      limit 1
+    `) as unknown as Array<{
+            share_id: string;
+            token: string;
+            doc_id: string;
+            to_email: string | null;
+            created_at: string;
+            expires_at: string | null;
+            max_views: number | null;
+            view_count: number | null;
+            revoked_at: string | null;
+            password_hash: string | null;
+            allowed_email: string | null;
+            allow_download: boolean | null;
+        }>;
+
+        if (rows?.length) {
+            const r = rows[0];
+            return {
+                ok: true,
+                table: "share_tokens",
+                shareId: r.share_id,
+                token: r.token,
+                docId: r.doc_id,
+
+                allowedEmail:
+                    normEmail(r.allowed_email ?? null) ?? normEmail(r.to_email ?? null),
+                allowDownload: Boolean(r.allow_download),
+
+                toEmail: r.to_email ?? null,
+                createdAt: r.created_at,
+                expiresAt: r.expires_at ?? null,
+                maxViews: r.max_views,
+                viewCount: Number(r.view_count ?? 0),
+                revokedAt: r.revoked_at ?? null,
+                hasPassword: Boolean(r.password_hash),
+                passwordHash: r.password_hash ?? null,
+            };
+        }
+    } catch {
+        // ignore
+    }
+
+    // share_tokens fallback (no new cols) + pk=id + counter=views_count
     try {
         const rows = (await sql`
       select
@@ -530,8 +809,7 @@ export async function resolveShareMeta(tokenInput: string): Promise<ShareMeta> {
         revoked_at::text as revoked_at,
         password_hash
       from public.share_tokens
-      where token::text = ${token}
-         or token = ${token}
+      where ${whereToken}
       limit 1
     `) as unknown as Array<{
             share_id: string;
@@ -572,7 +850,63 @@ export async function resolveShareMeta(tokenInput: string): Promise<ShareMeta> {
         // ignore
     }
 
-    // share_tokens fallback without new columns, `view_count`
+    // share_tokens fallback (no new cols) + pk=share_id + counter=views_count
+    try {
+        const rows = (await sql`
+      select
+        share_id::text as share_id,
+        token::text as token,
+        doc_id::text as doc_id,
+        to_email,
+        created_at::text as created_at,
+        expires_at::text as expires_at,
+        max_views,
+        views_count,
+        revoked_at::text as revoked_at,
+        password_hash
+      from public.share_tokens
+      where ${whereToken}
+      limit 1
+    `) as unknown as Array<{
+            share_id: string;
+            token: string;
+            doc_id: string;
+            to_email: string | null;
+            created_at: string;
+            expires_at: string | null;
+            max_views: number | null;
+            views_count: number | null;
+            revoked_at: string | null;
+            password_hash: string | null;
+        }>;
+
+        if (rows?.length) {
+            const r = rows[0];
+            return {
+                ok: true,
+                table: "share_tokens",
+                shareId: r.share_id,
+                token: r.token,
+                docId: r.doc_id,
+
+                allowedEmail: normEmail(r.to_email ?? null),
+                allowDownload: false,
+
+                toEmail: r.to_email ?? null,
+                createdAt: r.created_at,
+                expiresAt: r.expires_at ?? null,
+                maxViews: r.max_views,
+                viewCount: Number(r.views_count ?? 0),
+                revokedAt: r.revoked_at ?? null,
+                hasPassword: Boolean(r.password_hash),
+                passwordHash: r.password_hash ?? null,
+            };
+        }
+    } catch {
+        // ignore
+    }
+
+    // share_tokens fallback (no new cols) + pk=id + counter=view_count
     try {
         const rows = (await sql`
       select
@@ -587,8 +921,7 @@ export async function resolveShareMeta(tokenInput: string): Promise<ShareMeta> {
         revoked_at::text as revoked_at,
         password_hash
       from public.share_tokens
-      where token::text = ${token}
-         or token = ${token}
+      where ${whereToken}
       limit 1
     `) as unknown as Array<{
             share_id: string;
@@ -629,11 +962,72 @@ export async function resolveShareMeta(tokenInput: string): Promise<ShareMeta> {
         // ignore
     }
 
-    // Last-ditch share_tokens fallback: derive view count from doc_views (no counter column)
+    // share_tokens fallback (no new cols) + pk=share_id + counter=view_count
     try {
         const rows = (await sql`
       select
-        st.id::text as share_id,
+        share_id::text as share_id,
+        token::text as token,
+        doc_id::text as doc_id,
+        to_email,
+        created_at::text as created_at,
+        expires_at::text as expires_at,
+        max_views,
+        view_count,
+        revoked_at::text as revoked_at,
+        password_hash
+      from public.share_tokens
+      where ${whereToken}
+      limit 1
+    `) as unknown as Array<{
+            share_id: string;
+            token: string;
+            doc_id: string;
+            to_email: string | null;
+            created_at: string;
+            expires_at: string | null;
+            max_views: number | null;
+            view_count: number | null;
+            revoked_at: string | null;
+            password_hash: string | null;
+        }>;
+
+        if (rows?.length) {
+            const r = rows[0];
+            return {
+                ok: true,
+                table: "share_tokens",
+                shareId: r.share_id,
+                token: r.token,
+                docId: r.doc_id,
+
+                allowedEmail: normEmail(r.to_email ?? null),
+                allowDownload: false,
+
+                toEmail: r.to_email ?? null,
+                createdAt: r.created_at,
+                expiresAt: r.expires_at ?? null,
+                maxViews: r.max_views,
+                viewCount: Number(r.view_count ?? 0),
+                revokedAt: r.revoked_at ?? null,
+                hasPassword: Boolean(r.password_hash),
+                passwordHash: r.password_hash ?? null,
+            };
+        }
+    } catch {
+        // ignore
+    }
+
+    // Last-ditch: derive view count from doc_views (if no counter columns)
+    try {
+        const rows = (await sql`
+      select
+        -- try to provide a stable share id; if PK columns differ, use token itself
+        coalesce(
+          nullif((st.share_id)::text, ''),
+          nullif((st.id)::text, ''),
+          st.token::text
+        ) as share_id,
         st.token::text as token,
         st.doc_id::text as doc_id,
         st.to_email,
@@ -646,8 +1040,7 @@ export async function resolveShareMeta(tokenInput: string): Promise<ShareMeta> {
           select count(*)::int from public.doc_views dv where dv.token = st.token
         ), 0) as view_count
       from public.share_tokens st
-      where st.token::text = ${token}
-         or st.token = ${token}
+      where ${whereToken}
       limit 1
     `) as unknown as Array<{
             share_id: string;
@@ -667,7 +1060,7 @@ export async function resolveShareMeta(tokenInput: string): Promise<ShareMeta> {
             return {
                 ok: true,
                 table: "share_tokens",
-                shareId: r.share_id,
+                shareId: r.share_id || r.token,
                 token: r.token,
                 docId: r.doc_id,
 
@@ -694,7 +1087,6 @@ export async function resolveShareMeta(tokenInput: string): Promise<ShareMeta> {
 /**
  * Token resolution for /raw: increments views atomically while enforcing revoked/expired/max_views.
  * Keeps your current behavior: increments even if password-gated.
- * ✅ Handles share_tokens counter column drift: `views_count` OR `view_count`
  */
 async function resolveTokenAndIncrement(
     tokenInput: string
@@ -707,15 +1099,23 @@ async function resolveTokenAndIncrement(
     }
     | { ok: false; error: "NOT_FOUND" | "REVOKED" | "EXPIRED" | "MAXED" }
 > {
-    const token = String(tokenInput || "").trim();
+    const { raw: token, dashed } = tokenVariants(tokenInput);
     if (!token) return { ok: false, error: "NOT_FOUND" };
+
+    const tokenWhereDocShares = dashed
+        ? sql`(s.token = ${token} or s.token::text = ${token} or s.token = ${dashed} or s.token::text = ${dashed})`
+        : sql`(s.token = ${token} or s.token::text = ${token})`;
+
+    const tokenWhereShareTokens = dashed
+        ? sql`(st.token::text = ${token} or st.token = ${token} or st.token::text = ${dashed} or st.token = ${dashed})`
+        : sql`(st.token::text = ${token} or st.token = ${token})`;
 
     // doc_shares
     try {
         const rows = (await sql`
       update public.doc_shares s
       set view_count = s.view_count + 1
-      where s.token = ${token}
+      where ${tokenWhereDocShares}
         and s.revoked_at is null
         and (s.expires_at is null or s.expires_at > now())
         and (s.max_views is null or s.max_views = 0 or s.view_count < s.max_views)
@@ -739,7 +1139,7 @@ async function resolveTokenAndIncrement(
         const rows = (await sql`
       update public.share_tokens st
       set views_count = st.views_count + 1
-      where (st.token::text = ${token} or st.token = ${token})
+      where ${tokenWhereShareTokens}
         and st.revoked_at is null
         and (st.expires_at is null or st.expires_at > now())
         and (st.max_views is null or st.max_views = 0 or st.views_count < st.max_views)
@@ -755,7 +1155,7 @@ async function resolveTokenAndIncrement(
             };
         }
     } catch {
-        // ignore (column/table mismatch)
+        // ignore
     }
 
     // share_tokens (try increment view_count)
@@ -763,7 +1163,7 @@ async function resolveTokenAndIncrement(
         const rows = (await sql`
       update public.share_tokens st
       set view_count = st.view_count + 1
-      where (st.token::text = ${token} or st.token = ${token})
+      where ${tokenWhereShareTokens}
         and st.revoked_at is null
         and (st.expires_at is null or st.expires_at > now())
         and (st.max_views is null or st.max_views = 0 or st.view_count < st.max_views)
