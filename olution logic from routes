@@ -1,0 +1,1556 @@
+[1mdiff --git a/src/app/d/[alias]/page.tsx b/src/app/d/[alias]/page.tsx[m
+[1mindex 5e3a20b..c5c8b16 100644[m
+[1m--- a/src/app/d/[alias]/page.tsx[m
+[1m+++ b/src/app/d/[alias]/page.tsx[m
+[36m@@ -1,39 +1,26 @@[m
+[32m+[m[32m// src/app/d/[alias]/page.tsx[m
+ import { notFound } from "next/navigation";[m
+ import { unstable_noStore as noStore } from "next/cache";[m
+[31m-import { sql } from "@/lib/db";[m
+ import ShareForm from "./ShareForm";[m
+[32m+[m[32mimport { resolveDoc } from "@/lib/resolveDoc";[m
+ [m
+ export const runtime = "nodejs";[m
+ export const dynamic = "force-dynamic";[m
+ export const revalidate = 0;[m
+ [m
+[31m-type AliasRow = {[m
+[31m-  doc_id: string;[m
+[31m-};[m
+[31m-[m
+[31m-export default async function SharePage({[m
+[31m-  params,[m
+[31m-}: {[m
+[31m-  params: { alias: string };[m
+[31m-}) {[m
+[31m-  // Prevent cached 404s / cached alias misses[m
+[32m+[m[32mexport default async function SharePage({ params }: { params: { alias: string } }) {[m
+   noStore();[m
+ [m
+   const alias = decodeURIComponent(params.alias || "").trim();[m
+   if (!alias) notFound();[m
+ [m
+[31m-  const rows = (await sql`[m
+[31m-    select doc_id::text as doc_id[m
+[31m-    from public.doc_aliases[m
+[31m-    where alias = ${alias}[m
+[31m-      and revoked_at is null[m
+[31m-      and (expires_at is null or expires_at > now())[m
+[31m-    limit 1[m
+[31m-  `) as AliasRow[];[m
+[32m+[m[32m  const resolved = await resolveDoc({ alias });[m
+ [m
+[31m-  const docId = rows?.[0]?.doc_id;[m
+[31m-  if (!docId) notFound();[m
+[32m+[m[32m  if (!resolved.ok) {[m
+[32m+[m[32m    // If alias gets password support later, /d/[alias] is where you'd render the password UI.[m
+[32m+[m[32m    // For now: treat as not found.[m
+[32m+[m[32m    notFound();[m
+[32m+[m[32m  }[m
+ [m
+[31m-  // ShareForm currently expects only { docId: string }[m
+[31m-  return <ShareForm docId={docId} />;[m
+[32m+[m[32m  return <ShareForm docId={resolved.docId} />;[m
+ }[m
+[1mdiff --git a/src/app/d/[alias]/raw/route.ts b/src/app/d/[alias]/raw/route.ts[m
+[1mindex 795aae7..ddd8aaa 100644[m
+[1m--- a/src/app/d/[alias]/raw/route.ts[m
+[1m+++ b/src/app/d/[alias]/raw/route.ts[m
+[36m@@ -1,20 +1,18 @@[m
+[32m+[m[32m// src/app/d/[alias]/raw/route.ts[m
+ export const runtime = "nodejs";[m
+ export const dynamic = "force-dynamic";[m
+ [m
+ import type { NextRequest } from "next/server";[m
+[31m-import { sql } from "@/lib/db";[m
+ import { r2Client } from "@/lib/r2";[m
+ import { GetObjectCommand } from "@aws-sdk/client-s3";[m
+[32m+[m[32mimport { resolveDoc } from "@/lib/resolveDoc";[m
+ [m
+[31m-function pickFilename(title: string | null, fallback: string) {[m
+[31m-  const base = (title || fallback).trim() || fallback;[m
+[32m+[m[32mfunction pickFilename(title: string | null, original: string | null, fallback: string) {[m
+[32m+[m[32m  const base = (title || original || fallback).trim() || fallback;[m
+   return base.replace(/[^\w.\- ]+/g, "_");[m
+ }[m
+ [m
+[31m-export async function GET([m
+[31m-  _req: NextRequest,[m
+[31m-  ctx: { params: Promise<{ alias: string }> }[m
+[31m-): Promise<Response> {[m
+[32m+[m[32mexport async function GET(_req: NextRequest, ctx: { params: Promise<{ alias: string }> }): Promise<Response> {[m
+   const { alias: rawAlias } = await ctx.params;[m
+   const alias = String(rawAlias || "").trim();[m
+ [m
+[36m@@ -22,42 +20,24 @@[m [mexport async function GET([m
+     return new Response("Missing alias", { status: 400 });[m
+   }[m
+ [m
+[31m-  // Resolve alias -> doc storage pointer[m
+[31m-  const rows = (await sql`[m
+[31m-    select[m
+[31m-      d.id::text as id,[m
+[31m-      d.title::text as title,[m
+[31m-      d.bucket::text as bucket,[m
+[31m-      d.r2_key::text as r2_key,[m
+[31m-      d.content_type::text as content_type[m
+[31m-    from docs d[m
+[31m-    join doc_aliases a on a.doc_id = d.id[m
+[31m-    where a.alias = ${alias}[m
+[31m-    limit 1[m
+[31m-  `) as unknown as {[m
+[31m-    id: string;[m
+[31m-    title: string | null;[m
+[31m-    bucket: string;[m
+[31m-    r2_key: string;[m
+[31m-    content_type: string | null;[m
+[31m-  }[];[m
+[31m-[m
+[31m-  if (!rows || rows.length === 0) {[m
+[31m-    return new Response("Not found", { status: 404 });[m
+[32m+[m[32m  const resolved = await resolveDoc({ alias });[m
+[32m+[m
+[32m+[m[32m  if (!resolved.ok) {[m
+[32m+[m[32m    const status = resolved.error === "PASSWORD_REQUIRED" ? 302 : 404;[m
+[32m+[m[32m    // If password required for alias, you probably want to redirect to /d/[alias] (not raw)[m
+[32m+[m[32m    if (resolved.error === "PASSWORD_REQUIRED") {[m
+[32m+[m[32m      return new Response(null, {[m
+[32m+[m[32m        status: 302,[m
+[32m+[m[32m        headers: { Location: `/d/${encodeURIComponent(alias)}` },[m
+[32m+[m[32m      });[m
+[32m+[m[32m    }[m
+[32m+[m[32m    return new Response("Not found", { status });[m
+   }[m
+ [m
+[31m-  const doc = rows[0];[m
+[31m-[m
+[31m-  if (!doc.bucket || !doc.r2_key) {[m
+[31m-    return new Response("Document storage pointer missing", { status: 500 });[m
+[31m-  }[m
+[31m-[m
+[31m-  const client = r2Client;[m
+[31m-[m
+[31m-  const obj = await client.send([m
+[32m+[m[32m  const obj = await r2Client.send([m
+     new GetObjectCommand({[m
+[31m-      Bucket: doc.bucket,[m
+[31m-      Key: doc.r2_key,[m
+[32m+[m[32m      Bucket: resolved.bucket,[m
+[32m+[m[32m      Key: resolved.r2Key,[m
+     })[m
+   );[m
+ [m
+[36m@@ -65,8 +45,8 @@[m [mexport async function GET([m
+     return new Response("Object body missing", { status: 500 });[m
+   }[m
+ [m
+[31m-  const filename = pickFilename(doc.title, alias) + ".pdf";[m
+[31m-  const contentType = doc.content_type || "application/pdf";[m
+[32m+[m[32m  const filename = pickFilename(resolved.title, resolved.originalFilename, alias) + ".pdf";[m
+[32m+[m[32m  const contentType = resolved.contentType || "application/pdf";[m
+ [m
+   return new Response(obj.Body as any, {[m
+     status: 200,[m
+[1mdiff --git a/src/app/s/[token]/actions.ts b/src/app/s/[token]/actions.ts[m
+[1mindex ae836cd..679fc30 100644[m
+[1m--- a/src/app/s/[token]/actions.ts[m
+[1m+++ b/src/app/s/[token]/actions.ts[m
+[36m@@ -3,25 +3,14 @@[m
+ [m
+ import crypto from "crypto";[m
+ import bcrypt from "bcryptjs";[m
+[31m-import { cookies } from "next/headers";[m
+[32m+[m[32mimport { cookies, headers } from "next/headers";[m
+[32m+[m[32mimport { redirect } from "next/navigation";[m
+ import { sql } from "@/lib/db";[m
+[32m+[m[32mimport { resolveShareMeta } from "@/lib/resolveDoc";[m
+ [m
+ const UNLOCK_HOURS = 8;[m
+ const RATE_LIMIT_PER_MIN = 10;[m
+ [m
+[31m-function getClientIpFromHeaders(): string {[m
+[31m-    // For Server Actions, we don't get NextRequest easily.[m
+[31m-    // Try common headers that Vercel/Next set; fallback to empty.[m
+[31m-    // (Route handler will have better access; this is good enough.)[m
+[31m-    return "";[m
+[31m-}[m
+[31m-[m
+[31m-function hashIp(ip: string) {[m
+[31m-    const salt = process.env.VIEW_SALT || process.env.SHARE_SALT || "";[m
+[31m-    if (!salt || !ip) return null;[m
+[31m-    return crypto.createHmac("sha256", salt).update(ip).digest("hex").slice(0, 32);[m
+[31m-}[m
+[31m-[m
+ function cookieName(token: string) {[m
+     return `share_unlock_${token}`;[m
+ }[m
+[36m@@ -30,112 +19,6 @@[m [mfunction randomId() {[m
+     return crypto.randomBytes(24).toString("base64url");[m
+ }[m
+ [m
+[31m-/**[m
+[31m- * Resolve share row from either doc_shares OR share_tokens.[m
+[31m- * Returns normalized fields needed for gating and validation.[m
+[31m- */[m
+[31m-async function getShareRow(token: string): Promise<[m
+[31m-    | {[m
+[31m-        ok: true;[m
+[31m-        table: "doc_shares" | "share_tokens";[m
+[31m-        token: string;[m
+[31m-        doc_id: string;[m
+[31m-        revoked_at: string | null;[m
+[31m-        expires_at: string | null;[m
+[31m-        max_views: number | null;[m
+[31m-        view_count: number;[m
+[31m-        password_hash: string | null;[m
+[31m-    }[m
+[31m-    | { ok: false }[m
+[31m-> {[m
+[31m-    // Try doc_shares first[m
+[31m-    try {[m
+[31m-        const rows = (await sql`[m
+[31m-      select[m
+[31m-        token::text as token,[m
+[31m-        doc_id::text as doc_id,[m
+[31m-        revoked_at::text as revoked_at,[m
+[31m-        expires_at::text as expires_at,[m
+[31m-        max_views,[m
+[31m-        view_count,[m
+[31m-        password_hash[m
+[31m-      from public.doc_shares[m
+[31m-      where token = ${token}[m
+[31m-      limit 1[m
+[31m-    `) as unknown as Array<{[m
+[31m-            token: string;[m
+[31m-            doc_id: string;[m
+[31m-            revoked_at: string | null;[m
+[31m-            expires_at: string | null;[m
+[31m-            max_views: number | null;[m
+[31m-            view_count: number | null;[m
+[31m-            password_hash: string | null;[m
+[31m-        }>;[m
+[31m-[m
+[31m-        if (rows?.length) {[m
+[31m-            const r = rows[0];[m
+[31m-            return {[m
+[31m-                ok: true,[m
+[31m-                table: "doc_shares",[m
+[31m-                token: r.token,[m
+[31m-                doc_id: r.doc_id,[m
+[31m-                revoked_at: r.revoked_at,[m
+[31m-                expires_at: r.expires_at,[m
+[31m-                max_views: r.max_views,[m
+[31m-                view_count: Number(r.view_count ?? 0),[m
+[31m-                password_hash: r.password_hash ?? null,[m
+[31m-            };[m
+[31m-        }[m
+[31m-    } catch {[m
+[31m-        // ignore; table may not exist[m
+[31m-    }[m
+[31m-[m
+[31m-    // Fallback: share_tokens[m
+[31m-    try {[m
+[31m-        const rows = (await sql`[m
+[31m-      select[m
+[31m-        token::text as token,[m
+[31m-        doc_id::text as doc_id,[m
+[31m-        revoked_at::text as revoked_at,[m
+[31m-        expires_at::text as expires_at,[m
+[31m-        max_views,[m
+[31m-        views_count,[m
+[31m-        password_hash[m
+[31m-      from public.share_tokens[m
+[31m-      where token::text = ${token}[m
+[31m-         or token = ${token}[m
+[31m-      limit 1[m
+[31m-    `) as unknown as Array<{[m
+[31m-            token: string;[m
+[31m-            doc_id: string;[m
+[31m-            revoked_at: string | null;[m
+[31m-            expires_at: string | null;[m
+[31m-            max_views: number | null;[m
+[31m-            views_count: number | null;[m
+[31m-            password_hash: string | null;[m
+[31m-        }>;[m
+[31m-[m
+[31m-        if (rows?.length) {[m
+[31m-            const r = rows[0];[m
+[31m-            return {[m
+[31m-                ok: true,[m
+[31m-                table: "share_tokens",[m
+[31m-                token: r.token,[m
+[31m-                doc_id: r.doc_id,[m
+[31m-                revoked_at: r.revoked_at,[m
+[31m-                expires_at: r.expires_at,[m
+[31m-                max_views: r.max_views,[m
+[31m-                view_count: Number(r.views_count ?? 0),[m
+[31m-                password_hash: r.password_hash ?? null,[m
+[31m-            };[m
+[31m-        }[m
+[31m-    } catch {[m
+[31m-        // ignore[m
+[31m-    }[m
+[31m-[m
+[31m-    return { ok: false };[m
+[31m-}[m
+[31m-[m
+ function isExpired(expires_at: string | null) {[m
+     if (!expires_at) return false;[m
+     const t = new Date(expires_at).getTime();[m
+[36m@@ -148,7 +31,19 @@[m [mfunction isMaxed(view_count: number, max_views: number | null) {[m
+     return view_count >= max_views;[m
+ }[m
+ [m
+[31m-async function isUnlocked(token: string): Promise<boolean> {[m
+[32m+[m[32masync function getClientIpFromHeaders(): Promise<string> {[m
+[32m+[m[32m    const h = await headers();[m
+[32m+[m[32m    const xff = h.get("x-forwarded-for") || "";[m
+[32m+[m[32m    return xff.split(",")[0]?.trim() || "";[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32mfunction hashIp(ip: string) {[m
+[32m+[m[32m    const salt = process.env.VIEW_SALT || process.env.SHARE_SALT || "";[m
+[32m+[m[32m    if (!salt || !ip) return null;[m
+[32m+[m[32m    return crypto.createHmac("sha256", salt).update(ip).digest("hex").slice(0, 32);[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32mexport async function isShareUnlockedAction(token: string): Promise<boolean> {[m
+     const c = await cookies();[m
+     const unlockId = c.get(cookieName(token))?.value || "";[m
+     if (!unlockId) return false;[m
+[36m@@ -180,26 +75,36 @@[m [masync function rateLimitOk(token: string, ipHash: string) {[m
+ [m
+ export type VerifySharePasswordResult =[m
+     | { ok: true }[m
+[31m-    | { ok: false; error: "not_found" | "revoked" | "expired" | "maxed" | "rate_limited" | "bad_password"; message: string };[m
+[32m+[m[32m    | {[m
+[32m+[m[32m        ok: false;[m
+[32m+[m[32m        error: "not_found" | "revoked" | "expired" | "maxed" | "rate_limited" | "bad_password";[m
+[32m+[m[32m        message: string;[m
+[32m+[m[32m    };[m
+ [m
+[31m-export async function verifySharePasswordAction(formData: FormData): Promise<VerifySharePasswordResult> {[m
+[32m+[m[32m/**[m
+[32m+[m[32m * Core verifier that returns a structured result.[m
+[32m+[m[32m */[m
+[32m+[m[32mexport async function verifySharePasswordCore(formData: FormData): Promise<VerifySharePasswordResult> {[m
+     const token = String(formData.get("token") || "").trim();[m
+     const password = String(formData.get("password") || "");[m
+ [m
+     if (!token) return { ok: false, error: "not_found", message: "Missing token." };[m
+ [m
+[31m-    const share = await getShareRow(token);[m
+[32m+[m[32m    const share = await resolveShareMeta(token);[m
+     if (!share.ok) return { ok: false, error: "not_found", message: "Share not found." };[m
+ [m
+[31m-    if (share.revoked_at) return { ok: false, error: "revoked", message: "This share was revoked." };[m
+[31m-    if (isExpired(share.expires_at)) return { ok: false, error: "expired", message: "This share link has expired." };[m
+[31m-    if (isMaxed(share.view_count, share.max_views)) return { ok: false, error: "maxed", message: "This share link has reached its max views." };[m
+[32m+[m[32m    if (share.revokedAt) return { ok: false, error: "revoked", message: "This share was revoked." };[m
+[32m+[m[32m    if (isExpired(share.expiresAt)) return { ok: false, error: "expired", message: "This share link has expired." };[m
+[32m+[m[32m    if (isMaxed(share.viewCount, share.maxViews))[m
+[32m+[m[32m        return { ok: false, error: "maxed", message: "This share link has reached its max views." };[m
+[32m+[m
+[32m+[m[32m    const passwordHash = share.passwordHash;[m
+ [m
+[31m-    // If no password set, treat as ok (and still set an unlock cookie so /raw is gated consistently)[m
+[31m-    const passwordHash = share.password_hash;[m
+[32m+[m[32m    // No password set → unlock immediately (still creates DB unlock session + cookie)[m
+     if (!passwordHash) {[m
+         const unlockId = randomId();[m
+         const expiresAt = new Date(Date.now() + UNLOCK_HOURS * 3600 * 1000);[m
+[32m+[m
+         await sql`[m
+       insert into public.share_unlocks (token, unlock_id, ip_hash, expires_at)[m
+       values (${token}, ${unlockId}, ${null}, ${expiresAt.toISOString()})[m
+[36m@@ -217,32 +122,31 @@[m [mexport async function verifySharePasswordAction(formData: FormData): Promise<Ver[m
+         return { ok: true };[m
+     }[m
+ [m
+[31m-    // Rate limit only if password is set[m
+[31m-    const ip = getClientIpFromHeaders();[m
+[31m-    const ipHash = hashIp(ip) || "noip";[m
+[31m-    const ok = await rateLimitOk(token, ipHash);[m
+[31m-    if (!ok) {[m
+[31m-        return { ok: false, error: "rate_limited", message: "Too many attempts. Try again in a minute." };[m
+[31m-    }[m
+[32m+[m[32m    // Rate limit (best-effort)[m
+[32m+[m[32m    try {[m
+[32m+[m[32m        const ip = await getClientIpFromHeaders();[m
+[32m+[m[32m        const ipHash = hashIp(ip) || "unknown";[m
+ [m
+[31m-    // record attempt (always)[m
+[31m-    await sql`[m
+[31m-    insert into public.share_pw_attempts (token, ip_hash)[m
+[31m-    values (${token}, ${ipHash})[m
+[31m-  `;[m
+[32m+[m[32m        const ok = await rateLimitOk(token, ipHash);[m
+[32m+[m[32m        if (!ok) return { ok: false, error: "rate_limited", message: "Too many attempts. Try again soon." };[m
+ [m
+[31m-    const match = await bcrypt.compare(password, passwordHash);[m
+[31m-    if (!match) {[m
+[31m-        return { ok: false, error: "bad_password", message: "Incorrect password." };[m
+[32m+[m[32m        await sql`[m
+[32m+[m[32m      insert into public.share_pw_attempts (token, ip_hash)[m
+[32m+[m[32m      values (${token}, ${ipHash})[m
+[32m+[m[32m    `;[m
+[32m+[m[32m    } catch {[m
+[32m+[m[32m        // If attempts table missing, don’t block unlock.[m
+     }[m
+ [m
+[31m-    // Create unlock session + cookie (8 hours)[m
+[32m+[m[32m    const match = await bcrypt.compare(password, passwordHash);[m
+[32m+[m[32m    if (!match) return { ok: false, error: "bad_password", message: "Incorrect password." };[m
+[32m+[m
+     const unlockId = randomId();[m
+     const expiresAt = new Date(Date.now() + UNLOCK_HOURS * 3600 * 1000);[m
+ [m
+     await sql`[m
+     insert into public.share_unlocks (token, unlock_id, ip_hash, expires_at)[m
+[31m-    values (${token}, ${unlockId}, ${ipHash}, ${expiresAt.toISOString()})[m
+[32m+[m[32m    values (${token}, ${unlockId}, ${null}, ${expiresAt.toISOString()})[m
+   `;[m
+ [m
+     const c = await cookies();[m
+[36m@@ -257,8 +161,25 @@[m [mexport async function verifySharePasswordAction(formData: FormData): Promise<Ver[m
+     return { ok: true };[m
+ }[m
+ [m
+[31m-export async function isShareUnlockedAction(token: string): Promise<boolean> {[m
+[31m-    const t = (token || "").trim();[m
+[31m-    if (!t) return false;[m
+[31m-    return isUnlocked(t);[m
+[32m+[m[32m/**[m
+[32m+[m[32m * Use THIS for <form action={...}>.[m
+[32m+[m[32m * Must return void/Promise<void>. Redirects instead of returning data.[m
+[32m+[m[32m */[m
+[32m+[m[32mexport async function verifySharePasswordAction(formData: FormData): Promise<void> {[m
+[32m+[m[32m    const token = String(formData.get("token") || "").trim();[m
+[32m+[m[32m    const res = await verifySharePasswordCore(formData);[m
+[32m+[m
+[32m+[m[32m    if (res.ok) {[m
+[32m+[m[32m        redirect(`/s/${encodeURIComponent(token)}/raw`);[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    redirect(`/s/${encodeURIComponent(token)}?error=${encodeURIComponent(res.message)}`);[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32m/**[m
+[32m+[m[32m * Use THIS from client components (like passwordGate.tsx).[m
+[32m+[m[32m * Returns a result object; does NOT redirect.[m
+[32m+[m[32m */[m
+[32m+[m[32mexport async function verifySharePasswordResultAction(formData: FormData): Promise<VerifySharePasswordResult> {[m
+[32m+[m[32m    return verifySharePasswordCore(formData);[m
+ }[m
+[1mdiff --git a/src/app/s/[token]/page.tsx b/src/app/s/[token]/page.tsx[m
+[1mindex 51d3987..c0433db 100644[m
+[1m--- a/src/app/s/[token]/page.tsx[m
+[1m+++ b/src/app/s/[token]/page.tsx[m
+[36m@@ -1,90 +1,12 @@[m
+ // src/app/s/[token]/page.tsx[m
+ import Link from "next/link";[m
+ import { redirect } from "next/navigation";[m
+[31m-import { sql } from "@/lib/db";[m
+ import { isShareUnlockedAction, verifySharePasswordAction } from "./actions";[m
+[32m+[m[32mimport { resolveShareMeta } from "@/lib/resolveDoc";[m
+ [m
+ export const runtime = "nodejs";[m
+ export const dynamic = "force-dynamic";[m
+ [m
+[31m-async function getShareMeta(token: string) {[m
+[31m-    // Prefer doc_shares; fallback to share_tokens[m
+[31m-    try {[m
+[31m-        const rows = (await sql`[m
+[31m-      select[m
+[31m-        token::text as token,[m
+[31m-        to_email,[m
+[31m-        created_at::text as created_at,[m
+[31m-        expires_at::text as expires_at,[m
+[31m-        max_views,[m
+[31m-        view_count,[m
+[31m-        revoked_at::text as revoked_at,[m
+[31m-        (password_hash is not null) as has_password[m
+[31m-      from public.doc_shares[m
+[31m-      where token = ${token}[m
+[31m-      limit 1[m
+[31m-    `) as unknown as Array<{[m
+[31m-            token: string;[m
+[31m-            to_email: string | null;[m
+[31m-            created_at: string;[m
+[31m-            expires_at: string | null;[m
+[31m-            max_views: number | null;[m
+[31m-            view_count: number | null;[m
+[31m-            revoked_at: string | null;[m
+[31m-            has_password: boolean;[m
+[31m-        }>;[m
+[31m-        if (rows?.length) return { ok: true as const, table: "doc_shares" as const, ...rows[0] };[m
+[31m-    } catch {[m
+[31m-        // ignore[m
+[31m-    }[m
+[31m-[m
+[31m-    try {[m
+[31m-        const rows = (await sql`[m
+[31m-      select[m
+[31m-        token::text as token,[m
+[31m-        to_email,[m
+[31m-        created_at::text as created_at,[m
+[31m-        expires_at::text as expires_at,[m
+[31m-        max_views,[m
+[31m-        views_count,[m
+[31m-        revoked_at::text as revoked_at,[m
+[31m-        (password_hash is not null) as has_password[m
+[31m-      from public.share_tokens[m
+[31m-      where token::text = ${token}[m
+[31m-         or token = ${token}[m
+[31m-      limit 1[m
+[31m-    `) as unknown as Array<{[m
+[31m-            token: string;[m
+[31m-            to_email: string | null;[m
+[31m-            created_at: string;[m
+[31m-            expires_at: string | null;[m
+[31m-            max_views: number | null;[m
+[31m-            views_count: number | null;[m
+[31m-            revoked_at: string | null;[m
+[31m-            has_password: boolean;[m
+[31m-        }>;[m
+[31m-        if (rows?.length) {[m
+[31m-            const r = rows[0];[m
+[31m-            return {[m
+[31m-                ok: true as const,[m
+[31m-                table: "share_tokens" as const,[m
+[31m-                token: r.token,[m
+[31m-                to_email: r.to_email,[m
+[31m-                created_at: r.created_at,[m
+[31m-                expires_at: r.expires_at,[m
+[31m-                max_views: r.max_views,[m
+[31m-                view_count: Number(r.views_count ?? 0),[m
+[31m-                revoked_at: r.revoked_at,[m
+[31m-                has_password: r.has_password,[m
+[31m-            };[m
+[31m-        }[m
+[31m-    } catch {[m
+[31m-        // ignore[m
+[31m-    }[m
+[31m-[m
+[31m-    return { ok: false as const };[m
+[31m-}[m
+[31m-[m
+ function fmtDate(s: string | null) {[m
+     if (!s) return "—";[m
+     const d = new Date(s);[m
+[36m@@ -103,12 +25,19 @@[m [mfunction isMaxed(view_count: number, max_views: number | null) {[m
+     return view_count >= max_views;[m
+ }[m
+ [m
+[31m-export default async function ShareTokenPage(props: { params: Promise<{ token: string }> }) {[m
+[32m+[m[32mexport default async function ShareTokenPage(props: {[m
+[32m+[m[32m    params: Promise<{ token: string }>;[m
+[32m+[m[32m    searchParams?: Promise<Record<string, string | string[] | undefined>>;[m
+[32m+[m[32m}) {[m
+     const { token } = await props.params;[m
+[32m+[m[32m    const sp = (await props.searchParams) || {};[m
+[32m+[m[32m    const errorParam = sp.error;[m
+[32m+[m[32m    const errorText = Array.isArray(errorParam) ? errorParam[0] : errorParam;[m
+[32m+[m
+     const t = (token || "").trim();[m
+     if (!t) redirect("/");[m
+ [m
+[31m-    const meta = await getShareMeta(t);[m
+[32m+[m[32m    const meta = await resolveShareMeta(t);[m
+     if (!meta.ok) {[m
+         return ([m
+             <main className="mx-auto max-w-lg px-4 py-12">[m
+[36m@@ -123,7 +52,7 @@[m [mexport default async function ShareTokenPage(props: { params: Promise<{ token: s[m
+         );[m
+     }[m
+ [m
+[31m-    if (meta.revoked_at) {[m
+[32m+[m[32m    if (meta.revokedAt) {[m
+         return ([m
+             <main className="mx-auto max-w-lg px-4 py-12">[m
+                 <h1 className="text-xl font-semibold">Link revoked</h1>[m
+[36m@@ -132,7 +61,7 @@[m [mexport default async function ShareTokenPage(props: { params: Promise<{ token: s[m
+         );[m
+     }[m
+ [m
+[31m-    if (isExpired(meta.expires_at)) {[m
+[32m+[m[32m    if (isExpired(meta.expiresAt)) {[m
+         return ([m
+             <main className="mx-auto max-w-lg px-4 py-12">[m
+                 <h1 className="text-xl font-semibold">Link expired</h1>[m
+[36m@@ -141,7 +70,7 @@[m [mexport default async function ShareTokenPage(props: { params: Promise<{ token: s[m
+         );[m
+     }[m
+ [m
+[31m-    if (isMaxed(meta.view_count ?? 0, meta.max_views)) {[m
+[32m+[m[32m    if (isMaxed(meta.viewCount ?? 0, meta.maxViews)) {[m
+         return ([m
+             <main className="mx-auto max-w-lg px-4 py-12">[m
+                 <h1 className="text-xl font-semibold">View limit reached</h1>[m
+[36m@@ -150,31 +79,26 @@[m [mexport default async function ShareTokenPage(props: { params: Promise<{ token: s[m
+         );[m
+     }[m
+ [m
+[31m-    // If already unlocked, go straight to raw stream[m
+     const unlocked = await isShareUnlockedAction(t);[m
+     if (unlocked) redirect(`/s/${encodeURIComponent(t)}/raw`);[m
+ [m
+[31m-    // If no password is set, we still want to create an unlock session + cookie so /raw gating is consistent.[m
+[31m-    if (!meta.has_password) {[m
+[31m-        // POST via Server Action to set cookie + DB, then redirect.[m
+[31m-        // Easiest: render a tiny auto-submit form.[m
+[32m+[m[32m    // If no password, show Continue that triggers the action (action will redirect to /raw)[m
+[32m+[m[32m    if (!meta.hasPassword) {[m
+         return ([m
+             <main className="mx-auto max-w-lg px-4 py-12">[m
+[31m-                <h1 className="text-xl font-semibold">Opening…</h1>[m
+[31m-                <p className="mt-2 text-sm text-neutral-400">Just a moment.</p>[m
+[31m-[m
+[31m-                <form[m
+[31m-                    action={async (fd) => {[m
+[31m-                        "use server";[m
+[31m-                        fd.set("token", t);[m
+[31m-                        fd.set("password", "");[m
+[31m-                        await verifySharePasswordAction(fd);[m
+[31m-                        redirect(`/s/${encodeURIComponent(t)}/raw`);[m
+[31m-                    }}[m
+[31m-                >[m
+[32m+[m[32m                {errorText ? ([m
+[32m+[m[32m                    <div className="mb-4 rounded-md border border-red-900/40 bg-red-950/30 px-3 py-2 text-sm text-red-200">[m
+[32m+[m[32m                        {errorText}[m
+[32m+[m[32m                    </div>[m
+[32m+[m[32m                ) : null}[m
+[32m+[m
+[32m+[m[32m                <form action={verifySharePasswordAction}>[m
+                     <input type="hidden" name="token" value={t} />[m
+                     <input type="hidden" name="password" value="" />[m
+[31m-                    <button className="mt-6 rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm text-neutral-200">[m
+[32m+[m[32m                    <button[m
+[32m+[m[32m                        type="submit"[m
+[32m+[m[32m                        className="rounded-md bg-neutral-800 px-4 py-2 text-sm text-neutral-100 hover:bg-neutral-700"[m
+[32m+[m[32m                    >[m
+                         Continue[m
+                     </button>[m
+                 </form>[m
+[36m@@ -184,53 +108,45 @@[m [mexport default async function ShareTokenPage(props: { params: Promise<{ token: s[m
+ [m
+     return ([m
+         <main className="mx-auto max-w-lg px-4 py-12">[m
+[31m-            <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-6">[m
+[31m-                <h1 className="text-xl font-semibold tracking-tight">Password required</h1>[m
+[31m-                <p className="mt-2 text-sm text-neutral-400">[m
+[31m-                    Enter the password to view this document. Once unlocked, it stays unlocked for 8 hours on this browser.[m
+[31m-                </p>[m
+[31m-[m
+[31m-                <div className="mt-5 grid grid-cols-2 gap-3 text-xs text-neutral-400">[m
+[31m-                    <div className="rounded-lg border border-neutral-800 bg-neutral-950 p-3">[m
+[31m-                        <div className="text-neutral-500">Created</div>[m
+[31m-                        <div className="mt-1 text-neutral-200">{fmtDate(meta.created_at)}</div>[m
+[32m+[m[32m            <h1 className="text-xl font-semibold">Protected link</h1>[m
+[32m+[m[32m            <p className="mt-2 text-sm text-neutral-400">This share requires a password.</p>[m
+[32m+[m
+[32m+[m[32m            {errorText ? ([m
+[32m+[m[32m                <div className="mt-4 rounded-md border border-red-900/40 bg-red-950/30 px-3 py-2 text-sm text-red-200">[m
+[32m+[m[32m                    {errorText}[m
+[32m+[m[32m                </div>[m
+[32m+[m[32m            ) : null}[m
+[32m+[m
+[32m+[m[32m            <div className="mt-6 rounded-lg border border-neutral-800 bg-neutral-950 p-4">[m
+[32m+[m[32m                <div className="text-sm text-neutral-400 space-y-1">[m
+[32m+[m[32m                    <div>[m
+[32m+[m[32m                        <span className="text-neutral-300">Created:</span> {fmtDate(meta.createdAt)}[m
+                     </div>[m
+[31m-                    <div className="rounded-lg border border-neutral-800 bg-neutral-950 p-3">[m
+[31m-                        <div className="text-neutral-500">Expires</div>[m
+[31m-                        <div className="mt-1 text-neutral-200">{fmtDate(meta.expires_at)}</div>[m
+[32m+[m[32m                    <div>[m
+[32m+[m[32m                        <span className="text-neutral-300">Expires:</span> {fmtDate(meta.expiresAt)}[m
+[32m+[m[32m                    </div>[m
+[32m+[m[32m                    <div>[m
+[32m+[m[32m                        <span className="text-neutral-300">Views:</span> {meta.viewCount}[m
+[32m+[m[32m                        {meta.maxViews ? ` / ${meta.maxViews}` : ""}[m
+                     </div>[m
+                 </div>[m
+ [m
+[31m-                <form[m
+[31m-                    action={async (fd) => {[m
+[31m-                        "use server";[m
+[31m-                        const res = await verifySharePasswordAction(fd);[m
+[31m-                        if (res.ok) redirect(`/s/${encodeURIComponent(t)}/raw`);[m
+[31m-                        // If bad password / rate limited, we re-render by throwing message into query string:[m
+[31m-                        redirect(`/s/${encodeURIComponent(t)}?e=${encodeURIComponent(res.message)}`);[m
+[31m-                    }}[m
+[31m-                    className="mt-6"[m
+[31m-                >[m
+[32m+[m[32m                <form action={verifySharePasswordAction} className="mt-4 space-y-3">[m
+                     <input type="hidden" name="token" value={t} />[m
+[31m-                    <label className="block text-xs text-neutral-400">Password</label>[m
+[32m+[m
+                     <input[m
+[31m-                        name="password"[m
+                         type="password"[m
+[31m-                        autoFocus[m
+[31m-                        className="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm text-neutral-200 outline-none focus:border-neutral-600"[m
+[31m-                        placeholder="Enter password"[m
+[32m+[m[32m                        name="password"[m
+[32m+[m[32m                        placeholder="Password"[m
+[32m+[m[32m                        className="w-full rounded-md border border-neutral-800 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 placeholder:text-neutral-500"[m
+                     />[m
+ [m
+                     <button[m
+                         type="submit"[m
+[31m-                        className="mt-3 w-full rounded-lg border border-neutral-800 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 hover:bg-neutral-800"[m
+[32m+[m[32m                        className="w-full rounded-md bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-500"[m
+                     >[m
+                         Unlock[m
+                     </button>[m
+[31m-[m
+[31m-                    <p className="mt-3 text-xs text-neutral-500">[m
+[31m-                        Having trouble? Ask the sender to resend the link or confirm the password.[m
+[31m-                    </p>[m
+                 </form>[m
+             </div>[m
+         </main>[m
+[1mdiff --git a/src/app/s/[token]/passwordGate.tsx b/src/app/s/[token]/passwordGate.tsx[m
+[1mindex 651d7c0..52f6315 100644[m
+[1m--- a/src/app/s/[token]/passwordGate.tsx[m
+[1m+++ b/src/app/s/[token]/passwordGate.tsx[m
+[36m@@ -1,63 +1,62 @@[m
+ // src/app/s/[token]/passwordGate.tsx[m
+ "use client";[m
+ [m
+[31m-import { useState, useTransition } from "react";[m
+[31m-import { useRouter } from "next/navigation";[m
+[31m-import { verifySharePasswordAction } from "./actions";[m
+[32m+[m[32mimport { useState } from "react";[m
+[32m+[m[32mimport { verifySharePasswordResultAction } from "./actions";[m
+ [m
+[31m-export default function PasswordGate(props: { token: string }) {[m
+[32m+[m[32mexport default function PasswordGate({ token }: { token: string }) {[m
+     const [pw, setPw] = useState("");[m
+     const [err, setErr] = useState<string | null>(null);[m
+[31m-    const [busy, startTransition] = useTransition();[m
+[31m-    const router = useRouter();[m
+[32m+[m[32m    const [busy, setBusy] = useState(false);[m
+ [m
+     return ([m
+[31m-        <div className="rounded-xl border border-neutral-800 bg-black/20 p-4">[m
+[31m-            <div className="text-sm font-medium text-neutral-200">Enter password</div>[m
+[31m-            <div className="mt-1 text-xs text-neutral-500">[m
+[31m-                You will stay unlocked for 8 hours on this device.[m
+[32m+[m[32m        <div className="mt-6 rounded-lg border border-neutral-800 bg-neutral-950 p-4">[m
+[32m+[m[32m            <div className="text-sm text-neutral-400">[m
+[32m+[m[32m                This share link is password protected.[m
+             </div>[m
+ [m
+             {err ? ([m
+[31m-                <div className="mt-3 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-200">[m
+[32m+[m[32m                <div className="mt-3 rounded-md border border-red-900/40 bg-red-950/30 px-3 py-2 text-sm text-red-200">[m
+                     {err}[m
+                 </div>[m
+             ) : null}[m
+ [m
+[31m-            <div className="mt-4 flex gap-2">[m
+[32m+[m[32m            <div className="mt-4 space-y-3">[m
+                 <input[m
+                     type="password"[m
+                     value={pw}[m
+                     onChange={(e) => setPw(e.target.value)}[m
+                     placeholder="Password"[m
+[31m-                    className="flex-1 rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm text-neutral-200 outline-none focus:border-neutral-600"[m
+[32m+[m[32m                    className="w-full rounded-md border border-neutral-800 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 placeholder:text-neutral-500"[m
+                 />[m
+[32m+[m
+                 <button[m
+[31m-                    disabled={busy || !pw}[m
+[31m-                    onClick={() => {[m
+[32m+[m[32m                    disabled={busy}[m
+[32m+[m[32m                    onClick={async () => {[m
+                         setErr(null);[m
+[31m-                        startTransition(async () => {[m
+[32m+[m[32m                        setBusy(true);[m
+[32m+[m[32m                        try {[m
+                             const fd = new FormData();[m
+[31m-                            fd.set("token", props.token);[m
+[32m+[m[32m                            fd.set("token", token);[m
+                             fd.set("password", pw);[m
+[31m-                            const res = await verifySharePasswordAction(fd);[m
+[32m+[m
+[32m+[m[32m                            const res = await verifySharePasswordResultAction(fd);[m
+                             if (!res.ok) {[m
+                                 setErr(res.message);[m
+                                 return;[m
+                             }[m
+[31m-                            setPw("");[m
+[31m-                            router.refresh();[m
+[31m-                        });[m
+[32m+[m
+[32m+[m[32m                            // Success: client redirect to raw view[m
+[32m+[m[32m                            window.location.href = `/s/${encodeURIComponent(token)}/raw`;[m
+[32m+[m[32m                        } finally {[m
+[32m+[m[32m                            setBusy(false);[m
+[32m+[m[32m                        }[m
+                     }}[m
+[31m-                    className="rounded-lg border border-neutral-700 bg-neutral-900 px-4 py-2 text-sm text-neutral-100 hover:bg-neutral-800 disabled:opacity-50 disabled:cursor-not-allowed"[m
+[32m+[m[32m                    className="w-full rounded-md bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-500 disabled:opacity-60"[m
+                 >[m
+[31m-                    {busy ? "Checking…" : "Unlock"}[m
+[32m+[m[32m                    {busy ? "Unlocking…" : "Unlock"}[m
+                 </button>[m
+             </div>[m
+[31m-[m
+[31m-            <div className="mt-2 text-[11px] text-neutral-500">[m
+[31m-                Too many attempts will temporarily block you (10/min).[m
+[31m-            </div>[m
+         </div>[m
+     );[m
+ }[m
+[1mdiff --git a/src/app/s/[token]/raw/route.ts b/src/app/s/[token]/raw/route.ts[m
+[1mindex dd45e44..d3b63fd 100644[m
+[1m--- a/src/app/s/[token]/raw/route.ts[m
+[1m+++ b/src/app/s/[token]/raw/route.ts[m
+[36m@@ -5,17 +5,10 @@[m [mexport const dynamic = "force-dynamic";[m
+ import { NextRequest, NextResponse } from "next/server";[m
+ import { sql } from "@/lib/db";[m
+ import crypto from "crypto";[m
+[31m-import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";[m
+[32m+[m[32mimport { r2Client } from "@/lib/r2";[m
+[32m+[m[32mimport { GetObjectCommand } from "@aws-sdk/client-s3";[m
+ import type { Readable } from "node:stream";[m
+[31m-[m
+[31m-const s3 = new S3Client({[m
+[31m-  region: "auto",[m
+[31m-  endpoint: process.env.R2_ENDPOINT,[m
+[31m-  credentials: {[m
+[31m-    accessKeyId: process.env.R2_ACCESS_KEY_ID!,[m
+[31m-    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY!,[m
+[31m-  },[m
+[31m-});[m
+[32m+[m[32mimport { resolveDoc } from "@/lib/resolveDoc";[m
+ [m
+ function getClientIp(req: NextRequest) {[m
+   const xff = req.headers.get("x-forwarded-for") || "";[m
+[36m@@ -54,112 +47,27 @@[m [masync function isUnlocked(token: string, req: NextRequest): Promise<boolean> {[m
+   return rows.length > 0;[m
+ }[m
+ [m
+[31m-function isExpired(expires_at: string | null) {[m
+[31m-  if (!expires_at) return false;[m
+[31m-  return new Date(expires_at).getTime() <= Date.now();[m
+[31m-}[m
+[31m-[m
+[31m-function isMaxed(view_count: number, max_views: number | null) {[m
+[31m-  if (max_views === null) return false;[m
+[31m-  if (max_views === 0) return false;[m
+[31m-  return view_count >= max_views;[m
+[31m-}[m
+[31m-[m
+[31m-/**[m
+[31m- * Resolve token + increment views atomically while enforcing rules.[m
+[31m- * Supports doc_shares OR share_tokens.[m
+[31m- */[m
+[31m-async function resolveAndIncrement(token: string): Promise<[m
+[31m-  | {[m
+[31m-    ok: true;[m
+[31m-    table: "doc_shares" | "share_tokens";[m
+[31m-    doc_id: string;[m
+[31m-    password_hash: string | null;[m
+[31m-  }[m
+[31m-  | { ok: false }[m
+[31m-> {[m
+[31m-  // doc_shares (view_count)[m
+[31m-  try {[m
+[31m-    const rows = (await sql`[m
+[31m-      update public.doc_shares s[m
+[31m-      set view_count = s.view_count + 1[m
+[31m-      where s.token = ${token}[m
+[31m-        and s.revoked_at is null[m
+[31m-        and (s.expires_at is null or s.expires_at > now())[m
+[31m-        and (s.max_views is null or s.max_views = 0 or s.view_count < s.max_views)[m
+[31m-      returning s.doc_id::text as doc_id, s.password_hash[m
+[31m-    `) as unknown as Array<{ doc_id: string; password_hash: string | null }>;[m
+[31m-[m
+[31m-    if (rows?.length) return { ok: true, table: "doc_shares", doc_id: rows[0].doc_id, password_hash: rows[0].password_hash };[m
+[31m-  } catch {[m
+[31m-    // ignore table missing[m
+[31m-  }[m
+[31m-[m
+[31m-  // share_tokens (views_count)[m
+[31m-  try {[m
+[31m-    const rows = (await sql`[m
+[31m-      update public.share_tokens st[m
+[31m-      set views_count = st.views_count + 1[m
+[31m-      where (st.token::text = ${token} or st.token = ${token})[m
+[31m-        and st.revoked_at is null[m
+[31m-        and (st.expires_at is null or st.expires_at > now())[m
+[31m-        and (st.max_views is null or st.max_views = 0 or st.views_count < st.max_views)[m
+[31m-      returning st.doc_id::text as doc_id, st.password_hash[m
+[31m-    `) as unknown as Array<{ doc_id: string; password_hash: string | null }>;[m
+[31m-[m
+[31m-    if (rows?.length) return { ok: true, table: "share_tokens", doc_id: rows[0].doc_id, password_hash: rows[0].password_hash };[m
+[31m-  } catch {[m
+[31m-    // ignore[m
+[31m-  }[m
+[31m-[m
+[31m-  return { ok: false };[m
+[31m-}[m
+[31m-[m
+ export async function GET(req: NextRequest, context: { params: Promise<{ token: string }> }) {[m
+   const { token } = await context.params;[m
+   const t = (token || "").trim();[m
+   if (!t) return new NextResponse("Not found", { status: 404 });[m
+ [m
+[31m-  // 1) We need share meta BEFORE we stream so we can enforce password if set.[m
+[31m-  // We also increment views atomically here (your existing behavior).[m
+[31m-  const resolved = await resolveAndIncrement(t);[m
+[32m+[m[32m  // Central resolver:[m
+[32m+[m[32m  // - resolves share token[m
+[32m+[m[32m  // - enforces revoked/expired/max_views[m
+[32m+[m[32m  // - increments views atomically (keeps your current behavior)[m
+[32m+[m[32m  const resolved = await resolveDoc({ token: t });[m
+   if (!resolved.ok) return new NextResponse("Not found", { status: 404 });[m
+ [m
+[31m-  // 2) If password is set, require unlocked cookie+DB[m
+[31m-  if (resolved.password_hash) {[m
+[32m+[m[32m  // Password gate: require unlocked cookie+DB if password set[m
+[32m+[m[32m  if (resolved.requiresPassword) {[m
+     const ok = await isUnlocked(t, req);[m
+     if (!ok) {[m
+[31m-      // Don’t stream if locked[m
+       return NextResponse.redirect(new URL(`/s/${encodeURIComponent(t)}`, req.url), 302);[m
+     }[m
+   }[m
+ [m
+[31m-  // 3) Load doc storage info (docs with r2_bucket + r2_key)[m
+[31m-  const docRows = (await sql`[m
+[31m-    select[m
+[31m-      r2_bucket::text as bucket,[m
+[31m-      r2_key::text as key,[m
+[31m-      coalesce(original_filename, title, 'document.pdf')::text as name,[m
+[31m-      coalesce(content_type, 'application/pdf')::text as content_type[m
+[31m-    from public.docs[m
+[31m-    where id = ${resolved.doc_id}::uuid[m
+[31m-    limit 1[m
+[31m-  `) as unknown as Array<{[m
+[31m-    bucket: string | null;[m
+[31m-    key: string | null;[m
+[31m-    name: string;[m
+[31m-    content_type: string;[m
+[31m-  }>;[m
+[31m-[m
+[31m-  if (!docRows.length || !docRows[0].bucket || !docRows[0].key) {[m
+[31m-    return new NextResponse("Not found", { status: 404 });[m
+[31m-  }[m
+[31m-[m
+[31m-  const bucket = docRows[0].bucket!;[m
+[31m-  const key = docRows[0].key!;[m
+[31m-  const filename = safeFilename(docRows[0].name);[m
+[31m-[m
+[31m-  // 4) Analytics log (best-effort)[m
+[32m+[m[32m  // Analytics log (best-effort)[m
+   try {[m
+     const ip = getClientIp(req);[m
+     const ipHash = hashIp(ip);[m
+[36m@@ -170,19 +78,19 @@[m [mexport async function GET(req: NextRequest, context: { params: Promise<{ token:[m
+       insert into public.doc_views[m
+         (doc_id, token, path, kind, user_agent, referer, ip_hash)[m
+       values[m
+[31m-        (${resolved.doc_id}::uuid, ${t}, ${new URL(req.url).pathname}, 'share_raw', ${ua}, ${ref}, ${ipHash})[m
+[32m+[m[32m        (${resolved.docId}::uuid, ${t}, ${new URL(req.url).pathname}, 'share_raw', ${ua}, ${ref}, ${ipHash})[m
+     `;[m
+   } catch {[m
+     // ignore[m
+   }[m
+ [m
+[31m-  // 5) Stream from R2 with Range support[m
+[32m+[m[32m  // Stream from R2 with Range support[m
+   const range = req.headers.get("range") ?? undefined;[m
+ [m
+[31m-  const obj = await s3.send([m
+[32m+[m[32m  const obj = await r2Client.send([m
+     new GetObjectCommand({[m
+[31m-      Bucket: bucket,[m
+[31m-      Key: key,[m
+[32m+[m[32m      Bucket: resolved.bucket,[m
+[32m+[m[32m      Key: resolved.r2Key,[m
+       Range: range,[m
+     })[m
+   );[m
+[36m@@ -193,8 +101,12 @@[m [mexport async function GET(req: NextRequest, context: { params: Promise<{ token:[m
+   const url = new URL(req.url);[m
+   const download = url.searchParams.get("download") === "1";[m
+ [m
+[32m+[m[32m  const displayName =[m
+[32m+[m[32m    resolved.originalFilename || resolved.title || "document.pdf";[m
+[32m+[m[32m  const filename = safeFilename(displayName);[m
+[32m+[m
+   const headers = new Headers();[m
+[31m-  headers.set("Content-Type", obj.ContentType || docRows[0].content_type || "application/pdf");[m
+[32m+[m[32m  headers.set("Content-Type", obj.ContentType || resolved.contentType || "application/pdf");[m
+   headers.set("Accept-Ranges", "bytes");[m
+   headers.set("Cache-Control", "private, no-store");[m
+ [m
+[1mdiff --git a/src/app/serve/[docId]/route.ts b/src/app/serve/[docId]/route.ts[m
+[1mindex 6839dca..63a707e 100644[m
+[1m--- a/src/app/serve/[docId]/route.ts[m
+[1m+++ b/src/app/serve/[docId]/route.ts[m
+[36m@@ -1,3 +1,4 @@[m
+[32m+[m[32m// src/app/serve/[docId]/route.ts[m
+ export const runtime = "nodejs";[m
+ export const dynamic = "force-dynamic";[m
+ [m
+[36m@@ -7,13 +8,7 @@[m [mimport { r2Client } from "@/lib/r2";[m
+ import { GetObjectCommand } from "@aws-sdk/client-s3";[m
+ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";[m
+ import crypto from "crypto";[m
+[31m-[m
+[31m-type DocRow = {[m
+[31m-  r2_bucket: string | null;[m
+[31m-  r2_key: string | null;[m
+[31m-  content_type: string | null;[m
+[31m-  title: string | null;[m
+[31m-};[m
+[32m+[m[32mimport { resolveDoc } from "@/lib/resolveDoc";[m
+ [m
+ function getClientIp(req: NextRequest) {[m
+   const xff = req.headers.get("x-forwarded-for") || "";[m
+[36m@@ -26,22 +21,15 @@[m [mfunction hashIp(ip: string) {[m
+   return crypto.createHmac("sha256", salt).update(ip).digest("hex").slice(0, 32);[m
+ }[m
+ [m
+[31m-export async function GET([m
+[31m-  req: NextRequest,[m
+[31m-  ctx: { params: Promise<{ docId: string }> }[m
+[31m-) {[m
+[31m-  const { docId } = await ctx.params;[m
+[32m+[m[32mfunction safeName(name: string) {[m
+[32m+[m[32m  return (name || "document").replace(/[\r\n"]/g, " ").trim().slice(0, 120) || "document";[m
+[32m+[m[32m}[m
+ [m
+[31m-  const rows = (await sql`[m
+[31m-    select r2_bucket, r2_key, content_type, title[m
+[31m-    from public.docs[m
+[31m-    where id = ${docId}::uuid[m
+[31m-      and coalesce(status, '') <> 'deleted'[m
+[31m-    limit 1[m
+[31m-  `) as DocRow[];[m
+[32m+[m[32mexport async function GET(req: NextRequest, ctx: { params: Promise<{ docId: string }> }) {[m
+[32m+[m[32m  const { docId } = await ctx.params;[m
+[32m+[m[32m  const resolved = await resolveDoc({ docId });[m
+ [m
+[31m-  const row = rows?.[0];[m
+[31m-  if (!row?.r2_bucket || !row?.r2_key) {[m
+[32m+[m[32m  if (!resolved.ok) {[m
+     return new Response("Not found", { status: 404 });[m
+   }[m
+ [m
+[36m@@ -56,22 +44,22 @@[m [mexport async function GET([m
+       insert into public.doc_views[m
+         (doc_id, alias, path, kind, user_agent, referer, ip_hash)[m
+       values[m
+[31m-        (${docId}::uuid, null, ${new URL(req.url).pathname}, 'serve', ${ua}, ${ref}, ${ipHash})[m
+[32m+[m[32m        (${resolved.docId}::uuid, null, ${new URL(req.url).pathname}, 'serve', ${ua}, ${ref}, ${ipHash})[m
+     `;[m
+   } catch {[m
+     // ignore logging errors[m
+   }[m
+ [m
+[31m-  const contentType = row.content_type || "application/pdf";[m
+[31m-  const dispositionName = (row.title || "document").replace(/[\r\n"]/g, " ").slice(0, 120);[m
+[32m+[m[32m  const contentType = resolved.contentType || "application/pdf";[m
+[32m+[m[32m  const dispositionBase = safeName(resolved.title || resolved.originalFilename || "document");[m
+ [m
+   const url = await getSignedUrl([m
+     r2Client,[m
+     new GetObjectCommand({[m
+[31m-      Bucket: row.r2_bucket,[m
+[31m-      Key: row.r2_key,[m
+[32m+[m[32m      Bucket: resolved.bucket,[m
+[32m+[m[32m      Key: resolved.r2Key,[m
+       ResponseContentType: contentType,[m
+[31m-      ResponseContentDisposition: `inline; filename="${dispositionName}.pdf"`,[m
+[32m+[m[32m      ResponseContentDisposition: `inline; filename="${dispositionBase}.pdf"`,[m
+     }),[m
+     { expiresIn: 60 * 5 }[m
+   );[m
+[1mdiff --git a/src/lib/resolveDoc.ts b/src/lib/resolveDoc.ts[m
+[1mnew file mode 100644[m
+[1mindex 0000000..065e492[m
+[1m--- /dev/null[m
+[1m+++ b/src/lib/resolveDoc.ts[m
+[36m@@ -0,0 +1,475 @@[m
+[32m+[m[32m// src/lib/resolveDoc.ts[m
+[32m+[m[32mimport { sql } from "@/lib/db";[m
+[32m+[m[32mimport { R2_BUCKET } from "@/lib/r2";[m
+[32m+[m
+[32m+[m[32mexport type ResolveInput =[m
+[32m+[m[32m    | { alias: string }[m
+[32m+[m[32m    | { token: string }[m
+[32m+[m[32m    | { docId: string };[m
+[32m+[m
+[32m+[m[32mexport type ResolvedDocOk = {[m
+[32m+[m[32m    ok: true;[m
+[32m+[m[32m    source: "alias" | "token" | "direct";[m
+[32m+[m[32m    docId: string;[m
+[32m+[m
+[32m+[m[32m    // R2 pointer (normalized)[m
+[32m+[m[32m    bucket: string;[m
+[32m+[m[32m    r2Key: string;[m
+[32m+[m
+[32m+[m[32m    // Metadata (nice to have for headers / filenames)[m
+[32m+[m[32m    title: string | null;[m
+[32m+[m[32m    originalFilename: string | null;[m
+[32m+[m[32m    contentType: string | null;[m
+[32m+[m[32m    sizeBytes: number | null;[m
+[32m+[m
+[32m+[m[32m    // Auth/gating flags[m
+[32m+[m[32m    requiresPassword: boolean;[m
+[32m+[m
+[32m+[m[32m    // Token-specific (when source=token)[m
+[32m+[m[32m    token?: string;[m
+[32m+[m[32m};[m
+[32m+[m
+[32m+[m[32mexport type ResolvedDocErr = {[m
+[32m+[m[32m    ok: false;[m
+[32m+[m[32m    error: "NOT_FOUND" | "EXPIRED" | "REVOKED" | "PASSWORD_REQUIRED" | "MAXED";[m
+[32m+[m[32m};[m
+[32m+[m
+[32m+[m[32mexport type ResolvedDoc = ResolvedDocOk | ResolvedDocErr;[m
+[32m+[m
+[32m+[m[32mexport type ShareMeta =[m
+[32m+[m[32m    | {[m
+[32m+[m[32m        ok: true;[m
+[32m+[m[32m        table: "doc_shares" | "share_tokens";[m
+[32m+[m[32m        token: string;[m
+[32m+[m[32m        toEmail: string | null;[m
+[32m+[m[32m        createdAt: string;[m
+[32m+[m[32m        expiresAt: string | null;[m
+[32m+[m[32m        maxViews: number | null;[m
+[32m+[m[32m        viewCount: number;[m
+[32m+[m[32m        revokedAt: string | null;[m
+[32m+[m[32m        hasPassword: boolean;[m
+[32m+[m[32m        passwordHash: string | null;[m
+[32m+[m[32m        docId: string;[m
+[32m+[m[32m    }[m
+[32m+[m[32m    | { ok: false };[m
+[32m+[m
+[32m+[m[32mfunction isExpired(expiresAt: string | Date | null): boolean {[m
+[32m+[m[32m    if (!expiresAt) return false;[m
+[32m+[m[32m    const t = typeof expiresAt === "string" ? new Date(expiresAt).getTime() : expiresAt.getTime();[m
+[32m+[m[32m    return Number.isFinite(t) && t <= Date.now();[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32mfunction isMaxed(viewCount: number, maxViews: number | null): boolean {[m
+[32m+[m[32m    if (maxViews === null) return false;[m
+[32m+[m[32m    if (maxViews === 0) return false; // 0 = unlimited[m
+[32m+[m[32m    return viewCount >= maxViews;[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32masync function getDocPointer(docId: string): Promise<[m
+[32m+[m[32m    | {[m
+[32m+[m[32m        ok: true;[m
+[32m+[m[32m        docId: string;[m
+[32m+[m[32m        bucket: string;[m
+[32m+[m[32m        r2Key: string;[m
+[32m+[m[32m        title: string | null;[m
+[32m+[m[32m        originalFilename: string | null;[m
+[32m+[m[32m        contentType: string | null;[m
+[32m+[m[32m        sizeBytes: number | null;[m
+[32m+[m[32m    }[m
+[32m+[m[32m    | { ok: false }[m
+[32m+[m[32m> {[m
+[32m+[m[32m    // Prefer r2_bucket/r2_key; tolerate older bucket/key shapes.[m
+[32m+[m[32m    const rows = (await sql`[m
+[32m+[m[32m    select[m
+[32m+[m[32m      d.id::text as id,[m
+[32m+[m[32m      coalesce(d.r2_bucket::text, d.bucket::text, ${R2_BUCKET}) as bucket,[m
+[32m+[m[32m      coalesce(d.r2_key::text, d.r2_key::text) as r2_key,[m
+[32m+[m[32m      d.title::text as title,[m
+[32m+[m[32m      d.original_filename::text as original_filename,[m
+[32m+[m[32m      d.content_type::text as content_type,[m
+[32m+[m[32m      d.size_bytes::bigint as size_bytes,[m
+[32m+[m[32m      coalesce(d.status::text, '') as status[m
+[32m+[m[32m    from public.docs d[m
+[32m+[m[32m    where d.id = ${docId}::uuid[m
+[32m+[m[32m    limit 1[m
+[32m+[m[32m  `) as unknown as Array<{[m
+[32m+[m[32m        id: string;[m
+[32m+[m[32m        bucket: string | null;[m
+[32m+[m[32m        r2_key: string | null;[m
+[32m+[m[32m        title: string | null;[m
+[32m+[m[32m        original_filename: string | null;[m
+[32m+[m[32m        content_type: string | null;[m
+[32m+[m[32m        size_bytes: string | number | null;[m
+[32m+[m[32m        status: string;[m
+[32m+[m[32m    }>;[m
+[32m+[m
+[32m+[m[32m    const r = rows?.[0];[m
+[32m+[m[32m    if (!r?.id) return { ok: false };[m
+[32m+[m
+[32m+[m[32m    // honor "deleted" status if present (serve route already did this)[m
+[32m+[m[32m    if ((r.status || "").toLowerCase() === "deleted") return { ok: false };[m
+[32m+[m
+[32m+[m[32m    if (!r.bucket || !r.r2_key) return { ok: false };[m
+[32m+[m
+[32m+[m[32m    return {[m
+[32m+[m[32m        ok: true,[m
+[32m+[m[32m        docId: r.id,[m
+[32m+[m[32m        bucket: r.bucket || R2_BUCKET,[m
+[32m+[m[32m        r2Key: r.r2_key,[m
+[32m+[m[32m        title: r.title ?? null,[m
+[32m+[m[32m        originalFilename: r.original_filename ?? null,[m
+[32m+[m[32m        contentType: r.content_type ?? null,[m
+[32m+[m[32m        sizeBytes: r.size_bytes == null ? null : Number(r.size_bytes),[m
+[32m+[m[32m    };[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32masync function resolveAliasToDocId(alias: string): Promise<[m
+[32m+[m[32m    | {[m
+[32m+[m[32m        ok: true;[m
+[32m+[m[32m        docId: string;[m
+[32m+[m[32m        revokedAt: string | null;[m
+[32m+[m[32m        expiresAt: string | null;[m
+[32m+[m[32m        passwordHash: string | null;[m
+[32m+[m[32m    }[m
+[32m+[m[32m    | { ok: false }[m
+[32m+[m[32m> {[m
+[32m+[m[32m    // 1) Preferred table: public.doc_aliases[m
+[32m+[m[32m    // Some environments may not have password_hash on alias rows.[m
+[32m+[m[32m    try {[m
+[32m+[m[32m        const rows = (await sql`[m
+[32m+[m[32m      select[m
+[32m+[m[32m        a.doc_id::text as doc_id,[m
+[32m+[m[32m        a.revoked_at::text as revoked_at,[m
+[32m+[m[32m        a.expires_at::text as expires_at,[m
+[32m+[m[32m        a.password_hash::text as password_hash[m
+[32m+[m[32m      from public.doc_aliases a[m
+[32m+[m[32m      where a.alias = ${alias}[m
+[32m+[m[32m      limit 1[m
+[32m+[m[32m    `) as unknown as Array<{[m
+[32m+[m[32m            doc_id: string;[m
+[32m+[m[32m            revoked_at: string | null;[m
+[32m+[m[32m            expires_at: string | null;[m
+[32m+[m[32m            password_hash: string | null;[m
+[32m+[m[32m        }>;[m
+[32m+[m
+[32m+[m[32m        if (rows?.length) {[m
+[32m+[m[32m            const r = rows[0];[m
+[32m+[m[32m            return {[m
+[32m+[m[32m                ok: true,[m
+[32m+[m[32m                docId: r.doc_id,[m
+[32m+[m[32m                revokedAt: r.revoked_at ?? null,[m
+[32m+[m[32m                expiresAt: r.expires_at ?? null,[m
+[32m+[m[32m                passwordHash: r.password_hash ?? null,[m
+[32m+[m[32m            };[m
+[32m+[m[32m        }[m
+[32m+[m[32m    } catch {[m
+[32m+[m[32m        // fall through[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    // 1b) doc_aliases without password_hash[m
+[32m+[m[32m    try {[m
+[32m+[m[32m        const rows = (await sql`[m
+[32m+[m[32m      select[m
+[32m+[m[32m        a.doc_id::text as doc_id,[m
+[32m+[m[32m        a.revoked_at::text as revoked_at,[m
+[32m+[m[32m        a.expires_at::text as expires_at[m
+[32m+[m[32m      from public.doc_aliases a[m
+[32m+[m[32m      where a.alias = ${alias}[m
+[32m+[m[32m      limit 1[m
+[32m+[m[32m    `) as unknown as Array<{[m
+[32m+[m[32m            doc_id: string;[m
+[32m+[m[32m            revoked_at: string | null;[m
+[32m+[m[32m            expires_at: string | null;[m
+[32m+[m[32m        }>;[m
+[32m+[m
+[32m+[m[32m        if (rows?.length) {[m
+[32m+[m[32m            const r = rows[0];[m
+[32m+[m[32m            return {[m
+[32m+[m[32m                ok: true,[m
+[32m+[m[32m                docId: r.doc_id,[m
+[32m+[m[32m                revokedAt: r.revoked_at ?? null,[m
+[32m+[m[32m                expiresAt: r.expires_at ?? null,[m
+[32m+[m[32m                passwordHash: null,[m
+[32m+[m[32m            };[m
+[32m+[m[32m        }[m
+[32m+[m[32m    } catch {[m
+[32m+[m[32m        // fall through[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    // 2) Legacy table: document_aliases (used by older email auth flow)[m
+[32m+[m[32m    try {[m
+[32m+[m[32m        const rows = (await sql`[m
+[32m+[m[32m      select[m
+[32m+[m[32m        a.doc_id::text as doc_id,[m
+[32m+[m[32m        null::text as revoked_at,[m
+[32m+[m[32m        a.expires_at::text as expires_at,[m
+[32m+[m[32m        a.password_hash::text as password_hash[m
+[32m+[m[32m      from public.document_aliases a[m
+[32m+[m[32m      where a.alias = ${alias}[m
+[32m+[m[32m      limit 1[m
+[32m+[m[32m    `) as unknown as Array<{[m
+[32m+[m[32m            doc_id: string;[m
+[32m+[m[32m            revoked_at: string | null;[m
+[32m+[m[32m            expires_at: string | null;[m
+[32m+[m[32m            password_hash: string | null;[m
+[32m+[m[32m        }>;[m
+[32m+[m
+[32m+[m[32m        if (rows?.length) {[m
+[32m+[m[32m            const r = rows[0];[m
+[32m+[m[32m            return {[m
+[32m+[m[32m                ok: true,[m
+[32m+[m[32m                docId: r.doc_id,[m
+[32m+[m[32m                revokedAt: r.revoked_at ?? null,[m
+[32m+[m[32m                expiresAt: r.expires_at ?? null,[m
+[32m+[m[32m                passwordHash: r.password_hash ?? null,[m
+[32m+[m[32m            };[m
+[32m+[m[32m        }[m
+[32m+[m[32m    } catch {[m
+[32m+[m[32m        // ignore[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    return { ok: false };[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32m/**[m
+[32m+[m[32m * Read-only share meta (NO increment). Used by /s/[token] page and password verify.[m
+[32m+[m[32m */[m
+[32m+[m[32mexport async function resolveShareMeta(token: string): Promise<ShareMeta> {[m
+[32m+[m[32m    // Prefer doc_shares[m
+[32m+[m[32m    try {[m
+[32m+[m[32m        const rows = (await sql`[m
+[32m+[m[32m      select[m
+[32m+[m[32m        token::text as token,[m
+[32m+[m[32m        doc_id::text as doc_id,[m
+[32m+[m[32m        to_email,[m
+[32m+[m[32m        created_at::text as created_at,[m
+[32m+[m[32m        expires_at::text as expires_at,[m
+[32m+[m[32m        max_views,[m
+[32m+[m[32m        view_count,[m
+[32m+[m[32m        revoked_at::text as revoked_at,[m
+[32m+[m[32m        password_hash[m
+[32m+[m[32m      from public.doc_shares[m
+[32m+[m[32m      where token = ${token}[m
+[32m+[m[32m      limit 1[m
+[32m+[m[32m    `) as unknown as Array<{[m
+[32m+[m[32m            token: string;[m
+[32m+[m[32m            doc_id: string;[m
+[32m+[m[32m            to_email: string | null;[m
+[32m+[m[32m            created_at: string;[m
+[32m+[m[32m            expires_at: string | null;[m
+[32m+[m[32m            max_views: number | null;[m
+[32m+[m[32m            view_count: number | null;[m
+[32m+[m[32m            revoked_at: string | null;[m
+[32m+[m[32m            password_hash: string | null;[m
+[32m+[m[32m        }>;[m
+[32m+[m
+[32m+[m[32m        if (rows?.length) {[m
+[32m+[m[32m            const r = rows[0];[m
+[32m+[m[32m            return {[m
+[32m+[m[32m                ok: true,[m
+[32m+[m[32m                table: "doc_shares",[m
+[32m+[m[32m                token: r.token,[m
+[32m+[m[32m                docId: r.doc_id,[m
+[32m+[m[32m                toEmail: r.to_email ?? null,[m
+[32m+[m[32m                createdAt: r.created_at,[m
+[32m+[m[32m                expiresAt: r.expires_at ?? null,[m
+[32m+[m[32m                maxViews: r.max_views,[m
+[32m+[m[32m                viewCount: Number(r.view_count ?? 0),[m
+[32m+[m[32m                revokedAt: r.revoked_at ?? null,[m
+[32m+[m[32m                hasPassword: Boolean(r.password_hash),[m
+[32m+[m[32m                passwordHash: r.password_hash ?? null,[m
+[32m+[m[32m            };[m
+[32m+[m[32m        }[m
+[32m+[m[32m    } catch {[m
+[32m+[m[32m        // ignore[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    // Fallback share_tokens[m
+[32m+[m[32m    try {[m
+[32m+[m[32m        const rows = (await sql`[m
+[32m+[m[32m      select[m
+[32m+[m[32m        token::text as token,[m
+[32m+[m[32m        doc_id::text as doc_id,[m
+[32m+[m[32m        to_email,[m
+[32m+[m[32m        created_at::text as created_at,[m
+[32m+[m[32m        expires_at::text as expires_at,[m
+[32m+[m[32m        max_views,[m
+[32m+[m[32m        views_count,[m
+[32m+[m[32m        revoked_at::text as revoked_at,[m
+[32m+[m[32m        password_hash[m
+[32m+[m[32m      from public.share_tokens[m
+[32m+[m[32m      where token::text = ${token}[m
+[32m+[m[32m         or token = ${token}[m
+[32m+[m[32m      limit 1[m
+[32m+[m[32m    `) as unknown as Array<{[m
+[32m+[m[32m            token: string;[m
+[32m+[m[32m            doc_id: string;[m
+[32m+[m[32m            to_email: string | null;[m
+[32m+[m[32m            created_at: string;[m
+[32m+[m[32m            expires_at: string | null;[m
+[32m+[m[32m            max_views: number | null;[m
+[32m+[m[32m            views_count: number | null;[m
+[32m+[m[32m            revoked_at: string | null;[m
+[32m+[m[32m            password_hash: string | null;[m
+[32m+[m[32m        }>;[m
+[32m+[m
+[32m+[m[32m        if (rows?.length) {[m
+[32m+[m[32m            const r = rows[0];[m
+[32m+[m[32m            return {[m
+[32m+[m[32m                ok: true,[m
+[32m+[m[32m                table: "share_tokens",[m
+[32m+[m[32m                token: r.token,[m
+[32m+[m[32m                docId: r.doc_id,[m
+[32m+[m[32m                toEmail: r.to_email ?? null,[m
+[32m+[m[32m                createdAt: r.created_at,[m
+[32m+[m[32m                expiresAt: r.expires_at ?? null,[m
+[32m+[m[32m                maxViews: r.max_views,[m
+[32m+[m[32m                viewCount: Number(r.views_count ?? 0),[m
+[32m+[m[32m                revokedAt: r.revoked_at ?? null,[m
+[32m+[m[32m                hasPassword: Boolean(r.password_hash),[m
+[32m+[m[32m                passwordHash: r.password_hash ?? null,[m
+[32m+[m[32m            };[m
+[32m+[m[32m        }[m
+[32m+[m[32m    } catch {[m
+[32m+[m[32m        // ignore[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    return { ok: false };[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32m/**[m
+[32m+[m[32m * Token resolution for /raw: increments views atomically while enforcing revoked/expired/max_views.[m
+[32m+[m[32m * Keeps your current behavior: increments even if password-gated.[m
+[32m+[m[32m */[m
+[32m+[m[32masync function resolveTokenAndIncrement(token: string): Promise<[m
+[32m+[m[32m    | {[m
+[32m+[m[32m        ok: true;[m
+[32m+[m[32m        docId: string;[m
+[32m+[m[32m        passwordHash: string | null;[m
+[32m+[m[32m        table: "doc_shares" | "share_tokens";[m
+[32m+[m[32m    }[m
+[32m+[m[32m    | { ok: false; error: "NOT_FOUND" | "REVOKED" | "EXPIRED" | "MAXED" }[m
+[32m+[m[32m> {[m
+[32m+[m[32m    // doc_shares[m
+[32m+[m[32m    try {[m
+[32m+[m[32m        const rows = (await sql`[m
+[32m+[m[32m      update public.doc_shares s[m
+[32m+[m[32m      set view_count = s.view_count + 1[m
+[32m+[m[32m      where s.token = ${token}[m
+[32m+[m[32m        and s.revoked_at is null[m
+[32m+[m[32m        and (s.expires_at is null or s.expires_at > now())[m
+[32m+[m[32m        and (s.max_views is null or s.max_views = 0 or s.view_count < s.max_views)[m
+[32m+[m[32m      returning s.doc_id::text as doc_id, s.password_hash[m
+[32m+[m[32m    `) as unknown as Array<{ doc_id: string; password_hash: string | null }>;[m
+[32m+[m
+[32m+[m[32m        if (rows?.length) {[m
+[32m+[m[32m            return { ok: true, docId: rows[0].doc_id, passwordHash: rows[0].password_hash ?? null, table: "doc_shares" };[m
+[32m+[m[32m        }[m
+[32m+[m[32m    } catch {[m
+[32m+[m[32m        // ignore table missing[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    // share_tokens[m
+[32m+[m[32m    try {[m
+[32m+[m[32m        const rows = (await sql`[m
+[32m+[m[32m      update public.share_tokens st[m
+[32m+[m[32m      set views_count = st.views_count + 1[m
+[32m+[m[32m      where (st.token::text = ${token} or st.token = ${token})[m
+[32m+[m[32m        and st.revoked_at is null[m
+[32m+[m[32m        and (st.expires_at is null or st.expires_at > now())[m
+[32m+[m[32m        and (st.max_views is null or st.max_views = 0 or st.views_count < st.max_views)[m
+[32m+[m[32m      returning st.doc_id::text as doc_id, st.password_hash[m
+[32m+[m[32m    `) as unknown as Array<{ doc_id: string; password_hash: string | null }>;[m
+[32m+[m
+[32m+[m[32m        if (rows?.length) {[m
+[32m+[m[32m            return { ok: true, docId: rows[0].doc_id, passwordHash: rows[0].password_hash ?? null, table: "share_tokens" };[m
+[32m+[m[32m        }[m
+[32m+[m[32m    } catch {[m
+[32m+[m[32m        // ignore[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    // Distinguish *why* it failed (best-effort read-only check)[m
+[32m+[m[32m    const meta = await resolveShareMeta(token);[m
+[32m+[m[32m    if (!meta.ok) return { ok: false, error: "NOT_FOUND" };[m
+[32m+[m[32m    if (meta.revokedAt) return { ok: false, error: "REVOKED" };[m
+[32m+[m[32m    if (isExpired(meta.expiresAt)) return { ok: false, error: "EXPIRED" };[m
+[32m+[m[32m    if (isMaxed(meta.viewCount, meta.maxViews)) return { ok: false, error: "MAXED" };[m
+[32m+[m[32m    return { ok: false, error: "NOT_FOUND" };[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32mexport async function resolveDoc(input: ResolveInput): Promise<ResolvedDoc> {[m
+[32m+[m[32m    // DIRECT[m
+[32m+[m[32m    if ("docId" in input) {[m
+[32m+[m[32m        const doc = await getDocPointer(String(input.docId || "").trim());[m
+[32m+[m[32m        if (!doc.ok) return { ok: false, error: "NOT_FOUND" };[m
+[32m+[m
+[32m+[m[32m        return {[m
+[32m+[m[32m            ok: true,[m
+[32m+[m[32m            source: "direct",[m
+[32m+[m[32m            docId: doc.docId,[m
+[32m+[m[32m            bucket: doc.bucket,[m
+[32m+[m[32m            r2Key: doc.r2Key,[m
+[32m+[m[32m            title: doc.title,[m
+[32m+[m[32m            originalFilename: doc.originalFilename,[m
+[32m+[m[32m            contentType: doc.contentType,[m
+[32m+[m[32m            sizeBytes: doc.sizeBytes,[m
+[32m+[m[32m            requiresPassword: false,[m
+[32m+[m[32m        };[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    // ALIAS[m
+[32m+[m[32m    if ("alias" in input) {[m
+[32m+[m[32m        const alias = String(input.alias || "").trim();[m
+[32m+[m[32m        if (!alias) return { ok: false, error: "NOT_FOUND" };[m
+[32m+[m
+[32m+[m[32m        const a = await resolveAliasToDocId(alias);[m
+[32m+[m[32m        if (!a.ok) return { ok: false, error: "NOT_FOUND" };[m
+[32m+[m[32m        if (a.revokedAt) return { ok: false, error: "REVOKED" };[m
+[32m+[m[32m        if (isExpired(a.expiresAt)) return { ok: false, error: "EXPIRED" };[m
+[32m+[m[32m        if (a.passwordHash) return { ok: false, error: "PASSWORD_REQUIRED" };[m
+[32m+[m
+[32m+[m[32m        const doc = await getDocPointer(a.docId);[m
+[32m+[m[32m        if (!doc.ok) return { ok: false, error: "NOT_FOUND" };[m
+[32m+[m
+[32m+[m[32m        return {[m
+[32m+[m[32m            ok: true,[m
+[32m+[m[32m            source: "alias",[m
+[32m+[m[32m            docId: doc.docId,[m
+[32m+[m[32m            bucket: doc.bucket,[m
+[32m+[m[32m            r2Key: doc.r2Key,[m
+[32m+[m[32m            title: doc.title,[m
+[32m+[m[32m            originalFilename: doc.originalFilename,[m
+[32m+[m[32m            contentType: doc.contentType,[m
+[32m+[m[32m            sizeBytes: doc.sizeBytes,[m
+[32m+[m[32m            requiresPassword: false,[m
+[32m+[m[32m        };[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    // TOKEN (raw behavior = increment + enforce max/revoked/expired)[m
+[32m+[m[32m    if ("token" in input) {[m
+[32m+[m[32m        const token = String(input.token || "").trim();[m
+[32m+[m[32m        if (!token) return { ok: false, error: "NOT_FOUND" };[m
+[32m+[m
+[32m+[m[32m        const t = await resolveTokenAndIncrement(token);[m
+[32m+[m[32m        if (!t.ok) return { ok: false, error: t.error };[m
+[32m+[m
+[32m+[m[32m        const doc = await getDocPointer(t.docId);[m
+[32m+[m[32m        if (!doc.ok) return { ok: false, error: "NOT_FOUND" };[m
+[32m+[m
+[32m+[m[32m        return {[m
+[32m+[m[32m            ok: true,[m
+[32m+[m[32m            source: "token",[m
+[32m+[m[32m            token,[m
+[32m+[m[32m            docId: doc.docId,[m
+[32m+[m[32m            bucket: doc.bucket,[m
+[32m+[m[32m            r2Key: doc.r2Key,[m
+[32m+[m[32m            title: doc.title,[m
+[32m+[m[32m            originalFilename: doc.originalFilename,[m
+[32m+[m[32m            contentType: doc.contentType,[m
+[32m+[m[32m            sizeBytes: doc.sizeBytes,[m
+[32m+[m[32m            requiresPassword: Boolean(t.passwordHash),[m
+[32m+[m[32m        };[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    return { ok: false, error: "NOT_FOUND" };[m
+[32m+[m[32m}[m
