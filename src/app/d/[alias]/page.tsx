@@ -2,11 +2,14 @@
 import { notFound } from "next/navigation";
 import { unstable_noStore as noStore } from "next/cache";
 import ShareForm from "./ShareForm";
+import AliasPasswordGate from "./AliasPasswordGate";
 import { resolveDoc } from "@/lib/resolveDoc";
 
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import { sql } from "@/lib/db";
+import { cookies } from "next/headers";
+import { aliasTrustCookieName, isAliasTrusted } from "@/lib/deviceTrust";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -96,6 +99,85 @@ async function resolveAliasDocIdBypass(alias: string): Promise<
   return { ok: false };
 }
 
+/**
+ * Fetch alias row including password_hash (for public password gate).
+ */
+async function resolveAliasRow(alias: string): Promise<
+  | {
+    ok: true;
+    docId: string;
+    revokedAt: string | null;
+    expiresAt: string | null;
+    passwordHash: string | null;
+  }
+  | { ok: false }
+> {
+  // New table: doc_aliases
+  try {
+    const rows = (await sql`
+      select
+        a.doc_id::text as doc_id,
+        a.revoked_at::text as revoked_at,
+        a.expires_at::text as expires_at,
+        a.password_hash::text as password_hash
+      from public.doc_aliases a
+      where lower(a.alias) = ${alias}
+        and coalesce(a.is_active, true) = true
+      limit 1
+    `) as unknown as Array<{
+      doc_id: string;
+      revoked_at: string | null;
+      expires_at: string | null;
+      password_hash: string | null;
+    }>;
+
+    if (rows?.length) {
+      return {
+        ok: true,
+        docId: rows[0].doc_id,
+        revokedAt: rows[0].revoked_at ?? null,
+        expiresAt: rows[0].expires_at ?? null,
+        passwordHash: rows[0].password_hash ?? null,
+      };
+    }
+  } catch {
+    // ignore; fall through to legacy
+  }
+
+  // Legacy table: document_aliases
+  try {
+    const rows = (await sql`
+      select
+        a.doc_id::text as doc_id,
+        null::text as revoked_at,
+        a.expires_at::text as expires_at,
+        a.password_hash::text as password_hash
+      from public.document_aliases a
+      where lower(a.alias) = ${alias}
+      limit 1
+    `) as unknown as Array<{
+      doc_id: string;
+      revoked_at: string | null;
+      expires_at: string | null;
+      password_hash: string | null;
+    }>;
+
+    if (rows?.length) {
+      return {
+        ok: true,
+        docId: rows[0].doc_id,
+        revokedAt: rows[0].revoked_at ?? null,
+        expiresAt: rows[0].expires_at ?? null,
+        passwordHash: rows[0].password_hash ?? null,
+      };
+    }
+  } catch {
+    // ignore
+  }
+
+  return { ok: false };
+}
+
 export default async function SharePage({
   params,
 }: {
@@ -109,41 +191,52 @@ export default async function SharePage({
 
   const owner = await isOwner();
 
-  const resolved = await resolveDoc({ alias });
+  // Owner bypass stays: owner can always view regardless of alias password.
+  if (owner) {
+    const bypass = await resolveAliasDocIdBypass(alias);
+    if (!bypass.ok) notFound();
+    if (bypass.revokedAt) notFound();
+    if (isExpired(bypass.expiresAt)) notFound();
 
-  if (!resolved.ok) {
-    // ✅ Owner bypass: allow viewing even if password-protected
-    if (resolved.error === "PASSWORD_REQUIRED" && owner) {
-      const bypass = await resolveAliasDocIdBypass(alias);
-      if (!bypass.ok) notFound();
-      if (bypass.revokedAt) notFound();
-      if (isExpired(bypass.expiresAt)) notFound();
-
-      return (
-        <div style={{ padding: 24, maxWidth: 1100, margin: "0 auto" }}>
-          <ShareForm docId={bypass.docId} />
-          <DocumentViewer docId={bypass.docId} />
-        </div>
-      );
-    }
-
-    // Non-owner behavior unchanged
-    if (resolved.error === "PASSWORD_REQUIRED") {
-      return (
-        <div style={{ padding: 24, color: "white" }}>
-          This link is password-protected.
-        </div>
-      );
-    }
-
-    notFound();
+    return (
+      <main className="mx-auto max-w-5xl px-4 py-10">
+        <ShareForm docId={bypass.docId} />
+        <DocumentViewer docId={bypass.docId} />
+      </main>
+    );
   }
 
+  // Public viewer: handle alias password + device trust cookie (8h)
+  const row = await resolveAliasRow(alias);
+  if (!row.ok) notFound();
+  if (row.revokedAt) notFound();
+  if (isExpired(row.expiresAt)) notFound();
+
+  if (row.passwordHash) {
+    const c = await cookies();
+    const v = c.get(aliasTrustCookieName(alias))?.value;
+    const unlocked = isAliasTrusted(alias, v);
+
+    if (!unlocked) {
+      return (
+        <main className="mx-auto max-w-lg px-4 py-12">
+          <h1 className="text-xl font-semibold">Protected link</h1>
+          <p className="mt-2 text-sm text-neutral-400">
+            Enter the password to view this document. We’ll remember this device for 8 hours.
+          </p>
+          <AliasPasswordGate alias={alias} />
+        </main>
+      );
+    }
+  }
+
+  const resolved = await resolveDoc({ docId: row.docId });
+  if (!resolved.ok) notFound();
+
   return (
-    <div style={{ padding: 24, maxWidth: 1100, margin: "0 auto" }}>
-      <ShareForm docId={resolved.docId} />
+    <main className="mx-auto max-w-5xl px-4 py-10">
       <DocumentViewer docId={resolved.docId} />
-    </div>
+    </main>
   );
 }
 
@@ -151,36 +244,23 @@ function DocumentViewer({ docId }: { docId: string }) {
   const viewerUrl = `/serve/${docId}`;
 
   return (
-    <div style={{ marginTop: 16 }}>
-      <div
-        style={{
-          border: "1px solid rgba(255,255,255,0.08)",
-          borderRadius: 12,
-          overflow: "hidden",
-          background: "rgba(255,255,255,0.02)",
-        }}
-      >
+    <div className="mt-4">
+      <div className="overflow-hidden rounded-xl border border-white/10 bg-white/5">
         <iframe
           title="Document viewer"
           src={viewerUrl}
-          style={{
-            width: "100%",
-            height: "78vh",
-            border: 0,
-            display: "block",
-            background: "transparent",
-          }}
+          className="block h-[78vh] w-full border-0 bg-transparent"
           allow="fullscreen"
         />
       </div>
 
-      <div style={{ marginTop: 10, fontSize: 13, opacity: 0.8, color: "white" }}>
+      <div className="mt-3 text-xs text-neutral-400">
         If the viewer doesn’t load,{" "}
         <a
           href={viewerUrl}
           target="_blank"
           rel="noreferrer"
-          style={{ color: "white", textDecoration: "underline" }}
+          className="text-neutral-200 underline"
         >
           open the document in a new tab
         </a>

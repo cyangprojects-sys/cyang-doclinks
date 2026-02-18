@@ -1,0 +1,140 @@
+// src/app/d/[alias]/unlockActions.ts
+"use server";
+
+import bcrypt from "bcryptjs";
+import { cookies } from "next/headers";
+import { sql } from "@/lib/db";
+import {
+    DEVICE_TRUST_HOURS,
+    aliasTrustCookieName,
+    isAliasTrusted,
+    makeAliasTrustCookieValue,
+} from "@/lib/deviceTrust";
+
+export type VerifyAliasPasswordResult =
+    | { ok: true }
+    | { ok: false; error: "not_found" | "expired" | "revoked" | "bad_password"; message: string };
+
+function normAlias(alias: string): string {
+    return decodeURIComponent(String(alias || "")).trim().toLowerCase();
+}
+
+function isExpired(expiresAt: string | null): boolean {
+    if (!expiresAt) return false;
+    const t = new Date(expiresAt).getTime();
+    return Number.isFinite(t) && t <= Date.now();
+}
+
+async function getAliasRow(aliasInput: string): Promise<
+    | { ok: true; docId: string; revokedAt: string | null; expiresAt: string | null; passwordHash: string | null }
+    | { ok: false }
+> {
+    const alias = normAlias(aliasInput);
+    if (!alias) return { ok: false };
+
+    // Preferred: doc_aliases (new)
+    try {
+        const rows = (await sql`
+      select
+        a.doc_id::text as doc_id,
+        a.revoked_at::text as revoked_at,
+        a.expires_at::text as expires_at,
+        a.password_hash::text as password_hash
+      from public.doc_aliases a
+      where lower(a.alias) = ${alias}
+        and coalesce(a.is_active, true) = true
+      limit 1
+    `) as unknown as Array<{
+            doc_id: string;
+            revoked_at: string | null;
+            expires_at: string | null;
+            password_hash: string | null;
+        }>;
+
+        if (rows?.length) {
+            const r = rows[0];
+            return {
+                ok: true,
+                docId: r.doc_id,
+                revokedAt: r.revoked_at ?? null,
+                expiresAt: r.expires_at ?? null,
+                passwordHash: r.password_hash ?? null,
+            };
+        }
+    } catch {
+        // fall through to legacy
+    }
+
+    // Legacy: document_aliases
+    try {
+        const rows = (await sql`
+      select
+        a.doc_id::text as doc_id,
+        null::text as revoked_at,
+        a.expires_at::text as expires_at,
+        a.password_hash::text as password_hash
+      from public.document_aliases a
+      where lower(a.alias) = ${alias}
+      limit 1
+    `) as unknown as Array<{
+            doc_id: string;
+            revoked_at: string | null;
+            expires_at: string | null;
+            password_hash: string | null;
+        }>;
+
+        if (rows?.length) {
+            const r = rows[0];
+            return {
+                ok: true,
+                docId: r.doc_id,
+                revokedAt: r.revoked_at ?? null,
+                expiresAt: r.expires_at ?? null,
+                passwordHash: r.password_hash ?? null,
+            };
+        }
+    } catch {
+        // ignore
+    }
+
+    return { ok: false };
+}
+
+export async function isAliasUnlockedAction(aliasInput: string): Promise<boolean> {
+    const alias = normAlias(aliasInput);
+    if (!alias) return false;
+    const c = await cookies();
+    const v = c.get(aliasTrustCookieName(alias))?.value;
+    return isAliasTrusted(alias, v);
+}
+
+export async function verifyAliasPasswordResultAction(formData: FormData): Promise<VerifyAliasPasswordResult> {
+    const alias = normAlias(String(formData.get("alias") || ""));
+    const password = String(formData.get("password") || "");
+    if (!alias) return { ok: false, error: "not_found", message: "Missing alias." };
+
+    const row = await getAliasRow(alias);
+    if (!row.ok) return { ok: false, error: "not_found", message: "Link not found." };
+    if (row.revokedAt) return { ok: false, error: "revoked", message: "This link has been revoked." };
+    if (isExpired(row.expiresAt)) return { ok: false, error: "expired", message: "This link has expired." };
+
+    // If no password is set, treat as unlocked.
+    if (!row.passwordHash) {
+        return { ok: true };
+    }
+
+    const match = await bcrypt.compare(password, row.passwordHash);
+    if (!match) return { ok: false, error: "bad_password", message: "Incorrect password." };
+
+    const expMs = Date.now() + DEVICE_TRUST_HOURS * 3600 * 1000;
+    const c = await cookies();
+    c.set(aliasTrustCookieName(alias), makeAliasTrustCookieValue(alias, expMs), {
+        httpOnly: true,
+        secure: true,
+        sameSite: "lax",
+        path: `/d/${encodeURIComponent(alias)}`,
+        maxAge: DEVICE_TRUST_HOURS * 3600,
+    });
+
+    return { ok: true };
+}
