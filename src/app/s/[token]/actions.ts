@@ -77,14 +77,22 @@ export type VerifySharePasswordResult =
     | { ok: true }
     | {
         ok: false;
-        error: "not_found" | "revoked" | "expired" | "maxed" | "rate_limited" | "bad_password";
+        error:
+        | "not_found"
+        | "revoked"
+        | "expired"
+        | "maxed"
+        | "rate_limited"
+        | "bad_password";
         message: string;
     };
 
 /**
  * Core verifier that returns a structured result.
  */
-export async function verifySharePasswordCore(formData: FormData): Promise<VerifySharePasswordResult> {
+export async function verifySharePasswordCore(
+    formData: FormData
+): Promise<VerifySharePasswordResult> {
     const token = String(formData.get("token") || "").trim();
     const password = String(formData.get("password") || "");
 
@@ -180,6 +188,8 @@ export async function verifySharePasswordAction(formData: FormData): Promise<voi
  * Use THIS from client components (like passwordGate.tsx).
  * Returns a result object; does NOT redirect.
  */
-export async function verifySharePasswordResultAction(formData: FormData): Promise<VerifySharePasswordResult> {
+export async function verifySharePasswordResultAction(
+    formData: FormData
+): Promise<VerifySharePasswordResult> {
     return verifySharePasswordCore(formData);
 }

@@ -40,8 +40,19 @@ export type ShareMeta =
     | {
         ok: true;
         table: "doc_shares" | "share_tokens";
+
+        // Stable share row ID (used for device trust + audit)
+        shareId: string;
+
         token: string;
+
+        // Email binding / download control (new hardening layer)
+        allowedEmail: string | null;
+        allowDownload: boolean;
+
+        // Legacy field (existing app logic might use this)
         toEmail: string | null;
+
         createdAt: string;
         expiresAt: string | null;
         maxViews: number | null;
@@ -57,12 +68,15 @@ function norm(s: string): string {
     return decodeURIComponent(String(s || "")).trim().toLowerCase();
 }
 
+function normEmail(s: string | null | undefined): string | null {
+    const v = String(s || "").trim().toLowerCase();
+    return v ? v : null;
+}
+
 function isExpired(expiresAt: string | Date | null): boolean {
     if (!expiresAt) return false;
     const t =
-        typeof expiresAt === "string"
-            ? new Date(expiresAt).getTime()
-            : expiresAt.getTime();
+        typeof expiresAt === "string" ? new Date(expiresAt).getTime() : expiresAt.getTime();
     return Number.isFinite(t) && t <= Date.now();
 }
 
@@ -132,7 +146,9 @@ async function getDocPointer(
     };
 }
 
-async function resolveAliasToDocId(aliasInput: string): Promise<
+async function resolveAliasToDocId(
+    aliasInput: string
+): Promise<
     | {
         ok: true;
         docId: string;
@@ -247,15 +263,77 @@ async function resolveAliasToDocId(aliasInput: string): Promise<
 
 /**
  * Read-only share meta (NO increment). Used by /s/[token] page and password verify.
+ * ✅ Updated to include shareId + allowedEmail + allowDownload.
  */
 export async function resolveShareMeta(tokenInput: string): Promise<ShareMeta> {
     const token = String(tokenInput || "").trim();
     if (!token) return { ok: false };
 
-    // Prefer doc_shares
+    // Prefer doc_shares (try with new columns first; fallback if columns don't exist)
     try {
         const rows = (await sql`
       select
+        id::text as share_id,
+        token::text as token,
+        doc_id::text as doc_id,
+        to_email,
+        created_at::text as created_at,
+        expires_at::text as expires_at,
+        max_views,
+        view_count,
+        revoked_at::text as revoked_at,
+        password_hash,
+        allowed_email,
+        allow_download
+      from public.doc_shares
+      where token = ${token}
+      limit 1
+    `) as unknown as Array<{
+            share_id: string;
+            token: string;
+            doc_id: string;
+            to_email: string | null;
+            created_at: string;
+            expires_at: string | null;
+            max_views: number | null;
+            view_count: number | null;
+            revoked_at: string | null;
+            password_hash: string | null;
+            allowed_email: string | null;
+            allow_download: boolean | null;
+        }>;
+
+        if (rows?.length) {
+            const r = rows[0];
+            return {
+                ok: true,
+                table: "doc_shares",
+                shareId: r.share_id,
+                token: r.token,
+                docId: r.doc_id,
+
+                allowedEmail: normEmail(r.allowed_email ?? null) ?? normEmail(r.to_email ?? null),
+                allowDownload: Boolean(r.allow_download),
+
+                toEmail: r.to_email ?? null,
+                createdAt: r.created_at,
+                expiresAt: r.expires_at ?? null,
+                maxViews: r.max_views,
+                viewCount: Number(r.view_count ?? 0),
+                revokedAt: r.revoked_at ?? null,
+                hasPassword: Boolean(r.password_hash),
+                passwordHash: r.password_hash ?? null,
+            };
+        }
+    } catch {
+        // ignore (table missing or columns missing)
+    }
+
+    // doc_shares fallback without new columns
+    try {
+        const rows = (await sql`
+      select
+        id::text as share_id,
         token::text as token,
         doc_id::text as doc_id,
         to_email,
@@ -269,6 +347,7 @@ export async function resolveShareMeta(tokenInput: string): Promise<ShareMeta> {
       where token = ${token}
       limit 1
     `) as unknown as Array<{
+            share_id: string;
             token: string;
             doc_id: string;
             to_email: string | null;
@@ -285,8 +364,13 @@ export async function resolveShareMeta(tokenInput: string): Promise<ShareMeta> {
             return {
                 ok: true,
                 table: "doc_shares",
+                shareId: r.share_id,
                 token: r.token,
                 docId: r.doc_id,
+
+                allowedEmail: normEmail(r.to_email ?? null),
+                allowDownload: false,
+
                 toEmail: r.to_email ?? null,
                 createdAt: r.created_at,
                 expiresAt: r.expires_at ?? null,
@@ -301,10 +385,72 @@ export async function resolveShareMeta(tokenInput: string): Promise<ShareMeta> {
         // ignore
     }
 
-    // Fallback share_tokens
+    // Fallback share_tokens (try with new columns first; fallback if columns don't exist)
     try {
         const rows = (await sql`
       select
+        id::text as share_id,
+        token::text as token,
+        doc_id::text as doc_id,
+        to_email,
+        created_at::text as created_at,
+        expires_at::text as expires_at,
+        max_views,
+        views_count,
+        revoked_at::text as revoked_at,
+        password_hash,
+        allowed_email,
+        allow_download
+      from public.share_tokens
+      where token::text = ${token}
+         or token = ${token}
+      limit 1
+    `) as unknown as Array<{
+            share_id: string;
+            token: string;
+            doc_id: string;
+            to_email: string | null;
+            created_at: string;
+            expires_at: string | null;
+            max_views: number | null;
+            views_count: number | null;
+            revoked_at: string | null;
+            password_hash: string | null;
+            allowed_email: string | null;
+            allow_download: boolean | null;
+        }>;
+
+        if (rows?.length) {
+            const r = rows[0];
+            return {
+                ok: true,
+                table: "share_tokens",
+                shareId: r.share_id,
+                token: r.token,
+                docId: r.doc_id,
+
+                allowedEmail: normEmail(r.allowed_email ?? null) ?? normEmail(r.to_email ?? null),
+                allowDownload: Boolean(r.allow_download),
+
+                toEmail: r.to_email ?? null,
+                createdAt: r.created_at,
+                expiresAt: r.expires_at ?? null,
+                maxViews: r.max_views,
+                viewCount: Number(r.views_count ?? 0),
+                revokedAt: r.revoked_at ?? null,
+                hasPassword: Boolean(r.password_hash),
+                passwordHash: r.password_hash ?? null,
+            };
+        }
+    } catch {
+        // ignore
+    }
+
+    // share_tokens fallback without new columns
+    try {
+        const rows = (await sql`
+      select
+        id::text as share_id,
         token::text as token,
         doc_id::text as doc_id,
         to_email,
@@ -319,6 +465,7 @@ export async function resolveShareMeta(tokenInput: string): Promise<ShareMeta> {
          or token = ${token}
       limit 1
     `) as unknown as Array<{
+            share_id: string;
             token: string;
             doc_id: string;
             to_email: string | null;
@@ -335,8 +482,13 @@ export async function resolveShareMeta(tokenInput: string): Promise<ShareMeta> {
             return {
                 ok: true,
                 table: "share_tokens",
+                shareId: r.share_id,
                 token: r.token,
                 docId: r.doc_id,
+
+                allowedEmail: normEmail(r.to_email ?? null),
+                allowDownload: false,
+
                 toEmail: r.to_email ?? null,
                 createdAt: r.created_at,
                 expiresAt: r.expires_at ?? null,
