@@ -1,3 +1,4 @@
+// src/app/serve/[docId]/route.ts
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
@@ -7,13 +8,7 @@ import { r2Client } from "@/lib/r2";
 import { GetObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import crypto from "crypto";
-
-type DocRow = {
-  r2_bucket: string | null;
-  r2_key: string | null;
-  content_type: string | null;
-  title: string | null;
-};
+import { resolveDoc } from "@/lib/resolveDoc";
 
 function getClientIp(req: NextRequest) {
   const xff = req.headers.get("x-forwarded-for") || "";
@@ -26,22 +21,15 @@ function hashIp(ip: string) {
   return crypto.createHmac("sha256", salt).update(ip).digest("hex").slice(0, 32);
 }
 
-export async function GET(
-  req: NextRequest,
-  ctx: { params: Promise<{ docId: string }> }
-) {
+function safeName(name: string) {
+  return (name || "document").replace(/[\r\n"]/g, " ").trim().slice(0, 120) || "document";
+}
+
+export async function GET(req: NextRequest, ctx: { params: Promise<{ docId: string }> }) {
   const { docId } = await ctx.params;
+  const resolved = await resolveDoc({ docId });
 
-  const rows = (await sql`
-    select r2_bucket, r2_key, content_type, title
-    from public.docs
-    where id = ${docId}::uuid
-      and coalesce(status, '') <> 'deleted'
-    limit 1
-  `) as DocRow[];
-
-  const row = rows?.[0];
-  if (!row?.r2_bucket || !row?.r2_key) {
+  if (!resolved.ok) {
     return new Response("Not found", { status: 404 });
   }
 
@@ -56,22 +44,22 @@ export async function GET(
       insert into public.doc_views
         (doc_id, alias, path, kind, user_agent, referer, ip_hash)
       values
-        (${docId}::uuid, null, ${new URL(req.url).pathname}, 'serve', ${ua}, ${ref}, ${ipHash})
+        (${resolved.docId}::uuid, null, ${new URL(req.url).pathname}, 'serve', ${ua}, ${ref}, ${ipHash})
     `;
   } catch {
     // ignore logging errors
   }
 
-  const contentType = row.content_type || "application/pdf";
-  const dispositionName = (row.title || "document").replace(/[\r\n"]/g, " ").slice(0, 120);
+  const contentType = resolved.contentType || "application/pdf";
+  const dispositionBase = safeName(resolved.title || resolved.originalFilename || "document");
 
   const url = await getSignedUrl(
     r2Client,
     new GetObjectCommand({
-      Bucket: row.r2_bucket,
-      Key: row.r2_key,
+      Bucket: resolved.bucket,
+      Key: resolved.r2Key,
       ResponseContentType: contentType,
-      ResponseContentDisposition: `inline; filename="${dispositionName}.pdf"`,
+      ResponseContentDisposition: `inline; filename="${dispositionBase}.pdf"`,
     }),
     { expiresIn: 60 * 5 }
   );

@@ -1,89 +1,11 @@
 // src/app/s/[token]/page.tsx
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { sql } from "@/lib/db";
 import { isShareUnlockedAction, verifySharePasswordAction } from "./actions";
+import { resolveShareMeta } from "@/lib/resolveDoc";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-async function getShareMeta(token: string) {
-    // Prefer doc_shares; fallback to share_tokens
-    try {
-        const rows = (await sql`
-      select
-        token::text as token,
-        to_email,
-        created_at::text as created_at,
-        expires_at::text as expires_at,
-        max_views,
-        view_count,
-        revoked_at::text as revoked_at,
-        (password_hash is not null) as has_password
-      from public.doc_shares
-      where token = ${token}
-      limit 1
-    `) as unknown as Array<{
-            token: string;
-            to_email: string | null;
-            created_at: string;
-            expires_at: string | null;
-            max_views: number | null;
-            view_count: number | null;
-            revoked_at: string | null;
-            has_password: boolean;
-        }>;
-        if (rows?.length) return { ok: true as const, table: "doc_shares" as const, ...rows[0] };
-    } catch {
-        // ignore
-    }
-
-    try {
-        const rows = (await sql`
-      select
-        token::text as token,
-        to_email,
-        created_at::text as created_at,
-        expires_at::text as expires_at,
-        max_views,
-        views_count,
-        revoked_at::text as revoked_at,
-        (password_hash is not null) as has_password
-      from public.share_tokens
-      where token::text = ${token}
-         or token = ${token}
-      limit 1
-    `) as unknown as Array<{
-            token: string;
-            to_email: string | null;
-            created_at: string;
-            expires_at: string | null;
-            max_views: number | null;
-            views_count: number | null;
-            revoked_at: string | null;
-            has_password: boolean;
-        }>;
-        if (rows?.length) {
-            const r = rows[0];
-            return {
-                ok: true as const,
-                table: "share_tokens" as const,
-                token: r.token,
-                to_email: r.to_email,
-                created_at: r.created_at,
-                expires_at: r.expires_at,
-                max_views: r.max_views,
-                view_count: Number(r.views_count ?? 0),
-                revoked_at: r.revoked_at,
-                has_password: r.has_password,
-            };
-        }
-    } catch {
-        // ignore
-    }
-
-    return { ok: false as const };
-}
 
 function fmtDate(s: string | null) {
     if (!s) return "—";
@@ -103,12 +25,19 @@ function isMaxed(view_count: number, max_views: number | null) {
     return view_count >= max_views;
 }
 
-export default async function ShareTokenPage(props: { params: Promise<{ token: string }> }) {
+export default async function ShareTokenPage(props: {
+    params: Promise<{ token: string }>;
+    searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
     const { token } = await props.params;
+    const sp = (await props.searchParams) || {};
+    const errorParam = sp.error;
+    const errorText = Array.isArray(errorParam) ? errorParam[0] : errorParam;
+
     const t = (token || "").trim();
     if (!t) redirect("/");
 
-    const meta = await getShareMeta(t);
+    const meta = await resolveShareMeta(t);
     if (!meta.ok) {
         return (
             <main className="mx-auto max-w-lg px-4 py-12">
@@ -123,7 +52,7 @@ export default async function ShareTokenPage(props: { params: Promise<{ token: s
         );
     }
 
-    if (meta.revoked_at) {
+    if (meta.revokedAt) {
         return (
             <main className="mx-auto max-w-lg px-4 py-12">
                 <h1 className="text-xl font-semibold">Link revoked</h1>
@@ -132,7 +61,7 @@ export default async function ShareTokenPage(props: { params: Promise<{ token: s
         );
     }
 
-    if (isExpired(meta.expires_at)) {
+    if (isExpired(meta.expiresAt)) {
         return (
             <main className="mx-auto max-w-lg px-4 py-12">
                 <h1 className="text-xl font-semibold">Link expired</h1>
@@ -141,7 +70,7 @@ export default async function ShareTokenPage(props: { params: Promise<{ token: s
         );
     }
 
-    if (isMaxed(meta.view_count ?? 0, meta.max_views)) {
+    if (isMaxed(meta.viewCount ?? 0, meta.maxViews)) {
         return (
             <main className="mx-auto max-w-lg px-4 py-12">
                 <h1 className="text-xl font-semibold">View limit reached</h1>
@@ -150,31 +79,26 @@ export default async function ShareTokenPage(props: { params: Promise<{ token: s
         );
     }
 
-    // If already unlocked, go straight to raw stream
     const unlocked = await isShareUnlockedAction(t);
     if (unlocked) redirect(`/s/${encodeURIComponent(t)}/raw`);
 
-    // If no password is set, we still want to create an unlock session + cookie so /raw gating is consistent.
-    if (!meta.has_password) {
-        // POST via Server Action to set cookie + DB, then redirect.
-        // Easiest: render a tiny auto-submit form.
+    // If no password, show Continue that triggers the action (action will redirect to /raw)
+    if (!meta.hasPassword) {
         return (
             <main className="mx-auto max-w-lg px-4 py-12">
-                <h1 className="text-xl font-semibold">Opening…</h1>
-                <p className="mt-2 text-sm text-neutral-400">Just a moment.</p>
+                {errorText ? (
+                    <div className="mb-4 rounded-md border border-red-900/40 bg-red-950/30 px-3 py-2 text-sm text-red-200">
+                        {errorText}
+                    </div>
+                ) : null}
 
-                <form
-                    action={async (fd) => {
-                        "use server";
-                        fd.set("token", t);
-                        fd.set("password", "");
-                        await verifySharePasswordAction(fd);
-                        redirect(`/s/${encodeURIComponent(t)}/raw`);
-                    }}
-                >
+                <form action={verifySharePasswordAction}>
                     <input type="hidden" name="token" value={t} />
                     <input type="hidden" name="password" value="" />
-                    <button className="mt-6 rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm text-neutral-200">
+                    <button
+                        type="submit"
+                        className="rounded-md bg-neutral-800 px-4 py-2 text-sm text-neutral-100 hover:bg-neutral-700"
+                    >
                         Continue
                     </button>
                 </form>
@@ -184,53 +108,45 @@ export default async function ShareTokenPage(props: { params: Promise<{ token: s
 
     return (
         <main className="mx-auto max-w-lg px-4 py-12">
-            <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-6">
-                <h1 className="text-xl font-semibold tracking-tight">Password required</h1>
-                <p className="mt-2 text-sm text-neutral-400">
-                    Enter the password to view this document. Once unlocked, it stays unlocked for 8 hours on this browser.
-                </p>
+            <h1 className="text-xl font-semibold">Protected link</h1>
+            <p className="mt-2 text-sm text-neutral-400">This share requires a password.</p>
 
-                <div className="mt-5 grid grid-cols-2 gap-3 text-xs text-neutral-400">
-                    <div className="rounded-lg border border-neutral-800 bg-neutral-950 p-3">
-                        <div className="text-neutral-500">Created</div>
-                        <div className="mt-1 text-neutral-200">{fmtDate(meta.created_at)}</div>
+            {errorText ? (
+                <div className="mt-4 rounded-md border border-red-900/40 bg-red-950/30 px-3 py-2 text-sm text-red-200">
+                    {errorText}
+                </div>
+            ) : null}
+
+            <div className="mt-6 rounded-lg border border-neutral-800 bg-neutral-950 p-4">
+                <div className="text-sm text-neutral-400 space-y-1">
+                    <div>
+                        <span className="text-neutral-300">Created:</span> {fmtDate(meta.createdAt)}
                     </div>
-                    <div className="rounded-lg border border-neutral-800 bg-neutral-950 p-3">
-                        <div className="text-neutral-500">Expires</div>
-                        <div className="mt-1 text-neutral-200">{fmtDate(meta.expires_at)}</div>
+                    <div>
+                        <span className="text-neutral-300">Expires:</span> {fmtDate(meta.expiresAt)}
+                    </div>
+                    <div>
+                        <span className="text-neutral-300">Views:</span> {meta.viewCount}
+                        {meta.maxViews ? ` / ${meta.maxViews}` : ""}
                     </div>
                 </div>
 
-                <form
-                    action={async (fd) => {
-                        "use server";
-                        const res = await verifySharePasswordAction(fd);
-                        if (res.ok) redirect(`/s/${encodeURIComponent(t)}/raw`);
-                        // If bad password / rate limited, we re-render by throwing message into query string:
-                        redirect(`/s/${encodeURIComponent(t)}?e=${encodeURIComponent(res.message)}`);
-                    }}
-                    className="mt-6"
-                >
+                <form action={verifySharePasswordAction} className="mt-4 space-y-3">
                     <input type="hidden" name="token" value={t} />
-                    <label className="block text-xs text-neutral-400">Password</label>
+
                     <input
-                        name="password"
                         type="password"
-                        autoFocus
-                        className="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm text-neutral-200 outline-none focus:border-neutral-600"
-                        placeholder="Enter password"
+                        name="password"
+                        placeholder="Password"
+                        className="w-full rounded-md border border-neutral-800 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 placeholder:text-neutral-500"
                     />
 
                     <button
                         type="submit"
-                        className="mt-3 w-full rounded-lg border border-neutral-800 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 hover:bg-neutral-800"
+                        className="w-full rounded-md bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-500"
                     >
                         Unlock
                     </button>
-
-                    <p className="mt-3 text-xs text-neutral-500">
-                        Having trouble? Ask the sender to resend the link or confirm the password.
-                    </p>
                 </form>
             </div>
         </main>
