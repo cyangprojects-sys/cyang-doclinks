@@ -23,33 +23,53 @@ function isNoSuchKey(err: any) {
   );
 }
 
-export async function GET(_req: NextRequest, ctx: { params: Promise<{ alias: string }> }): Promise<Response> {
-  const { alias: rawAlias } = await ctx.params;
-  const alias = decodeURIComponent(String(rawAlias || "")).trim();
-
-  if (!alias) return new Response("Missing alias", { status: 400 });
-
-  const resolved = await resolveDoc({ alias });
-
-  if (!resolved.ok) {
-    if (resolved.error === "PASSWORD_REQUIRED") {
-      return new Response(null, {
-        status: 302,
-        headers: { Location: `/d/${encodeURIComponent(alias)}` },
-      });
-    }
-    return new Response("Not found", { status: 404 });
-  }
-
+export async function GET(
+  _req: NextRequest,
+  ctx: { params: Promise<{ alias: string }> }
+): Promise<Response> {
   try {
-    const obj = await r2Client.send(
-      new GetObjectCommand({
-        Bucket: resolved.bucket,
-        Key: resolved.r2Key,
-      })
-    );
+    const { alias: rawAlias } = await ctx.params;
+    const alias = decodeURIComponent(String(rawAlias || "")).trim();
 
-    if (!obj.Body) return new Response("Object body missing", { status: 500 });
+    if (!alias) return new Response("Missing alias", { status: 400 });
+
+    let resolved: Awaited<ReturnType<typeof resolveDoc>>;
+    try {
+      resolved = await resolveDoc({ alias });
+    } catch (e: any) {
+      console.error("resolveDoc threw:", e);
+      return new Response("Not found", { status: 404 });
+    }
+
+    if (!resolved.ok) {
+      if (resolved.error === "PASSWORD_REQUIRED") {
+        return new Response(null, {
+          status: 302,
+          headers: { Location: `/d/${encodeURIComponent(alias)}` },
+        });
+      }
+      return new Response("Not found", { status: 404 });
+    }
+
+    if (!resolved.bucket || !resolved.r2Key) {
+      return new Response("Not found", { status: 404 });
+    }
+
+    let obj;
+    try {
+      obj = await r2Client.send(
+        new GetObjectCommand({
+          Bucket: resolved.bucket,
+          Key: resolved.r2Key,
+        })
+      );
+    } catch (e: any) {
+      if (isNoSuchKey(e)) return new Response("Not found", { status: 404 });
+      console.error("R2 GetObject error:", e);
+      return new Response("Internal server error", { status: 500 });
+    }
+
+    if (!obj?.Body) return new Response("Object body missing", { status: 500 });
 
     const filename = pickFilename(resolved.title, resolved.originalFilename, alias) + ".pdf";
     const contentType = resolved.contentType || "application/pdf";
@@ -63,10 +83,7 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ alias: str
       },
     });
   } catch (err: any) {
-    // Map “file missing” to 404, not 500
-    if (isNoSuchKey(err)) return new Response("Not found", { status: 404 });
-
-    // Everything else is a real server error
-    return new Response(`R2 error: ${err?.message || "Unknown error"}`, { status: 500 });
+    console.error("RAW ROUTE ERROR:", err);
+    return new Response("Internal server error", { status: 500 });
   }
 }
