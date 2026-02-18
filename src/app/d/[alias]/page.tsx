@@ -15,8 +15,12 @@ export default async function SharePage({
 }) {
   noStore();
 
+  const { alias: rawAlias } = await params;
   const alias = decodeURIComponent(rawAlias || "").trim().toLowerCase();
-  if (!alias) notFound();
+
+  if (!alias) {
+    notFound();
+  }
 
   const resolved = await resolveDoc({ alias });
 
@@ -28,6 +32,7 @@ export default async function SharePage({
         </div>
       );
     }
+
     notFound();
   }
 
