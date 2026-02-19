@@ -127,7 +127,7 @@ export async function createAndEmailShareToken(
 
     const docRows = (await sql`
       select id::text as id, title::text as title
-      from docs
+      from public.docs
       where id = ${docId}::uuid
       limit 1
     `) as unknown as { id: string; title: string | null }[];
@@ -139,7 +139,7 @@ export async function createAndEmailShareToken(
     const token = newToken();
 
     await sql`
-      insert into share_tokens (token, doc_id, to_email, expires_at, max_views, password_hash)
+      insert into public.share_tokens (token, doc_id, to_email, expires_at, max_views, password_hash)
       values (${token}, ${docId}::uuid, ${toEmail}, ${expiresAt}, ${maxViews}, ${passwordHash})
     `;
 
@@ -186,24 +186,45 @@ export async function getShareStatsByToken(
   try {
     await requireOwner();
 
-    const rows = await sql`
+    const rows = (await sql`
       select
         token::text as token,
         doc_id::text as doc_id,
-        to_email::text as to_email,
+        to_email,
         created_at::text as created_at,
         expires_at::text as expires_at,
         max_views,
-        revoked_at::text as revoked_at,
-        views_count as view_count,
-        null::text as last_viewed_at
-      from share_tokens
+        views_count,
+        revoked_at::text as revoked_at
+      from public.share_tokens
       where token = ${token}
       limit 1
-    `;
+    `) as unknown as Array<{
+      token: string;
+      doc_id: string;
+      to_email: string | null;
+      created_at: string;
+      expires_at: string | null;
+      max_views: number | null;
+      views_count: number | null;
+      revoked_at: string | null;
+    }>;
 
-    const row = (rows as any).rows?.[0] ?? null;
-    if (!row) return { ok: false, error: "not_found", message: "Token not found" };
+    const r = rows[0];
+    if (!r) return { ok: false, error: "not_found", message: "Token not found" };
+
+    const row: ShareRow = {
+      token: r.token,
+      doc_id: r.doc_id,
+      to_email: r.to_email,
+      created_at: r.created_at,
+      expires_at: r.expires_at,
+      max_views: r.max_views,
+      view_count: r.views_count ?? 0,
+      revoked_at: r.revoked_at,
+      last_viewed_at: null,
+    };
+
     return { ok: true, row };
   } catch (e: any) {
     return { ok: false, error: "exception", message: e?.message || "Error" };
@@ -217,7 +238,7 @@ export async function revokeShareToken(
     await requireOwner();
 
     await sql`
-      update share_tokens
+      update public.share_tokens
       set revoked_at = now()
       where token = ${token}
     `;
