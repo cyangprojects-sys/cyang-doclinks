@@ -41,9 +41,9 @@ async function getObjectStream(key: string) {
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { token: string } }
+  { params }: { params: Promise<{ token: string }> }
 ) {
-  const token = params.token;
+  const { token } = await params;
 
   const rows = await sql<{
     doc_id: string;
