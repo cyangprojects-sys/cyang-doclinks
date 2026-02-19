@@ -8,7 +8,7 @@ import crypto from "crypto";
 import { r2Client } from "@/lib/r2";
 import { GetObjectCommand } from "@aws-sdk/client-s3";
 import type { Readable } from "node:stream";
-import { resolveDoc } from "@/lib/resolveDoc";
+import { consumeShareTokenView, resolveDoc } from "@/lib/resolveDoc";
 
 function getClientIp(req: NextRequest) {
   const xff = req.headers.get("x-forwarded-for") || "";

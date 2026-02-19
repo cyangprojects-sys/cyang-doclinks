@@ -152,7 +152,7 @@ export async function deleteDocAction(formData: FormData): Promise<void> {
 
 /**
  * Share admin actions
- * Expected table: doc_shares(token text primary key, revoked_at timestamptz, password_hash text null, ...)
+ * Expected table: share_tokens(token text primary key, revoked_at timestamptz, password_hash text null, ...)
  */
 
 // Used as <form action={revokeDocShareAction}>
@@ -163,7 +163,7 @@ export async function revokeDocShareAction(formData: FormData): Promise<void> {
   if (!token) throw new Error("Missing token.");
 
   await sql`
-    update doc_shares
+    update share_tokens
     set revoked_at = now()
     where token = ${token}
       and revoked_at is null
@@ -187,7 +187,7 @@ export async function setSharePasswordAction(formData: FormData): Promise<void> 
   const hash = await bcrypt.hash(password, 12);
 
   await sql`
-    update doc_shares
+    update share_tokens
     set password_hash = ${hash}
     where token = ${token}
   `;
@@ -204,7 +204,7 @@ export async function clearSharePasswordAction(formData: FormData): Promise<void
   if (!token) throw new Error("Missing token.");
 
   await sql`
-    update doc_shares
+    update share_tokens
     set password_hash = null
     where token = ${token}
   `;

@@ -30,7 +30,7 @@ type ShareRow = {
     created_at: string;
     expires_at: string | null;
     max_views: number | null;
-    view_count: number | null;
+    views_count: number | null;
     revoked_at: string | null;
     doc_title: string | null;
     alias: string | null;
@@ -60,12 +60,12 @@ export default async function AdminDashboardPage() {
       s.created_at::text as created_at,
       s.expires_at::text as expires_at,
       s.max_views,
-      s.view_count,
+      s.views_count,
       s.revoked_at::text as revoked_at,
       (s.password_hash is not null) as has_password,
       d.title as doc_title,
       a.alias
-    from doc_shares s
+    from share_tokens s
     join docs d on d.id = s.doc_id
     left join doc_aliases a on a.doc_id = s.doc_id
     order by s.created_at desc
@@ -79,7 +79,7 @@ export default async function AdminDashboardPage() {
         created_at: s.created_at,
         expires_at: s.expires_at,
         max_views: s.max_views,
-        view_count: Number(s.view_count ?? 0),
+        view_count: Number(s.views_count ?? 0),
         revoked_at: s.revoked_at,
         doc_title: s.doc_title,
         alias: s.alias,

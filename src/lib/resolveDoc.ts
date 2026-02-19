@@ -39,30 +39,26 @@ export type ResolvedDoc = ResolvedDocOk | ResolvedDocErr;
 export type ShareMeta =
     | {
         ok: true;
-        table: "doc_shares" | "share_tokens";
+        table: "share_tokens";
 
-        // Stable share row ID (used for device trust + audit)
+        // token is the stable primary key in your schema
         shareId: string;
-
         token: string;
 
-        // Email binding / download control (new hardening layer)
-        allowedEmail: string | null;
-        allowDownload: boolean;
+        docId: string;
 
-        // Legacy field (existing app logic might use this)
         toEmail: string | null;
-
         createdAt: string;
         expiresAt: string | null;
         maxViews: number | null;
         viewCount: number;
         revokedAt: string | null;
+
         hasPassword: boolean;
         passwordHash: string | null;
-        docId: string;
     }
     | { ok: false };
+
 
 function norm(s: string): string {
     return decodeURIComponent(String(s || "")).trim().toLowerCase();
@@ -292,31 +288,13 @@ async function resolveAliasToDocId(
  *
  * Robustness goals:
  * - token in email may be 32-hex (no dashes) while DB stores UUID (dashed)
- * - doc_shares/share_tokens primary key column may NOT be `id` in your DB (your screenshot proves `id` doesn't exist)
- * - share_tokens view counter may be `views_count`, `view_count`, or derived from doc_views
+ * - share_tokens primary key column is `token` in your DB
+ * - share_tokens view counter column is `views_count`
  */
 export async function resolveShareMeta(tokenInput: string): Promise<ShareMeta> {
     const { raw: token, dashed } = tokenVariants(tokenInput);
     if (!token) return { ok: false };
 
-    // helper: WHERE token matches either raw or dashed (some envs store UUID-with-dashes)
-    const whereToken = sql`
-      (
-        token = ${token}
-        or token::text = ${token}
-        ${dashed ? sql`or token = ${dashed} or token::text = ${dashed}` : sql``}
-      )
-    `;
-
-    // NOTE:
-    // Your production schema uses token as the primary key for BOTH:
-    //   - public.share_tokens (views_count)
-    //   - public.doc_shares   (view_count)
-    // There is no id/share_id column. So shareId must be the token itself.
-
-    // -------------------------
-    // share_tokens (preferred for email links)
-    // -------------------------
     try {
         const rows = (await sql`
       select
@@ -330,7 +308,8 @@ export async function resolveShareMeta(tokenInput: string): Promise<ShareMeta> {
         revoked_at::text as revoked_at,
         password_hash
       from public.share_tokens
-      where ${whereToken}
+      where token = ${token}
+        ${dashed ? sql`or token = ${dashed}` : sql``}
       limit 1
     `) as unknown as Array<{
             token: string;
@@ -344,195 +323,99 @@ export async function resolveShareMeta(tokenInput: string): Promise<ShareMeta> {
             password_hash: string | null;
         }>;
 
-        if (rows?.length) {
-            const r = rows[0];
-            return {
-                ok: true,
-                table: "share_tokens",
-                shareId: r.token, // token-as-PK
-                token: r.token,
-                docId: r.doc_id,
+        const r = rows?.[0];
+        if (!r?.token) return { ok: false };
 
-                allowedEmail: normEmail(r.to_email ?? null),
-                allowDownload: false,
-
-                toEmail: r.to_email ?? null,
-                createdAt: r.created_at,
-                expiresAt: r.expires_at ?? null,
-                maxViews: r.max_views,
-                viewCount: Number(r.views_count ?? 0),
-                revokedAt: r.revoked_at ?? null,
-                hasPassword: Boolean(r.password_hash),
-                passwordHash: r.password_hash ?? null,
-            };
-        }
+        return {
+            ok: true,
+            table: "share_tokens",
+            shareId: r.token,
+            token: r.token,
+            docId: r.doc_id,
+            toEmail: r.to_email ?? null,
+            createdAt: r.created_at,
+            expiresAt: r.expires_at ?? null,
+            maxViews: r.max_views ?? null,
+            viewCount: Number(r.views_count ?? 0),
+            revokedAt: r.revoked_at ?? null,
+            hasPassword: Boolean(r.password_hash),
+            passwordHash: r.password_hash ?? null,
+        };
     } catch {
-        // ignore
+        return { ok: false };
     }
-
-    // -------------------------
-    // doc_shares (fallback)
-    // -------------------------
-    try {
-        const rows = (await sql`
-      select
-        token::text as token,
-        doc_id::text as doc_id,
-        to_email,
-        created_at::text as created_at,
-        expires_at::text as expires_at,
-        max_views,
-        view_count,
-        revoked_at::text as revoked_at,
-        password_hash
-      from public.doc_shares
-      where ${whereToken}
-      limit 1
-    `) as unknown as Array<{
-            token: string;
-            doc_id: string;
-            to_email: string | null;
-            created_at: string;
-            expires_at: string | null;
-            max_views: number | null;
-            view_count: number | null;
-            revoked_at: string | null;
-            password_hash: string | null;
-        }>;
-
-        if (rows?.length) {
-            const r = rows[0];
-            return {
-                ok: true,
-                table: "doc_shares",
-                shareId: r.token, // token-as-PK
-                token: r.token,
-                docId: r.doc_id,
-
-                allowedEmail: normEmail(r.to_email ?? null),
-                allowDownload: false,
-
-                toEmail: r.to_email ?? null,
-                createdAt: r.created_at,
-                expiresAt: r.expires_at ?? null,
-                maxViews: r.max_views,
-                viewCount: Number(r.view_count ?? 0),
-                revokedAt: r.revoked_at ?? null,
-                hasPassword: Boolean(r.password_hash),
-                passwordHash: r.password_hash ?? null,
-            };
-        }
-    } catch {
-        // ignore
-    }
-
-    return { ok: false };
 }
-
 
 /**
  * Token resolution for /raw: increments views atomically while enforcing revoked/expired/max_views.
  * Keeps your current behavior: increments even if password-gated.
  */
-async function resolveTokenAndIncrement(
+/**
+ * Token resolution for /raw: NO increment. Used to check existence + gating state and to get doc_id.
+ */
+async function resolveTokenNoIncrement(
     tokenInput: string
 ): Promise<
-    | {
-        ok: true;
-        docId: string;
-        passwordHash: string | null;
-        table: "doc_shares" | "share_tokens";
-    }
+    | { ok: true; docId: string; passwordHash: string | null }
+    | { ok: false; error: "NOT_FOUND" | "REVOKED" | "EXPIRED" | "MAXED" }
+> {
+    const meta = await resolveShareMeta(tokenInput);
+    if (!meta.ok) return { ok: false, error: "NOT_FOUND" };
+    if (meta.revokedAt) return { ok: false, error: "REVOKED" };
+    if (isExpired(meta.expiresAt)) return { ok: false, error: "EXPIRED" };
+    if (isMaxed(meta.viewCount ?? 0, meta.maxViews)) return { ok: false, error: "MAXED" };
+
+    return { ok: true, docId: meta.docId, passwordHash: meta.passwordHash ?? null };
+}
+
+/**
+ * Consume a view for a share token (atomic increment + enforcement).
+ * Call this ONLY once you've decided the request is authorized to view.
+ */
+export async function consumeShareTokenView(
+    tokenInput: string
+): Promise<
+    | { ok: true; docId: string; viewsCount: number }
     | { ok: false; error: "NOT_FOUND" | "REVOKED" | "EXPIRED" | "MAXED" }
 > {
     const { raw: token, dashed } = tokenVariants(tokenInput);
     if (!token) return { ok: false, error: "NOT_FOUND" };
 
-    const tokenWhereDocShares = dashed
-        ? sql`(s.token = ${token} or s.token::text = ${token} or s.token = ${dashed} or s.token::text = ${dashed})`
-        : sql`(s.token = ${token} or s.token::text = ${token})`;
-
-    const tokenWhereShareTokens = dashed
-        ? sql`(st.token::text = ${token} or st.token = ${token} or st.token::text = ${dashed} or st.token = ${dashed})`
-        : sql`(st.token::text = ${token} or st.token = ${token})`;
-
-    // doc_shares
-    try {
-        const rows = (await sql`
-      update public.doc_shares s
-      set view_count = s.view_count + 1
-      where ${tokenWhereDocShares}
-        and s.revoked_at is null
-        and (s.expires_at is null or s.expires_at > now())
-        and (s.max_views is null or s.max_views = 0 or s.view_count < s.max_views)
-      returning s.doc_id::text as doc_id, s.password_hash
-    `) as unknown as Array<{ doc_id: string; password_hash: string | null }>;
-
-        if (rows?.length) {
-            return {
-                ok: true,
-                docId: rows[0].doc_id,
-                passwordHash: rows[0].password_hash ?? null,
-                table: "doc_shares",
-            };
-        }
-    } catch {
-        // ignore table missing
-    }
-
-    // share_tokens (try increment views_count)
+    // Atomic: only increments if still valid and below max (unless max_views is null/0)
     try {
         const rows = (await sql`
       update public.share_tokens st
-      set views_count = st.views_count + 1
-      where ${tokenWhereShareTokens}
+      set views_count = coalesce(st.views_count, 0) + 1
+      where (st.token = ${token} ${dashed ? sql`or st.token = ${dashed}` : sql``})
         and st.revoked_at is null
         and (st.expires_at is null or st.expires_at > now())
-        and (st.max_views is null or st.max_views = 0 or st.views_count < st.max_views)
-      returning st.doc_id::text as doc_id, st.password_hash
-    `) as unknown as Array<{ doc_id: string; password_hash: string | null }>;
+        and (
+          st.max_views is null
+          or st.max_views = 0
+          or coalesce(st.views_count, 0) < st.max_views
+        )
+      returning st.doc_id::text as doc_id, coalesce(st.views_count, 0)::int as views_count
+    `) as unknown as Array<{ doc_id: string; views_count: number }>;
 
-        if (rows?.length) {
-            return {
-                ok: true,
-                docId: rows[0].doc_id,
-                passwordHash: rows[0].password_hash ?? null,
-                table: "share_tokens",
-            };
-        }
+        const r = rows?.[0];
+        if (r?.doc_id) return { ok: true, docId: r.doc_id, viewsCount: Number(r.views_count ?? 0) };
     } catch {
-        // ignore
+        // fall through to read-only checks
     }
 
-    // share_tokens (try increment view_count)
-    try {
-        const rows = (await sql`
-      update public.share_tokens st
-      set view_count = st.view_count + 1
-      where ${tokenWhereShareTokens}
-        and st.revoked_at is null
-        and (st.expires_at is null or st.expires_at > now())
-        and (st.max_views is null or st.max_views = 0 or st.view_count < st.max_views)
-      returning st.doc_id::text as doc_id, st.password_hash
-    `) as unknown as Array<{ doc_id: string; password_hash: string | null }>;
-
-        if (rows?.length) {
-            return {
-                ok: true,
-                docId: rows[0].doc_id,
-                passwordHash: rows[0].password_hash ?? null,
-                table: "share_tokens",
-            };
-        }
-    } catch {
-        // ignore
-    }
-
+    // If update returned 0 rows, determine why (best-effort)
     const meta = await resolveShareMeta(token);
-    if (!meta.ok) return { ok: false, error: "NOT_FOUND" };
-    if (meta.revokedAt) return { ok: false, error: "REVOKED" };
-    if (isExpired(meta.expiresAt)) return { ok: false, error: "EXPIRED" };
-    if (isMaxed(meta.viewCount, meta.maxViews)) return { ok: false, error: "MAXED" };
+    if (!meta.ok && dashed) {
+        const meta2 = await resolveShareMeta(dashed);
+        if (meta2.ok) return consumeShareTokenView(meta2.token);
+    }
+    const m = meta.ok ? meta : null;
+    if (!m) return { ok: false, error: "NOT_FOUND" };
+    if (m.revokedAt) return { ok: false, error: "REVOKED" };
+    if (isExpired(m.expiresAt)) return { ok: false, error: "EXPIRED" };
+    if (isMaxed(m.viewCount ?? 0, m.maxViews)) return { ok: false, error: "MAXED" };
+
+    // Race condition fallback
     return { ok: false, error: "NOT_FOUND" };
 }
 
@@ -589,7 +472,7 @@ export async function resolveDoc(input: ResolveInput): Promise<ResolvedDoc> {
         const token = String(input.token || "").trim();
         if (!token) return { ok: false, error: "NOT_FOUND" };
 
-        const t = await resolveTokenAndIncrement(token);
+        const t = await resolveTokenNoIncrement(token);
         if (!t.ok) return { ok: false, error: t.error };
 
         const doc = await getDocPointer(t.docId);
