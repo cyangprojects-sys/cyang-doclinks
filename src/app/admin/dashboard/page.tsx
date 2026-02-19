@@ -154,6 +154,13 @@ export default async function AdminDashboardPage() {
                 >
                     Back to Admin
                 </Link>
+
+                <Link
+                    href="/admin/audit"
+                    className="text-sm text-neutral-400 hover:text-neutral-200 underline underline-offset-4"
+                >
+                    Audit logs
+                </Link>
             </div>
 
             {/* ✅ UPLOAD */}
