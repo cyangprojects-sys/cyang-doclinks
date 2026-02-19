@@ -14,20 +14,21 @@ function fmtIso(iso: string | null) {
   }
 }
 
-function toIsoFromDatetimeLocal(v: string): string | null {
+function toIsoFromDatetimeLocal(v: string): string | "" {
   const s = (v || "").trim();
-  if (!s) return null;
-  // datetime-local: "YYYY-MM-DDTHH:mm"
+  if (!s) return "";
+  // datetime-local returns "YYYY-MM-DDTHH:mm"
   const d = new Date(s);
-  if (Number.isNaN(d.getTime())) return null;
+  if (Number.isNaN(d.getTime())) return "";
   return d.toISOString();
 }
 
 export default function ShareForm({ docId, alias }: { docId: string; alias?: string }) {
   const [toEmail, setToEmail] = useState("");
-  const [expiresLocal, setExpiresLocal] = useState("");
-  const [maxViews, setMaxViews] = useState<string>("");
   const [password, setPassword] = useState("");
+  const [maxViews, setMaxViews] = useState<string>("");
+  const [expiresLocal, setExpiresLocal] = useState<string>(""); // datetime-local
+
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [token, setToken] = useState<string | null>(null);
@@ -35,7 +36,8 @@ export default function ShareForm({ docId, alias }: { docId: string; alias?: str
 
   const shareUrl = useMemo(() => {
     if (!token) return null;
-    const origin = typeof window !== "undefined" ? window.location.origin : "";
+    const origin =
+      typeof window !== "undefined" ? window.location.origin : "";
     return `${origin}/s/${token}`;
   }, [token]);
 
@@ -48,9 +50,9 @@ export default function ShareForm({ docId, alias }: { docId: string; alias?: str
       fd.set("docId", docId);
       fd.set("alias", alias || "");
       fd.set("toEmail", toEmail.trim() ? toEmail.trim() : "");
-      fd.set("expiresAt", toIsoFromDatetimeLocal(expiresLocal) ?? "");
-      fd.set("maxViews", maxViews.trim());
-      fd.set("password", password);
+      fd.set("password", password); // may be blank
+      fd.set("expiresAt", toIsoFromDatetimeLocal(expiresLocal));
+      fd.set("maxViews", maxViews.trim() ? maxViews.trim() : "");
 
       const res: any = await createAndEmailShareToken(fd);
       if (!res.ok) {
@@ -83,49 +85,56 @@ export default function ShareForm({ docId, alias }: { docId: string; alias?: str
     }
   }
 
+  async function copyShareUrl() {
+    if (!shareUrl) return;
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+    } catch {
+      // ignore
+    }
+  }
+
   return (
     <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-4 shadow-sm">
       <div className="flex flex-col gap-3">
-        <div className="grid gap-3 md:grid-cols-2">
-          <div>
-            <label className="text-sm font-medium text-neutral-300">
-              Recipient email (optional)
-            </label>
-            <div className="mt-1 text-xs text-neutral-500">
-              If set, the viewer must enter the same email to unlock this link.
-            </div>
-            <input
-              value={toEmail}
-              onChange={(e) => setToEmail(e.target.value)}
-              placeholder="recipient@example.com"
-              inputMode="email"
-              className="mt-2 w-full rounded-lg border border-neutral-800 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 placeholder:text-neutral-500 focus:border-neutral-600 focus:outline-none focus:ring-2 focus:ring-neutral-700 transition"
-            />
+        <div>
+          <label className="text-sm font-medium text-neutral-300">
+            Recipient Email (optional)
+          </label>
+          <div className="mt-1 text-xs text-neutral-500">
+            If set, the viewer must enter this email to unlock.
           </div>
-
-          <div>
-            <label className="text-sm font-medium text-neutral-300">
-              Expires (optional)
-            </label>
-            <div className="mt-1 text-xs text-neutral-500">
-              Uses your local time.
-            </div>
-            <input
-              type="datetime-local"
-              value={expiresLocal}
-              onChange={(e) => setExpiresLocal(e.target.value)}
-              className="mt-2 w-full rounded-lg border border-neutral-800 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 placeholder:text-neutral-500 focus:border-neutral-600 focus:outline-none focus:ring-2 focus:ring-neutral-700 transition"
-            />
-          </div>
+          <input
+            value={toEmail}
+            onChange={(e) => setToEmail(e.target.value)}
+            placeholder="recipient@example.com"
+            className="mt-2 w-full rounded-lg border border-neutral-800 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 placeholder:text-neutral-500 focus:border-neutral-600 focus:outline-none focus:ring-2 focus:ring-neutral-700 transition"
+          />
         </div>
 
-        <div className="grid gap-3 md:grid-cols-2">
+        <div>
+          <label className="text-sm font-medium text-neutral-300">
+            Password (optional)
+          </label>
+          <div className="mt-1 text-xs text-neutral-500">
+            If set, the viewer must enter this password (in addition to email, if required).
+          </div>
+          <input
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Set a password"
+            type="password"
+            className="mt-2 w-full rounded-lg border border-neutral-800 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 placeholder:text-neutral-500 focus:border-neutral-600 focus:outline-none focus:ring-2 focus:ring-neutral-700 transition"
+          />
+        </div>
+
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
           <div>
             <label className="text-sm font-medium text-neutral-300">
-              Max views (optional)
+              Max Views (optional)
             </label>
             <div className="mt-1 text-xs text-neutral-500">
-              Leave blank for unlimited. Use 0 for unlimited.
+              Leave blank for unlimited. Use 1 for single-view.
             </div>
             <input
               value={maxViews}
@@ -138,16 +147,15 @@ export default function ShareForm({ docId, alias }: { docId: string; alias?: str
 
           <div>
             <label className="text-sm font-medium text-neutral-300">
-              Password (optional)
+              Expiration (optional)
             </label>
             <div className="mt-1 text-xs text-neutral-500">
-              If set, viewer must enter password (and email if restricted).
+              When set, the link stops working after this time.
             </div>
             <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Set a password"
+              value={expiresLocal}
+              onChange={(e) => setExpiresLocal(e.target.value)}
+              type="datetime-local"
               className="mt-2 w-full rounded-lg border border-neutral-800 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 placeholder:text-neutral-500 focus:border-neutral-600 focus:outline-none focus:ring-2 focus:ring-neutral-700 transition"
             />
           </div>
@@ -159,7 +167,7 @@ export default function ShareForm({ docId, alias }: { docId: string; alias?: str
             disabled={busy || !docId}
             className="rounded-lg bg-neutral-100 px-3 py-2 text-sm font-medium text-neutral-950 hover:bg-white disabled:opacity-50"
           >
-            {busy ? "Working…" : "Create share link"}
+            {busy ? "Working…" : "Create + Email link"}
           </button>
 
           <button
@@ -186,16 +194,12 @@ export default function ShareForm({ docId, alias }: { docId: string; alias?: str
               <input
                 readOnly
                 value={shareUrl}
-                className="w-full rounded-md border border-neutral-800 bg-neutral-900 px-2 py-1 font-mono text-xs text-neutral-100 placeholder:text-neutral-500 focus:outline-none"
+                className="w-full rounded-md border border-neutral-800 bg-neutral-900 px-2 py-1 font-mono text-xs text-neutral-100 focus:outline-none"
               />
               <button
                 type="button"
+                onClick={copyShareUrl}
                 className="rounded-md border border-neutral-700 bg-neutral-900 px-2 py-1 text-xs text-neutral-200 hover:bg-neutral-800"
-                onClick={async () => {
-                  try {
-                    await navigator.clipboard.writeText(shareUrl);
-                  } catch {}
-                }}
               >
                 Copy
               </button>
@@ -205,16 +209,27 @@ export default function ShareForm({ docId, alias }: { docId: string; alias?: str
 
         {stats?.ok ? (
           <div className="rounded-lg border border-neutral-800 bg-neutral-950 p-3 text-sm text-neutral-200">
-            <div>
-              <span className="text-neutral-500">Views:</span> {stats.view_count}
-            </div>
-            <div>
-              <span className="text-neutral-500">Last viewed:</span>{" "}
-              {fmtIso(stats.last_viewed_at ?? null)}
-            </div>
-            <div className="mt-2 text-xs text-neutral-500">
-              Expires: {fmtIso(stats.expires_at ?? null)} • Max views:{" "}
-              {stats.max_views ?? "—"} • Recipient: {stats.to_email ?? "—"}
+            <div className="grid grid-cols-1 gap-1 md:grid-cols-2">
+              <div>
+                <span className="text-neutral-500">Created:</span>{" "}
+                {fmtIso(stats.row.created_at)}
+              </div>
+              <div>
+                <span className="text-neutral-500">Expires:</span>{" "}
+                {fmtIso(stats.row.expires_at)}
+              </div>
+              <div>
+                <span className="text-neutral-500">Max Views:</span>{" "}
+                {stats.row.max_views ?? "—"}
+              </div>
+              <div>
+                <span className="text-neutral-500">Views:</span>{" "}
+                {stats.row.view_count ?? stats.row.views_count ?? 0}
+              </div>
+              <div className="md:col-span-2">
+                <span className="text-neutral-500">Recipient:</span>{" "}
+                {stats.row.to_email || "—"}
+              </div>
             </div>
           </div>
         ) : null}
