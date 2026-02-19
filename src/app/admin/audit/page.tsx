@@ -63,6 +63,16 @@ async function tryQuery(name: string, queryFn: () => Promise<any>, countFn?: () 
   }
 }
 
+async function tableExists(fqTable: string): Promise<boolean> {
+  // fqTable like: "public.doc_access_log"
+  try {
+    const rows = (await sql`select to_regclass(${fqTable})::text as reg`) as unknown as Array<{ reg: string | null }>;
+    return !!rows?.[0]?.reg;
+  } catch {
+    return false;
+  }
+}
+
 function fmt(v: any): string {
   if (v === null || v === undefined || v === "") return "—";
   if (v instanceof Date) return v.toISOString();
@@ -173,6 +183,10 @@ export default async function AdminAuditPage({
   const doc = (sp.doc || "").trim();
   const docFilter = doc ? doc : null;
 
+  // Existence checks (keeps the UI calm when optional tables are missing)
+  const hasDocAudit = await tableExists("public.doc_audit");
+  const hasDocAccessLog = await tableExists("public.doc_access_log");
+
   // doc_audit
   const audit = await tryQuery(
     "doc_audit",
@@ -201,52 +215,58 @@ export default async function AdminAuditPage({
     }
   );
 
-  // doc_access_log (some schemas use accessed_at, some created_at)
-  const accessLog = await tryQuery(
-    "doc_access_log",
-    async () => {
-      if (docFilter) {
-        try {
-          return sql`
-            select *
-            from public.doc_access_log
-            where doc_id = ${docFilter}::uuid
-            order by accessed_at desc
-            limit ${limit} offset ${offset}
-          `;
-        } catch {
-          return sql`
-            select *
-            from public.doc_access_log
-            where doc_id = ${docFilter}::uuid
-            order by created_at desc
-            limit ${limit} offset ${offset}
-          `;
+  // doc_access_log is OPTIONAL.
+  // In this codebase, logDocAccess() writes to doc_audit first, then falls back to doc_access_log.
+  // So if doc_access_log doesn't exist, we show doc_audit as the "access log" too.
+  const accessLog: QueryState = hasDocAccessLog
+    ? await tryQuery(
+        "doc_access_log",
+        async () => {
+          if (docFilter) {
+            try {
+              return sql`
+                select *
+                from public.doc_access_log
+                where doc_id = ${docFilter}::uuid
+                order by accessed_at desc
+                limit ${limit} offset ${offset}
+              `;
+            } catch {
+              return sql`
+                select *
+                from public.doc_access_log
+                where doc_id = ${docFilter}::uuid
+                order by created_at desc
+                limit ${limit} offset ${offset}
+              `;
+            }
+          }
+          try {
+            return sql`
+              select *
+              from public.doc_access_log
+              order by accessed_at desc
+              limit ${limit} offset ${offset}
+            `;
+          } catch {
+            return sql`
+              select *
+              from public.doc_access_log
+              order by created_at desc
+              limit ${limit} offset ${offset}
+            `;
+          }
+        },
+        async () => {
+          if (docFilter) {
+            return sql`select count(*)::int as total from public.doc_access_log where doc_id = ${docFilter}::uuid`;
+          }
+          return sql`select count(*)::int as total from public.doc_access_log`;
         }
-      }
-      try {
-        return sql`
-          select *
-          from public.doc_access_log
-          order by accessed_at desc
-          limit ${limit} offset ${offset}
-        `;
-      } catch {
-        return sql`
-          select *
-          from public.doc_access_log
-          order by created_at desc
-          limit ${limit} offset ${offset}
-        `;
-      }
-    },
-    async () => {
-      if (docFilter) {
-        return sql`select count(*)::int as total from public.doc_access_log where doc_id = ${docFilter}::uuid`;
-      }
-      return sql`select count(*)::int as total from public.doc_access_log`;
-    }
-  );
+      )
+    : hasDocAudit
+      ? { ...audit, name: "doc_audit (fallback)" }
+      : { name: "doc_access_log", ok: false, error: "Table not found (or not accessible).", rows: [] };
 
   // doc_views
   const docViews = await tryQuery(
@@ -376,7 +396,17 @@ export default async function AdminAuditPage({
 
       <div className="grid gap-6">
         <ScrollTable title="Audit events" subtitle="Reads from public.doc_audit (if present)." state={audit} />
-        <ScrollTable title="Access logs" subtitle="Reads from public.doc_access_log (if present)." state={accessLog} />
+        <ScrollTable
+          title="Access logs"
+          subtitle={
+            hasDocAccessLog
+              ? "Reads from public.doc_access_log (if present)."
+              : hasDocAudit
+                ? "doc_access_log not found — showing doc_audit as fallback (logDocAccess writes there by default)."
+                : "Reads from public.doc_access_log (if present)."
+          }
+          state={accessLog}
+        />
         <ScrollTable title="Views" subtitle="Reads from public.doc_views (if present)." state={docViews} />
       </div>
     </div>

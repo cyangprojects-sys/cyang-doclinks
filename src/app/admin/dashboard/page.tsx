@@ -71,6 +71,15 @@ function fmtDate(s: string | null) {
     return d.toLocaleString();
 }
 
+async function tableExists(fqTable: string): Promise<boolean> {
+    try {
+        const rows = (await sql`select to_regclass(${fqTable})::text as reg`) as unknown as Array<{ reg: string | null }>;
+        return !!rows?.[0]?.reg;
+    } catch {
+        return false;
+    }
+}
+
 export default async function AdminDashboardPage() {
     const ok = await isOwnerAdmin();
     if (!ok) redirect("/api/auth/signin");
@@ -106,25 +115,50 @@ export default async function AdminDashboardPage() {
     limit 500
   `) as unknown as ShareRow[];
 
+    const hasDocAccessLog = await tableExists("public.doc_access_log");
+    const hasDocAudit = await tableExists("public.doc_audit");
+
     // Recent access logs (best-effort; table may not exist in older envs)
     let access: AccessRow[] = [];
     try {
-        access = (await sql`
-      select
-        l.accessed_at::text as accessed_at,
-        l.doc_id::text as doc_id,
-        d.title as doc_title,
-        l.alias::text as alias,
-        l.share_id::text as share_id,
-        l.email_used::text as email_used,
-        l.ip::text as ip,
-        l.device_hash::text as device_hash,
-        l.user_agent::text as user_agent
-      from public.doc_access_log l
-      join public.docs d on d.id = l.doc_id
-      order by l.accessed_at desc
-      limit 200
-    `) as unknown as AccessRow[];
+        if (hasDocAccessLog) {
+            access = (await sql`
+        select
+          l.accessed_at::text as accessed_at,
+          l.doc_id::text as doc_id,
+          d.title as doc_title,
+          l.alias::text as alias,
+          l.share_id::text as share_id,
+          l.email_used::text as email_used,
+          l.ip::text as ip,
+          l.device_hash::text as device_hash,
+          l.user_agent::text as user_agent
+        from public.doc_access_log l
+        join public.docs d on d.id = l.doc_id
+        order by l.accessed_at desc
+        limit 200
+      `) as unknown as AccessRow[];
+        } else if (hasDocAudit) {
+            // logDocAccess() writes to doc_audit by default in this repo.
+            access = (await sql`
+        select
+          a.created_at::text as accessed_at,
+          a.doc_id::text as doc_id,
+          d.title as doc_title,
+          a.alias::text as alias,
+          a.share_id::text as share_id,
+          a.email_used::text as email_used,
+          null::text as ip,
+          null::text as device_hash,
+          a.user_agent::text as user_agent
+        from public.doc_audit a
+        join public.docs d on d.id = a.doc_id
+        order by a.created_at desc
+        limit 200
+      `) as unknown as AccessRow[];
+        } else {
+            access = [];
+        }
     } catch {
         access = [];
     }
@@ -136,13 +170,23 @@ export default async function AdminDashboardPage() {
         last: null,
     };
     try {
-        const rows = (await sql`
-      select
-        count(*)::int as total,
-        count(distinct coalesce(device_hash, ''))::int as uniques,
-        max(accessed_at)::text as last
-      from public.doc_access_log
-    `) as unknown as Array<{ total: number; uniques: number; last: string | null }>;
+        const rows = hasDocAccessLog
+            ? ((await sql`
+        select
+          count(*)::int as total,
+          count(distinct coalesce(device_hash, ''))::int as uniques,
+          max(accessed_at)::text as last
+        from public.doc_access_log
+      `) as unknown as Array<{ total: number; uniques: number; last: string | null }> )
+            : hasDocAudit
+              ? ((await sql`
+        select
+          count(*)::int as total,
+          0::int as uniques,
+          max(created_at)::text as last
+        from public.doc_audit
+      `) as unknown as Array<{ total: number; uniques: number; last: string | null }> )
+              : ([] as Array<{ total: number; uniques: number; last: string | null }>);
         if (rows?.[0]) accessSummary = rows[0];
     } catch {
         // ignore
