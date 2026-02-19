@@ -6,23 +6,12 @@ import { requireOwner } from "@/lib/owner";
 import { randomBytes } from "crypto";
 import bcrypt from "bcryptjs";
 
-export type ShareRow = {
-  token: string;
-  to_email: string | null;
-  created_at: string;
-  expires_at: string | null;
-  max_views: number | null;
-  view_count: number;
-  revoked_at: string | null;
-  last_viewed_at: string | null;
-};
-
 export type CreateShareResult =
   | { ok: true; token: string; url: string }
   | { ok: false; error: string; message?: string };
 
 export type ShareStatsResult =
-  | { ok: true; row: ShareRow }
+  | { ok: true; row: any }
   | { ok: false; error: string; message?: string };
 
 export type RevokeShareResult =
@@ -45,6 +34,7 @@ function baseUrlFromEnv(): string {
 }
 
 function buildShareUrl(token: string): string {
+  // IMPORTANT: link users to /s/<token> (NOT /raw) so they hit the gate UI.
   const base = baseUrlFromEnv().replace(/\/+$/, "");
   return `${base}/s/${token}`;
 }
@@ -129,18 +119,10 @@ export async function createAndEmailShareToken(
 
     const token = newToken();
 
-    try {
-      await sql`
-        insert into share_tokens (token, doc_id, to_email, expires_at, max_views, password_hash)
-        values (${token}, ${docId}::uuid, ${toEmail}, ${expiresAt}, ${maxViews}, ${passwordHash})
-      `;
-    } catch (e: any) {
-      return {
-        ok: false,
-        error: "db_error",
-        message: e?.message || "Failed to insert share token.",
-      };
-    }
+    await sql`
+      insert into share_tokens (token, doc_id, to_email, expires_at, max_views, password_hash)
+      values (${token}, ${docId}::uuid, ${toEmail}, ${expiresAt}, ${maxViews}, ${passwordHash})
+    `;
 
     const url = buildShareUrl(token);
 
@@ -166,6 +148,9 @@ export async function createAndEmailShareToken(
             Open document
           </a>
         </p>
+        <p style="color:#777;font-size:12px;margin-top:14px;">
+          Tip: This link will open a secure gate page first, then load the PDF.
+        </p>
       </div>
     `;
 
@@ -180,34 +165,24 @@ export async function getShareStatsByToken(token: string): Promise<ShareStatsRes
   try {
     await requireOwner();
 
-    const rows = (await sql`
+    const rows = await sql`
       select
-        st.token::text as token,
-        st.to_email::text as to_email,
-        st.created_at::text as created_at,
-        st.expires_at::text as expires_at,
-        st.max_views::int as max_views,
-        st.revoked_at::text as revoked_at,
-        coalesce((
-          select count(*)::int
-          from doc_views dv
-          where dv.token = st.token
-        ), 0) as view_count,
-        (
-          select max(dv.viewed_at)::text
-          from doc_views dv
-          where dv.token = st.token
-        ) as last_viewed_at
-      from share_tokens st
-      where st.token = ${token}
+        token::text as token,
+        doc_id::text as doc_id,
+        to_email::text as to_email,
+        created_at::text as created_at,
+        expires_at::text as expires_at,
+        max_views,
+        revoked_at::text as revoked_at,
+        views_count
+      from share_tokens
+      where token = ${token}
       limit 1
-    `) as unknown as ShareRow[];
+    `;
 
-    if (!rows || rows.length === 0) {
-      return { ok: false, error: "not_found", message: "Token not found" };
-    }
-
-    return { ok: true, row: rows[0] };
+    const row = (rows as any).rows?.[0] ?? null;
+    if (!row) return { ok: false, error: "not_found", message: "Token not found" };
+    return { ok: true, row };
   } catch (e: any) {
     return { ok: false, error: "exception", message: e?.message || "Error" };
   }

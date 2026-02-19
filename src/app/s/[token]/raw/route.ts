@@ -1,123 +1,130 @@
 // src/app/s/[token]/raw/route.ts
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
-
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
-import crypto from "crypto";
-import { r2Client } from "@/lib/r2";
-import { GetObjectCommand } from "@aws-sdk/client-s3";
-import type { Readable } from "node:stream";
-import { consumeShareTokenView, resolveDoc } from "@/lib/resolveDoc";
+import { getObjectStream } from "@/lib/r2";
+import { sha256Hex } from "@/lib/crypto";
+import { cookies } from "next/headers";
 
-function getClientIp(req: NextRequest) {
-  const xff = req.headers.get("x-forwarded-for") || "";
-  return xff.split(",")[0]?.trim() || "";
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
+/**
+ * If someone PASTES /raw into the address bar, the browser navigation sends
+ * Accept: text/html and we should redirect them to /s/<token> so they hit the
+ * gate UI (email/password) instead of getting a PDF endpoint directly.
+ *
+ * But when the embedded PDF viewer fetches the PDF, Accept is usually
+ * application/pdf or */* (not text/html), so we keep serving the PDF normally.
+ */
+function shouldRedirectToGate(req: NextRequest): boolean {
+  const accept = (req.headers.get("accept") || "").toLowerCase();
+  // If HTML is preferred, treat as navigation.
+  return accept.includes("text/html");
 }
 
-function hashIp(ip: string) {
-  const salt = process.env.VIEW_SALT || process.env.SHARE_SALT || "";
-  if (!salt || !ip) return null;
-  return crypto.createHmac("sha256", salt).update(ip).digest("hex").slice(0, 32);
+function gateCookieName(token: string): string {
+  // keep cookie key stable but scoped by token
+  return `s_gate_${sha256Hex(token).slice(0, 16)}`;
 }
 
-function safeFilename(name: string) {
-  const cleaned = (name || "document.pdf").replace(/["\r\n]/g, "").trim();
-  if (!cleaned) return "document.pdf";
-  return cleaned.toLowerCase().endsWith(".pdf") ? cleaned : `${cleaned}.pdf`;
+async function isGateUnlocked(token: string): Promise<boolean> {
+  const jar = await cookies();
+  const c = jar.get(gateCookieName(token))?.value || "";
+  return c === "1";
 }
 
-function cookieName(token: string) {
-  return `share_unlock_${token}`;
-}
+export async function GET(
+  req: NextRequest,
+  { params }: { params: Promise<{ token: string }> }
+) {
+  const { token } = await params;
 
-async function isUnlocked(token: string, req: NextRequest): Promise<boolean> {
-  const unlockId = req.cookies.get(cookieName(token))?.value || "";
-  if (!unlockId) return false;
+  if (shouldRedirectToGate(req)) {
+    return NextResponse.redirect(new URL(`/s/${token}`, req.url), 302);
+  }
 
-  const rows = (await sql`
-    select 1
-    from public.share_unlocks
+  // Load share metadata
+  const r = await sql`
+    select
+      doc_id::text as doc_id,
+      expires_at,
+      revoked_at,
+      max_views,
+      views_count,
+      password_hash,
+      to_email
+    from share_tokens
     where token = ${token}
-      and unlock_id = ${unlockId}
-      and expires_at > now()
     limit 1
-  `) as unknown as Array<{ "?column?": number }>;
+  `;
 
-  return rows.length > 0;
-}
+  const share = (r as any).rows?.[0] ?? null;
+  if (!share) return new NextResponse("Not found", { status: 404 });
 
-export async function GET(req: NextRequest, context: { params: Promise<{ token: string }> }) {
-  const { token } = await context.params;
-  const t = (token || "").trim();
-  if (!t) return new NextResponse("Not found", { status: 404 });
-
-  // Central resolver:
-  // - resolves share token
-  // - enforces revoked/expired/max_views
-  // - increments views atomically (keeps your current behavior)
-  const resolved = await resolveDoc({ token: t });
-  if (!resolved.ok) return new NextResponse("Not found", { status: 404 });
-
-  // Password gate: require unlocked cookie+DB if password set
-  if (resolved.requiresPassword) {
-    const ok = await isUnlocked(t, req);
-    if (!ok) {
-      return NextResponse.redirect(new URL(`/s/${encodeURIComponent(t)}`, req.url), 302);
+  // enforce revoke/expiry/max-views
+  if (share.revoked_at) return new NextResponse("Not found", { status: 404 });
+  if (share.expires_at && new Date(share.expires_at).getTime() < Date.now()) {
+    return new NextResponse("Not found", { status: 404 });
+  }
+  if (share.max_views !== null && share.max_views !== undefined) {
+    const maxv = Number(share.max_views);
+    const cur = Number(share.views_count || 0);
+    if (!Number.isNaN(maxv) && cur >= maxv) {
+      return new NextResponse("Not found", { status: 404 });
     }
   }
 
-  // Analytics log (best-effort)
-  try {
-    const ip = getClientIp(req);
-    const ipHash = hashIp(ip);
-    const ua = req.headers.get("user-agent") || null;
-    const ref = req.headers.get("referer") || null;
+  // If gated by email/password, require unlock cookie before serving PDF
+  const needsGate = !!share.to_email || !!share.password_hash;
+  if (needsGate) {
+    const ok = await isGateUnlocked(token);
+    if (!ok) {
+      // Return 403 (not 404) because token exists but access not yet granted.
+      return new NextResponse("Forbidden", { status: 403 });
+    }
+  }
 
+  // Increment views_count best-effort
+  try {
     await sql`
-      insert into public.doc_views
-        (doc_id, token, path, kind, user_agent, referer, ip_hash)
-      values
-        (${resolved.docId}::uuid, ${t}, ${new URL(req.url).pathname}, 'share_raw', ${ua}, ${ref}, ${ipHash})
+      update share_tokens
+      set views_count = coalesce(views_count, 0) + 1
+      where token = ${token}
     `;
   } catch {
     // ignore
   }
 
-  // Stream from R2 with Range support
-  const range = req.headers.get("range") ?? undefined;
+  // Fetch doc
+  const docId = share.doc_id;
+  const d = await sql`
+    select
+      storage_key::text as storage_key,
+      mime_type::text as mime_type,
+      file_name::text as file_name
+    from docs
+    where id = ${docId}::uuid
+    limit 1
+  `;
+  const doc = (d as any).rows?.[0] ?? null;
+  if (!doc) return new NextResponse("Not found", { status: 404 });
 
-  const obj = await r2Client.send(
-    new GetObjectCommand({
-      Bucket: resolved.bucket,
-      Key: resolved.r2Key,
-      Range: range,
-    })
-  );
+  const stream = await getObjectStream(doc.storage_key);
+  const mime = doc.mime_type || "application/pdf";
+  const filename = doc.file_name || "document.pdf";
 
-  const body = obj.Body as Readable | undefined;
-  if (!body) return new NextResponse("Not found", { status: 404 });
-
-  const url = new URL(req.url);
-  const download = url.searchParams.get("download") === "1";
-
-  const displayName =
-    resolved.originalFilename || resolved.title || "document.pdf";
-  const filename = safeFilename(displayName);
-
-  const headers = new Headers();
-  headers.set("Content-Type", obj.ContentType || resolved.contentType || "application/pdf");
-  headers.set("Accept-Ranges", "bytes");
-  headers.set("Cache-Control", "private, no-store");
-
-  const contentRange = (obj as any).ContentRange as string | undefined;
-  if (contentRange) headers.set("Content-Range", contentRange);
-  if (obj.ContentLength != null) headers.set("Content-Length", String(obj.ContentLength));
-
-  headers.set("Content-Disposition", `${download ? "attachment" : "inline"}; filename="${filename}"`);
-
-  return new NextResponse(body as any, {
-    status: range ? 206 : 200,
-    headers,
+  const res = new NextResponse(stream as any, {
+    status: 200,
+    headers: {
+      "Content-Type": mime,
+      "Content-Disposition": `inline; filename="${filename}"`,
+      // For PDF viewers/range requests:
+      "Accept-Ranges": "bytes",
+      // Don’t cache sensitive docs by default
+      "Cache-Control": "private, no-store, max-age=0",
+    },
   });
+
+  return res;
 }
