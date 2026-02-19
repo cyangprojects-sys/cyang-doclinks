@@ -9,6 +9,7 @@ import { GetObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import crypto from "crypto";
 import { resolveDoc } from "@/lib/resolveDoc";
+import { getClientIpFromHeaders, getUserAgentFromHeaders, logDocAccess } from "@/lib/audit";
 
 function getClientIp(req: NextRequest) {
   const xff = req.headers.get("x-forwarded-for") || "";
@@ -31,6 +32,22 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ docId: stri
 
   if (!resolved.ok) {
     return new Response("Not found", { status: 404 });
+  }
+
+  // Audit log (best-effort)
+  try {
+    const url = new URL(req.url);
+    const alias = url.searchParams.get("alias");
+    await logDocAccess({
+      docId: resolved.docId,
+      alias: alias || null,
+      shareId: null,
+      emailUsed: null,
+      ip: getClientIpFromHeaders(req.headers),
+      userAgent: getUserAgentFromHeaders(req.headers),
+    });
+  } catch {
+    // ignore
   }
 
   // Analytics (best-effort)

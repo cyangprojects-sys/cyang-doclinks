@@ -2,7 +2,7 @@
 "use server";
 
 import bcrypt from "bcryptjs";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { sql } from "@/lib/db";
 import {
     DEVICE_TRUST_HOURS,
@@ -10,6 +10,7 @@ import {
     isAliasTrusted,
     makeAliasTrustCookieValue,
 } from "@/lib/deviceTrust";
+import { deviceHashFrom, getClientIpFromHeaders, getUserAgentFromHeaders, isDeviceTrustedForDoc, trustDeviceForDoc } from "@/lib/audit";
 
 export type VerifyAliasPasswordResult =
     | { ok: true }
@@ -103,9 +104,23 @@ async function getAliasRow(aliasInput: string): Promise<
 export async function isAliasUnlockedAction(aliasInput: string): Promise<boolean> {
     const alias = normAlias(aliasInput);
     if (!alias) return false;
+
+    // Fast path: cookie trust
     const c = await cookies();
     const v = c.get(aliasTrustCookieName(alias))?.value;
-    return isAliasTrusted(alias, v);
+    if (isAliasTrusted(alias, v)) return true;
+
+    // DB trust (requires your trusted_devices table)
+    const row = await getAliasRow(alias);
+    if (!row.ok) return false;
+
+    const h = await headers();
+    const ip = getClientIpFromHeaders(h);
+    const ua = getUserAgentFromHeaders(h);
+    const dHash = deviceHashFrom(ip, ua);
+    if (!dHash) return false;
+
+    return isDeviceTrustedForDoc({ docId: row.docId, deviceHash: dHash });
 }
 
 export async function verifyAliasPasswordResultAction(formData: FormData): Promise<VerifyAliasPasswordResult> {
@@ -125,6 +140,20 @@ export async function verifyAliasPasswordResultAction(formData: FormData): Promi
 
     const match = await bcrypt.compare(password, row.passwordHash);
     if (!match) return { ok: false, error: "bad_password", message: "Incorrect password." };
+
+    // DB trust (best-effort)
+    try {
+        const h = await headers();
+        const ip = getClientIpFromHeaders(h);
+        const ua = getUserAgentFromHeaders(h);
+        const dHash = deviceHashFrom(ip, ua);
+        if (dHash) {
+            const trustedUntilIso = new Date(Date.now() + DEVICE_TRUST_HOURS * 3600 * 1000).toISOString();
+            await trustDeviceForDoc({ docId: row.docId, deviceHash: dHash, trustedUntilIso });
+        }
+    } catch {
+        // ignore
+    }
 
     const expMs = Date.now() + DEVICE_TRUST_HOURS * 3600 * 1000;
     const c = await cookies();

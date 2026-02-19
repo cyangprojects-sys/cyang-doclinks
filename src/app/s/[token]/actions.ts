@@ -15,6 +15,10 @@ function cookieName(token: string) {
     return `share_unlock_${token}`;
 }
 
+function emailCookieName(token: string) {
+    return `share_email_${token}`;
+}
+
 function randomId() {
     return crypto.randomBytes(24).toString("base64url");
 }
@@ -95,11 +99,31 @@ export async function verifySharePasswordCore(
 ): Promise<VerifySharePasswordResult> {
     const token = String(formData.get("token") || "").trim();
     const password = String(formData.get("password") || "");
+    const emailInput = String(formData.get("email") || "").trim().toLowerCase();
 
     if (!token) return { ok: false, error: "not_found", message: "Missing token." };
 
     const share = await resolveShareMeta(token);
     if (!share.ok) return { ok: false, error: "not_found", message: "Share not found." };
+
+    // Recipient restriction (forward protection)
+    if (share.toEmail) {
+        const required = String(share.toEmail || "").trim().toLowerCase();
+        if (!emailInput) {
+            return {
+                ok: false,
+                error: "bad_password",
+                message: "Enter the recipient email for this share.",
+            };
+        }
+        if (emailInput !== required) {
+            return {
+                ok: false,
+                error: "bad_password",
+                message: "That email doesn’t match the recipient for this share.",
+            };
+        }
+    }
 
     if (share.revokedAt) return { ok: false, error: "revoked", message: "This share was revoked." };
     if (isExpired(share.expiresAt)) return { ok: false, error: "expired", message: "This share link has expired." };
@@ -126,6 +150,17 @@ export async function verifySharePasswordCore(
             path: `/s/${token}`,
             maxAge: UNLOCK_HOURS * 3600,
         });
+
+        // Store email used (if any) so /raw can audit it.
+        if (share.toEmail) {
+            c.set(emailCookieName(token), String(share.toEmail).trim().toLowerCase(), {
+                httpOnly: true,
+                secure: true,
+                sameSite: "lax",
+                path: `/s/${token}`,
+                maxAge: UNLOCK_HOURS * 3600,
+            });
+        }
 
         return { ok: true };
     }
@@ -165,6 +200,16 @@ export async function verifySharePasswordCore(
         path: `/s/${token}`,
         maxAge: UNLOCK_HOURS * 3600,
     });
+
+    if (share.toEmail) {
+        c.set(emailCookieName(token), String(share.toEmail).trim().toLowerCase(), {
+            httpOnly: true,
+            secure: true,
+            sameSite: "lax",
+            path: `/s/${token}`,
+            maxAge: UNLOCK_HOURS * 3600,
+        });
+    }
 
     return { ok: true };
 }

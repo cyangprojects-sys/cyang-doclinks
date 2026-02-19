@@ -8,8 +8,7 @@ import { resolveDoc } from "@/lib/resolveDoc";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import { sql } from "@/lib/db";
-import { cookies } from "next/headers";
-import { aliasTrustCookieName, isAliasTrusted } from "@/lib/deviceTrust";
+import { isAliasUnlockedAction } from "./unlockActions";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -201,7 +200,7 @@ export default async function SharePage({
     return (
       <main className="mx-auto max-w-5xl px-4 py-10">
         <ShareForm docId={bypass.docId} />
-        <DocumentViewer docId={bypass.docId} />
+        <DocumentViewer docId={bypass.docId} alias={alias} />
       </main>
     );
   }
@@ -213,9 +212,7 @@ export default async function SharePage({
   if (isExpired(row.expiresAt)) notFound();
 
   if (row.passwordHash) {
-    const c = await cookies();
-    const v = c.get(aliasTrustCookieName(alias))?.value;
-    const unlocked = isAliasTrusted(alias, v);
+    const unlocked = await isAliasUnlockedAction(alias);
 
     if (!unlocked) {
       return (
@@ -234,14 +231,16 @@ export default async function SharePage({
   if (!resolved.ok) notFound();
 
   return (
-    <main className="mx-auto max-w-5xl px-4 py-10">
-      <DocumentViewer docId={resolved.docId} />
+        <main className="mx-auto max-w-5xl px-4 py-10">
+      <DocumentViewer docId={resolved.docId} alias={alias} />
     </main>
   );
 }
 
-function DocumentViewer({ docId }: { docId: string }) {
-  const viewerUrl = `/serve/${docId}`;
+function DocumentViewer({ docId, alias }: { docId: string; alias?: string }) {
+  const viewerUrl = alias
+    ? `/serve/${docId}?alias=${encodeURIComponent(alias)}`
+    : `/serve/${docId}`;
 
   return (
     <div className="mt-4">

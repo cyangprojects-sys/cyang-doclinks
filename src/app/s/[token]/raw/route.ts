@@ -4,6 +4,7 @@ import { GetObjectCommand } from "@aws-sdk/client-s3";
 import { r2Client, r2Bucket } from "@/lib/r2";
 import { cookies } from "next/headers";
 import { consumeShareTokenView } from "@/lib/resolveDoc";
+import { getClientIpFromHeaders, getUserAgentFromHeaders, logDocAccess } from "@/lib/audit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -23,6 +24,11 @@ function shouldRedirectToGate(req: NextRequest): boolean {
 function unlockCookieName(token: string) {
   // Must match src/app/s/[token]/actions.ts
   return `share_unlock_${token}`;
+}
+
+function emailCookieName(token: string) {
+  // Must match src/app/s/[token]/actions.ts
+  return `share_email_${token}`;
 }
 
 async function isUnlocked(token: string): Promise<boolean> {
@@ -148,6 +154,22 @@ export async function GET(
         default:
           return new NextResponse("Not found", { status: 404 });
       }
+    }
+
+    // Audit log (best-effort) — only on the first counted request
+    try {
+      const jar = await cookies();
+      const emailUsed = jar.get(emailCookieName(token))?.value || null;
+      await logDocAccess({
+        docId: share.doc_id,
+        shareId: share.token,
+        alias: null,
+        emailUsed,
+        ip: getClientIpFromHeaders(req.headers),
+        userAgent: getUserAgentFromHeaders(req.headers),
+      });
+    } catch {
+      // ignore
     }
   }
 
