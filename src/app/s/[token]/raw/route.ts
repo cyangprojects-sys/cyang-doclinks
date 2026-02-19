@@ -3,6 +3,7 @@ import { sql } from "@/lib/db";
 import { GetObjectCommand } from "@aws-sdk/client-s3";
 import { r2Client, r2Bucket } from "@/lib/r2";
 import { cookies } from "next/headers";
+import { consumeShareTokenView } from "@/lib/resolveDoc";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -76,6 +77,18 @@ function isMaxed(view_count: number, max_views: number | null) {
   return view_count >= max_views;
 }
 
+/**
+ * Avoid counting every byte-range follow-up as a new "view".
+ * Most PDF viewers request ranges; we count only the first request that includes byte 0.
+ */
+function shouldCountView(req: NextRequest): boolean {
+  const range = (req.headers.get("range") || "").toLowerCase();
+  if (!range) return true; // full request
+
+  // Examples: "bytes=0-" or "bytes=0-65535" should count; later ranges should not.
+  return range.includes("bytes=0-");
+}
+
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ token: string }> }
@@ -117,6 +130,24 @@ export async function GET(
         return NextResponse.redirect(url);
       }
       return new NextResponse("Unauthorized", { status: 401 });
+    }
+  }
+
+  // Enforce + increment max views here too (raw link is often what the PDF viewer hits).
+  // We only count once per initial range request to avoid burning views on chunked fetches.
+  if (shouldCountView(req)) {
+    const consumed = await consumeShareTokenView(token);
+    if (!consumed.ok) {
+      switch (consumed.error) {
+        case "REVOKED":
+          return new NextResponse("Revoked", { status: 410 });
+        case "EXPIRED":
+          return new NextResponse("Link expired", { status: 410 });
+        case "MAXED":
+          return new NextResponse("Max views reached", { status: 410 });
+        default:
+          return new NextResponse("Not found", { status: 404 });
+      }
     }
   }
 
