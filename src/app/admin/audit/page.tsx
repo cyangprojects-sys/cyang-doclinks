@@ -1,6 +1,9 @@
 // src/app/admin/audit/page.tsx
+import Link from "next/link";
+import { redirect } from "next/navigation";
 import { sql } from "@/lib/db";
 import { unstable_noStore as noStore } from "next/cache";
+import { isOwnerAdmin } from "@/lib/admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -8,6 +11,9 @@ export const revalidate = 0;
 
 export default async function AuditPage() {
   noStore();
+
+  const ok = await isOwnerAdmin();
+  if (!ok) redirect("/api/auth/signin");
 
   let auditRows: any[] = [];
   let accessRows: any[] = [];
@@ -24,12 +30,32 @@ export default async function AuditPage() {
   } catch { }
 
   try {
-    accessRows = await sql`
+    // Be tolerant of schema drift. Some environments may not have `accessed_at`.
+    // We fetch a larger window and sort in JS using the first timestamp-like column we find.
+    const raw = (await sql`
       select *
       from public.doc_access_log
-      order by accessed_at desc
-      limit 50
-    `;
+      limit 200
+    `) as unknown as any[];
+
+    const preferredCols = ["accessed_at", "accessedAt", "created_at", "createdAt", "ts", "timestamp"];
+    const cols = raw?.[0] ? Object.keys(raw[0]) : [];
+    const tsCol = preferredCols.find((c) => cols.includes(c)) ?? null;
+
+    if (!tsCol) {
+      accessRows = raw.slice(0, 50);
+    } else {
+      const toTime = (v: any) => {
+        if (!v) return 0;
+        const d = new Date(v);
+        const t = d.getTime();
+        return Number.isNaN(t) ? 0 : t;
+      };
+      accessRows = raw
+        .slice()
+        .sort((a, b) => toTime(b?.[tsCol]) - toTime(a?.[tsCol]))
+        .slice(0, 50);
+    }
   } catch (err: any) {
     accessError = err.message;
   }
@@ -45,7 +71,15 @@ export default async function AuditPage() {
 
   return (
     <div className="mx-auto max-w-7xl p-6 text-white">
-      <h1 className="text-2xl font-semibold mb-8">Audit Logs</h1>
+      <div className="mb-8 flex items-center justify-between gap-3">
+        <h1 className="text-2xl font-semibold">Audit Logs</h1>
+        <Link
+          href="/admin/dashboard"
+          className="rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm text-neutral-200 hover:bg-neutral-900"
+        >
+          ← Back to dashboard
+        </Link>
+      </div>
 
       <div className="space-y-10">
 
@@ -89,7 +123,7 @@ export default async function AuditPage() {
 
           {accessError && (
             <div className="text-yellow-400 text-sm">
-              Table not found (or not accessible).<br />
+              Access logs query failed.<br />
               <span className="text-neutral-500">{accessError}</span>
             </div>
           )}
