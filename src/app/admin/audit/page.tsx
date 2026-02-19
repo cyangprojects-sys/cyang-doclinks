@@ -26,8 +26,15 @@ async function isOwner(): Promise<boolean> {
 }
 
 function isMissingRelationError(err: unknown): boolean {
+  const anyErr = err as any;
+  const code = typeof anyErr?.code === "string" ? anyErr.code : undefined;
+  // Postgres undefined_table
+  if (code === "42P01") return true;
+
   const msg = (err instanceof Error ? err.message : String(err)).toLowerCase();
-  return msg.includes("does not exist") || msg.includes("relation") || msg.includes("undefined_table");
+  // Be specific here — do NOT match the generic word "relation" because
+  // errors like "permission denied for relation ..." would be misclassified.
+  return msg.includes("does not exist") || msg.includes("undefined_table");
 }
 
 async function tryQuery(name: string, queryFn: () => Promise<any>): Promise<QueryState> {
@@ -150,7 +157,7 @@ export default async function AdminAuditPage() {
   );
 
   const docViews = await tryQuery("doc_views", async () =>
-    sql`SELECT * FROM doc_views ORDER BY created_at DESC LIMIT 200`
+    sql`SELECT * FROM public.doc_views ORDER BY created_at DESC LIMIT 200`
   );
 
   return (
