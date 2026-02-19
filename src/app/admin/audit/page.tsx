@@ -26,14 +26,13 @@ async function isOwner(): Promise<boolean> {
 }
 
 function isMissingRelationError(err: unknown): boolean {
+  // Prefer SQLSTATE when available (Postgres undefined_table = 42P01)
   const anyErr = err as any;
-  const code = typeof anyErr?.code === "string" ? anyErr.code : undefined;
-  // Postgres undefined_table
+  const code = typeof anyErr?.code === "string" ? anyErr.code : "";
   if (code === "42P01") return true;
 
-  const msg = (err instanceof Error ? err.message : String(err)).toLowerCase();
-  // Be specific here — do NOT match the generic word "relation" because
-  // errors like "permission denied for relation ..." would be misclassified.
+  // Fallback to message matching (avoid overly-broad matches like "relation")
+  const msg = (anyErr?.message ? String(anyErr.message) : String(err)).toLowerCase();
   return msg.includes("does not exist") || msg.includes("undefined_table");
 }
 
