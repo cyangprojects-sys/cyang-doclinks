@@ -15,7 +15,7 @@ export const revalidate = 0;
  * gate UI (email/password) instead of getting a PDF endpoint directly.
  *
  * But when the embedded PDF viewer fetches the PDF, Accept is usually
- * application/pdf or */* (not text/html), so we keep serving the PDF normally.
+ * application/pdf or * / * (not text/html), so we keep serving the PDF normally.
  */
 function shouldRedirectToGate(req: NextRequest): boolean {
   const accept = (req.headers.get("accept") || "").toLowerCase();
