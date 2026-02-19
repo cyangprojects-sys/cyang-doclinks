@@ -39,24 +39,30 @@ async function getObjectStream(key: string) {
   return out.Body as any;
 }
 
+type ShareLookupRow = {
+  doc_id: string;
+  r2_key: string;
+  password_hash: string | null;
+  expires_at: string | null;
+};
+
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ token: string }> }
 ) {
   const { token } = await params;
 
-  const rows = await sql<{
-    doc_id: string;
-    r2_key: string;
-    password_hash: string | null;
-    expires_at: string | null;
-  }[]>`
-    select s.doc_id, d.r2_key, s.password_hash, s.expires_at
+  const rows = (await sql`
+    select
+      s.doc_id::text as doc_id,
+      d.r2_key::text as r2_key,
+      s.password_hash::text as password_hash,
+      s.expires_at::text as expires_at
     from doc_shares s
     join docs d on d.id = s.doc_id
     where s.token = ${token}
     limit 1
-  `;
+  `) as unknown as ShareLookupRow[];
 
   const share = rows[0];
   if (!share) {
@@ -68,7 +74,8 @@ export async function GET(
   }
 
   const cookieName = gateCookieName(token);
-  const hasGateCookie = cookies().get(cookieName);
+  const cookieJar = await cookies();
+  const hasGateCookie = cookieJar.get(cookieName);
 
   if (share.password_hash && !hasGateCookie) {
     if (shouldRedirectToGate(req)) {

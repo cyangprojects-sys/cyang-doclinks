@@ -6,12 +6,30 @@ import { requireOwner } from "@/lib/owner";
 import { randomBytes } from "crypto";
 import bcrypt from "bcryptjs";
 
+/**
+ * NOTE:
+ * SharePanel synthesizes a ShareRow immediately after creating a token,
+ * before it can hydrate real stats from the DB. For that reason `doc_id`
+ * is optional here.
+ */
+export type ShareRow = {
+  token: string;
+  doc_id?: string;
+  to_email: string | null;
+  created_at: string;
+  expires_at: string | null;
+  max_views: number | null;
+  view_count: number | null;
+  revoked_at: string | null;
+  last_viewed_at: string | null;
+};
+
 export type CreateShareResult =
   | { ok: true; token: string; url: string }
   | { ok: false; error: string; message?: string };
 
 export type ShareStatsResult =
-  | { ok: true; row: any }
+  | { ok: true; row: ShareRow }
   | { ok: false; error: string; message?: string };
 
 export type RevokeShareResult =
@@ -91,7 +109,8 @@ export async function createAndEmailShareToken(
     const maxViewsRaw = String(form.get("maxViews") || "").trim();
     const passwordRaw = String(form.get("password") || "");
 
-    if (!docId) return { ok: false, error: "bad_request", message: "Missing docId" };
+    if (!docId)
+      return { ok: false, error: "bad_request", message: "Missing docId" };
 
     const toEmail = toEmailRaw ? toEmailRaw.toLowerCase() : null;
 
@@ -161,7 +180,9 @@ export async function createAndEmailShareToken(
   }
 }
 
-export async function getShareStatsByToken(token: string): Promise<ShareStatsResult> {
+export async function getShareStatsByToken(
+  token: string
+): Promise<ShareStatsResult> {
   try {
     await requireOwner();
 
@@ -174,7 +195,8 @@ export async function getShareStatsByToken(token: string): Promise<ShareStatsRes
         expires_at::text as expires_at,
         max_views,
         revoked_at::text as revoked_at,
-        views_count
+        views_count as view_count,
+        null::text as last_viewed_at
       from share_tokens
       where token = ${token}
       limit 1
@@ -188,7 +210,9 @@ export async function getShareStatsByToken(token: string): Promise<ShareStatsRes
   }
 }
 
-export async function revokeShareToken(token: string): Promise<RevokeShareResult> {
+export async function revokeShareToken(
+  token: string
+): Promise<RevokeShareResult> {
   try {
     await requireOwner();
 
