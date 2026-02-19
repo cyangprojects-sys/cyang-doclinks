@@ -148,8 +148,9 @@ export default function SharesTableClient(props: {
 
             {/* Table */}
             <div className="mt-3 overflow-hidden rounded-lg border border-neutral-800">
-                <table className="w-full text-sm">
-                    <thead className="bg-neutral-900 text-neutral-300">
+                <div className="max-h-[560px] overflow-auto">
+                    <table className="w-full text-sm">
+                        <thead className="sticky top-0 bg-neutral-900 text-neutral-300">
                         <tr>
                             <th className="px-4 py-3 text-left">Recipient</th>
                             <th className="px-4 py-3 text-left">Token</th>
@@ -161,7 +162,7 @@ export default function SharesTableClient(props: {
                             <th className="px-4 py-3 text-right">Password</th>
                             <th className="px-4 py-3 text-right">Action</th>
                         </tr>
-                    </thead>
+                        </thead>
 
                     <tbody>
                         {filtered.length === 0 ? (
@@ -239,7 +240,8 @@ export default function SharesTableClient(props: {
                             })
                         )}
                     </tbody>
-                </table>
+                    </table>
+                </div>
             </div>
         </div>
     );

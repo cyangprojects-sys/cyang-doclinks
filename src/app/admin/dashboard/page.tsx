@@ -49,6 +49,28 @@ type AccessRow = {
     user_agent: string | null;
 };
 
+type ViewsByDocRow = {
+    doc_id: string;
+    doc_title: string | null;
+    alias: string | null;
+    views: number;
+    unique_ips: number;
+    last_view: string | null;
+};
+
+type DailyAggRow = {
+    day: string;
+    views: number;
+    unique_ips: number;
+};
+
+function fmtDate(s: string | null) {
+    if (!s) return "—";
+    const d = new Date(s);
+    if (Number.isNaN(d.getTime())) return s;
+    return d.toLocaleString();
+}
+
 export default async function AdminDashboardPage() {
     const ok = await isOwnerAdmin();
     if (!ok) redirect("/api/auth/signin");
@@ -98,7 +120,7 @@ export default async function AdminDashboardPage() {
         l.ip::text as ip,
         l.device_hash::text as device_hash,
         l.user_agent::text as user_agent
-      from public.doc_access_logs l
+      from public.doc_access_log l
       join public.docs d on d.id = l.doc_id
       order by l.accessed_at desc
       limit 200
@@ -119,11 +141,50 @@ export default async function AdminDashboardPage() {
         count(*)::int as total,
         count(distinct coalesce(device_hash, ''))::int as uniques,
         max(accessed_at)::text as last
-      from public.doc_access_logs
+      from public.doc_access_log
     `) as unknown as Array<{ total: number; uniques: number; last: string | null }>;
         if (rows?.[0]) accessSummary = rows[0];
     } catch {
         // ignore
+    }
+
+    // View count per doc (best-effort; doc_views may not exist)
+    let viewsByDoc: ViewsByDocRow[] = [];
+    try {
+        viewsByDoc = (await sql`
+      select
+        v.doc_id::text as doc_id,
+        d.title as doc_title,
+        a.alias as alias,
+        count(*)::int as views,
+        count(distinct coalesce(v.ip_hash, ''))::int as unique_ips,
+        max(v.created_at)::text as last_view
+      from public.doc_views v
+      join public.docs d on d.id = v.doc_id
+      left join public.doc_aliases a on a.doc_id = v.doc_id
+      group by v.doc_id, d.title, a.alias
+      order by views desc
+      limit 50
+    `) as unknown as ViewsByDocRow[];
+    } catch {
+        viewsByDoc = [];
+    }
+
+    // Daily aggregation summary (best-effort; table may not exist)
+    let dailyAgg: DailyAggRow[] = [];
+    try {
+        dailyAgg = (await sql`
+      select
+        day::text as day,
+        sum(views)::int as views,
+        sum(unique_ips)::int as unique_ips
+      from public.doc_daily_analytics
+      where day >= (current_date - interval '14 days')
+      group by day
+      order by day desc
+    `) as unknown as DailyAggRow[];
+    } catch {
+        dailyAgg = [];
     }
 
     const sharesClient: ShareRowClient[] = shares.map((s) => ({
@@ -168,16 +229,17 @@ export default async function AdminDashboardPage() {
 
             {/* DOCS */}
             <div className="mt-8 overflow-hidden rounded-lg border border-neutral-800">
-                <table className="w-full text-sm">
-                    <thead className="bg-neutral-900 text-neutral-300">
+                <div className="max-h-[560px] overflow-auto">
+                    <table className="w-full text-sm">
+                        <thead className="sticky top-0 bg-neutral-900 text-neutral-300">
                         <tr>
                             <th className="px-4 py-3 text-left">Title</th>
                             <th className="px-4 py-3 text-left">Alias</th>
                             <th className="px-4 py-3 text-left">Created</th>
                             <th className="px-4 py-3 text-right">Actions</th>
                         </tr>
-                    </thead>
-                    <tbody>
+                        </thead>
+                        <tbody>
                         {docs.length === 0 ? (
                             <tr>
                                 <td colSpan={4} className="px-4 py-6 text-neutral-400">
@@ -220,8 +282,9 @@ export default async function AdminDashboardPage() {
                                 </tr>
                             ))
                         )}
-                    </tbody>
-                </table>
+                        </tbody>
+                    </table>
+                </div>
             </div>
 
             {/* SHARES */}
@@ -264,8 +327,9 @@ export default async function AdminDashboardPage() {
                 </div>
 
                 <div className="mt-4 overflow-hidden rounded-lg border border-neutral-800">
-                    <table className="w-full text-sm">
-                        <thead className="bg-neutral-900 text-neutral-300">
+                    <div className="max-h-[560px] overflow-auto">
+                        <table className="w-full text-sm">
+                            <thead className="sticky top-0 bg-neutral-900 text-neutral-300">
                             <tr>
                                 <th className="px-4 py-3 text-left">When</th>
                                 <th className="px-4 py-3 text-left">Doc</th>
@@ -275,8 +339,8 @@ export default async function AdminDashboardPage() {
                                 <th className="px-4 py-3 text-left">IP</th>
                                 <th className="px-4 py-3 text-left">Device</th>
                             </tr>
-                        </thead>
-                        <tbody>
+                            </thead>
+                            <tbody>
                             {access.length === 0 ? (
                                 <tr>
                                     <td colSpan={7} className="px-4 py-6 text-neutral-400">
@@ -287,7 +351,7 @@ export default async function AdminDashboardPage() {
                                 access.map((r, idx) => (
                                     <tr key={`${r.doc_id}-${r.accessed_at}-${idx}`} className="border-t border-neutral-800">
                                         <td className="px-4 py-3 text-neutral-400 whitespace-nowrap">
-                                            {new Date(r.accessed_at).toLocaleString()}
+                                            {fmtDate(r.accessed_at)}
                                         </td>
                                         <td className="px-4 py-3">
                                             {r.doc_title || "Untitled"}
@@ -323,8 +387,128 @@ export default async function AdminDashboardPage() {
                                     </tr>
                                 ))
                             )}
-                        </tbody>
-                    </table>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            {/* VIEW COUNTS */}
+            <div className="mt-12">
+                <div className="flex items-end justify-between gap-3">
+                    <div>
+                        <h2 className="text-lg font-semibold tracking-tight">View counts per doc</h2>
+                        <p className="mt-1 text-sm text-neutral-400">
+                            Top documents by total views (best-effort; uses <span className="font-mono">doc_views</span>).
+                        </p>
+                    </div>
+                    <div className="text-xs text-neutral-500">
+                        {viewsByDoc.length ? `Top ${Math.min(viewsByDoc.length, 50)}` : "—"}
+                    </div>
+                </div>
+
+                <div className="mt-4 overflow-hidden rounded-lg border border-neutral-800">
+                    <div className="max-h-[560px] overflow-auto">
+                        <table className="w-full text-sm">
+                            <thead className="sticky top-0 bg-neutral-900 text-neutral-300">
+                                <tr>
+                                    <th className="px-4 py-3 text-left">Doc</th>
+                                    <th className="px-4 py-3 text-left">Alias</th>
+                                    <th className="px-4 py-3 text-right">Views</th>
+                                    <th className="px-4 py-3 text-right">Unique IPs</th>
+                                    <th className="px-4 py-3 text-right">Last view</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {viewsByDoc.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={5} className="px-4 py-6 text-neutral-400">
+                                            No view data found (or table not available).
+                                        </td>
+                                    </tr>
+                                ) : (
+                                    viewsByDoc.map((r) => (
+                                        <tr key={r.doc_id} className="border-t border-neutral-800">
+                                            <td className="px-4 py-3">
+                                                <div className="text-neutral-200">{r.doc_title || "Untitled"}</div>
+                                                <div className="text-xs text-neutral-500 font-mono">{r.doc_id}</div>
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                {r.alias ? (
+                                                    <Link href={`/d/${r.alias}`} target="_blank" className="text-blue-400 hover:underline">
+                                                        /d/{r.alias}
+                                                    </Link>
+                                                ) : (
+                                                    <span className="text-neutral-500">—</span>
+                                                )}
+                                            </td>
+                                            <td className="px-4 py-3 text-right text-neutral-200">{r.views}</td>
+                                            <td className="px-4 py-3 text-right text-neutral-200">{r.unique_ips}</td>
+                                            <td className="px-4 py-3 text-right text-neutral-400 whitespace-nowrap">
+                                                {fmtDate(r.last_view)}
+                                            </td>
+                                        </tr>
+                                    ))
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            {/* DAILY ANALYTICS */}
+            <div className="mt-12">
+                <div className="flex items-end justify-between gap-3">
+                    <div>
+                        <h2 className="text-lg font-semibold tracking-tight">Daily analytics (last 14 days)</h2>
+                        <p className="mt-1 text-sm text-neutral-400">
+                            Reads from <span className="font-mono">doc_daily_analytics</span>. Generate/refresh via{" "}
+                            <Link className="text-blue-400 hover:underline" href="/api/admin/analytics/aggregate" target="_blank">
+                                /api/admin/analytics/aggregate
+                            </Link>
+                            .
+                        </p>
+                    </div>
+                    <div className="text-xs text-neutral-500">
+                        <Link
+                            className="text-neutral-400 hover:text-neutral-200 underline underline-offset-4"
+                            href="/api/admin/retention/run"
+                            target="_blank"
+                        >
+                            Run retention
+                        </Link>
+                    </div>
+                </div>
+
+                <div className="mt-4 overflow-hidden rounded-lg border border-neutral-800">
+                    <div className="max-h-[560px] overflow-auto">
+                        <table className="w-full text-sm">
+                            <thead className="sticky top-0 bg-neutral-900 text-neutral-300">
+                                <tr>
+                                    <th className="px-4 py-3 text-left">Day</th>
+                                    <th className="px-4 py-3 text-right">Views</th>
+                                    <th className="px-4 py-3 text-right">Unique IPs</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {dailyAgg.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={3} className="px-4 py-6 text-neutral-400">
+                                            No daily analytics found (or table not available).
+                                        </td>
+                                    </tr>
+                                ) : (
+                                    dailyAgg.map((r) => (
+                                        <tr key={r.day} className="border-t border-neutral-800">
+                                            <td className="px-4 py-3 text-neutral-200 font-mono text-xs">{r.day}</td>
+                                            <td className="px-4 py-3 text-right text-neutral-200">{r.views}</td>
+                                            <td className="px-4 py-3 text-right text-neutral-200">{r.unique_ips}</td>
+                                        </tr>
+                                    ))
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </main>
