@@ -32,6 +32,21 @@ function ownerEmailFromEnv(): string | null {
 }
 
 /**
+ * Back-compat helper: return the configured owner email (or empty string).
+ * Some older code wraps this in an async function, so this is intentionally sync.
+ */
+export function getOwnerEmail(): string {
+  return ownerEmailFromEnv() ?? "";
+}
+
+/**
+ * Back-compat helper: check if a role meets or exceeds a minimum required role.
+ */
+export function roleAtLeast(role: Role, minRole: Role): boolean {
+  return roleRank(role) >= roleRank(minRole);
+}
+
+/**
  * Ensure a row exists in public.users for this email and return {id,email,role}.
  * - Default role: viewer
  * - If email matches OWNER_EMAIL: role forced to owner (never downgraded)
@@ -119,7 +134,7 @@ export async function requireUser(): Promise<AuthedUser> {
  */
 export async function requireRole(minRole: Role): Promise<AuthedUser> {
   const u = await requireUser();
-  if (roleRank(u.role) < roleRank(minRole)) throw new Error("FORBIDDEN");
+  if (!roleAtLeast(u.role, minRole)) throw new Error("FORBIDDEN");
   return u;
 }
 
