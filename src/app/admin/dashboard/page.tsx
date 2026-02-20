@@ -64,6 +64,53 @@ type DailyAggRow = {
     unique_ips: number;
 };
 
+type TopDocRow = {
+    doc_id: string;
+    doc_title: string | null;
+    alias: string | null;
+    views_7d: number;
+    unique_ips_7d: number;
+};
+
+type SparkRow = {
+    day: string;
+    views: number;
+};
+
+function Sparkline({ values }: { values: number[] }) {
+    const w = 140;
+    const h = 36;
+    const pad = 3;
+    const n = values.length;
+    if (n === 0) return <div className="text-xs text-neutral-500">—</div>;
+
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const span = max - min || 1;
+
+    const points = values
+        .map((v, i) => {
+            const x = pad + (i * (w - pad * 2)) / Math.max(1, n - 1);
+            const y = pad + (1 - (v - min) / span) * (h - pad * 2);
+            return `${x.toFixed(2)},${y.toFixed(2)}`;
+        })
+        .join(" ");
+
+    return (
+        <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} className="block">
+            <polyline
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinejoin="round"
+                strokeLinecap="round"
+                points={points}
+                className="text-neutral-200"
+            />
+        </svg>
+    );
+}
+
 function fmtDate(s: string | null) {
     if (!s) return "—";
     const d = new Date(s);
@@ -214,19 +261,61 @@ export default async function AdminDashboardPage() {
         viewsByDoc = [];
     }
 
+    // Fast analytics read layer (doc_view_daily)
+    const hasDocViewDaily = await tableExists("public.doc_view_daily");
+    let topDocs7d: TopDocRow[] = [];
+    let spark30: SparkRow[] = [];
+    try {
+        if (hasDocViewDaily) {
+            topDocs7d = (await sql`
+        select
+          d.id::text as doc_id,
+          d.title as doc_title,
+          a.alias as alias,
+          coalesce(sum(x.view_count), 0)::int as views_7d,
+          coalesce(sum(x.unique_ip_count), 0)::int as unique_ips_7d
+        from public.docs d
+        left join public.doc_aliases a on a.doc_id = d.id
+        left join public.doc_view_daily x
+          on x.doc_id = d.id
+         and x.date >= (current_date - interval '6 days')
+        group by d.id, d.title, a.alias
+        order by views_7d desc
+        limit 10
+      `) as unknown as TopDocRow[];
+
+            spark30 = (await sql`
+        select
+          x.date::text as day,
+          sum(x.view_count)::int as views
+        from public.doc_view_daily x
+        where x.date >= (current_date - interval '29 days')
+        group by x.date
+        order by x.date asc
+      `) as unknown as SparkRow[];
+        }
+    } catch {
+        topDocs7d = [];
+        spark30 = [];
+    }
+
     // Daily aggregation summary (best-effort; table may not exist)
     let dailyAgg: DailyAggRow[] = [];
     try {
-        dailyAgg = (await sql`
-      select
-        day::text as day,
-        sum(views)::int as views,
-        sum(unique_ips)::int as unique_ips
-      from public.doc_daily_analytics
-      where day >= (current_date - interval '14 days')
-      group by day
-      order by day desc
-    `) as unknown as DailyAggRow[];
+        if (hasDocViewDaily) {
+            dailyAgg = (await sql`
+        select
+          x.date::text as day,
+          sum(x.view_count)::int as views,
+          sum(x.unique_ip_count)::int as unique_ips
+        from public.doc_view_daily x
+        where x.date >= (current_date - interval '14 days')
+        group by x.date
+        order by x.date desc
+      `) as unknown as DailyAggRow[];
+        } else {
+            dailyAgg = [];
+        }
     } catch {
         dailyAgg = [];
     }
@@ -437,6 +526,89 @@ export default async function AdminDashboardPage() {
                 </div>
             </div>
 
+            {/* TOP DOCS + 30-DAY SPARKLINE */}
+            <div className="mt-12">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                    <div>
+                        <h2 className="text-lg font-semibold tracking-tight">Top docs</h2>
+                        <p className="mt-1 text-sm text-neutral-400">
+                            Uses <span className="font-mono">doc_view_daily</span> (7-day leaderboard + 30-day trend).
+                        </p>
+                    </div>
+                    <div className="flex items-center gap-4 text-xs text-neutral-500">
+                        <div className="flex items-center gap-2">
+                            <span className="text-neutral-400">30-day views</span>
+                            <Sparkline values={spark30.map((r) => r.views)} />
+                        </div>
+                        <Link
+                            className="text-neutral-400 hover:text-neutral-200 underline underline-offset-4"
+                            href="/api/admin/analytics/aggregate"
+                            target="_blank"
+                        >
+                            Run aggregate
+                        </Link>
+                    </div>
+                </div>
+
+                {!hasDocViewDaily ? (
+                    <div className="mt-4 rounded-lg border border-neutral-800 bg-neutral-950 p-4 text-sm text-neutral-300">
+                        <div className="font-semibold">Missing table: public.doc_view_daily</div>
+                        <div className="mt-1 text-neutral-400">
+                            Create it with <span className="font-mono">scripts/sql/doc_view_daily.sql</span>, then run the
+                            aggregate.
+                        </div>
+                    </div>
+                ) : (
+                    <div className="mt-4 overflow-hidden rounded-lg border border-neutral-800">
+                        <div className="max-h-[420px] overflow-auto">
+                            <table className="w-full text-sm">
+                                <thead className="sticky top-0 bg-neutral-900 text-neutral-300">
+                                    <tr>
+                                        <th className="px-4 py-3 text-left">Doc</th>
+                                        <th className="px-4 py-3 text-left">Alias</th>
+                                        <th className="px-4 py-3 text-right">Views (7d)</th>
+                                        <th className="px-4 py-3 text-right">Unique IPs (7d)</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {topDocs7d.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={4} className="px-4 py-6 text-neutral-400">
+                                                No aggregated view data yet.
+                                            </td>
+                                        </tr>
+                                    ) : (
+                                        topDocs7d.map((r) => (
+                                            <tr key={r.doc_id} className="border-t border-neutral-800">
+                                                <td className="px-4 py-3">
+                                                    <div className="text-neutral-200">{r.doc_title || "Untitled"}</div>
+                                                    <div className="text-xs text-neutral-500 font-mono">{r.doc_id}</div>
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                    {r.alias ? (
+                                                        <Link
+                                                            href={`/d/${r.alias}`}
+                                                            target="_blank"
+                                                            className="text-blue-400 hover:underline"
+                                                        >
+                                                            /d/{r.alias}
+                                                        </Link>
+                                                    ) : (
+                                                        <span className="text-neutral-500">—</span>
+                                                    )}
+                                                </td>
+                                                <td className="px-4 py-3 text-right text-neutral-200">{r.views_7d}</td>
+                                                <td className="px-4 py-3 text-right text-neutral-200">{r.unique_ips_7d}</td>
+                                            </tr>
+                                        ))
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                )}
+            </div>
+
             {/* VIEW COUNTS */}
             <div className="mt-12">
                 <div className="flex items-end justify-between gap-3">
@@ -506,7 +678,7 @@ export default async function AdminDashboardPage() {
                     <div>
                         <h2 className="text-lg font-semibold tracking-tight">Daily analytics (last 14 days)</h2>
                         <p className="mt-1 text-sm text-neutral-400">
-                            Reads from <span className="font-mono">doc_daily_analytics</span>. Generate/refresh via{" "}
+                            Reads from <span className="font-mono">doc_view_daily</span>. Generate/refresh via{" "}
                             <Link className="text-blue-400 hover:underline" href="/api/admin/analytics/aggregate" target="_blank">
                                 /api/admin/analytics/aggregate
                             </Link>

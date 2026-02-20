@@ -26,8 +26,13 @@ function envInt(name: string, fallback: number): number {
 }
 
 async function deleteOlderThan(args: {
-  table: "public.doc_views" | "public.doc_audit" | "public.doc_access_log" | "public.doc_daily_analytics";
-  columnCandidates: Array<"created_at" | "accessed_at" | "day">;
+  table:
+    | "public.doc_views"
+    | "public.doc_audit"
+    | "public.doc_access_log"
+    | "public.doc_daily_analytics"
+    | "public.doc_view_daily";
+  columnCandidates: Array<"created_at" | "accessed_at" | "day" | "date">;
   days: number;
 }): Promise<RetentionResult> {
   const { table, columnCandidates, days } = args;
@@ -95,6 +100,18 @@ async function deleteOlderThan(args: {
         `) as unknown as Array<{ deleted: number }>;
         return { table, ok: true, deleted: res?.[0]?.deleted ?? 0 };
       }
+
+      if (table === "public.doc_view_daily" && col === "date") {
+        const res = (await sql`
+          with d as (
+            delete from public.doc_view_daily
+            where date < (current_date - (${days}::int * interval '1 day'))
+            returning 1
+          )
+          select count(*)::int as deleted from d
+        `) as unknown as Array<{ deleted: number }>;
+        return { table, ok: true, deleted: res?.[0]?.deleted ?? 0 };
+      }
     } catch (e) {
       // Try the next column candidate.
       const msg = e instanceof Error ? e.message : String(e);
@@ -144,6 +161,14 @@ export async function runRetention(): Promise<{ rawDays: number; dailyDays: numb
     await deleteOlderThan({
       table: "public.doc_daily_analytics",
       columnCandidates: ["day"],
+      days: dailyDays,
+    })
+  );
+
+  results.push(
+    await deleteOlderThan({
+      table: "public.doc_view_daily",
+      columnCandidates: ["date"],
       days: dailyDays,
     })
   );
