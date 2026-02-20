@@ -81,22 +81,28 @@ export async function trustDeviceForDoc(args: {
 export async function logDocAccess(args: {
   docId: string;
   alias: string | null;
+  /**
+   * Back-compat: older callers pass shareId. If you also have a share/token string,
+   * prefer passing it via `token` (optional) so it lands in doc_access_log.token.
+   */
   shareId: string | null;
   emailUsed: string | null;
+  /** Optional share token (preferred for doc_access_log.token). */
+  token?: string | null;
   ip: string;
   userAgent: string;
 }): Promise<void> {
-  const { docId, alias, shareId, emailUsed, ip, userAgent } = args;
+  const { docId, alias, shareId, emailUsed, token, ip, userAgent } = args;
   if (!docId) return;
 
+  // Keep storing hashed IP in doc_audit (privacy-friendly).
   const ipHash = (() => {
     const salt = (process.env.VIEW_SALT || "").trim();
     if (!salt || !ip) return null;
     return crypto.createHmac("sha256", salt).update(ip).digest("hex").slice(0, 32);
   })();
 
-  // Try a couple likely table names/column sets.
-  // If your schema differs, we can align it once you paste your CREATE TABLE.
+  // 1) Primary: doc_audit (richer event model)
   try {
     await sql`
       insert into public.doc_audit
@@ -104,17 +110,21 @@ export async function logDocAccess(args: {
       values
         (${docId}::uuid, ${alias}, ${shareId}, ${emailUsed}, ${ipHash}, ${userAgent})
     `;
-    return;
   } catch {
-    // fall through
+    // best-effort
   }
 
+  // 2) Secondary: doc_access_log (simple access trail)
+  // Your production schema (per /admin/db-debug) is:
+  //   id, doc_id, alias, token, ip, user_agent, created_at
+  // So we write only those columns.
   try {
+    const tok = (token ?? shareId) || null;
     await sql`
       insert into public.doc_access_log
-        (doc_id, alias, share_id, email_used, ip_hash, user_agent)
+        (doc_id, alias, token, ip, user_agent)
       values
-        (${docId}::uuid, ${alias}, ${shareId}, ${emailUsed}, ${ipHash}, ${userAgent})
+        (${docId}::uuid, ${alias}, ${tok}, ${ip || null}, ${userAgent || null})
     `;
   } catch {
     // best-effort
