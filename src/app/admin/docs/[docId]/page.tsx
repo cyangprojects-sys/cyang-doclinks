@@ -87,7 +87,7 @@ export default async function AdminDocInvestigatePage(props: { params: Promise<{
       d.created_at::text as created_at,
       a.alias,
       d.r2_key::text as r2_key,
-      coalesce(d.bucket::text, null) as bucket
+      coalesce(d.r2_bucket::text, null) as bucket
     from public.docs d
     left join public.doc_aliases a on a.doc_id = d.id
     where d.id = ${id}::uuid
