@@ -50,10 +50,14 @@ export async function POST(req: NextRequest) {
 
     if (!docId) {
       return NextResponse.json(
-        { ok: false, error: "missing_doc_id", message: "Send doc_id (preferred) or r2_bucket + r2_key." },
+        { ok: false, error: "Missing docId" },
         { status: 400 }
       );
     }
+
+    // AuthZ: must be able to manage this doc.
+    await requireDocWrite(docId);
+  }
 
     // 2) Fetch existing doc (for slug fallback)
     const docRows = (await sql`
@@ -67,14 +71,14 @@ export async function POST(req: NextRequest) {
       limit 1
     `) as { id: string; name: string; r2_bucket: string | null; r2_key: string | null }[];
 
-    if (!docRows.length) {
-      return NextResponse.json({ ok: false, error: "doc_not_found" }, { status: 404 });
-    }
+  if (!docRows.length) {
+    return NextResponse.json({ ok: false, error: "doc_not_found" }, { status: 404 });
+  }
 
-    const existingName = docRows[0].name;
+  const existingName = docRows[0].name;
 
-    // 3) Mark doc ready + update metadata (best-effort)
-    await sql`
+  // 3) Mark doc ready + update metadata (best-effort)
+  await sql`
       update public.docs
       set
         title = coalesce(${title}, title),
@@ -83,46 +87,46 @@ export async function POST(req: NextRequest) {
       where id = ${docId}::uuid
     `;
 
-    // 4) Generate alias base
-    let base = slugify(title || originalFilename || existingName || "document");
-    if (!base) base = `doc-${docId.slice(0, 8)}`;
+  // 4) Generate alias base
+  let base = slugify(title || originalFilename || existingName || "document");
+  if (!base) base = `doc-${docId.slice(0, 8)}`;
 
-    // 5) Create alias with collision handling
-    let finalAlias: string | null = null;
+  // 5) Create alias with collision handling
+  let finalAlias: string | null = null;
 
-    for (let i = 0; i < 50; i++) {
-      const candidateAlias = i === 0 ? base : `${base}-${i + 1}`;
+  for (let i = 0; i < 50; i++) {
+    const candidateAlias = i === 0 ? base : `${base}-${i + 1}`;
 
-      try {
-        await sql`
+    try {
+      await sql`
           insert into public.doc_aliases (alias, doc_id)
           values (${candidateAlias}, ${docId}::uuid)
         `;
-        finalAlias = candidateAlias;
-        break;
-      } catch {
-        // alias collision, try next
-      }
+      finalAlias = candidateAlias;
+      break;
+    } catch {
+      // alias collision, try next
     }
-
-    if (!finalAlias) {
-      return NextResponse.json({ ok: false, error: "alias_generation_failed" }, { status: 500 });
-    }
-
-    const baseUrl =
-      process.env.NEXT_PUBLIC_SITE_URL ||
-      (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000");
-
-    return NextResponse.json({
-      ok: true,
-      doc_id: docId,
-      alias: finalAlias,
-      view_url: `${baseUrl}/d/${encodeURIComponent(finalAlias)}`,
-    });
-  } catch (e: any) {
-    return NextResponse.json(
-      { ok: false, error: "server_error", message: e?.message || "Unknown error" },
-      { status: 500 }
-    );
   }
+
+  if (!finalAlias) {
+    return NextResponse.json({ ok: false, error: "alias_generation_failed" }, { status: 500 });
+  }
+
+  const baseUrl =
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000");
+
+  return NextResponse.json({
+    ok: true,
+    doc_id: docId,
+    alias: finalAlias,
+    view_url: `${baseUrl}/d/${encodeURIComponent(finalAlias)}`,
+  });
+} catch (e: any) {
+  return NextResponse.json(
+    { ok: false, error: "server_error", message: e?.message || "Unknown error" },
+    { status: 500 }
+  );
+}
 }
