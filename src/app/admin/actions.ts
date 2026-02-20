@@ -10,6 +10,7 @@ import { r2Bucket, r2Client, r2Prefix } from "@/lib/r2";
 import { sendMail } from "@/lib/email";
 import { requireDocWrite, requireRole, requireUser } from "@/lib/authz";
 import { setRetentionSettings } from "@/lib/settings";
+import { generateApiKey, hashApiKey } from "@/lib/apiKeys";
 
 function getBaseUrl() {
   const explicit = process.env.BASE_URL || process.env.NEXTAUTH_URL;
@@ -561,4 +562,42 @@ export async function sendExpirationAlertAction(formData: FormData): Promise<voi
 
   revalidatePath("/admin/dashboard");
   revalidatePath("/admin");
+}
+
+// =========================
+// API Keys (admin/owner)
+// =========================
+
+export async function createApiKeyAction(formData: FormData) {
+  const u = await requireRole("admin");
+
+  const name = String(formData.get("name") || "").trim();
+  if (!name) throw new Error("Missing name.");
+
+  const { plaintext, prefix } = generateApiKey();
+  const keyHash = hashApiKey(plaintext);
+
+  const rows = (await sql`
+    insert into public.api_keys (owner_id, name, prefix, key_hash)
+    values (${u.id}::uuid, ${name}, ${prefix}, ${keyHash})
+    returning id::text as id
+  `) as unknown as Array<{ id: string }>;
+
+  revalidatePath("/admin/api-keys");
+  return { ok: true as const, id: rows?.[0]?.id ?? null, apiKey: plaintext };
+}
+
+export async function revokeApiKeyAction(formData: FormData) {
+  await requireRole("admin");
+  const id = String(formData.get("id") || "").trim();
+  if (!id) throw new Error("Missing id.");
+
+  await sql`
+    update public.api_keys
+    set revoked_at = now()
+    where id = ${id}::uuid
+  `;
+
+  revalidatePath("/admin/api-keys");
+  return { ok: true as const };
 }

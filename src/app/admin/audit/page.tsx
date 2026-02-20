@@ -112,12 +112,33 @@ export default async function AuditPage() {
     <div className="mx-auto max-w-7xl p-6 text-white">
       <div className="mb-8 flex items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold">Audit Logs</h1>
-        <Link
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <a
+            href="/api/admin/audit/export?type=audit"
+            className="rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm text-neutral-200 hover:bg-neutral-900"
+          >
+            Export Audit CSV
+          </a>
+          <a
+            href="/api/admin/audit/export?type=access"
+            className="rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm text-neutral-200 hover:bg-neutral-900"
+          >
+            Export Access CSV
+          </a>
+          <a
+            href="/api/admin/audit/export?type=views"
+            className="rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm text-neutral-200 hover:bg-neutral-900"
+          >
+            Export Views CSV
+          </a>
+          <Link
           href="/admin/dashboard"
           className="rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm text-neutral-200 hover:bg-neutral-900"
         >
           ← Back to dashboard
         </Link>
+        </div>
+
       </div>
 
       <div className="space-y-10">

@@ -9,6 +9,7 @@ import crypto from "crypto";
 import { resolveDoc } from "@/lib/resolveDoc";
 import { getClientIpFromHeaders, getUserAgentFromHeaders, logDocAccess } from "@/lib/audit";
 import { rateLimit, rateLimitHeaders, stableHash } from "@/lib/rateLimit";
+import { emitWebhook } from "@/lib/webhooks";
 
 function getClientIp(req: NextRequest) {
   const xff = req.headers.get("x-forwarded-for") || "";
@@ -105,6 +106,16 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ docId: stri
         insert into public.doc_access_log (doc_id, alias, token, ip, user_agent)
         values (${resolved.docId}::uuid, ${alias || null}, ${token || null}, ${ip || null}, ${userAgent || null})
       `;
+
+      emitWebhook("doc.viewed", {
+        docId: resolved.docId,
+        alias: aliasParam ?? null,
+        path: url.pathname,
+        kind: "serve",
+        ipHash,
+        shareToken: tokenParam ?? null,
+        eventType: disposition === "attachment" ? "file_download" : "preview_view",
+      });
     } catch {
       // ignore (table may be missing or schema may differ)
     }
@@ -132,6 +143,16 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ docId: stri
         values
           (${resolved.docId}::uuid, ${aliasParam}, ${url.pathname}, 'serve', ${ua}, ${ref}, ${ipHash}, ${tokenParam}, ${disposition === "attachment" ? "file_download" : "preview_view"})
       `;
+
+      emitWebhook("doc.viewed", {
+        docId: resolved.docId,
+        alias: aliasParam ?? null,
+        path: url.pathname,
+        kind: "serve",
+        ipHash,
+        shareToken: tokenParam ?? null,
+        eventType: disposition === "attachment" ? "file_download" : "preview_view",
+      });
     } catch {
       await sql`
         insert into public.doc_views

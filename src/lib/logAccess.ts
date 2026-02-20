@@ -1,5 +1,6 @@
 // src/lib/logAccess.ts
 import { sql } from "@/lib/db";
+import { emitWebhook } from "@/lib/webhooks";
 
 interface LogAccessParams {
     docId: string;

@@ -741,6 +741,13 @@ try {
                 >
                     Audit logs
                 </Link>
+<Link
+    href="/admin/api-keys"
+    className="text-sm text-neutral-400 hover:text-neutral-200 underline underline-offset-4"
+>
+    API keys
+</Link>
+
             </div>
 
             {/* ✅ UPLOAD */}
