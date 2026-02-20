@@ -1,6 +1,7 @@
 // src/app/admin/dashboard/page.tsx
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import type { ReactNode } from "react";
 import { sql } from "@/lib/db";
 import { isOwnerAdmin } from "@/lib/admin";
 import DeleteDocForm from "../DeleteDocForm";
@@ -77,6 +78,12 @@ type SparkRow = {
     views: number;
 };
 
+type MetricCounts = {
+    expiring_shares: number;
+    active_shares: number;
+    revoked_shares: number;
+};
+
 function Sparkline({ values }: { values: number[] }) {
     const w = 140;
     const h = 36;
@@ -116,6 +123,43 @@ function fmtDate(s: string | null) {
     const d = new Date(s);
     if (Number.isNaN(d.getTime())) return s;
     return d.toLocaleString();
+}
+
+function MetricCard({
+    title,
+    value,
+    sub,
+    right,
+}: {
+    title: string;
+    value: ReactNode;
+    sub?: ReactNode;
+    right?: ReactNode;
+}) {
+    return (
+        <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-4 shadow-sm">
+            <div className="flex items-start justify-between gap-3">
+                <div>
+                    <div className="text-xs font-medium text-neutral-400">{title}</div>
+                    <div className="mt-2 text-2xl font-semibold tracking-tight text-neutral-100">{value}</div>
+                    {sub ? <div className="mt-1 text-xs text-neutral-500">{sub}</div> : null}
+                </div>
+                {right ? <div className="text-neutral-200">{right}</div> : null}
+            </div>
+        </div>
+    );
+}
+
+function rollingSum(values: number[], window: number) {
+    if (window <= 1) return values;
+    const out: number[] = [];
+    let sum = 0;
+    for (let i = 0; i < values.length; i++) {
+        sum += values[i] || 0;
+        if (i >= window) sum -= values[i - window] || 0;
+        out.push(sum);
+    }
+    return out;
 }
 
 async function tableExists(fqTable: string): Promise<boolean> {
@@ -299,6 +343,82 @@ export default async function AdminDashboardPage() {
         spark30 = [];
     }
 
+    // 30 days of daily totals (best-effort; prefer doc_view_daily)
+    let daily30: SparkRow[] = [];
+    try {
+        if (hasDocViewDaily) {
+            daily30 = (await sql`
+        select
+          x.date::text as day,
+          sum(x.view_count)::int as views
+        from public.doc_view_daily x
+        where x.date >= (current_date - interval '29 days')
+        group by x.date
+        order by x.date asc
+      `) as unknown as SparkRow[];
+        } else {
+            // fallback to raw views table if present
+            daily30 = (await sql`
+        select
+          (date_trunc('day', v.created_at))::date::text as day,
+          count(*)::int as views
+        from public.doc_views v
+        where v.created_at >= (now() - interval '29 days')
+        group by 1
+        order by 1 asc
+      `) as unknown as SparkRow[];
+        }
+    } catch {
+        daily30 = [];
+    }
+
+    const views30Total = daily30.reduce((acc, r) => acc + (r.views || 0), 0);
+    const rolling7 = rollingSum(daily30.map((r) => r.views || 0), 7);
+    const rolling7Latest = rolling7.length ? rolling7[rolling7.length - 1] : 0;
+
+    // Share status widgets
+    let shareCounts: MetricCounts = { expiring_shares: 0, active_shares: 0, revoked_shares: 0 };
+    try {
+        const rows = (await sql`
+      with base as (
+        select
+          revoked_at,
+          expires_at
+        from public.share_tokens
+      )
+      select
+        sum(case when revoked_at is null and (expires_at is null or expires_at > now()) then 1 else 0 end)::int as active_shares,
+        sum(case when revoked_at is not null then 1 else 0 end)::int as revoked_shares,
+        sum(case when revoked_at is null and expires_at is not null and expires_at > now() and expires_at <= (now() + interval '7 days') then 1 else 0 end)::int as expiring_shares
+      from base
+    `) as unknown as MetricCounts[];
+        if (rows?.[0]) shareCounts = rows[0];
+    } catch {
+        // ignore
+    }
+
+    // Top 5 docs by total views (prefer doc_views)
+    let top5AllTime: ViewsByDocRow[] = [];
+    try {
+        top5AllTime = (await sql`
+      select
+        v.doc_id::text as doc_id,
+        d.title as doc_title,
+        a.alias as alias,
+        count(*)::int as views,
+        count(distinct coalesce(v.ip_hash, ''))::int as unique_ips,
+        max(v.created_at)::text as last_view
+      from public.doc_views v
+      join public.docs d on d.id = v.doc_id
+      left join public.doc_aliases a on a.doc_id = v.doc_id
+      group by v.doc_id, d.title, a.alias
+      order by views desc
+      limit 5
+    `) as unknown as ViewsByDocRow[];
+    } catch {
+        top5AllTime = [];
+    }
+
     // Daily aggregation summary (best-effort; table may not exist)
     let dailyAgg: DailyAggRow[] = [];
     try {
@@ -359,6 +479,106 @@ export default async function AdminDashboardPage() {
 
             {/* ✅ UPLOAD */}
             <UploadPanel />
+
+            {/* ANALYTICS WIDGETS */}
+            <div className="mt-8">
+                <div className="flex items-end justify-between gap-3">
+                    <div>
+                        <h2 className="text-lg font-semibold tracking-tight">Analytics</h2>
+                        <p className="mt-1 text-sm text-neutral-400">Quick health check widgets (best-effort).</p>
+                    </div>
+                    <div className="text-xs text-neutral-500">
+                        {hasDocViewDaily ? (
+                            <>
+                                Source: <span className="font-mono">doc_view_daily</span>
+                            </>
+                        ) : (
+                            <>
+                                Source: <span className="font-mono">doc_views</span> (fallback)
+                            </>
+                        )}
+                    </div>
+                </div>
+
+                <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    <MetricCard
+                        title="30-day views"
+                        value={views30Total}
+                        sub={daily30.length ? `Last day: ${daily30[daily30.length - 1]?.day}` : "No data"}
+                        right={<Sparkline values={daily30.map((r) => r.views)} />}
+                    />
+                    <MetricCard
+                        title="7-day rolling views"
+                        value={rolling7Latest}
+                        sub={daily30.length ? `Window: last 7 days (rolling)` : "No data"}
+                        right={<Sparkline values={rolling7} />}
+                    />
+                    <MetricCard
+                        title="Expiring links"
+                        value={shareCounts.expiring_shares}
+                        sub="Shares expiring in the next 7 days"
+                    />
+                    <MetricCard
+                        title="Active shares"
+                        value={shareCounts.active_shares}
+                        sub="Not revoked; not expired"
+                    />
+                    <MetricCard
+                        title="Revoked shares"
+                        value={shareCounts.revoked_shares}
+                        sub="Revoked_at is set"
+                    />
+                    <MetricCard
+                        title="Top 5 docs by views"
+                        value={top5AllTime.length ? top5AllTime.reduce((acc, r) => acc + r.views, 0) : "—"}
+                        sub="All-time (top 5 combined)"
+                    />
+                </div>
+
+                <div className="mt-4 overflow-hidden rounded-lg border border-neutral-800">
+                    <div className="max-h-[320px] overflow-auto">
+                        <table className="w-full text-sm">
+                            <thead className="sticky top-0 bg-neutral-900 text-neutral-300">
+                                <tr>
+                                    <th className="px-4 py-3 text-left">Doc</th>
+                                    <th className="px-4 py-3 text-left">Alias</th>
+                                    <th className="px-4 py-3 text-right">Views</th>
+                                    <th className="px-4 py-3 text-right">Unique IPs</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {top5AllTime.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={4} className="px-4 py-6 text-neutral-400">
+                                            No top-doc data found (or table not available).
+                                        </td>
+                                    </tr>
+                                ) : (
+                                    top5AllTime.map((r) => (
+                                        <tr key={r.doc_id} className="border-t border-neutral-800">
+                                            <td className="px-4 py-3">
+                                                <div className="text-neutral-200">{r.doc_title || "Untitled"}</div>
+                                                <div className="text-xs text-neutral-500 font-mono">{r.doc_id}</div>
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                {r.alias ? (
+                                                    <Link href={`/d/${r.alias}`} target="_blank" className="text-blue-400 hover:underline">
+                                                        /d/{r.alias}
+                                                    </Link>
+                                                ) : (
+                                                    <span className="text-neutral-500">—</span>
+                                                )}
+                                            </td>
+                                            <td className="px-4 py-3 text-right text-neutral-200">{r.views}</td>
+                                            <td className="px-4 py-3 text-right text-neutral-200">{r.unique_ips}</td>
+                                        </tr>
+                                    ))
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
 
             {/* DOCS */}
             <div className="mt-8 overflow-hidden rounded-lg border border-neutral-800">
