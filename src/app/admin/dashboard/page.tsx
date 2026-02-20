@@ -1,7 +1,6 @@
 // src/app/admin/dashboard/page.tsx
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import type { ReactNode } from "react";
 import { sql } from "@/lib/db";
 import { isOwnerAdmin } from "@/lib/admin";
 import DeleteDocForm from "../DeleteDocForm";
@@ -13,6 +12,7 @@ import {
 } from "../actions";
 import SharesTableClient, { type ShareRow as ShareRowClient } from "./SharesTableClient";
 import UploadPanel from "./UploadPanel";
+import ViewsByDocTableClient, { type ViewsByDocRow as ViewsByDocRowClient } from "./ViewsByDocTableClient";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -78,12 +78,6 @@ type SparkRow = {
     views: number;
 };
 
-type MetricCounts = {
-    expiring_shares: number;
-    active_shares: number;
-    revoked_shares: number;
-};
-
 function Sparkline({ values }: { values: number[] }) {
     const w = 140;
     const h = 36;
@@ -123,43 +117,6 @@ function fmtDate(s: string | null) {
     const d = new Date(s);
     if (Number.isNaN(d.getTime())) return s;
     return d.toLocaleString();
-}
-
-function MetricCard({
-    title,
-    value,
-    sub,
-    right,
-}: {
-    title: string;
-    value: ReactNode;
-    sub?: ReactNode;
-    right?: ReactNode;
-}) {
-    return (
-        <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-4 shadow-sm">
-            <div className="flex items-start justify-between gap-3">
-                <div>
-                    <div className="text-xs font-medium text-neutral-400">{title}</div>
-                    <div className="mt-2 text-2xl font-semibold tracking-tight text-neutral-100">{value}</div>
-                    {sub ? <div className="mt-1 text-xs text-neutral-500">{sub}</div> : null}
-                </div>
-                {right ? <div className="text-neutral-200">{right}</div> : null}
-            </div>
-        </div>
-    );
-}
-
-function rollingSum(values: number[], window: number) {
-    if (window <= 1) return values;
-    const out: number[] = [];
-    let sum = 0;
-    for (let i = 0; i < values.length; i++) {
-        sum += values[i] || 0;
-        if (i >= window) sum -= values[i - window] || 0;
-        out.push(sum);
-    }
-    return out;
 }
 
 async function tableExists(fqTable: string): Promise<boolean> {
@@ -343,82 +300,6 @@ export default async function AdminDashboardPage() {
         spark30 = [];
     }
 
-    // 30 days of daily totals (best-effort; prefer doc_view_daily)
-    let daily30: SparkRow[] = [];
-    try {
-        if (hasDocViewDaily) {
-            daily30 = (await sql`
-        select
-          x.date::text as day,
-          sum(x.view_count)::int as views
-        from public.doc_view_daily x
-        where x.date >= (current_date - interval '29 days')
-        group by x.date
-        order by x.date asc
-      `) as unknown as SparkRow[];
-        } else {
-            // fallback to raw views table if present
-            daily30 = (await sql`
-        select
-          (date_trunc('day', v.created_at))::date::text as day,
-          count(*)::int as views
-        from public.doc_views v
-        where v.created_at >= (now() - interval '29 days')
-        group by 1
-        order by 1 asc
-      `) as unknown as SparkRow[];
-        }
-    } catch {
-        daily30 = [];
-    }
-
-    const views30Total = daily30.reduce((acc, r) => acc + (r.views || 0), 0);
-    const rolling7 = rollingSum(daily30.map((r) => r.views || 0), 7);
-    const rolling7Latest = rolling7.length ? rolling7[rolling7.length - 1] : 0;
-
-    // Share status widgets
-    let shareCounts: MetricCounts = { expiring_shares: 0, active_shares: 0, revoked_shares: 0 };
-    try {
-        const rows = (await sql`
-      with base as (
-        select
-          revoked_at,
-          expires_at
-        from public.share_tokens
-      )
-      select
-        sum(case when revoked_at is null and (expires_at is null or expires_at > now()) then 1 else 0 end)::int as active_shares,
-        sum(case when revoked_at is not null then 1 else 0 end)::int as revoked_shares,
-        sum(case when revoked_at is null and expires_at is not null and expires_at > now() and expires_at <= (now() + interval '7 days') then 1 else 0 end)::int as expiring_shares
-      from base
-    `) as unknown as MetricCounts[];
-        if (rows?.[0]) shareCounts = rows[0];
-    } catch {
-        // ignore
-    }
-
-    // Top 5 docs by total views (prefer doc_views)
-    let top5AllTime: ViewsByDocRow[] = [];
-    try {
-        top5AllTime = (await sql`
-      select
-        v.doc_id::text as doc_id,
-        d.title as doc_title,
-        a.alias as alias,
-        count(*)::int as views,
-        count(distinct coalesce(v.ip_hash, ''))::int as unique_ips,
-        max(v.created_at)::text as last_view
-      from public.doc_views v
-      join public.docs d on d.id = v.doc_id
-      left join public.doc_aliases a on a.doc_id = v.doc_id
-      group by v.doc_id, d.title, a.alias
-      order by views desc
-      limit 5
-    `) as unknown as ViewsByDocRow[];
-    } catch {
-        top5AllTime = [];
-    }
-
     // Daily aggregation summary (best-effort; table may not exist)
     let dailyAgg: DailyAggRow[] = [];
     try {
@@ -454,6 +335,32 @@ export default async function AdminDashboardPage() {
         has_password: Boolean((s as any).has_password),
     }));
 
+    const viewsByDocClient: ViewsByDocRowClient[] = viewsByDoc.map((r) => ({
+        doc_id: r.doc_id,
+        doc_title: r.doc_title,
+        alias: r.alias,
+        views: Number(r.views ?? 0),
+        unique_ips: Number(r.unique_ips ?? 0),
+        last_view: r.last_view,
+    }));
+
+    // Widget metrics (best-effort)
+    const now = Date.now();
+    const sevenDays = 7 * 24 * 60 * 60 * 1000;
+    const expiringCount7d = sharesClient.reduce((acc, s) => {
+        if (s.revoked_at) return acc;
+        if (!s.expires_at) return acc;
+        const exp = new Date(s.expires_at).getTime();
+        if (Number.isNaN(exp)) return acc;
+        if (exp > now && exp <= now + sevenDays) return acc + 1;
+        return acc;
+    }, 0);
+
+    const revokedCount = sharesClient.reduce((acc, s) => (s.revoked_at ? acc + 1 : acc), 0);
+    const activeCount = sharesClient.length - revokedCount;
+
+    const top5TotalViews = viewsByDocClient.slice(0, 5).reduce((acc, r) => acc + (r.views || 0), 0);
+
     return (
         <main className="mx-auto max-w-6xl px-4 py-12">
             <div className="flex items-center justify-between gap-3">
@@ -485,103 +392,83 @@ export default async function AdminDashboardPage() {
                 <div className="flex items-end justify-between gap-3">
                     <div>
                         <h2 className="text-lg font-semibold tracking-tight">Analytics</h2>
-                        <p className="mt-1 text-sm text-neutral-400">Quick health check widgets (best-effort).</p>
+                        <p className="mt-1 text-sm text-neutral-400">Quick links that jump + filter tables below.</p>
                     </div>
-                    <div className="text-xs text-neutral-500">
-                        {hasDocViewDaily ? (
-                            <>
-                                Source: <span className="font-mono">doc_view_daily</span>
-                            </>
-                        ) : (
-                            <>
-                                Source: <span className="font-mono">doc_views</span> (fallback)
-                            </>
-                        )}
-                    </div>
+                    <div className="text-xs text-neutral-500">Links keep filters in the URL (shareable).</div>
                 </div>
 
                 <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                    <MetricCard
-                        title="30-day views"
-                        value={views30Total}
-                        sub={daily30.length ? `Last day: ${daily30[daily30.length - 1]?.day}` : "No data"}
-                        right={<Sparkline values={daily30.map((r) => r.views)} />}
-                    />
-                    <MetricCard
-                        title="7-day rolling views"
-                        value={rolling7Latest}
-                        sub={daily30.length ? `Window: last 7 days (rolling)` : "No data"}
-                        right={<Sparkline values={rolling7} />}
-                    />
-                    <MetricCard
-                        title="Expiring links"
-                        value={shareCounts.expiring_shares}
-                        sub="Shares expiring in the next 7 days"
-                    />
-                    <MetricCard
-                        title="Active shares"
-                        value={shareCounts.active_shares}
-                        sub="Not revoked; not expired"
-                    />
-                    <MetricCard
-                        title="Revoked shares"
-                        value={shareCounts.revoked_shares}
-                        sub="Revoked_at is set"
-                    />
-                    <MetricCard
-                        title="Top 5 docs by views"
-                        value={top5AllTime.length ? top5AllTime.reduce((acc, r) => acc + r.views, 0) : "—"}
-                        sub="All-time (top 5 combined)"
-                    />
-                </div>
+                    <Link
+                        href="#views-by-doc"
+                        className="rounded-xl border border-neutral-800 bg-neutral-950 p-4 hover:bg-neutral-900"
+                    >
+                        <div className="text-xs text-neutral-400">📊 Total views per document</div>
+                        <div className="mt-2 text-2xl font-semibold text-neutral-100">{viewsByDocClient.length || 0}</div>
+                        <div className="mt-1 text-xs text-neutral-500">Jump to “View counts per doc”.</div>
+                    </Link>
 
-                <div className="mt-4 overflow-hidden rounded-lg border border-neutral-800">
-                    <div className="max-h-[320px] overflow-auto">
-                        <table className="w-full text-sm">
-                            <thead className="sticky top-0 bg-neutral-900 text-neutral-300">
-                                <tr>
-                                    <th className="px-4 py-3 text-left">Doc</th>
-                                    <th className="px-4 py-3 text-left">Alias</th>
-                                    <th className="px-4 py-3 text-right">Views</th>
-                                    <th className="px-4 py-3 text-right">Unique IPs</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {top5AllTime.length === 0 ? (
-                                    <tr>
-                                        <td colSpan={4} className="px-4 py-6 text-neutral-400">
-                                            No top-doc data found (or table not available).
-                                        </td>
-                                    </tr>
-                                ) : (
-                                    top5AllTime.map((r) => (
-                                        <tr key={r.doc_id} className="border-t border-neutral-800">
-                                            <td className="px-4 py-3">
-                                                <div className="text-neutral-200">{r.doc_title || "Untitled"}</div>
-                                                <div className="text-xs text-neutral-500 font-mono">{r.doc_id}</div>
-                                            </td>
-                                            <td className="px-4 py-3">
-                                                {r.alias ? (
-                                                    <Link href={`/d/${r.alias}`} target="_blank" className="text-blue-400 hover:underline">
-                                                        /d/{r.alias}
-                                                    </Link>
-                                                ) : (
-                                                    <span className="text-neutral-500">—</span>
-                                                )}
-                                            </td>
-                                            <td className="px-4 py-3 text-right text-neutral-200">{r.views}</td>
-                                            <td className="px-4 py-3 text-right text-neutral-200">{r.unique_ips}</td>
-                                        </tr>
-                                    ))
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
+                    <Link
+                        href="#top-docs"
+                        className="rounded-xl border border-neutral-800 bg-neutral-950 p-4 hover:bg-neutral-900"
+                    >
+                        <div className="text-xs text-neutral-400">📈 7-day rolling views</div>
+                        <div className="mt-2 flex items-center justify-between gap-3">
+                            <div className="text-2xl font-semibold text-neutral-100">
+                                {spark30.length ? spark30.slice(-7).reduce((a, r) => a + r.views, 0) : "—"}
+                            </div>
+                            <Sparkline values={spark30.map((r) => r.views).slice(-14)} />
+                        </div>
+                        <div className="mt-1 text-xs text-neutral-500">Jump to “Top docs”.</div>
+                    </Link>
+
+                    <Link
+                        href="#top-docs"
+                        className="rounded-xl border border-neutral-800 bg-neutral-950 p-4 hover:bg-neutral-900"
+                    >
+                        <div className="text-xs text-neutral-400">📉 30-day views</div>
+                        <div className="mt-2 flex items-center justify-between gap-3">
+                            <div className="text-2xl font-semibold text-neutral-100">
+                                {spark30.length ? spark30.reduce((a, r) => a + r.views, 0) : "—"}
+                            </div>
+                            <Sparkline values={spark30.map((r) => r.views)} />
+                        </div>
+                        <div className="mt-1 text-xs text-neutral-500">Jump to “Top docs”.</div>
+                    </Link>
+
+                    <Link
+                        href="/admin/dashboard?viewLimit=5#views-by-doc"
+                        className="rounded-xl border border-neutral-800 bg-neutral-950 p-4 hover:bg-neutral-900"
+                    >
+                        <div className="text-xs text-neutral-400">🔥 Top 5 documents by views</div>
+                        <div className="mt-2 text-2xl font-semibold text-neutral-100">{top5TotalViews || 0}</div>
+                        <div className="mt-1 text-xs text-neutral-500">Filters the table to “Top 5”.</div>
+                    </Link>
+
+                    <Link
+                        href="/admin/dashboard?shareStatus=expiring#shares"
+                        className="rounded-xl border border-neutral-800 bg-neutral-950 p-4 hover:bg-neutral-900"
+                    >
+                        <div className="text-xs text-neutral-400">⏳ Expiring links (next 7 days)</div>
+                        <div className="mt-2 text-2xl font-semibold text-neutral-100">{expiringCount7d}</div>
+                        <div className="mt-1 text-xs text-neutral-500">Filters Shares → “Expiring (7d)”.</div>
+                    </Link>
+
+                    <Link
+                        href="/admin/dashboard?shareStatus=revoked#shares"
+                        className="rounded-xl border border-neutral-800 bg-neutral-950 p-4 hover:bg-neutral-900"
+                    >
+                        <div className="text-xs text-neutral-400">❌ Revoked vs Active shares</div>
+                        <div className="mt-2 flex items-baseline justify-between">
+                            <div className="text-2xl font-semibold text-neutral-100">{revokedCount}</div>
+                            <div className="text-sm text-neutral-500">revoked · {activeCount} total</div>
+                        </div>
+                        <div className="mt-1 text-xs text-neutral-500">Filters Shares → “Revoked”.</div>
+                    </Link>
                 </div>
             </div>
 
             {/* DOCS */}
-            <div className="mt-8 overflow-hidden rounded-lg border border-neutral-800">
+            <div id="docs" className="mt-8 overflow-hidden rounded-lg border border-neutral-800">
                 <div className="max-h-[560px] overflow-auto">
                     <table className="w-full text-sm">
                         <thead className="sticky top-0 bg-neutral-900 text-neutral-300">
@@ -641,7 +528,7 @@ export default async function AdminDashboardPage() {
             </div>
 
             {/* SHARES */}
-            <div className="mt-10">
+            <div id="shares" className="mt-10">
                 <div className="flex items-end justify-between gap-3">
                     <div>
                         <h2 className="text-lg font-semibold tracking-tight">Shares</h2>
@@ -747,7 +634,7 @@ export default async function AdminDashboardPage() {
             </div>
 
             {/* TOP DOCS + 30-DAY SPARKLINE */}
-            <div className="mt-12">
+            <div id="top-docs" className="mt-12">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                     <div>
                         <h2 className="text-lg font-semibold tracking-tight">Top docs</h2>
@@ -830,7 +717,7 @@ export default async function AdminDashboardPage() {
             </div>
 
             {/* VIEW COUNTS */}
-            <div className="mt-12">
+            <div id="views-by-doc" className="mt-12">
                 <div className="flex items-end justify-between gap-3">
                     <div>
                         <h2 className="text-lg font-semibold tracking-tight">View counts per doc</h2>
@@ -843,53 +730,13 @@ export default async function AdminDashboardPage() {
                     </div>
                 </div>
 
-                <div className="mt-4 overflow-hidden rounded-lg border border-neutral-800">
-                    <div className="max-h-[560px] overflow-auto">
-                        <table className="w-full text-sm">
-                            <thead className="sticky top-0 bg-neutral-900 text-neutral-300">
-                                <tr>
-                                    <th className="px-4 py-3 text-left">Doc</th>
-                                    <th className="px-4 py-3 text-left">Alias</th>
-                                    <th className="px-4 py-3 text-right">Views</th>
-                                    <th className="px-4 py-3 text-right">Unique IPs</th>
-                                    <th className="px-4 py-3 text-right">Last view</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {viewsByDoc.length === 0 ? (
-                                    <tr>
-                                        <td colSpan={5} className="px-4 py-6 text-neutral-400">
-                                            No view data found (or table not available).
-                                        </td>
-                                    </tr>
-                                ) : (
-                                    viewsByDoc.map((r) => (
-                                        <tr key={r.doc_id} className="border-t border-neutral-800">
-                                            <td className="px-4 py-3">
-                                                <div className="text-neutral-200">{r.doc_title || "Untitled"}</div>
-                                                <div className="text-xs text-neutral-500 font-mono">{r.doc_id}</div>
-                                            </td>
-                                            <td className="px-4 py-3">
-                                                {r.alias ? (
-                                                    <Link href={`/d/${r.alias}`} target="_blank" className="text-blue-400 hover:underline">
-                                                        /d/{r.alias}
-                                                    </Link>
-                                                ) : (
-                                                    <span className="text-neutral-500">—</span>
-                                                )}
-                                            </td>
-                                            <td className="px-4 py-3 text-right text-neutral-200">{r.views}</td>
-                                            <td className="px-4 py-3 text-right text-neutral-200">{r.unique_ips}</td>
-                                            <td className="px-4 py-3 text-right text-neutral-400 whitespace-nowrap">
-                                                {fmtDate(r.last_view)}
-                                            </td>
-                                        </tr>
-                                    ))
-                                )}
-                            </tbody>
-                        </table>
+                {viewsByDocClient.length === 0 ? (
+                    <div className="mt-4 rounded-lg border border-neutral-800 bg-neutral-950 p-4 text-sm text-neutral-300">
+                        No view data found (or table not available).
                     </div>
-                </div>
+                ) : (
+                    <ViewsByDocTableClient rows={viewsByDocClient} />
+                )}
             </div>
 
             {/* DAILY ANALYTICS */}

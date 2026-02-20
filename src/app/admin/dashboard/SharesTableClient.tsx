@@ -2,7 +2,8 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import RevokeShareForm from "./RevokeShareForm";
 import SharePasswordForm from "./SharePasswordForm";
 
@@ -36,6 +37,8 @@ function maxLabel(n: number | null) {
 
 type Status = "all" | "active" | "expired" | "maxed" | "revoked";
 
+type StatusFilter = Status | "expiring";
+
 function computeStatus(s: ShareRow): Exclude<Status, "all"> {
     if (s.revoked_at) return "revoked";
     if (s.expires_at && new Date(s.expires_at).getTime() <= Date.now()) return "expired";
@@ -62,8 +65,21 @@ export default function SharesTableClient(props: {
     setPasswordAction: (formData: FormData) => Promise<void>;
     clearPasswordAction: (formData: FormData) => Promise<void>;
 }) {
+    const sp = useSearchParams();
+    const router = useRouter();
+    const pathname = usePathname();
+
     const [q, setQ] = useState("");
-    const [status, setStatus] = useState<Status>("all");
+    const [status, setStatus] = useState<StatusFilter>("all");
+
+    // URL -> UI (one-way sync)
+    useEffect(() => {
+        const nextQ = (sp.get("shareQ") || "").trim();
+        const nextStatus = (sp.get("shareStatus") || "all") as StatusFilter;
+
+        setQ(nextQ);
+        setStatus(nextStatus);
+    }, [sp]);
 
     const normalizedQ = q.trim().toLowerCase();
 
@@ -71,7 +87,20 @@ export default function SharesTableClient(props: {
         return props.shares.filter((s) => {
             const st = computeStatus(s);
 
-            if (status !== "all" && st !== status) return false;
+            if (status !== "all") {
+                if (status === "expiring") {
+                    if (st !== "active") return false;
+                    if (!s.expires_at) return false;
+                    const exp = new Date(s.expires_at).getTime();
+                    const now = Date.now();
+                    const sevenDays = 7 * 24 * 60 * 60 * 1000;
+                    if (Number.isNaN(exp)) return false;
+                    if (exp <= now) return false;
+                    if (exp > now + sevenDays) return false;
+                } else {
+                    if (st !== status) return false;
+                }
+            }
 
             if (!normalizedQ) return true;
 
@@ -99,6 +128,39 @@ export default function SharesTableClient(props: {
         return c;
     }, [props.shares]);
 
+    const expiringCount = useMemo(() => {
+        const now = Date.now();
+        const sevenDays = 7 * 24 * 60 * 60 * 1000;
+        let n = 0;
+        for (const s of props.shares) {
+            if (computeStatus(s) !== "active") continue;
+            if (!s.expires_at) continue;
+            const exp = new Date(s.expires_at).getTime();
+            if (Number.isNaN(exp)) continue;
+            if (exp > now && exp <= now + sevenDays) n += 1;
+        }
+        return n;
+    }, [props.shares]);
+
+    function syncUrl(next: { shareQ?: string; shareStatus?: StatusFilter }) {
+        const params = new URLSearchParams(sp.toString());
+
+        if (next.shareQ !== undefined) {
+            const v = next.shareQ.trim();
+            if (v) params.set("shareQ", v);
+            else params.delete("shareQ");
+        }
+        if (next.shareStatus !== undefined) {
+            if (next.shareStatus && next.shareStatus !== "all") params.set("shareStatus", next.shareStatus);
+            else params.delete("shareStatus");
+        }
+
+        // Preserve the hash so widgets can deep-link.
+        const hash = typeof window !== "undefined" ? window.location.hash : "";
+        const qs = params.toString();
+        router.replace(`${pathname}${qs ? `?${qs}` : ""}${hash}`, { scroll: false });
+    }
+
     return (
         <div className="mt-4">
             {/* Filters */}
@@ -108,7 +170,11 @@ export default function SharesTableClient(props: {
                         <label className="block text-xs text-neutral-400">Search</label>
                         <input
                             value={q}
-                            onChange={(e) => setQ(e.target.value)}
+                            onChange={(e) => {
+                                const v = e.target.value;
+                                setQ(v);
+                                syncUrl({ shareQ: v });
+                            }}
                             placeholder="email, alias, title, token…"
                             className="mt-1 w-full md:w-[360px] rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm text-neutral-200 outline-none focus:border-neutral-600"
                         />
@@ -118,11 +184,16 @@ export default function SharesTableClient(props: {
                         <label className="block text-xs text-neutral-400">Status</label>
                         <select
                             value={status}
-                            onChange={(e) => setStatus(e.target.value as Status)}
+                            onChange={(e) => {
+                                const v = e.target.value as StatusFilter;
+                                setStatus(v);
+                                syncUrl({ shareStatus: v });
+                            }}
                             className="mt-1 w-full md:w-[180px] rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm text-neutral-200 outline-none focus:border-neutral-600"
                         >
                             <option value="all">All ({counts.all})</option>
                             <option value="active">Active ({counts.active})</option>
+                            <option value="expiring">Expiring (7d) ({expiringCount})</option>
                             <option value="expired">Expired ({counts.expired})</option>
                             <option value="maxed">Maxed ({counts.maxed})</option>
                             <option value="revoked">Revoked ({counts.revoked})</option>
@@ -133,6 +204,7 @@ export default function SharesTableClient(props: {
                         onClick={() => {
                             setQ("");
                             setStatus("all");
+                            syncUrl({ shareQ: "", shareStatus: "all" });
                         }}
                         className="md:mb-[2px] rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm text-neutral-200 hover:bg-neutral-900"
                     >
