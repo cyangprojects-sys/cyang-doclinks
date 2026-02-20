@@ -151,7 +151,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ docId: stri
 
   const disposition = parseDisposition(req);
 
-  const url = await getSignedUrl(
+  const signedUrl = await getSignedUrl(
     r2Client,
     new GetObjectCommand({
       Bucket: resolved.bucket,
@@ -165,7 +165,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ docId: stri
   return new Response(null, {
     status: 302,
     headers: {
-      Location: url,
+      Location: signedUrl,
       ...rateLimitHeaders(ipRl),
     },
   });
