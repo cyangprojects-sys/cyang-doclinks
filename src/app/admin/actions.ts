@@ -9,6 +9,7 @@ import { sql } from "@/lib/db";
 import { r2Bucket, r2Client, r2Prefix } from "@/lib/r2";
 import { sendMail } from "@/lib/email";
 import { requireOwnerAdmin } from "@/lib/admin";
+import { setRetentionSettings } from "@/lib/settings";
 
 function getBaseUrl() {
   const explicit = process.env.BASE_URL || process.env.NEXTAUTH_URL;
@@ -119,6 +120,28 @@ export async function emailMagicLinkAction(formData: FormData): Promise<void> {
   });
 
   revalidatePath("/admin");
+  revalidatePath("/admin/dashboard");
+}
+
+// Retention settings (admin toggle)
+export async function updateRetentionSettingsAction(formData: FormData): Promise<void> {
+  await requireOwnerAdmin();
+
+  const enabledRaw = String(formData.get("retention_enabled") ?? "");
+  const deleteExpiredRaw = String(formData.get("retention_delete_expired_shares") ?? "");
+  const graceRaw = String(formData.get("retention_share_grace_days") ?? "");
+
+  const enabled = enabledRaw === "on" || enabledRaw === "true" || enabledRaw === "1";
+  const deleteExpiredShares = deleteExpiredRaw === "on" || deleteExpiredRaw === "true" || deleteExpiredRaw === "1";
+
+  const graceNum = Number(graceRaw);
+  const shareGraceDays = Number.isFinite(graceNum) ? Math.max(0, Math.floor(graceNum)) : 0;
+
+  const res = await setRetentionSettings({ enabled, deleteExpiredShares, shareGraceDays });
+  if (!res.ok) {
+    throw new Error(`Failed to save retention settings: ${res.error}`);
+  }
+
   revalidatePath("/admin/dashboard");
 }
 

@@ -20,10 +20,12 @@ import {
     bulkExtendSharesAction,
     bulkRevokeAllSharesForDocsAction,
     bulkDisableAliasesForDocsAction,
+    updateRetentionSettingsAction,
 } from "../actions";
 import SharesTableClient, { type ShareRow as ShareRowClient } from "./SharesTableClient";
 import UploadPanel from "./UploadPanel";
 import ViewsByDocTableClient, { type ViewsByDocRow as ViewsByDocRowClient } from "./ViewsByDocTableClient";
+import { getRetentionSettings } from "@/lib/settings";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -360,6 +362,16 @@ export default async function AdminDashboardPage() {
         }
     } catch {
         retentionInfo = { oldest: null, scheduled: null };
+    }
+
+    // Retention toggle/settings (best-effort; requires public.app_settings)
+    const hasAppSettings = await tableExists("public.app_settings");
+    let retentionSettings:
+        | { ok: true; settings: { enabled: boolean; deleteExpiredShares: boolean; shareGraceDays: number } }
+        | { ok: false; error: string }
+        | null = null;
+    if (hasAppSettings) {
+        retentionSettings = await getRetentionSettings();
     }
 
     const sharesClient: ShareRowClient[] = shares.map((s) => ({
@@ -808,6 +820,62 @@ export default async function AdminDashboardPage() {
                         <div className="mt-2 text-xs text-neutral-500">
                             Retention: {retentionRawDays} days · Oldest retained: {fmtDate(retentionInfo.oldest)} · Rows scheduled for deletion: {retentionInfo.scheduled ?? "—"}
                         </div>
+
+                        {hasAppSettings ? (
+                            retentionSettings && retentionSettings.ok ? (
+                                <form action={updateRetentionSettingsAction} className="mt-3 flex flex-wrap items-end gap-3 text-xs">
+                                    <label className="flex items-center gap-2 text-neutral-300">
+                                        <input
+                                            type="checkbox"
+                                            name="retention_enabled"
+                                            defaultChecked={retentionSettings.settings.enabled}
+                                            className="h-4 w-4 rounded border-neutral-700 bg-neutral-950"
+                                        />
+                                        <span>Retention enabled</span>
+                                    </label>
+
+                                    <label className="flex items-center gap-2 text-neutral-300">
+                                        <input
+                                            type="checkbox"
+                                            name="retention_delete_expired_shares"
+                                            defaultChecked={retentionSettings.settings.deleteExpiredShares}
+                                            className="h-4 w-4 rounded border-neutral-700 bg-neutral-950"
+                                        />
+                                        <span>Delete expired shares</span>
+                                    </label>
+
+                                    <label className="flex items-center gap-2 text-neutral-300">
+                                        <span className="text-neutral-400">Share grace days</span>
+                                        <input
+                                            type="number"
+                                            min={0}
+                                            name="retention_share_grace_days"
+                                            defaultValue={retentionSettings.settings.shareGraceDays}
+                                            className="w-20 rounded-md border border-neutral-800 bg-neutral-950 px-2 py-1 text-neutral-100"
+                                        />
+                                    </label>
+
+                                    <button
+                                        type="submit"
+                                        className="rounded-md bg-neutral-800 px-3 py-1.5 text-neutral-100 hover:bg-neutral-700"
+                                    >
+                                        Save
+                                    </button>
+
+                                    <div className="text-neutral-500">
+                                        Stored in <span className="font-mono">app_settings</span> (key: <span className="font-mono">retention</span>).
+                                    </div>
+                                </form>
+                            ) : (
+                                <div className="mt-3 text-xs text-neutral-500">
+                                    Retention toggle unavailable (settings read error). You can still control retention via env vars.
+                                </div>
+                            )
+                        ) : (
+                            <div className="mt-3 text-xs text-neutral-500">
+                                Optional admin toggle not installed. Run <span className="font-mono">scripts/sql/app_settings.sql</span> to enable.
+                            </div>
+                        )}
                     </div>
                     <div className="text-xs text-neutral-500">
                         <Link
