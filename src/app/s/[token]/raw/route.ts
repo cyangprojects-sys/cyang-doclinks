@@ -1,13 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
-import { GetObjectCommand } from "@aws-sdk/client-s3";
-import { r2Client, r2Bucket } from "@/lib/r2";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { cookies } from "next/headers";
 import { consumeShareTokenView } from "@/lib/resolveDoc";
 import { getClientIpFromHeaders, getUserAgentFromHeaders, logDocAccess } from "@/lib/audit";
 import crypto from "crypto";
 import { rateLimit, rateLimitHeaders, stableHash } from "@/lib/rateLimit";
+import { mintAccessTicket } from "@/lib/accessTicket";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -57,19 +55,7 @@ async function isUnlocked(token: string): Promise<boolean> {
   return rows.length > 0;
 }
 
-async function mintSignedUrl(args: { key: string; disposition: "inline" | "attachment" }) {
-  // Short-lived signed URL (enforcement step): clients fetch from R2 directly.
-  return getSignedUrl(
-    r2Client,
-    new GetObjectCommand({
-      Bucket: r2Bucket,
-      Key: args.key,
-      ResponseContentType: "application/pdf",
-      ResponseContentDisposition: args.disposition,
-    }),
-    { expiresIn: Number(process.env.SIGNED_URL_TTL_SECONDS || 300) }
-  );
-}
+const R2_BUCKET = (process.env.R2_BUCKET || "").trim();
 
 type ShareLookupRow = {
   token: string;
@@ -248,11 +234,32 @@ export async function GET(
     }
   }
 
-  const signed = await mintSignedUrl({ key: share.r2_key, disposition: "inline" });
+  const ticketId = await mintAccessTicket({
+    req,
+    docId: share.doc_id,
+    shareToken: token,
+    alias: null,
+    purpose: "preview_view",
+    r2Bucket: R2_BUCKET,
+    r2Key: share.r2_key,
+    responseContentType: "application/pdf",
+    responseContentDisposition: "inline",
+  });
+
+  if (!ticketId) {
+    return new NextResponse("Server error", {
+      status: 500,
+      headers: {
+        ...rateLimitHeaders(ipRl),
+        "Cache-Control": "private, no-store",
+      },
+    });
+  }
+
   return new NextResponse(null, {
     status: 302,
     headers: {
-      Location: signed,
+      Location: new URL(`/t/${ticketId}`, req.url).toString(),
       ...rateLimitHeaders(ipRl),
       "Cache-Control": "private, no-store",
     },

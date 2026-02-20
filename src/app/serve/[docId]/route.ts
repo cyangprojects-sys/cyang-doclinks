@@ -4,9 +4,7 @@ export const dynamic = "force-dynamic";
 
 import { NextRequest } from "next/server";
 import { sql } from "@/lib/db";
-import { r2Client } from "@/lib/r2";
-import { GetObjectCommand } from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { mintAccessTicket } from "@/lib/accessTicket";
 import crypto from "crypto";
 import { resolveDoc } from "@/lib/resolveDoc";
 import { getClientIpFromHeaders, getUserAgentFromHeaders, logDocAccess } from "@/lib/audit";
@@ -151,21 +149,29 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ docId: stri
 
   const disposition = parseDisposition(req);
 
-  const signedUrl = await getSignedUrl(
-    r2Client,
-    new GetObjectCommand({
-      Bucket: resolved.bucket,
-      Key: resolved.r2Key,
-      ResponseContentType: contentType,
-      ResponseContentDisposition: `${disposition}; filename="${dispositionBase}.pdf"`,
-    }),
-    { expiresIn: 60 * 5 }
-  );
+  const ticketId = await mintAccessTicket({
+    req,
+    docId: resolved.docId,
+    shareToken: url.searchParams.get("token") || null,
+    alias: url.searchParams.get("alias") || null,
+    purpose: disposition === "attachment" ? "file_download" : "preview_view",
+    r2Bucket: resolved.bucket,
+    r2Key: resolved.r2Key,
+    responseContentType: contentType,
+    responseContentDisposition: `${disposition}; filename="${dispositionBase}.pdf"`,
+  });
+
+  if (!ticketId) {
+    return new Response("Server error", {
+      status: 500,
+      headers: { ...rateLimitHeaders(ipRl) },
+    });
+  }
 
   return new Response(null, {
     status: 302,
     headers: {
-      Location: signedUrl,
+      Location: new URL(`/t/${ticketId}`, req.url).toString(),
       ...rateLimitHeaders(ipRl),
     },
   });

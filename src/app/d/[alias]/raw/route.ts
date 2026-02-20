@@ -3,13 +3,11 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 import type { NextRequest } from "next/server";
-import { r2Client } from "@/lib/r2";
-import { GetObjectCommand } from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { resolveDoc } from "@/lib/resolveDoc";
 import { sql } from "@/lib/db";
 import { aliasTrustCookieName, isAliasTrusted } from "@/lib/deviceTrust";
 import { rateLimit, rateLimitHeaders, stableHash } from "@/lib/rateLimit";
+import { mintAccessTicket } from "@/lib/accessTicket";
 
 function normAlias(alias: string): string {
   return decodeURIComponent(String(alias || "")).trim().toLowerCase();
@@ -158,21 +156,29 @@ export async function GET(
     const filename = pickFilename(resolved.title, resolved.originalFilename, alias) + ".pdf";
     const contentType = resolved.contentType || "application/pdf";
 
-    const signed = await getSignedUrl(
-      r2Client,
-      new GetObjectCommand({
-        Bucket: resolved.bucket,
-        Key: resolved.r2Key,
-        ResponseContentType: contentType,
-        ResponseContentDisposition: `inline; filename="${filename}"`,
-      }),
-      { expiresIn: Number(process.env.SIGNED_URL_TTL_SECONDS || 300) }
-    );
+    const ticketId = await mintAccessTicket({
+      req,
+      docId: row.docId,
+      shareToken: null,
+      alias,
+      purpose: "preview_view",
+      r2Bucket: resolved.bucket,
+      r2Key: resolved.r2Key,
+      responseContentType: contentType,
+      responseContentDisposition: `inline; filename="${filename}"`,
+    });
+
+    if (!ticketId) {
+      return new Response("Internal server error", {
+        status: 500,
+        headers: { ...rateLimitHeaders(ipRl) },
+      });
+    }
 
     return new Response(null, {
       status: 302,
       headers: {
-        Location: signed,
+        Location: new URL(`/t/${ticketId}`, req.url).toString(),
         ...rateLimitHeaders(ipRl),
         "Cache-Control": "private, no-store",
       },
