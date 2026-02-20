@@ -48,13 +48,6 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ docId: stri
   const alias = url.searchParams.get("alias");
   const token = url.searchParams.get("token");
   const ip = getClientIpFromHeaders(req.headers) || "";
-
-  // Derived params used in audit + analytics payloads
-  const disposition = parseDisposition(req);
-  const aliasParam = alias || null;
-  const tokenParam = token || null;
-  const ipHash = hashIp(ip);
-
   const ipKey = stableHash(ip, "VIEW_SALT");
 
   const ipRl = await rateLimit({
@@ -116,12 +109,12 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ docId: stri
 
       emitWebhook("doc.viewed", {
         docId: resolved.docId,
-        alias: aliasParam,
+        alias: aliasParam ?? null,
         path: url.pathname,
         kind: "serve",
         ipHash,
-        shareToken: tokenParam,
-        eventType: disposition === "attachment" ? "file_download" : "preview_view",
+        shareToken: tokenParam ?? null,
+        eventType: dispositionForLog === "attachment" ? "file_download" : "preview_view",
       });
     } catch {
       // ignore (table may be missing or schema may differ)
@@ -133,8 +126,14 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ docId: stri
 
   // Analytics (best-effort)
   try {
+    const ip = getClientIp(req);
+    const ipHash = hashIp(ip);
     const ua = req.headers.get("user-agent") || null;
     const ref = req.headers.get("referer") || null;
+
+    const dispositionForLog = parseDisposition(req);
+    const aliasParam = url.searchParams.get("alias") || null;
+    const tokenParam = url.searchParams.get("token") || null;
 
     // Try newer schema first (share_token + event_type). Fall back to legacy schema.
     try {
@@ -142,7 +141,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ docId: stri
         insert into public.doc_views
           (doc_id, alias, path, kind, user_agent, referer, ip_hash, share_token, event_type)
         values
-          (${resolved.docId}::uuid, ${aliasParam}, ${url.pathname}, 'serve', ${ua}, ${ref}, ${ipHash}, ${tokenParam}, ${disposition === "attachment" ? "file_download" : "preview_view"})
+          (${resolved.docId}::uuid, ${aliasParam}, ${url.pathname}, 'serve', ${ua}, ${ref}, ${ipHash}, ${tokenParam}, ${dispositionForLog === "attachment" ? "file_download" : "preview_view"})
       `;
 
       emitWebhook("doc.viewed", {
@@ -152,7 +151,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ docId: stri
         kind: "serve",
         ipHash,
         shareToken: tokenParam ?? null,
-        eventType: disposition === "attachment" ? "file_download" : "preview_view",
+        eventType: dispositionForLog === "attachment" ? "file_download" : "preview_view",
       });
     } catch {
       await sql`
@@ -176,7 +175,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ docId: stri
     docId: resolved.docId,
     shareToken: url.searchParams.get("token") || null,
     alias: url.searchParams.get("alias") || null,
-    purpose: disposition === "attachment" ? "file_download" : "preview_view",
+    purpose: dispositionForLog === "attachment" ? "file_download" : "preview_view",
     r2Bucket: resolved.bucket,
     r2Key: resolved.r2Key,
     responseContentType: contentType,
