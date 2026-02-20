@@ -10,6 +10,7 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import crypto from "crypto";
 import { resolveDoc } from "@/lib/resolveDoc";
 import { getClientIpFromHeaders, getUserAgentFromHeaders, logDocAccess } from "@/lib/audit";
+import { rateLimit, rateLimitHeaders, stableHash } from "@/lib/rateLimit";
 
 function getClientIp(req: NextRequest) {
   const xff = req.headers.get("x-forwarded-for") || "";
@@ -26,6 +27,13 @@ function safeName(name: string) {
   return (name || "document").replace(/[\r\n"]/g, " ").trim().slice(0, 120) || "document";
 }
 
+function parseDisposition(req: NextRequest): "inline" | "attachment" {
+  const url = new URL(req.url);
+  const d = (url.searchParams.get("disposition") || url.searchParams.get("dl") || "").toLowerCase();
+  if (d === "1" || d === "true" || d === "download" || d === "attachment") return "attachment";
+  return "inline";
+}
+
 export async function GET(req: NextRequest, ctx: { params: Promise<{ docId: string }> }) {
   const { docId } = await ctx.params;
   const resolved = await resolveDoc({ docId });
@@ -34,13 +42,52 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ docId: stri
     return new Response("Not found", { status: 404 });
   }
 
+  // --- Rate limiting (best-effort) ---
+  // 1) Global IP throttling for the serve endpoint
+  // 2) Optional token abuse protection if a share token is provided
+  const url = new URL(req.url);
+  const alias = url.searchParams.get("alias");
+  const token = url.searchParams.get("token");
+  const ip = getClientIpFromHeaders(req.headers) || "";
+  const ipKey = stableHash(ip, "VIEW_SALT");
+
+  const ipRl = await rateLimit({
+    scope: "ip:serve",
+    id: ipKey,
+    limit: Number(process.env.RATE_LIMIT_SERVE_IP_PER_MIN || 120),
+    windowSeconds: 60,
+  });
+
+  if (!ipRl.ok) {
+    return new Response("Too Many Requests", {
+      status: 429,
+      headers: {
+        ...rateLimitHeaders(ipRl),
+        "Retry-After": String(ipRl.resetSeconds),
+      },
+    });
+  }
+
+  if (token) {
+    const tokenRl = await rateLimit({
+      scope: "token:serve",
+      id: stableHash(String(token), "VIEW_SALT"),
+      limit: Number(process.env.RATE_LIMIT_SERVE_TOKEN_PER_MIN || 240),
+      windowSeconds: 60,
+    });
+    if (!tokenRl.ok) {
+      return new Response("Too Many Requests", {
+        status: 429,
+        headers: {
+          ...rateLimitHeaders(tokenRl),
+          "Retry-After": String(tokenRl.resetSeconds),
+        },
+      });
+    }
+  }
+
   // Audit log (best-effort)
   try {
-    const url = new URL(req.url);
-    const alias = url.searchParams.get("alias");
-    const token = url.searchParams.get("token");
-
-    const ip = getClientIpFromHeaders(req.headers);
     const userAgent = getUserAgentFromHeaders(req.headers);
 
     // 1) High-level audit trail (writes to doc_audit if present)
@@ -75,9 +122,9 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ docId: stri
     const ua = req.headers.get("user-agent") || null;
     const ref = req.headers.get("referer") || null;
 
-    const url = new URL(req.url);
-    const alias = url.searchParams.get("alias") || null;
-    const token = url.searchParams.get("token") || null;
+    const disposition = parseDisposition(req);
+    const aliasParam = url.searchParams.get("alias") || null;
+    const tokenParam = url.searchParams.get("token") || null;
 
     // Try newer schema first (share_token + event_type). Fall back to legacy schema.
     try {
@@ -85,14 +132,14 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ docId: stri
         insert into public.doc_views
           (doc_id, alias, path, kind, user_agent, referer, ip_hash, share_token, event_type)
         values
-          (${resolved.docId}::uuid, ${alias}, ${url.pathname}, 'serve', ${ua}, ${ref}, ${ipHash}, ${token}, 'viewer_served')
+          (${resolved.docId}::uuid, ${aliasParam}, ${url.pathname}, 'serve', ${ua}, ${ref}, ${ipHash}, ${tokenParam}, ${disposition === "attachment" ? "file_download" : "preview_view"})
       `;
     } catch {
       await sql`
         insert into public.doc_views
           (doc_id, alias, path, kind, user_agent, referer, ip_hash)
         values
-          (${resolved.docId}::uuid, ${alias}, ${url.pathname}, 'serve', ${ua}, ${ref}, ${ipHash})
+          (${resolved.docId}::uuid, ${aliasParam}, ${url.pathname}, 'serve', ${ua}, ${ref}, ${ipHash})
       `;
     }
   } catch {
@@ -102,16 +149,24 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ docId: stri
   const contentType = resolved.contentType || "application/pdf";
   const dispositionBase = safeName(resolved.title || resolved.originalFilename || "document");
 
+  const disposition = parseDisposition(req);
+
   const url = await getSignedUrl(
     r2Client,
     new GetObjectCommand({
       Bucket: resolved.bucket,
       Key: resolved.r2Key,
       ResponseContentType: contentType,
-      ResponseContentDisposition: `inline; filename="${dispositionBase}.pdf"`,
+      ResponseContentDisposition: `${disposition}; filename="${dispositionBase}.pdf"`,
     }),
     { expiresIn: 60 * 5 }
   );
 
-  return Response.redirect(url, 302);
+  return new Response(null, {
+    status: 302,
+    headers: {
+      Location: url,
+      ...rateLimitHeaders(ipRl),
+    },
+  });
 }

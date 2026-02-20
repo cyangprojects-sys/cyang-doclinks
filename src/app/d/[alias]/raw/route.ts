@@ -5,9 +5,11 @@ export const dynamic = "force-dynamic";
 import type { NextRequest } from "next/server";
 import { r2Client } from "@/lib/r2";
 import { GetObjectCommand } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { resolveDoc } from "@/lib/resolveDoc";
 import { sql } from "@/lib/db";
 import { aliasTrustCookieName, isAliasTrusted } from "@/lib/deviceTrust";
+import { rateLimit, rateLimitHeaders, stableHash } from "@/lib/rateLimit";
 
 function normAlias(alias: string): string {
   return decodeURIComponent(String(alias || "")).trim().toLowerCase();
@@ -99,17 +101,6 @@ function pickFilename(title: string | null, original: string | null, fallback: s
   return base.replace(/[^\w.\- ]+/g, "_");
 }
 
-function isNoSuchKey(err: any) {
-  const name = String(err?.name || "");
-  const code = String(err?.Code || err?.code || "");
-  const message = String(err?.message || "");
-  return (
-    name === "NoSuchKey" ||
-    code === "NoSuchKey" ||
-    message.toLowerCase().includes("nosuchkey")
-  );
-}
-
 export async function GET(
   req: NextRequest,
   ctx: { params: Promise<{ alias: string }> }
@@ -137,6 +128,26 @@ export async function GET(
       }
     }
 
+    // --- Rate limiting (best-effort) ---
+    const xff = req.headers.get("x-forwarded-for") || "";
+    const ip = xff.split(",")[0]?.trim() || "";
+    const ipKey = stableHash(ip, "VIEW_SALT");
+    const ipRl = await rateLimit({
+      scope: "ip:alias_raw",
+      id: ipKey,
+      limit: Number(process.env.RATE_LIMIT_ALIAS_IP_PER_MIN || 90),
+      windowSeconds: 60,
+    });
+    if (!ipRl.ok) {
+      return new Response("Too Many Requests", {
+        status: 429,
+        headers: {
+          ...rateLimitHeaders(ipRl),
+          "Retry-After": String(ipRl.resetSeconds),
+        },
+      });
+    }
+
     const resolved = await resolveDoc({ docId: row.docId });
     if (!resolved.ok) return new Response("Not found", { status: 404 });
 
@@ -144,31 +155,26 @@ export async function GET(
       return new Response("Not found", { status: 404 });
     }
 
-    let obj;
-    try {
-      obj = await r2Client.send(
-        new GetObjectCommand({
-          Bucket: resolved.bucket,
-          Key: resolved.r2Key,
-        })
-      );
-    } catch (e: any) {
-      if (isNoSuchKey(e)) return new Response("Not found", { status: 404 });
-      console.error("R2 GetObject error:", e);
-      return new Response("Internal server error", { status: 500 });
-    }
-
-    if (!obj?.Body) return new Response("Object body missing", { status: 500 });
-
     const filename = pickFilename(resolved.title, resolved.originalFilename, alias) + ".pdf";
     const contentType = resolved.contentType || "application/pdf";
 
-    return new Response(obj.Body as any, {
-      status: 200,
+    const signed = await getSignedUrl(
+      r2Client,
+      new GetObjectCommand({
+        Bucket: resolved.bucket,
+        Key: resolved.r2Key,
+        ResponseContentType: contentType,
+        ResponseContentDisposition: `inline; filename="${filename}"`,
+      }),
+      { expiresIn: Number(process.env.SIGNED_URL_TTL_SECONDS || 300) }
+    );
+
+    return new Response(null, {
+      status: 302,
       headers: {
-        "Content-Type": contentType,
-        "Content-Disposition": `inline; filename="${filename}"`,
-        "Cache-Control": "private, max-age=0, must-revalidate",
+        Location: signed,
+        ...rateLimitHeaders(ipRl),
+        "Cache-Control": "private, no-store",
       },
     });
   } catch (err: any) {

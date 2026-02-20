@@ -7,9 +7,11 @@ import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { sql } from "@/lib/db";
 import { resolveShareMeta } from "@/lib/resolveDoc";
+import { rateLimit, stableHash } from "@/lib/rateLimit";
 
 const UNLOCK_HOURS = 8;
 const RATE_LIMIT_PER_MIN = 10;
+const RATE_LIMIT_PER_10MIN = 25;
 
 function cookieName(token: string) {
     return `share_unlock_${token}`;
@@ -64,17 +66,37 @@ export async function isShareUnlockedAction(token: string): Promise<boolean> {
     return rows.length > 0;
 }
 
-async function rateLimitOk(token: string, ipHash: string) {
-    const rows = (await sql`
-    select count(*)::int as c
-    from public.share_pw_attempts
-    where token = ${token}
-      and ip_hash = ${ipHash}
-      and created_at > now() - interval '1 minute'
-  `) as unknown as Array<{ c: number }>;
+async function throttlePasswordAttempts(args: { token: string; ip: string }): Promise<
+  | { ok: true }
+  | { ok: false; retryAfterSeconds: number; message: string }
+> {
+  const ipKey = stableHash(args.ip, "VIEW_SALT");
+  const tokenKey = stableHash(args.token, "VIEW_SALT");
+  const id = `${tokenKey}:${ipKey}`;
 
-    const c = rows?.[0]?.c ?? 0;
-    return c < RATE_LIMIT_PER_MIN;
+  // Fast bucket (burst)
+  const rl1 = await rateLimit({
+    scope: "pw:share:1m",
+    id,
+    limit: Number(process.env.RATE_LIMIT_PW_PER_MIN || RATE_LIMIT_PER_MIN),
+    windowSeconds: 60,
+  });
+  if (!rl1.ok) {
+    return { ok: false, retryAfterSeconds: rl1.resetSeconds, message: "Too many attempts. Try again soon." };
+  }
+
+  // Slow bucket (sustained brute force)
+  const rl2 = await rateLimit({
+    scope: "pw:share:10m",
+    id,
+    limit: Number(process.env.RATE_LIMIT_PW_PER_10MIN || RATE_LIMIT_PER_10MIN),
+    windowSeconds: 600,
+  });
+  if (!rl2.ok) {
+    return { ok: false, retryAfterSeconds: rl2.resetSeconds, message: "Too many attempts. Please wait a bit and try again." };
+  }
+
+  return { ok: true };
 }
 
 export type VerifySharePasswordResult =
@@ -170,13 +192,14 @@ export async function verifySharePasswordCore(
         const ip = await getClientIpFromHeaders();
         const ipHash = hashIp(ip) || "unknown";
 
-        const ok = await rateLimitOk(token, ipHash);
-        if (!ok) return { ok: false, error: "rate_limited", message: "Too many attempts. Try again soon." };
+        const thr = await throttlePasswordAttempts({ token, ip });
+        if (!thr.ok) return { ok: false, error: "rate_limited", message: thr.message };
 
+        // Keep old table (if present) for admin debugging / history.
         await sql`
-      insert into public.share_pw_attempts (token, ip_hash)
-      values (${token}, ${ipHash})
-    `;
+          insert into public.share_pw_attempts (token, ip_hash)
+          values (${token}, ${ipHash})
+        `;
     } catch {
         // If attempts table missing, don’t block unlock.
     }

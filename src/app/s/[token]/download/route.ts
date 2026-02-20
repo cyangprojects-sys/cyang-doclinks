@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { GetObjectCommand } from "@aws-sdk/client-s3";
-import { r2Client, r2Bucket } from "@/lib/r2";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { r2Client, r2Bucket } from "@/lib/r2";
 import { cookies } from "next/headers";
 import { consumeShareTokenView } from "@/lib/resolveDoc";
 import { getClientIpFromHeaders, getUserAgentFromHeaders, logDocAccess } from "@/lib/audit";
@@ -18,25 +18,16 @@ function hashIp(ip: string | null) {
   return crypto.createHmac("sha256", salt).update(ip).digest("hex").slice(0, 32);
 }
 
-/**
- * We only redirect to password gate when this is a browser navigation
- * requesting HTML.
- *
- * When the embedded PDF viewer fetches the PDF, Accept is usually
- * application/pdf or * / * (not text/html), so we keep serving the PDF normally.
- */
 function shouldRedirectToGate(req: NextRequest): boolean {
   const accept = (req.headers.get("accept") || "").toLowerCase();
   return accept.includes("text/html");
 }
 
 function unlockCookieName(token: string) {
-  // Must match src/app/s/[token]/actions.ts
   return `share_unlock_${token}`;
 }
 
 function emailCookieName(token: string) {
-  // Must match src/app/s/[token]/actions.ts
   return `share_email_${token}`;
 }
 
@@ -55,20 +46,6 @@ async function isUnlocked(token: string): Promise<boolean> {
   `) as unknown as Array<{ "?column?": number }>;
 
   return rows.length > 0;
-}
-
-async function mintSignedUrl(args: { key: string; disposition: "inline" | "attachment" }) {
-  // Short-lived signed URL (enforcement step): clients fetch from R2 directly.
-  return getSignedUrl(
-    r2Client,
-    new GetObjectCommand({
-      Bucket: r2Bucket,
-      Key: args.key,
-      ResponseContentType: "application/pdf",
-      ResponseContentDisposition: args.disposition,
-    }),
-    { expiresIn: Number(process.env.SIGNED_URL_TTL_SECONDS || 300) }
-  );
 }
 
 type ShareLookupRow = {
@@ -90,26 +67,24 @@ function isExpired(expires_at: string | null) {
 
 function isMaxed(view_count: number, max_views: number | null) {
   if (max_views === null) return false;
-  if (max_views === 0) return false; // 0 = unlimited
+  if (max_views === 0) return false;
   return view_count >= max_views;
 }
 
-/**
- * Avoid counting every byte-range follow-up as a new "view".
- * Most PDF viewers request ranges; we count only the first request that includes byte 0.
- */
-function shouldCountView(req: NextRequest): boolean {
-  const range = (req.headers.get("range") || "").toLowerCase();
-  if (!range) return true; // full request
-
-  // Examples: "bytes=0-" or "bytes=0-65535" should count; later ranges should not.
-  return range.includes("bytes=0-");
+async function mintSignedUrl(key: string) {
+  return getSignedUrl(
+    r2Client,
+    new GetObjectCommand({
+      Bucket: r2Bucket,
+      Key: key,
+      ResponseContentType: "application/pdf",
+      ResponseContentDisposition: "attachment",
+    }),
+    { expiresIn: Number(process.env.SIGNED_URL_TTL_SECONDS || 300) }
+  );
 }
 
-export async function GET(
-  req: NextRequest,
-  { params }: { params: Promise<{ token: string }> }
-) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
 
   // --- Rate limiting (best-effort) ---
@@ -118,7 +93,7 @@ export async function GET(
   const tokenKey = stableHash(String(token), "VIEW_SALT");
 
   const ipRl = await rateLimit({
-    scope: "ip:share_preview",
+    scope: "ip:share_download",
     id: ipKey,
     limit: Number(process.env.RATE_LIMIT_SHARE_IP_PER_MIN || 60),
     windowSeconds: 60,
@@ -134,7 +109,7 @@ export async function GET(
   }
 
   const tokenRl = await rateLimit({
-    scope: "token:share_preview",
+    scope: "token:share_download",
     id: tokenKey,
     limit: Number(process.env.RATE_LIMIT_SHARE_TOKEN_PER_MIN || 240),
     windowSeconds: 60,
@@ -171,11 +146,8 @@ export async function GET(
   if (isExpired(share.expires_at)) return new NextResponse("Link expired", { status: 410 });
 
   const viewCount = share.views_count ?? 0;
-  if (isMaxed(viewCount, share.max_views)) {
-    return new NextResponse("Max views reached", { status: 410 });
-  }
+  if (isMaxed(viewCount, share.max_views)) return new NextResponse("Max views reached", { status: 410 });
 
-  // If share is password protected, require an active unlock record (set by /s/[token] gate)
   if (share.password_hash) {
     const unlocked = await isUnlocked(token);
     if (!unlocked) {
@@ -187,68 +159,64 @@ export async function GET(
     }
   }
 
-  // Enforce + increment max views here too (raw link is often what the PDF viewer hits).
-  // We only count once per initial range request to avoid burning views on chunked fetches.
-  if (shouldCountView(req)) {
-    const consumed = await consumeShareTokenView(token);
-    if (!consumed.ok) {
-      switch (consumed.error) {
-        case "REVOKED":
-          return new NextResponse("Revoked", { status: 410 });
-        case "EXPIRED":
-          return new NextResponse("Link expired", { status: 410 });
-        case "MAXED":
-          return new NextResponse("Max views reached", { status: 410 });
-        default:
-          return new NextResponse("Not found", { status: 404 });
-      }
-    }
-
-    // Audit log (best-effort) — only on the first counted request
-    try {
-      const jar = await cookies();
-      const emailUsed = jar.get(emailCookieName(token))?.value || null;
-      await logDocAccess({
-        docId: share.doc_id,
-        shareId: share.token,
-        alias: null,
-        emailUsed,
-        ip: getClientIpFromHeaders(req.headers),
-        userAgent: getUserAgentFromHeaders(req.headers),
-      });
-    } catch {
-      // ignore
-    }
-
-    // Analytics (best-effort) — only on the first counted request
-    try {
-      const ip = getClientIpFromHeaders(req.headers);
-      const ua = getUserAgentFromHeaders(req.headers);
-      const ref = req.headers.get("referer") || null;
-      const ipHash = hashIp(ip);
-
-      // Try newer schema first (share_token + event_type). Fall back to legacy schema.
-      try {
-        await sql`
-          insert into public.doc_views
-            (doc_id, alias, path, kind, user_agent, referer, ip_hash, share_token, event_type)
-          values
-            (${share.doc_id}::uuid, null, ${new URL(req.url).pathname}, 'share', ${ua}, ${ref}, ${ipHash}, ${token}, 'preview_view')
-        `;
-      } catch {
-        await sql`
-          insert into public.doc_views
-            (doc_id, alias, path, kind, user_agent, referer, ip_hash)
-          values
-            (${share.doc_id}::uuid, null, ${new URL(req.url).pathname}, 'share', ${ua}, ${ref}, ${ipHash})
-        `;
-      }
-    } catch {
-      // ignore
+  // Consume view on download too (prevents bypassing max views).
+  const consumed = await consumeShareTokenView(token);
+  if (!consumed.ok) {
+    switch (consumed.error) {
+      case "REVOKED":
+        return new NextResponse("Revoked", { status: 410 });
+      case "EXPIRED":
+        return new NextResponse("Link expired", { status: 410 });
+      case "MAXED":
+        return new NextResponse("Max views reached", { status: 410 });
+      default:
+        return new NextResponse("Not found", { status: 404 });
     }
   }
 
-  const signed = await mintSignedUrl({ key: share.r2_key, disposition: "inline" });
+  // Audit log (best-effort)
+  try {
+    const jar = await cookies();
+    const emailUsed = jar.get(emailCookieName(token))?.value || null;
+    await logDocAccess({
+      docId: share.doc_id,
+      shareId: share.token,
+      alias: null,
+      emailUsed,
+      ip: getClientIpFromHeaders(req.headers),
+      userAgent: getUserAgentFromHeaders(req.headers),
+    });
+  } catch {
+    // ignore
+  }
+
+  // Analytics (best-effort)
+  try {
+    const ip = getClientIpFromHeaders(req.headers);
+    const ua = getUserAgentFromHeaders(req.headers);
+    const ref = req.headers.get("referer") || null;
+    const ipHash = hashIp(ip);
+
+    try {
+      await sql`
+        insert into public.doc_views
+          (doc_id, alias, path, kind, user_agent, referer, ip_hash, share_token, event_type)
+        values
+          (${share.doc_id}::uuid, null, ${new URL(req.url).pathname}, 'share', ${ua}, ${ref}, ${ipHash}, ${token}, 'file_download')
+      `;
+    } catch {
+      await sql`
+        insert into public.doc_views
+          (doc_id, alias, path, kind, user_agent, referer, ip_hash)
+        values
+          (${share.doc_id}::uuid, null, ${new URL(req.url).pathname}, 'share', ${ua}, ${ref}, ${ipHash})
+      `;
+    }
+  } catch {
+    // ignore
+  }
+
+  const signed = await mintSignedUrl(share.r2_key);
   return new NextResponse(null, {
     status: 302,
     headers: {

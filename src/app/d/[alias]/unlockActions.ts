@@ -11,6 +11,7 @@ import {
     makeAliasTrustCookieValue,
 } from "@/lib/deviceTrust";
 import { deviceHashFrom, getClientIpFromHeaders, getUserAgentFromHeaders, isDeviceTrustedForDoc, trustDeviceForDoc } from "@/lib/audit";
+import { rateLimit, stableHash } from "@/lib/rateLimit";
 
 export type VerifyAliasPasswordResult =
     | { ok: true }
@@ -136,6 +137,33 @@ export async function verifyAliasPasswordResultAction(formData: FormData): Promi
     // If no password is set, treat as unlocked.
     if (!row.passwordHash) {
         return { ok: true };
+    }
+
+    // Brute-force throttle (best-effort)
+    try {
+        const h = await headers();
+        const ip = getClientIpFromHeaders(h) || "";
+        const ipKey = stableHash(ip, "VIEW_SALT");
+        const aliasKey = stableHash(alias, "VIEW_SALT");
+        const id = `${aliasKey}:${ipKey}`;
+
+        const rl1 = await rateLimit({
+            scope: "pw:alias:1m",
+            id,
+            limit: Number(process.env.RATE_LIMIT_ALIAS_PW_PER_MIN || 10),
+            windowSeconds: 60,
+        });
+        if (!rl1.ok) return { ok: false, error: "bad_password", message: "Too many attempts. Try again soon." };
+
+        const rl2 = await rateLimit({
+            scope: "pw:alias:10m",
+            id,
+            limit: Number(process.env.RATE_LIMIT_ALIAS_PW_PER_10MIN || 25),
+            windowSeconds: 600,
+        });
+        if (!rl2.ok) return { ok: false, error: "bad_password", message: "Too many attempts. Please wait and try again." };
+    } catch {
+        // fail open
     }
 
     const match = await bcrypt.compare(password, row.passwordHash);

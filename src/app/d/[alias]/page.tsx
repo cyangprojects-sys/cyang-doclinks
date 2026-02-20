@@ -242,6 +242,10 @@ function DocumentViewer({ docId, alias }: { docId: string; alias?: string }) {
     ? `/serve/${docId}?alias=${encodeURIComponent(alias)}`
     : `/serve/${docId}`;
 
+  const downloadUrl = alias
+    ? `/serve/${docId}?alias=${encodeURIComponent(alias)}&disposition=attachment`
+    : `/serve/${docId}?disposition=attachment`;
+
   return (
     <div className="mt-4">
       <div className="overflow-hidden rounded-xl border border-white/10 bg-white/5">
@@ -262,6 +266,13 @@ function DocumentViewer({ docId, alias }: { docId: string; alias?: string }) {
           className="text-neutral-200 underline"
         >
           open the document in a new tab
+        </a>
+        .{" "}
+        <a
+          href={downloadUrl}
+          className="ml-2 text-neutral-200 underline"
+        >
+          Download
         </a>
         .
       </div>
