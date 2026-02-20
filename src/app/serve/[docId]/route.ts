@@ -48,6 +48,13 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ docId: stri
   const alias = url.searchParams.get("alias");
   const token = url.searchParams.get("token");
   const ip = getClientIpFromHeaders(req.headers) || "";
+
+  // Derived params used in audit + analytics payloads
+  const disposition = parseDisposition(req);
+  const aliasParam = alias || null;
+  const tokenParam = token || null;
+  const ipHash = hashIp(ip);
+
   const ipKey = stableHash(ip, "VIEW_SALT");
 
   const ipRl = await rateLimit({
@@ -109,11 +116,11 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ docId: stri
 
       emitWebhook("doc.viewed", {
         docId: resolved.docId,
-        alias: aliasParam ?? null,
+        alias: aliasParam,
         path: url.pathname,
         kind: "serve",
         ipHash,
-        shareToken: tokenParam ?? null,
+        shareToken: tokenParam,
         eventType: disposition === "attachment" ? "file_download" : "preview_view",
       });
     } catch {
@@ -126,14 +133,8 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ docId: stri
 
   // Analytics (best-effort)
   try {
-    const ip = getClientIp(req);
-    const ipHash = hashIp(ip);
     const ua = req.headers.get("user-agent") || null;
     const ref = req.headers.get("referer") || null;
-
-    const disposition = parseDisposition(req);
-    const aliasParam = url.searchParams.get("alias") || null;
-    const tokenParam = url.searchParams.get("token") || null;
 
     // Try newer schema first (share_token + event_type). Fall back to legacy schema.
     try {
