@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { sql } from "@/lib/db";
-import { isOwnerAdmin } from "@/lib/admin";
+import { getAuthedUser } from "@/lib/authz";
 import DeleteDocForm from "../DeleteDocForm";
 import {
     deleteDocAction,
@@ -156,10 +156,12 @@ async function tableExists(fqTable: string): Promise<boolean> {
 }
 
 export default async function AdminDashboardPage() {
-    const ok = await isOwnerAdmin();
-    if (!ok) redirect("/api/auth/signin");
+    const u = await getAuthedUser();
+    if (!u) redirect("/api/auth/signin");
+    const canSeeAll = u.role === "owner" || u.role === "admin";
 
-    const docs = (await sql`
+    const docs = (await (canSeeAll
+        ? sql`
     select
       d.id::text as id,
       d.title,
@@ -168,9 +170,21 @@ export default async function AdminDashboardPage() {
     from docs d
     left join doc_aliases a on a.doc_id = d.id
     order by d.created_at desc
-  `) as unknown as DocRow[];
+  `
+        : sql`
+    select
+      d.id::text as id,
+      d.title,
+      d.created_at::text as created_at,
+      a.alias
+    from docs d
+    left join doc_aliases a on a.doc_id = d.id
+    where d.owner_id = ${u.id}::uuid
+    order by d.created_at desc
+  `)) as unknown as DocRow[];
 
-    const shares = (await sql`
+    const shares = (await (canSeeAll
+        ? sql`
     select
       s.token::text as token,
       s.doc_id::text as doc_id,
@@ -188,7 +202,27 @@ export default async function AdminDashboardPage() {
     left join doc_aliases a on a.doc_id = s.doc_id
     order by s.created_at desc
     limit 500
-  `) as unknown as ShareRow[];
+  `
+        : sql`
+    select
+      s.token::text as token,
+      s.doc_id::text as doc_id,
+      s.to_email,
+      s.created_at::text as created_at,
+      s.expires_at::text as expires_at,
+      s.max_views,
+      s.views_count,
+      s.revoked_at::text as revoked_at,
+      (s.password_hash is not null) as has_password,
+      d.title as doc_title,
+      a.alias
+    from share_tokens s
+    join docs d on d.id = s.doc_id
+    left join doc_aliases a on a.doc_id = s.doc_id
+    where d.owner_id = ${u.id}::uuid
+    order by s.created_at desc
+    limit 500
+  `)) as unknown as ShareRow[];
 
     const hasDocAccessLog = await tableExists("public.doc_access_log");
     const hasDocAudit = await tableExists("public.doc_audit");

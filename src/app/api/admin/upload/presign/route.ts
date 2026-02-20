@@ -5,7 +5,7 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 import { sql } from "@/lib/db";
 import { r2Client, r2Bucket } from "@/lib/r2";
-import { requireOwner } from "@/lib/owner";
+import { requireUser } from "@/lib/authz";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -29,13 +29,7 @@ function getKeyPrefix() {
 
 export async function POST(req: Request) {
     try {
-        const owner = await requireOwner();
-        if (!owner.ok) {
-            return NextResponse.json(
-                { ok: false, error: owner.reason },
-                { status: owner.reason === "UNAUTHENTICATED" ? 401 : 403 }
-            );
-        }
+        const user = await requireUser();
 
         const json = await req.json().catch(() => null);
         const parsed = BodySchema.safeParse(json);
@@ -58,15 +52,12 @@ export async function POST(req: Request) {
         );
         const key = `${keyPrefix}${docId}_${safeName}`;
 
-        const createdByEmail =
-            (owner as any).email ??
-            (owner as any).user?.email ??
-            process.env.OWNER_EMAIL ??
-            null;
+        const createdByEmail = user.email;
 
         await sql`
       insert into docs (
         id,
+        owner_id,
         title,
         original_filename,
         content_type,
@@ -78,6 +69,7 @@ export async function POST(req: Request) {
       )
       values (
         ${docId}::uuid,
+        ${user.id}::uuid,
         ${title ?? filename},
         ${filename},
         ${contentType},

@@ -1,31 +1,28 @@
 // src/lib/admin.ts
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/auth";
+// Back-compat helpers used by existing pages/actions.
+
+import { getAuthedUser, getOwnerEmail as _getOwnerEmail, roleAtLeast, type Role } from "@/lib/authz";
 
 export async function getOwnerEmail(): Promise<string> {
-    const owner = (process.env.OWNER_EMAIL || "").toLowerCase().trim();
-    if (!owner) throw new Error("Missing OWNER_EMAIL");
-    return owner;
+  return _getOwnerEmail();
 }
 
+// Historically: "owner" only. Now: owner/admin.
 export async function isOwnerAdmin(): Promise<boolean> {
-    const session = (await getServerSession(authOptions)) as any;
-    const email = (session?.user?.email as string | undefined) ?? "";
-    if (!email) return false;
-
-    const owner = await getOwnerEmail();
-    return email.toLowerCase() === owner;
+  const u = await getAuthedUser();
+  if (!u) return false;
+  return roleAtLeast(u.role, "admin");
 }
 
 // Throws on fail (use inside Server Actions / routes)
 export async function requireOwnerAdmin(): Promise<string> {
-    const session = (await getServerSession(authOptions)) as any;
-    const email = (session?.user?.email as string | undefined) ?? null;
+  const u = await getAuthedUser();
+  if (!u) throw new Error("Unauthorized.");
+  if (!roleAtLeast(u.role, "admin")) throw new Error("Forbidden.");
+  return u.email;
+}
 
-    if (!email) throw new Error("Unauthorized.");
-
-    const owner = await getOwnerEmail();
-    if (email.toLowerCase() !== owner) throw new Error("Forbidden.");
-
-    return email;
+export async function getRole(): Promise<Role | null> {
+  const u = await getAuthedUser();
+  return u?.role ?? null;
 }

@@ -2,7 +2,7 @@
 "use server";
 
 import { sql } from "@/lib/db";
-import { requireOwner } from "@/lib/owner";
+import { requireDocWrite } from "@/lib/authz";
 import { randomBytes } from "crypto";
 import bcrypt from "bcryptjs";
 
@@ -100,8 +100,6 @@ export async function createAndEmailShareToken(
   form: FormData
 ): Promise<CreateShareResult> {
   try {
-    await requireOwner();
-
     const docId = String(form.get("docId") || "").trim();
     const alias = String(form.get("alias") || "").trim();
     const toEmailRaw = String(form.get("toEmail") || "").trim();
@@ -111,6 +109,8 @@ export async function createAndEmailShareToken(
 
     if (!docId)
       return { ok: false, error: "bad_request", message: "Missing docId" };
+
+    await requireDocWrite(docId);
 
     const toEmail = toEmailRaw ? toEmailRaw.toLowerCase() : null;
 
@@ -184,8 +184,6 @@ export async function getShareStatsByToken(
   token: string
 ): Promise<ShareStatsResult> {
   try {
-    await requireOwner();
-
     const rows = (await sql`
       select
         token::text as token,
@@ -213,6 +211,8 @@ export async function getShareStatsByToken(
     const r = rows[0];
     if (!r) return { ok: false, error: "not_found", message: "Token not found" };
 
+    await requireDocWrite(r.doc_id);
+
     const row: ShareRow = {
       token: r.token,
       doc_id: r.doc_id,
@@ -235,7 +235,18 @@ export async function revokeShareToken(
   token: string
 ): Promise<RevokeShareResult> {
   try {
-    await requireOwner();
+    // Lookup doc_id first so we can enforce ownership.
+    const rows = (await sql`
+      select doc_id::text as doc_id
+      from public.share_tokens
+      where token = ${token}
+      limit 1
+    `) as unknown as Array<{ doc_id: string }>;
+
+    const docId = rows?.[0]?.doc_id ?? null;
+    if (!docId) return { ok: false, error: "not_found", message: "Token not found" };
+
+    await requireDocWrite(docId);
 
     await sql`
       update public.share_tokens

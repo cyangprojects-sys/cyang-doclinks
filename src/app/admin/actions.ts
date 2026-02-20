@@ -8,7 +8,7 @@ import bcrypt from "bcryptjs";
 import { sql } from "@/lib/db";
 import { r2Bucket, r2Client, r2Prefix } from "@/lib/r2";
 import { sendMail } from "@/lib/email";
-import { requireOwnerAdmin } from "@/lib/admin";
+import { requireDocWrite, requireRole, requireUser } from "@/lib/authz";
 import { setRetentionSettings } from "@/lib/settings";
 
 function getBaseUrl() {
@@ -19,6 +19,22 @@ function getBaseUrl() {
   if (vercel) return `https://${vercel}`.replace(/\/+$/, "");
 
   return "http://localhost:3000";
+}
+
+async function requireShareWrite(token: string) {
+  const t = String(token || "").trim();
+  if (!t) throw new Error("Missing token.");
+
+  const rows = (await sql`
+    select doc_id::text as doc_id
+    from public.share_tokens
+    where token = ${t}
+    limit 1
+  `) as unknown as Array<{ doc_id: string }>;
+
+  const docId = rows?.[0]?.doc_id ?? null;
+  if (!docId) throw new Error("Token not found.");
+  await requireDocWrite(docId);
 }
 
 async function resolveR2LocationForDoc(docId: string): Promise<{ bucket: string; key: string }> {
@@ -60,19 +76,19 @@ async function resolveR2LocationForDoc(docId: string): Promise<{ bucket: string;
 
 // Back-compat export expected by older admin UI
 export async function uploadPdfAction(): Promise<void> {
-  await requireOwnerAdmin();
+  await requireRole("admin");
   throw new Error("uploadPdfAction is deprecated. Use /admin/upload instead.");
 }
 
 // Used as <form action={createOrAssignAliasAction}> — must return void
 export async function createOrAssignAliasAction(formData: FormData): Promise<void> {
-  await requireOwnerAdmin();
-
   const alias = String(formData.get("alias") || "").trim();
   const docId = String(formData.get("docId") || formData.get("doc_id") || "").trim();
 
   if (!alias) throw new Error("Missing alias.");
   if (!docId) throw new Error("Missing docId.");
+
+  await requireDocWrite(docId);
   if (!/^[a-zA-Z0-9_-]{3,80}$/.test(alias)) {
     throw new Error("Alias must be 3-80 chars: letters, numbers, underscore, dash.");
   }
@@ -90,7 +106,7 @@ export async function createOrAssignAliasAction(formData: FormData): Promise<voi
 
 // Used as <form action={emailMagicLinkAction}> — must return void
 export async function emailMagicLinkAction(formData: FormData): Promise<void> {
-  const ownerEmail = await requireOwnerAdmin();
+  const u = await requireUser();
 
   const to = String(
     formData.get("to") || formData.get("email") || formData.get("recipient") || ""
@@ -101,6 +117,21 @@ export async function emailMagicLinkAction(formData: FormData): Promise<void> {
 
   if (!to) throw new Error("Missing recipient email.");
   if (!alias && !docId) throw new Error("Provide alias or docId.");
+
+  // AuthZ: verify ownership when docId/alias is provided.
+  if (docId) {
+    await requireDocWrite(docId);
+  } else if (alias) {
+    const rows = (await sql`
+      select doc_id::text as doc_id
+      from public.doc_aliases
+      where lower(alias) = lower(${alias})
+      limit 1
+    `) as unknown as Array<{ doc_id: string }>;
+    const did = rows?.[0]?.doc_id ?? null;
+    if (!did) throw new Error("Alias not found.");
+    await requireDocWrite(did);
+  }
 
   const base = getBaseUrl();
   const token = alias || docId;
@@ -114,8 +145,8 @@ export async function emailMagicLinkAction(formData: FormData): Promise<void> {
 
   // Optional audit
   await sendMail({
-    to: ownerEmail,
-    subject: "cyang.io: magic link emailed",
+    to: u.email,
+    subject: "cyang.io: link emailed",
     text: `Sent link to ${to}\n\n${url}`,
   });
 
@@ -125,7 +156,7 @@ export async function emailMagicLinkAction(formData: FormData): Promise<void> {
 
 // Retention settings (admin toggle)
 export async function updateRetentionSettingsAction(formData: FormData): Promise<void> {
-  await requireOwnerAdmin();
+  await requireRole("admin");
 
   const enabledRaw = String(formData.get("retention_enabled") ?? "");
   const deleteExpiredRaw = String(formData.get("retention_delete_expired_shares") ?? "");
@@ -147,10 +178,10 @@ export async function updateRetentionSettingsAction(formData: FormData): Promise
 
 // Used as <form action={deleteDocAction}> — must return void
 export async function deleteDocAction(formData: FormData): Promise<void> {
-  await requireOwnerAdmin();
-
   const docId = String(formData.get("docId") || formData.get("doc_id") || "").trim();
   if (!docId) throw new Error("Missing docId.");
+
+  await requireDocWrite(docId);
 
   const { bucket, key } = await resolveR2LocationForDoc(docId);
 
@@ -180,10 +211,10 @@ export async function deleteDocAction(formData: FormData): Promise<void> {
 
 // Used as <form action={revokeDocShareAction}>
 export async function revokeDocShareAction(formData: FormData): Promise<void> {
-  await requireOwnerAdmin();
-
   const token = String(formData.get("token") || "").trim();
   if (!token) throw new Error("Missing token.");
+
+  await requireShareWrite(token);
 
   await sql`
     update share_tokens
@@ -198,13 +229,13 @@ export async function revokeDocShareAction(formData: FormData): Promise<void> {
 
 // Used as <form action={setSharePasswordAction}>
 export async function setSharePasswordAction(formData: FormData): Promise<void> {
-  await requireOwnerAdmin();
-
   const token = String(formData.get("token") || "").trim();
   const password = String(formData.get("password") || "").trim();
 
   if (!token) throw new Error("Missing token.");
   if (password.length < 4) throw new Error("Password must be at least 4 characters.");
+
+  await requireShareWrite(token);
 
   // bcrypt cost (12 is a good default for serverless)
   const hash = await bcrypt.hash(password, 12);
@@ -221,10 +252,10 @@ export async function setSharePasswordAction(formData: FormData): Promise<void> 
 
 // Used as <form action={clearSharePasswordAction}>
 export async function clearSharePasswordAction(formData: FormData): Promise<void> {
-  await requireOwnerAdmin();
-
   const token = String(formData.get("token") || "").trim();
   if (!token) throw new Error("Missing token.");
+
+  await requireShareWrite(token);
 
   await sql`
     update share_tokens
@@ -239,7 +270,7 @@ export async function clearSharePasswordAction(formData: FormData): Promise<void
 // --- Dashboard v2 actions (actionable + bulk) ---
 
 export async function revokeAllSharesForDocAction(formData: FormData): Promise<void> {
-  await requireOwnerAdmin();
+  await requireRole("admin");
   const docId = String(formData.get("docId") || "").trim();
   if (!docId) throw new Error("Missing docId.");
 
@@ -256,7 +287,7 @@ export async function revokeAllSharesForDocAction(formData: FormData): Promise<v
 }
 
 export async function disableAliasForDocAction(formData: FormData): Promise<void> {
-  await requireOwnerAdmin();
+  await requireRole("admin");
   const docId = String(formData.get("docId") || "").trim();
   if (!docId) throw new Error("Missing docId.");
 
@@ -290,7 +321,7 @@ export async function disableAliasForDocAction(formData: FormData): Promise<void
 }
 
 export async function extendAliasExpirationAction(formData: FormData): Promise<void> {
-  await requireOwnerAdmin();
+  await requireRole("admin");
   const docId = String(formData.get("docId") || "").trim();
   const days = Number(formData.get("days") || 0);
   if (!docId) throw new Error("Missing docId.");
@@ -313,7 +344,7 @@ export async function extendAliasExpirationAction(formData: FormData): Promise<v
 }
 
 export async function extendShareExpirationAction(formData: FormData): Promise<void> {
-  await requireOwnerAdmin();
+  await requireRole("admin");
   const token = String(formData.get("token") || "").trim();
   const days = Number(formData.get("days") || 0);
   if (!token) throw new Error("Missing token.");
@@ -330,7 +361,7 @@ export async function extendShareExpirationAction(formData: FormData): Promise<v
 }
 
 export async function setShareMaxViewsAction(formData: FormData): Promise<void> {
-  await requireOwnerAdmin();
+  await requireRole("admin");
   const token = String(formData.get("token") || "").trim();
   const maxViewsRaw = String(formData.get("maxViews") || "").trim();
   if (!token) throw new Error("Missing token.");
@@ -351,7 +382,7 @@ export async function setShareMaxViewsAction(formData: FormData): Promise<void> 
 }
 
 export async function resetShareViewsCountAction(formData: FormData): Promise<void> {
-  await requireOwnerAdmin();
+  await requireRole("admin");
   const token = String(formData.get("token") || "").trim();
   if (!token) throw new Error("Missing token.");
 
@@ -366,7 +397,7 @@ export async function resetShareViewsCountAction(formData: FormData): Promise<vo
 }
 
 export async function forceSharePasswordResetAction(formData: FormData): Promise<void> {
-  await requireOwnerAdmin();
+  await requireRole("admin");
   const token = String(formData.get("token") || "").trim();
   if (!token) throw new Error("Missing token.");
 
@@ -388,7 +419,7 @@ export async function forceSharePasswordResetAction(formData: FormData): Promise
 }
 
 export async function bulkRevokeSharesAction(formData: FormData): Promise<void> {
-  await requireOwnerAdmin();
+  await requireRole("admin");
   const raw = String(formData.get("tokens") || "").trim();
   if (!raw) throw new Error("Missing tokens.");
   const tokens = JSON.parse(raw) as string[];
@@ -406,7 +437,7 @@ export async function bulkRevokeSharesAction(formData: FormData): Promise<void> 
 }
 
 export async function bulkExtendSharesAction(formData: FormData): Promise<void> {
-  await requireOwnerAdmin();
+  await requireRole("admin");
   const raw = String(formData.get("tokens") || "").trim();
   const days = Number(formData.get("days") || 0);
   if (!raw) throw new Error("Missing tokens.");
@@ -425,7 +456,7 @@ export async function bulkExtendSharesAction(formData: FormData): Promise<void> 
 }
 
 export async function bulkRevokeAllSharesForDocsAction(formData: FormData): Promise<void> {
-  await requireOwnerAdmin();
+  await requireRole("admin");
   const raw = String(formData.get("docIds") || "").trim();
   if (!raw) throw new Error("Missing docIds.");
   const docIds = JSON.parse(raw) as string[];
@@ -444,7 +475,7 @@ export async function bulkRevokeAllSharesForDocsAction(formData: FormData): Prom
 }
 
 export async function bulkDisableAliasesForDocsAction(formData: FormData): Promise<void> {
-  await requireOwnerAdmin();
+  await requireRole("admin");
   const raw = String(formData.get("docIds") || "").trim();
   if (!raw) throw new Error("Missing docIds.");
   const docIds = JSON.parse(raw) as string[];
@@ -479,7 +510,7 @@ export async function bulkDisableAliasesForDocsAction(formData: FormData): Promi
 
 // Expiration warning email (best-effort; uses doc_aliases.expires_at)
 export async function sendExpirationAlertAction(formData: FormData): Promise<void> {
-  const ownerEmail = await requireOwnerAdmin();
+  const u = await requireRole("admin");
 
   const daysRaw = String(formData.get("days") || "3").trim();
   const daysNum = Number(daysRaw);
@@ -523,7 +554,7 @@ export async function sendExpirationAlertAction(formData: FormData): Promise<voi
       : `Aliases expiring in the next ${days} day(s):\n\n${lines.join("\n\n")}`;
 
   await sendMail({
-    to: ownerEmail,
+    to: u.email,
     subject: `cyang.io: expiring in ${days} day(s)`,
     text: body,
   });

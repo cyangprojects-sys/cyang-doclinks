@@ -4,6 +4,7 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { slugify } from "@/lib/slug";
+import { requireDocWrite } from "@/lib/authz";
 
 type CompleteRequest = {
   // Newer flow: doc_id from /presign response
@@ -43,6 +44,9 @@ export async function POST(req: NextRequest) {
         docId = rows?.[0]?.id ?? null;
       }
     }
+
+    // AuthZ: must be able to manage this doc.
+    await requireDocWrite(docId);
 
     if (!docId) {
       return NextResponse.json(

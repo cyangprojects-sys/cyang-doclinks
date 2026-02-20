@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import { sql } from "@/lib/db";
-import { requireOwner } from "@/lib/owner";
+import { requireRole } from "@/lib/authz";
 
 async function regclass(name: string) {
   const rows = (await sql`select to_regclass(${name})::text as reg`) as { reg: string | null }[];
@@ -11,13 +11,7 @@ async function regclass(name: string) {
 }
 
 export async function GET() {
-  const owner = await requireOwner();
-  if (!owner.ok) {
-    return NextResponse.json(
-      { ok: false, error: owner.reason },
-      { status: owner.reason === "UNAUTHENTICATED" ? 401 : 403 }
-    );
-  }
+  await requireRole("admin");
 
   // NOTE: We intentionally do NOT return DATABASE_URL (would leak credentials).
   const infoRows = await sql`

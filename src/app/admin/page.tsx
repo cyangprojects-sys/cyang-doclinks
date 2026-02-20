@@ -1,14 +1,14 @@
 // src/app/admin/page.tsx
 import Link from "next/link";
-import { isOwnerAdmin } from "@/lib/admin";
+import { getAuthedUser } from "@/lib/authz";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export default async function AdminPage() {
-  const ok = await isOwnerAdmin();
+  const u = await getAuthedUser();
 
-  if (!ok) {
+  if (!u) {
     return (
       <main className="mx-auto max-w-3xl px-4 py-12">
         <div className="flex items-center justify-between">
@@ -21,7 +21,7 @@ export default async function AdminPage() {
           </Link>
         </div>
 
-        <p className="mt-3 text-sm text-neutral-300">Owner access required.</p>
+        <p className="mt-3 text-sm text-neutral-300">Sign in to manage your documents.</p>
 
         <div className="mt-6 flex flex-wrap gap-3">
           <Link
@@ -39,9 +39,7 @@ export default async function AdminPage() {
           </Link>
         </div>
 
-        <div className="mt-4 text-xs text-neutral-500">
-          Make sure <span className="font-mono">OWNER_EMAIL</span> is set in env.
-        </div>
+        <div className="mt-4 text-xs text-neutral-500">You’ll be placed in the <span className="font-mono">viewer</span> role by default.</div>
       </main>
     );
   }
@@ -51,7 +49,9 @@ export default async function AdminPage() {
       <div className="flex items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold tracking-tight">Admin</h1>
-          <p className="mt-1 text-sm text-neutral-400">You’re signed in as the owner.</p>
+          <p className="mt-1 text-sm text-neutral-400">
+            Signed in as <span className="font-mono">{u.email}</span> · role: <span className="font-mono">{u.role}</span>
+          </p>
         </div>
 
         <div className="flex items-center gap-3">

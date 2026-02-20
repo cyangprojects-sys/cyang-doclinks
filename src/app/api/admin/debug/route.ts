@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
-import { requireOwner } from "@/lib/owner";
+import { requireRole } from "@/lib/authz";
 
 import { HeadObjectCommand } from "@aws-sdk/client-s3";
 import { r2Client, r2Bucket } from "@/lib/r2";
@@ -29,13 +29,7 @@ async function tableExists(regclass: string) {
 
 export async function GET(req: NextRequest) {
   try {
-    const owner = await requireOwner();
-    if (!owner.ok) {
-      return NextResponse.json(
-        { ok: false, error: owner.reason },
-        { status: owner.reason === "UNAUTHENTICATED" ? 401 : 403 }
-      );
-    }
+    await requireRole("admin");
 
     const url = new URL(req.url);
     const alias = (url.searchParams.get("alias") || "").trim();

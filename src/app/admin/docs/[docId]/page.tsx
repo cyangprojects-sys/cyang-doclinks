@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { sql } from "@/lib/db";
-import { isOwnerAdmin } from "@/lib/admin";
+import { requireDocWrite } from "@/lib/authz";
 import { revokeAllSharesForDocAction } from "../../actions";
 
 export const runtime = "nodejs";
@@ -90,12 +90,15 @@ type ShareRow = {
 };
 
 export default async function AdminDocInvestigatePage(props: { params: Promise<{ docId: string }> }) {
-  const ok = await isOwnerAdmin();
-  if (!ok) redirect("/api/auth/signin");
-
   const { docId } = await props.params;
   const id = (docId || "").trim();
   if (!id) redirect("/admin/dashboard#views-by-doc");
+
+  try {
+    await requireDocWrite(id);
+  } catch {
+    redirect("/api/auth/signin");
+  }
 
   const docRows = (await sql`
     select

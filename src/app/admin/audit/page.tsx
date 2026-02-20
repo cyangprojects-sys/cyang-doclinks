@@ -3,7 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { sql } from "@/lib/db";
 import { unstable_noStore as noStore } from "next/cache";
-import { isOwnerAdmin } from "@/lib/admin";
+import { getAuthedUser } from "@/lib/authz";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -12,8 +12,9 @@ export const revalidate = 0;
 export default async function AuditPage() {
   noStore();
 
-  const ok = await isOwnerAdmin();
-  if (!ok) redirect("/api/auth/signin");
+  const u = await getAuthedUser();
+  if (!u) redirect("/api/auth/signin");
+  const canSeeAll = u.role === "owner" || u.role === "admin";
 
   let auditRows: any[] = [];
   let accessRows: any[] = [];
@@ -21,12 +22,20 @@ export default async function AuditPage() {
   let accessError: string | null = null;
 
   try {
-    auditRows = await sql`
-      select *
-      from public.doc_audit
-      order by created_at desc
-      limit 50
-    `;
+    auditRows = await (canSeeAll
+      ? sql`
+        select *
+        from public.doc_audit
+        order by created_at desc
+        limit 50
+      `
+      : sql`
+        select *
+        from public.doc_audit a
+        where a.doc_id in (select d.id from public.docs d where d.owner_id = ${u.id}::uuid)
+        order by a.created_at desc
+        limit 50
+      `);
   } catch { }
 
   try {
@@ -38,12 +47,34 @@ export default async function AuditPage() {
       limit 200
     `) as unknown as any[];
 
+    const filtered = canSeeAll
+      ? raw
+      : raw.filter((r) => {
+        const docId = String(r?.doc_id || r?.docId || "").trim();
+        return !!docId;
+      });
+
+    // If viewer, do a cheap allowlist query of owned doc_ids.
+    let owned: Set<string> | null = null;
+    if (!canSeeAll) {
+      const ids = (await sql`
+        select id::text as id
+        from public.docs
+        where owner_id = ${u.id}::uuid
+      `) as unknown as Array<{ id: string }>;
+      owned = new Set(ids.map((x) => x.id));
+    }
+
+    const scoped = canSeeAll
+      ? raw
+      : filtered.filter((r) => owned?.has(String(r?.doc_id || r?.docId || "")));
+
     const preferredCols = ["accessed_at", "accessedAt", "created_at", "createdAt", "ts", "timestamp"];
-    const cols = raw?.[0] ? Object.keys(raw[0]) : [];
+    const cols = scoped?.[0] ? Object.keys(scoped[0]) : [];
     const tsCol = preferredCols.find((c) => cols.includes(c)) ?? null;
 
     if (!tsCol) {
-      accessRows = raw.slice(0, 50);
+      accessRows = scoped.slice(0, 50);
     } else {
       const toTime = (v: any) => {
         if (!v) return 0;
@@ -51,7 +82,7 @@ export default async function AuditPage() {
         const t = d.getTime();
         return Number.isNaN(t) ? 0 : t;
       };
-      accessRows = raw
+      accessRows = scoped
         .slice()
         .sort((a, b) => toTime(b?.[tsCol]) - toTime(a?.[tsCol]))
         .slice(0, 50);
@@ -61,12 +92,20 @@ export default async function AuditPage() {
   }
 
   try {
-    viewRows = await sql`
-      select *
-      from public.doc_views
-      order by viewed_at desc
-      limit 50
-    `;
+    viewRows = await (canSeeAll
+      ? sql`
+        select *
+        from public.doc_views
+        order by viewed_at desc
+        limit 50
+      `
+      : sql`
+        select *
+        from public.doc_views v
+        where v.doc_id in (select d.id from public.docs d where d.owner_id = ${u.id}::uuid)
+        order by v.viewed_at desc
+        limit 50
+      `);
   } catch { }
 
   return (

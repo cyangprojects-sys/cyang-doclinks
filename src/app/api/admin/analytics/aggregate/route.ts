@@ -2,17 +2,11 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
-import { requireOwner } from "@/lib/owner";
+import { requireRole } from "@/lib/authz";
 import { aggregateDocViewDaily, envInt } from "@/lib/analytics";
 
 export async function GET() {
-  const owner = await requireOwner();
-  if (!owner.ok) {
-    return NextResponse.json(
-      { ok: false, error: owner.reason },
-      { status: owner.reason === "UNAUTHENTICATED" ? 401 : 403 }
-    );
-  }
+  await requireRole("admin");
 
   // How far back we recompute daily aggregates.
   // Keep this relatively small; re-running daily is cheap.

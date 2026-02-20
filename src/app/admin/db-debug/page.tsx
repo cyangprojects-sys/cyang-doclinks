@@ -3,7 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { unstable_noStore as noStore } from "next/cache";
 import { sql } from "@/lib/db";
-import { isOwnerAdmin } from "@/lib/admin";
+import { requireRole } from "@/lib/authz";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -14,8 +14,11 @@ type TableRow = { table_name: string };
 export default async function DbDebugPage() {
   noStore();
 
-  const ok = await isOwnerAdmin();
-  if (!ok) redirect("/api/auth/signin");
+  try {
+    await requireRole("admin");
+  } catch {
+    redirect("/api/auth/signin");
+  }
 
   let dbUser: string = "unknown";
   let dbName: string | null = null;
