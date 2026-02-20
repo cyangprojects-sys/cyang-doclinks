@@ -228,10 +228,12 @@ export default async function AdminDashboardPage() {
     const hasDocAudit = await tableExists("public.doc_audit");
 
     // Recent access logs (best-effort; table may not exist in older envs)
+    // For viewers, scope to *their* docs. For owner/admin, show site-wide.
     let access: AccessRow[] = [];
     try {
         if (hasDocAccessLog) {
-            access = (await sql`
+            access = (await (canSeeAll
+                ? sql`
         select
           l.accessed_at::text as accessed_at,
           l.doc_id::text as doc_id,
@@ -246,10 +248,28 @@ export default async function AdminDashboardPage() {
         join public.docs d on d.id = l.doc_id
         order by l.accessed_at desc
         limit 200
-      `) as unknown as AccessRow[];
+      `
+                : sql`
+        select
+          l.accessed_at::text as accessed_at,
+          l.doc_id::text as doc_id,
+          d.title as doc_title,
+          l.alias::text as alias,
+          l.share_id::text as share_id,
+          l.email_used::text as email_used,
+          l.ip::text as ip,
+          l.device_hash::text as device_hash,
+          l.user_agent::text as user_agent
+        from public.doc_access_log l
+        join public.docs d on d.id = l.doc_id
+        where d.owner_id = ${u.id}::uuid
+        order by l.accessed_at desc
+        limit 200
+      `)) as unknown as AccessRow[];
         } else if (hasDocAudit) {
             // logDocAccess() writes to doc_audit by default in this repo.
-            access = (await sql`
+            access = (await (canSeeAll
+                ? sql`
         select
           a.created_at::text as accessed_at,
           a.doc_id::text as doc_id,
@@ -264,9 +284,24 @@ export default async function AdminDashboardPage() {
         join public.docs d on d.id = a.doc_id
         order by a.created_at desc
         limit 200
-      `) as unknown as AccessRow[];
-        } else {
-            access = [];
+      `
+                : sql`
+        select
+          a.created_at::text as accessed_at,
+          a.doc_id::text as doc_id,
+          d.title as doc_title,
+          a.alias::text as alias,
+          a.share_id::text as share_id,
+          a.email_used::text as email_used,
+          null::text as ip,
+          null::text as device_hash,
+          a.user_agent::text as user_agent
+        from public.doc_audit a
+        join public.docs d on d.id = a.doc_id
+        where d.owner_id = ${u.id}::uuid
+        order by a.created_at desc
+        limit 200
+      `)) as unknown as AccessRow[];
         }
     } catch {
         access = [];
@@ -376,7 +411,8 @@ export default async function AdminDashboardPage() {
     // Expiration warnings (aliases expiring in next 3 days)
     let expiringSoon: Array<{ doc_id: string; doc_title: string | null; alias: string | null; expires_at: string | null }> = [];
     try {
-        expiringSoon = (await sql`
+        expiringSoon = (await (canSeeAll
+            ? sql`
       select
         d.id::text as doc_id,
         d.title as doc_title,
@@ -391,18 +427,37 @@ export default async function AdminDashboardPage() {
         and a.expires_at <= (now() + interval '3 days')
       order by a.expires_at asc
       limit 8
-    `) as unknown as Array<{ doc_id: string; doc_title: string | null; alias: string | null; expires_at: string | null }>;
+    `
+            : sql`
+      select
+        d.id::text as doc_id,
+        d.title as doc_title,
+        a.alias as alias,
+        a.expires_at::text as expires_at
+      from public.doc_aliases a
+      join public.docs d on d.id = a.doc_id
+      where d.owner_id = ${u.id}::uuid
+        and coalesce(a.is_active, true) = true
+        and a.revoked_at is null
+        and a.expires_at is not null
+        and a.expires_at > now()
+        and a.expires_at <= (now() + interval '3 days')
+      order by a.expires_at asc
+      limit 8
+    `)) as unknown as Array<{ doc_id: string; doc_title: string | null; alias: string | null; expires_at: string | null }>;
     } catch {
         expiringSoon = [];
     }
 
     // Fast analytics read layer (doc_view_daily)
+
     const hasDocViewDaily = await tableExists("public.doc_view_daily");
     let topDocs7d: TopDocRow[] = [];
     let spark30: SparkRow[] = [];
     try {
         if (hasDocViewDaily) {
-            topDocs7d = (await sql`
+            topDocs7d = (await (canSeeAll
+                ? sql`
         select
           d.id::text as doc_id,
           d.title as doc_title,
@@ -417,9 +472,27 @@ export default async function AdminDashboardPage() {
         group by d.id, d.title, a.alias
         order by views_7d desc
         limit 10
-      `) as unknown as TopDocRow[];
+      `
+                : sql`
+        select
+          d.id::text as doc_id,
+          d.title as doc_title,
+          a.alias as alias,
+          coalesce(sum(x.view_count), 0)::int as views_7d,
+          coalesce(sum(x.unique_ip_count), 0)::int as unique_ips_7d
+        from public.docs d
+        left join public.doc_aliases a on a.doc_id = d.id
+        left join public.doc_view_daily x
+          on x.doc_id = d.id
+         and x.date >= (current_date - interval '6 days')
+        where d.owner_id = ${u.id}::uuid
+        group by d.id, d.title, a.alias
+        order by views_7d desc
+        limit 10
+      `)) as unknown as TopDocRow[];
 
-            spark30 = (await sql`
+            spark30 = (await (canSeeAll
+                ? sql`
         select
           x.date::text as day,
           sum(x.view_count)::int as views
@@ -427,7 +500,18 @@ export default async function AdminDashboardPage() {
         where x.date >= (current_date - interval '29 days')
         group by x.date
         order by x.date asc
-      `) as unknown as SparkRow[];
+      `
+                : sql`
+        select
+          x.date::text as day,
+          sum(x.view_count)::int as views
+        from public.doc_view_daily x
+        join public.docs d on d.id = x.doc_id
+        where d.owner_id = ${u.id}::uuid
+          and x.date >= (current_date - interval '29 days')
+        group by x.date
+        order by x.date asc
+      `)) as unknown as SparkRow[];
         }
     } catch {
         topDocs7d = [];
@@ -438,7 +522,8 @@ export default async function AdminDashboardPage() {
     let dailyAgg: DailyAggRow[] = [];
     try {
         if (hasDocViewDaily) {
-            dailyAgg = (await sql`
+            dailyAgg = (await (canSeeAll
+                ? sql`
         select
           x.date::text as day,
           sum(x.view_count)::int as views,
@@ -447,7 +532,19 @@ export default async function AdminDashboardPage() {
         where x.date >= (current_date - interval '14 days')
         group by x.date
         order by x.date desc
-      `) as unknown as DailyAggRow[];
+      `
+                : sql`
+        select
+          x.date::text as day,
+          sum(x.view_count)::int as views,
+          sum(x.unique_ip_count)::int as unique_ips
+        from public.doc_view_daily x
+        join public.docs d on d.id = x.doc_id
+        where d.owner_id = ${u.id}::uuid
+          and x.date >= (current_date - interval '14 days')
+        group by x.date
+        order by x.date desc
+      `)) as unknown as DailyAggRow[];
         } else {
             dailyAgg = [];
         }
@@ -455,7 +552,7 @@ export default async function AdminDashboardPage() {
         dailyAgg = [];
     }
 
-    // Retention widget (best-effort)
+    // Retention widget (best-effort) — site-wide/admin only
     const retentionRawDays = (() => {
         const raw = (process.env.RETENTION_DAYS || "").trim();
         const n = Number(raw);
@@ -463,36 +560,41 @@ export default async function AdminDashboardPage() {
         return Math.floor(n);
     })();
 
-    let retentionInfo: { oldest: string | null; scheduled: number | null } = { oldest: null, scheduled: null };
-    try {
-        const hasDocViews = await tableExists("public.doc_views");
-        if (hasDocViews) {
-            const oldestRows = (await sql`
-        select min(created_at)::text as oldest
-        from public.doc_views
-      `) as unknown as Array<{ oldest: string | null }>;
-            const oldest = oldestRows?.[0]?.oldest ?? null;
-
-            const scheduledRows = (await sql`
-        select count(*)::int as c
-        from public.doc_views
-        where created_at < (now() - (${retentionRawDays}::int * interval '1 day'))
-      `) as unknown as Array<{ c: number }>;
-            const scheduled = scheduledRows?.[0]?.c ?? 0;
-            retentionInfo = { oldest, scheduled };
-        }
-    } catch {
-        retentionInfo = { oldest: null, scheduled: null };
-    }
-
-    // Retention toggle/settings (best-effort; requires public.app_settings)
-    const hasAppSettings = await tableExists("public.app_settings");
+    let retentionInfo: { oldest: string | null; scheduled: number | null } | null = null;
     let retentionSettings:
         | { ok: true; settings: { enabled: boolean; deleteExpiredShares: boolean; shareGraceDays: number } }
         | { ok: false; error: string }
         | null = null;
-    if (hasAppSettings) {
-        retentionSettings = await getRetentionSettings();
+
+    if (canSeeAll) {
+        retentionInfo = { oldest: null, scheduled: null };
+        try {
+            const hasDocViews = await tableExists("public.doc_views");
+            if (hasDocViews) {
+                const oldestRows = (await sql`
+          select min(created_at)::text as oldest
+          from public.doc_views
+        `) as unknown as Array<{ oldest: string | null }>;
+                const oldest = oldestRows?.[0]?.oldest ?? null;
+
+                const scheduledRows = (await sql`
+          select count(*)::int as c
+          from public.doc_views
+          where created_at < (now() - (${retentionRawDays}::int * interval '1 day'))
+        `) as unknown as Array<{ c: number }>;
+                const scheduled = scheduledRows?.[0]?.c ?? 0;
+
+                retentionInfo = { oldest, scheduled };
+            }
+        } catch {
+            retentionInfo = { oldest: null, scheduled: null };
+        }
+
+        // Retention toggle/settings (best-effort; requires public.app_settings)
+        const hasAppSettings = await tableExists("public.app_settings");
+        if (hasAppSettings) {
+            retentionSettings = await getRetentionSettings();
+        }
     }
 
     const sharesClient: ShareRowClient[] = shares.map((s) => ({
@@ -551,7 +653,7 @@ export default async function AdminDashboardPage() {
         <main className="mx-auto max-w-6xl px-4 py-12">
             <div className="flex items-center justify-between gap-3">
                 <div>
-                    <h1 className="text-xl font-semibold tracking-tight">Admin dashboard</h1>
+                    <h1 className="text-xl font-semibold tracking-tight">Dashboard</h1>
                     <p className="mt-1 text-sm text-neutral-400">Owner-only tools.</p>
                 </div>
 
@@ -954,80 +1056,90 @@ export default async function AdminDashboardPage() {
                     <div>
                         <h2 className="text-lg font-semibold tracking-tight">Daily analytics (last 14 days)</h2>
                         <p className="mt-1 text-sm text-neutral-400">
-                            Reads from <span className="font-mono">doc_view_daily</span>. Generate/refresh via{" "}
-                            <Link className="text-blue-400 hover:underline" href="/api/admin/analytics/aggregate" target="_blank">
-                                /api/admin/analytics/aggregate
-                            </Link>
-                            .
+                            Reads from <span className="font-mono">doc_view_daily</span>.{" "}
+                            {canSeeAll ? (
+                                <>
+                                    Generate/refresh via{" "}
+                                    <Link className="text-blue-400 hover:underline" href="/api/admin/analytics/aggregate" target="_blank">
+                                        /api/admin/analytics/aggregate
+                                    </Link>
+                                    .
+                                </>
+                            ) : (
+                                <>Auto-refreshed nightly.</>
+                            )}
                         </p>
                         <div className="mt-2 text-xs text-neutral-500">
-                            Retention: {retentionRawDays} days · Oldest retained: {fmtDate(retentionInfo.oldest)} · Rows scheduled for deletion: {retentionInfo.scheduled ?? "—"}
+                            {canSeeAll ? (
+                                <>
+                                    Retention: {retentionRawDays} days · Oldest retained: {fmtDate(retentionInfo?.oldest ?? null)} · Rows scheduled for deletion: {retentionInfo?.scheduled ?? "—"}
+                                </>
+                            ) : (
+                                <>Retention controls are available to the site owner.</>
+                            )}
                         </div>
 
-                        {hasAppSettings ? (
-                            retentionSettings && retentionSettings.ok ? (
-                                <form action={updateRetentionSettingsAction} className="mt-3 flex flex-wrap items-end gap-3 text-xs">
-                                    <label className="flex items-center gap-2 text-neutral-300">
-                                        <input
-                                            type="checkbox"
-                                            name="retention_enabled"
-                                            defaultChecked={retentionSettings.settings.enabled}
-                                            className="h-4 w-4 rounded border-neutral-700 bg-neutral-950"
-                                        />
-                                        <span>Retention enabled</span>
-                                    </label>
+                        {canSeeAll ? (
+                            retentionSettings ? (
+                                retentionSettings.ok ? (
+                                    <form action={updateRetentionSettingsAction} className="mt-3 flex flex-wrap items-end gap-3 text-xs">
+                                        <label className="flex items-center gap-2 text-neutral-300">
+                                            <input
+                                                type="checkbox"
+                                                name="retention_enabled"
+                                                defaultChecked={retentionSettings.settings.enabled}
+                                                className="h-4 w-4 rounded border-neutral-700 bg-neutral-950 text-neutral-200"
+                                            />
+                                            <span>Retention enabled</span>
+                                        </label>
 
-                                    <label className="flex items-center gap-2 text-neutral-300">
-                                        <input
-                                            type="checkbox"
-                                            name="retention_delete_expired_shares"
-                                            defaultChecked={retentionSettings.settings.deleteExpiredShares}
-                                            className="h-4 w-4 rounded border-neutral-700 bg-neutral-950"
-                                        />
-                                        <span>Delete expired shares</span>
-                                    </label>
+                                        <label className="flex items-center gap-2 text-neutral-300">
+                                            <input
+                                                type="checkbox"
+                                                name="retention_delete_expired_shares"
+                                                defaultChecked={retentionSettings.settings.deleteExpiredShares}
+                                                className="h-4 w-4 rounded border-neutral-700 bg-neutral-950 text-neutral-200"
+                                            />
+                                            <span>Auto-delete expired shares</span>
+                                        </label>
 
-                                    <label className="flex items-center gap-2 text-neutral-300">
-                                        <span className="text-neutral-400">Share grace days</span>
-                                        <input
-                                            type="number"
-                                            min={0}
-                                            name="retention_share_grace_days"
-                                            defaultValue={retentionSettings.settings.shareGraceDays}
-                                            className="w-20 rounded-md border border-neutral-800 bg-neutral-950 px-2 py-1 text-neutral-100"
-                                        />
-                                    </label>
+                                        <label className="flex items-center gap-2 text-neutral-300">
+                                            <span>Grace days</span>
+                                            <input
+                                                type="number"
+                                                name="retention_share_grace_days"
+                                                min={0}
+                                                defaultValue={retentionSettings.settings.shareGraceDays}
+                                                className="w-20 rounded-md border border-neutral-800 bg-neutral-950 px-2 py-1 text-neutral-100"
+                                            />
+                                        </label>
 
-                                    <button
-                                        type="submit"
-                                        className="rounded-md bg-neutral-800 px-3 py-1.5 text-neutral-100 hover:bg-neutral-700"
-                                    >
-                                        Save
-                                    </button>
+                                        <button type="submit" className="rounded-md bg-neutral-800 px-3 py-1.5 text-neutral-100 hover:bg-neutral-700">
+                                            Save
+                                        </button>
 
-                                    <div className="text-neutral-500">
-                                        Stored in <span className="font-mono">app_settings</span> (key: <span className="font-mono">retention</span>).
+                                        <div className="text-neutral-500">
+                                            Stored in <span className="font-mono">app_settings</span> (key: <span className="font-mono">retention</span>).
+                                        </div>
+                                    </form>
+                                ) : (
+                                    <div className="mt-3 text-xs text-neutral-500">
+                                        Retention toggle unavailable (settings read error). You can still control retention via env vars.
                                     </div>
-                                </form>
+                                )
                             ) : (
                                 <div className="mt-3 text-xs text-neutral-500">
-                                    Retention toggle unavailable (settings read error). You can still control retention via env vars.
+                                    Optional admin toggle not installed. Run <span className="font-mono">scripts/sql/app_settings.sql</span> to enable.
                                 </div>
                             )
-                        ) : (
-                            <div className="mt-3 text-xs text-neutral-500">
-                                Optional admin toggle not installed. Run <span className="font-mono">scripts/sql/app_settings.sql</span> to enable.
-                            </div>
-                        )}
+                        ) : null}
                     </div>
                     <div className="text-xs text-neutral-500">
-                        <Link
-                            className="text-neutral-400 hover:text-neutral-200 underline underline-offset-4"
-                            href="/api/admin/retention/run"
-                            target="_blank"
-                        >
-                            Run retention
-                        </Link>
+                        {canSeeAll ? (
+                            <Link className="text-neutral-400 hover:text-neutral-200 underline underline-offset-4" href="/api/admin/retention/run" target="_blank">
+                                Run retention
+                            </Link>
+                        ) : null}
                     </div>
                 </div>
 
