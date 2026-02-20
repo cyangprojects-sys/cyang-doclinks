@@ -75,12 +75,26 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ docId: stri
     const ua = req.headers.get("user-agent") || null;
     const ref = req.headers.get("referer") || null;
 
-    await sql`
-      insert into public.doc_views
-        (doc_id, alias, path, kind, user_agent, referer, ip_hash)
-      values
-        (${resolved.docId}::uuid, null, ${new URL(req.url).pathname}, 'serve', ${ua}, ${ref}, ${ipHash})
-    `;
+    const url = new URL(req.url);
+    const alias = url.searchParams.get("alias") || null;
+    const token = url.searchParams.get("token") || null;
+
+    // Try newer schema first (share_token + event_type). Fall back to legacy schema.
+    try {
+      await sql`
+        insert into public.doc_views
+          (doc_id, alias, path, kind, user_agent, referer, ip_hash, share_token, event_type)
+        values
+          (${resolved.docId}::uuid, ${alias}, ${url.pathname}, 'serve', ${ua}, ${ref}, ${ipHash}, ${token}, 'viewer_served')
+      `;
+    } catch {
+      await sql`
+        insert into public.doc_views
+          (doc_id, alias, path, kind, user_agent, referer, ip_hash)
+        values
+          (${resolved.docId}::uuid, ${alias}, ${url.pathname}, 'serve', ${ua}, ${ref}, ${ipHash})
+      `;
+    }
   } catch {
     // ignore logging errors
   }

@@ -9,6 +9,17 @@ import {
     revokeDocShareAction,
     setSharePasswordAction,
     clearSharePasswordAction,
+    revokeAllSharesForDocAction,
+    disableAliasForDocAction,
+    extendAliasExpirationAction,
+    extendShareExpirationAction,
+    setShareMaxViewsAction,
+    resetShareViewsCountAction,
+    forceSharePasswordResetAction,
+    bulkRevokeSharesAction,
+    bulkExtendSharesAction,
+    bulkRevokeAllSharesForDocsAction,
+    bulkDisableAliasesForDocsAction,
 } from "../actions";
 import SharesTableClient, { type ShareRow as ShareRowClient } from "./SharesTableClient";
 import UploadPanel from "./UploadPanel";
@@ -321,6 +332,36 @@ export default async function AdminDashboardPage() {
         dailyAgg = [];
     }
 
+    // Retention widget (best-effort)
+    const retentionRawDays = (() => {
+        const raw = (process.env.RETENTION_DAYS || "").trim();
+        const n = Number(raw);
+        if (!raw || !Number.isFinite(n) || n <= 0) return 90;
+        return Math.floor(n);
+    })();
+
+    let retentionInfo: { oldest: string | null; scheduled: number | null } = { oldest: null, scheduled: null };
+    try {
+        const hasDocViews = await tableExists("public.doc_views");
+        if (hasDocViews) {
+            const oldestRows = (await sql`
+        select min(created_at)::text as oldest
+        from public.doc_views
+      `) as unknown as Array<{ oldest: string | null }>;
+            const oldest = oldestRows?.[0]?.oldest ?? null;
+
+            const scheduledRows = (await sql`
+        select count(*)::int as c
+        from public.doc_views
+        where created_at < (now() - (${retentionRawDays}::int * interval '1 day'))
+      `) as unknown as Array<{ c: number }>;
+            const scheduled = scheduledRows?.[0]?.c ?? 0;
+            retentionInfo = { oldest, scheduled };
+        }
+    } catch {
+        retentionInfo = { oldest: null, scheduled: null };
+    }
+
     const sharesClient: ShareRowClient[] = shares.map((s) => ({
         token: s.token,
         doc_id: s.doc_id,
@@ -546,6 +587,12 @@ export default async function AdminDashboardPage() {
                     revokeAction={revokeDocShareAction}
                     setPasswordAction={setSharePasswordAction}
                     clearPasswordAction={clearSharePasswordAction}
+                    extendShareExpirationAction={extendShareExpirationAction}
+                    setShareMaxViewsAction={setShareMaxViewsAction}
+                    resetShareViewsCountAction={resetShareViewsCountAction}
+                    forceSharePasswordResetAction={forceSharePasswordResetAction}
+                    bulkRevokeSharesAction={bulkRevokeSharesAction}
+                    bulkExtendSharesAction={bulkExtendSharesAction}
                 />
             </div>
 
@@ -735,7 +782,14 @@ export default async function AdminDashboardPage() {
                         No view data found (or table not available).
                     </div>
                 ) : (
-                    <ViewsByDocTableClient rows={viewsByDocClient} />
+                    <ViewsByDocTableClient
+                        rows={viewsByDocClient}
+                        revokeAllSharesForDocAction={revokeAllSharesForDocAction}
+                        disableAliasForDocAction={disableAliasForDocAction}
+                        extendAliasExpirationAction={extendAliasExpirationAction}
+                        bulkRevokeAllSharesForDocsAction={bulkRevokeAllSharesForDocsAction}
+                        bulkDisableAliasesForDocsAction={bulkDisableAliasesForDocsAction}
+                    />
                 )}
             </div>
 
@@ -751,6 +805,9 @@ export default async function AdminDashboardPage() {
                             </Link>
                             .
                         </p>
+                        <div className="mt-2 text-xs text-neutral-500">
+                            Retention: {retentionRawDays} days · Oldest retained: {fmtDate(retentionInfo.oldest)} · Rows scheduled for deletion: {retentionInfo.scheduled ?? "—"}
+                        </div>
                     </div>
                     <div className="text-xs text-neutral-500">
                         <Link

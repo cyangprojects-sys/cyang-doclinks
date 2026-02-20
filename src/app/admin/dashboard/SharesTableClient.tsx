@@ -18,7 +18,6 @@ export type ShareRow = {
     revoked_at: string | null;
     doc_title: string | null;
     alias: string | null;
-
     has_password: boolean;
 };
 
@@ -36,7 +35,6 @@ function maxLabel(n: number | null) {
 }
 
 type Status = "all" | "active" | "expired" | "maxed" | "revoked";
-
 type StatusFilter = Status | "expiring";
 
 function computeStatus(s: ShareRow): Exclude<Status, "all"> {
@@ -64,6 +62,12 @@ export default function SharesTableClient(props: {
     revokeAction: (formData: FormData) => Promise<void>;
     setPasswordAction: (formData: FormData) => Promise<void>;
     clearPasswordAction: (formData: FormData) => Promise<void>;
+    extendShareExpirationAction: (formData: FormData) => Promise<void>;
+    setShareMaxViewsAction: (formData: FormData) => Promise<void>;
+    resetShareViewsCountAction: (formData: FormData) => Promise<void>;
+    forceSharePasswordResetAction: (formData: FormData) => Promise<void>;
+    bulkRevokeSharesAction: (formData: FormData) => Promise<void>;
+    bulkExtendSharesAction: (formData: FormData) => Promise<void>;
 }) {
     const sp = useSearchParams();
     const router = useRouter();
@@ -71,6 +75,7 @@ export default function SharesTableClient(props: {
 
     const [q, setQ] = useState("");
     const [status, setStatus] = useState<StatusFilter>("all");
+    const [selected, setSelected] = useState<Record<string, boolean>>({});
 
     // URL -> UI (one-way sync)
     useEffect(() => {
@@ -155,10 +160,68 @@ export default function SharesTableClient(props: {
             else params.delete("shareStatus");
         }
 
-        // Preserve the hash so widgets can deep-link.
         const hash = typeof window !== "undefined" ? window.location.hash : "";
         const qs = params.toString();
         router.replace(`${pathname}${qs ? `?${qs}` : ""}${hash}`, { scroll: false });
+    }
+
+    const filteredTokens = useMemo(() => filtered.map((s) => s.token), [filtered]);
+    const selectedTokens = useMemo(() => Object.keys(selected).filter((k) => selected[k]), [selected]);
+    const anySelected = selectedTokens.length > 0;
+
+    const allVisibleSelected = useMemo(() => {
+        if (filteredTokens.length === 0) return false;
+        return filteredTokens.every((t) => selected[t]);
+    }, [filteredTokens, selected]);
+
+    function toggleAllVisible(next: boolean) {
+        setSelected((prev) => {
+            const out = { ...prev };
+            for (const t of filteredTokens) out[t] = next;
+            return out;
+        });
+    }
+
+    function downloadCsvForSelected() {
+        const rows = props.shares.filter((s) => selected[s.token]);
+        const header = [
+            "token",
+            "doc_id",
+            "alias",
+            "doc_title",
+            "to_email",
+            "created_at",
+            "expires_at",
+            "max_views",
+            "view_count",
+            "revoked_at",
+            "has_password",
+        ].join(",");
+        const lines = rows.map((s) =>
+            [
+                s.token,
+                s.doc_id,
+                JSON.stringify(s.alias || ""),
+                JSON.stringify(s.doc_title || ""),
+                JSON.stringify(s.to_email || ""),
+                JSON.stringify(s.created_at || ""),
+                JSON.stringify(s.expires_at || ""),
+                s.max_views == null ? "" : String(s.max_views),
+                String(s.view_count ?? 0),
+                JSON.stringify(s.revoked_at || ""),
+                s.has_password ? "true" : "false",
+            ].join(",")
+        );
+        const csv = [header, ...lines].join("\n");
+        const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `shares_export_${new Date().toISOString().slice(0, 10)}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
     }
 
     return (
@@ -223,96 +286,288 @@ export default function SharesTableClient(props: {
                 <div className="max-h-[560px] overflow-auto">
                     <table className="w-full text-sm">
                         <thead className="sticky top-0 bg-neutral-900 text-neutral-300">
-                        <tr>
-                            <th className="px-4 py-3 text-left">Recipient</th>
-                            <th className="px-4 py-3 text-left">Token</th>
-                            <th className="px-4 py-3 text-left">Doc</th>
-                            <th className="px-4 py-3 text-left">Status</th>
-                            <th className="px-4 py-3 text-left">Expires</th>
-                            <th className="px-4 py-3 text-right">Max</th>
-                            <th className="px-4 py-3 text-right">Views</th>
-                            <th className="px-4 py-3 text-right">Password</th>
-                            <th className="px-4 py-3 text-right">Action</th>
-                        </tr>
+                            <tr>
+                                <th className="px-4 py-3 text-left w-[44px]">
+                                    <input
+                                        type="checkbox"
+                                        checked={allVisibleSelected}
+                                        onChange={(e) => toggleAllVisible(e.target.checked)}
+                                        aria-label="Select all visible shares"
+                                    />
+                                </th>
+                                <th className="px-4 py-3 text-left">Recipient</th>
+                                <th className="px-4 py-3 text-left">Token</th>
+                                <th className="px-4 py-3 text-left">Doc</th>
+                                <th className="px-4 py-3 text-left">Status</th>
+                                <th className="px-4 py-3 text-left">Expires</th>
+                                <th className="px-4 py-3 text-right">Max</th>
+                                <th className="px-4 py-3 text-right">Views</th>
+                                <th className="px-4 py-3 text-right">Password</th>
+                                <th className="px-4 py-3 text-right">Actions</th>
+                            </tr>
                         </thead>
 
-                    <tbody>
-                        {filtered.length === 0 ? (
-                            <tr>
-                                <td colSpan={9} className="px-4 py-6 text-neutral-400">
-                                    No shares match your filters.
-                                </td>
-                            </tr>
-                        ) : (
-                            filtered.map((s) => {
-                                const st = computeStatus(s);
-                                const badge = statusBadge(st);
+                        <tbody>
+                            {filtered.length === 0 ? (
+                                <tr>
+                                    <td colSpan={10} className="px-4 py-6 text-neutral-400">
+                                        No shares match your filters.
+                                    </td>
+                                </tr>
+                            ) : (
+                                filtered.map((s) => {
+                                    const st = computeStatus(s);
+                                    const badge = statusBadge(st);
 
-                                const tokenShort =
-                                    s.token.length > 16 ? `${s.token.slice(0, 8)}…${s.token.slice(-4)}` : s.token;
+                                    const tokenShort =
+                                        s.token.length > 16 ? `${s.token.slice(0, 8)}…${s.token.slice(-4)}` : s.token;
 
-                                return (
-                                    <tr key={s.token} className="border-t border-neutral-800">
-                                        <td className="px-4 py-3 text-neutral-200">{s.to_email || "—"}</td>
+                                    return (
+                                        <tr key={s.token} className="border-t border-neutral-800">
+                                            <td className="px-4 py-3 align-top">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={!!selected[s.token]}
+                                                    onChange={(e) =>
+                                                        setSelected((prev) => ({ ...prev, [s.token]: e.target.checked }))
+                                                    }
+                                                    aria-label={`Select ${s.token}`}
+                                                />
+                                            </td>
 
-                                        <td className="px-4 py-3">
-                                            <div className="font-mono text-xs text-neutral-200">{tokenShort}</div>
-                                            <div className="mt-1 text-xs text-neutral-500">
-                                                <Link href={`/s/${s.token}`} target="_blank" className="text-blue-400 hover:underline">
-                                                    Open
-                                                </Link>
-                                                <span className="text-neutral-700"> · </span>
-                                                <span className="text-neutral-500">Created: {fmtDate(s.created_at)}</span>
-                                            </div>
-                                        </td>
+                                            <td className="px-4 py-3">
+                                                <div className="text-neutral-200">
+                                                    {s.to_email || <span className="text-neutral-500">(public)</span>}
+                                                </div>
+                                                <div className="text-xs text-neutral-500">{fmtDate(s.created_at)}</div>
+                                            </td>
 
-                                        <td className="px-4 py-3">
-                                            <div className="text-neutral-200">{s.doc_title || "Untitled"}</div>
-                                            <div className="mt-1 text-xs text-neutral-500">
-                                                {s.alias ? (
-                                                    <Link href={`/d/${s.alias}`} target="_blank" className="text-blue-400 hover:underline">
-                                                        /d/{s.alias}
+                                            <td className="px-4 py-3">
+                                                <div className="font-mono text-xs text-neutral-200">{tokenShort}</div>
+                                                <div className="mt-1 text-xs text-neutral-500">
+                                                    <Link href={`/s/${s.token}`} target="_blank" className="text-blue-400 hover:underline">
+                                                        Open
                                                     </Link>
-                                                ) : (
-                                                    <span className="text-neutral-500 font-mono">{s.doc_id}</span>
-                                                )}
-                                            </div>
-                                        </td>
+                                                    <span className="text-neutral-700"> · </span>
+                                                    <Link
+                                                        href={`/s/${s.token}/raw`}
+                                                        target="_blank"
+                                                        className="text-blue-400 hover:underline"
+                                                    >
+                                                        Raw
+                                                    </Link>
+                                                </div>
+                                            </td>
 
-                                        <td className="px-4 py-3">
-                                            <span
-                                                className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs ${badge.cls}`}
-                                            >
-                                                {badge.label}
-                                            </span>
-                                        </td>
+                                            <td className="px-4 py-3">
+                                                <div className="text-neutral-200">{s.doc_title || "Untitled"}</div>
+                                                <div className="mt-1 text-xs text-neutral-500">
+                                                    {s.alias ? (
+                                                        <Link
+                                                            href={`/d/${s.alias}`}
+                                                            target="_blank"
+                                                            className="text-blue-400 hover:underline"
+                                                        >
+                                                            /d/{s.alias}
+                                                        </Link>
+                                                    ) : (
+                                                        <span className="text-neutral-500 font-mono">{s.doc_id}</span>
+                                                    )}
+                                                </div>
+                                            </td>
 
-                                        <td className="px-4 py-3 text-neutral-400">{fmtDate(s.expires_at)}</td>
-                                        <td className="px-4 py-3 text-right text-neutral-200">{maxLabel(s.max_views)}</td>
-                                        <td className="px-4 py-3 text-right text-neutral-200">{s.view_count}</td>
+                                            <td className="px-4 py-3">
+                                                <span
+                                                    className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs ${badge.cls}`}
+                                                >
+                                                    {badge.label}
+                                                </span>
+                                            </td>
 
-                                        <td className="px-4 py-3 text-right">
-                                            <SharePasswordForm
-                                                token={s.token}
-                                                hasPassword={Boolean(s.has_password)}
-                                                setAction={props.setPasswordAction}
-                                                clearAction={props.clearPasswordAction}
-                                            />
-                                        </td>
+                                            <td className="px-4 py-3 text-neutral-400">{fmtDate(s.expires_at)}</td>
+                                            <td className="px-4 py-3 text-right text-neutral-200">{maxLabel(s.max_views)}</td>
+                                            <td className="px-4 py-3 text-right text-neutral-200">{s.view_count ?? 0}</td>
 
-                                        <td className="px-4 py-3 text-right">
-                                            <RevokeShareForm
-                                                token={s.token}
-                                                revoked={Boolean(s.revoked_at)}
-                                                action={props.revokeAction}
-                                            />
-                                        </td>
-                                    </tr>
-                                );
-                            })
-                        )}
-                    </tbody>
+                                            <td className="px-4 py-3 text-right">
+                                                <SharePasswordForm
+                                                    token={s.token}
+                                                    hasPassword={Boolean(s.has_password)}
+                                                    setAction={props.setPasswordAction}
+                                                    clearAction={props.clearPasswordAction}
+                                                />
+                                            </td>
+
+                                            <td className="px-4 py-3 text-right whitespace-nowrap">
+                                                <div className="flex flex-wrap items-center justify-end gap-2">
+                                                    <button
+                                                        type="button"
+                                                        onClick={async () => {
+                                                            const link = `${window.location.origin}/s/${encodeURIComponent(s.token)}`;
+                                                            await navigator.clipboard.writeText(link);
+                                                        }}
+                                                        className="rounded-md border border-neutral-800 bg-neutral-950 px-2.5 py-1.5 text-xs text-neutral-200 hover:bg-neutral-900"
+                                                    >
+                                                        Copy
+                                                    </button>
+
+                                                    <form action={props.extendShareExpirationAction}>
+                                                        <input type="hidden" name="token" value={s.token} />
+                                                        <input type="hidden" name="days" value="7" />
+                                                        <button
+                                                            type="submit"
+                                                            disabled={!!s.revoked_at}
+                                                            className="rounded-md border border-neutral-800 bg-neutral-950 px-2.5 py-1.5 text-xs text-neutral-200 hover:bg-neutral-900 disabled:opacity-40"
+                                                        >
+                                                            +7d
+                                                        </button>
+                                                    </form>
+
+                                                    <form action={props.extendShareExpirationAction}>
+                                                        <input type="hidden" name="token" value={s.token} />
+                                                        <input type="hidden" name="days" value="30" />
+                                                        <button
+                                                            type="submit"
+                                                            disabled={!!s.revoked_at}
+                                                            className="rounded-md border border-neutral-800 bg-neutral-950 px-2.5 py-1.5 text-xs text-neutral-200 hover:bg-neutral-900 disabled:opacity-40"
+                                                        >
+                                                            +30d
+                                                        </button>
+                                                    </form>
+
+                                                    <form action={props.resetShareViewsCountAction}>
+                                                        <input type="hidden" name="token" value={s.token} />
+                                                        <button
+                                                            type="submit"
+                                                            disabled={!!s.revoked_at}
+                                                            className="rounded-md border border-neutral-800 bg-neutral-950 px-2.5 py-1.5 text-xs text-neutral-200 hover:bg-neutral-900 disabled:opacity-40"
+                                                        >
+                                                            Reset views
+                                                        </button>
+                                                    </form>
+
+                                                    <form action={props.forceSharePasswordResetAction}>
+                                                        <input type="hidden" name="token" value={s.token} />
+                                                        <button
+                                                            type="submit"
+                                                            disabled={!!s.revoked_at}
+                                                            className="rounded-md border border-neutral-800 bg-neutral-950 px-2.5 py-1.5 text-xs text-neutral-200 hover:bg-neutral-900 disabled:opacity-40"
+                                                        >
+                                                            Clear pw
+                                                        </button>
+                                                    </form>
+
+                                                    <form
+                                                        action={props.setShareMaxViewsAction}
+                                                        onSubmit={(e) => {
+                                                            const input =
+                                                                (e.currentTarget.querySelector(
+                                                                    'input[name="maxViews"]'
+                                                                ) as HTMLInputElement) || null;
+                                                            if (!input) return;
+
+                                                            const v = window.prompt(
+                                                                "Set max views (number). Use 0 for unlimited. Leave blank to clear.",
+                                                                s.max_views == null ? "" : String(s.max_views)
+                                                            );
+                                                            if (v === null) {
+                                                                e.preventDefault();
+                                                                return;
+                                                            }
+                                                            input.value = v.trim();
+                                                        }}
+                                                    >
+                                                        <input type="hidden" name="token" value={s.token} />
+                                                        <input type="hidden" name="maxViews" defaultValue="" />
+                                                        <button
+                                                            type="submit"
+                                                            disabled={!!s.revoked_at}
+                                                            className="rounded-md border border-neutral-800 bg-neutral-950 px-2.5 py-1.5 text-xs text-neutral-200 hover:bg-neutral-900 disabled:opacity-40"
+                                                        >
+                                                            Set max
+                                                        </button>
+                                                    </form>
+
+                                                    <RevokeShareForm token={s.token} revoked={Boolean(s.revoked_at)} action={props.revokeAction} />
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                })
+                            )}
+                        </tbody>
                     </table>
+                </div>
+            </div>
+
+            {/* Bulk actions */}
+            <div className="mt-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                <div className="text-xs text-neutral-500">
+                    Selected: <span className="text-neutral-200">{selectedTokens.length}</span>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                    <form
+                        action={props.bulkRevokeSharesAction}
+                        onSubmit={(e) => {
+                            if (!anySelected) e.preventDefault();
+                        }}
+                    >
+                        <input type="hidden" name="tokens" value={JSON.stringify(selectedTokens)} />
+                        <button
+                            type="submit"
+                            disabled={!anySelected}
+                            className="rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm text-neutral-200 hover:bg-neutral-900 disabled:opacity-40"
+                        >
+                            Revoke selected
+                        </button>
+                    </form>
+
+                    <form
+                        action={props.bulkExtendSharesAction}
+                        onSubmit={(e) => {
+                            if (!anySelected) {
+                                e.preventDefault();
+                                return;
+                            }
+                            const days = window.prompt("Extend expiration by how many days?", "7");
+                            if (days === null) {
+                                e.preventDefault();
+                                return;
+                            }
+                            const d = (e.currentTarget.querySelector('input[name="days"]') as HTMLInputElement) || null;
+                            if (d) d.value = days.trim();
+                        }}
+                    >
+                        <input type="hidden" name="tokens" value={JSON.stringify(selectedTokens)} />
+                        <input type="hidden" name="days" defaultValue="7" />
+                        <button
+                            type="submit"
+                            disabled={!anySelected}
+                            className="rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm text-neutral-200 hover:bg-neutral-900 disabled:opacity-40"
+                        >
+                            Extend selected…
+                        </button>
+                    </form>
+
+                    <button
+                        type="button"
+                        disabled={!anySelected}
+                        onClick={() => {
+                            if (!anySelected) return;
+                            downloadCsvForSelected();
+                        }}
+                        className="rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm text-neutral-200 hover:bg-neutral-900 disabled:opacity-40"
+                    >
+                        Export CSV
+                    </button>
+
+                    <button
+                        type="button"
+                        onClick={() => setSelected({})}
+                        className="rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm text-neutral-200 hover:bg-neutral-900"
+                    >
+                        Clear selection
+                    </button>
                 </div>
             </div>
         </div>

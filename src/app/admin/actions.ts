@@ -212,3 +212,244 @@ export async function clearSharePasswordAction(formData: FormData): Promise<void
   revalidatePath("/admin/dashboard");
   revalidatePath("/admin");
 }
+
+// --- Dashboard v2 actions (actionable + bulk) ---
+
+export async function revokeAllSharesForDocAction(formData: FormData): Promise<void> {
+  await requireOwnerAdmin();
+  const docId = String(formData.get("docId") || "").trim();
+  if (!docId) throw new Error("Missing docId.");
+
+  await sql`
+    update public.share_tokens
+    set revoked_at = now()
+    where doc_id = ${docId}::uuid
+      and revoked_at is null
+  `;
+
+  revalidatePath("/admin/dashboard");
+  revalidatePath("/admin");
+  revalidatePath(`/admin/docs/${docId}`);
+}
+
+export async function disableAliasForDocAction(formData: FormData): Promise<void> {
+  await requireOwnerAdmin();
+  const docId = String(formData.get("docId") || "").trim();
+  if (!docId) throw new Error("Missing docId.");
+
+  // Best-effort: prefer is_active=false if the column exists; fall back to revoked_at.
+  try {
+    await sql`
+      update public.doc_aliases
+      set is_active = false
+      where doc_id = ${docId}::uuid
+    `;
+  } catch {
+    try {
+      await sql`
+        update public.doc_aliases
+        set revoked_at = now()
+        where doc_id = ${docId}::uuid
+          and revoked_at is null
+      `;
+    } catch {
+      // last-resort: delete (older envs)
+      await sql`
+        delete from public.doc_aliases
+        where doc_id = ${docId}::uuid
+      `;
+    }
+  }
+
+  revalidatePath("/admin/dashboard");
+  revalidatePath("/admin");
+  revalidatePath(`/admin/docs/${docId}`);
+}
+
+export async function extendAliasExpirationAction(formData: FormData): Promise<void> {
+  await requireOwnerAdmin();
+  const docId = String(formData.get("docId") || "").trim();
+  const days = Number(formData.get("days") || 0);
+  if (!docId) throw new Error("Missing docId.");
+  if (!Number.isFinite(days) || days <= 0) throw new Error("Invalid days.");
+
+  // Extend alias expiration (or set it) by +days from now.
+  try {
+    await sql`
+      update public.doc_aliases
+      set expires_at = greatest(coalesce(expires_at, now()), now()) + (${days}::int * interval '1 day')
+      where doc_id = ${docId}::uuid
+    `;
+  } catch {
+    // If the env doesn't have expires_at, ignore.
+  }
+
+  revalidatePath("/admin/dashboard");
+  revalidatePath("/admin");
+  revalidatePath(`/admin/docs/${docId}`);
+}
+
+export async function extendShareExpirationAction(formData: FormData): Promise<void> {
+  await requireOwnerAdmin();
+  const token = String(formData.get("token") || "").trim();
+  const days = Number(formData.get("days") || 0);
+  if (!token) throw new Error("Missing token.");
+  if (!Number.isFinite(days) || days <= 0) throw new Error("Invalid days.");
+
+  await sql`
+    update public.share_tokens
+    set expires_at = greatest(coalesce(expires_at, now()), now()) + (${days}::int * interval '1 day')
+    where token = ${token}
+  `;
+
+  revalidatePath("/admin/dashboard");
+  revalidatePath("/admin");
+}
+
+export async function setShareMaxViewsAction(formData: FormData): Promise<void> {
+  await requireOwnerAdmin();
+  const token = String(formData.get("token") || "").trim();
+  const maxViewsRaw = String(formData.get("maxViews") || "").trim();
+  if (!token) throw new Error("Missing token.");
+
+  const maxViews = maxViewsRaw === "" ? null : Number(maxViewsRaw);
+  if (maxViews !== null && (!Number.isFinite(maxViews) || maxViews < 0)) {
+    throw new Error("Invalid maxViews.");
+  }
+
+  await sql`
+    update public.share_tokens
+    set max_views = ${maxViews}
+    where token = ${token}
+  `;
+
+  revalidatePath("/admin/dashboard");
+  revalidatePath("/admin");
+}
+
+export async function resetShareViewsCountAction(formData: FormData): Promise<void> {
+  await requireOwnerAdmin();
+  const token = String(formData.get("token") || "").trim();
+  if (!token) throw new Error("Missing token.");
+
+  await sql`
+    update public.share_tokens
+    set views_count = 0
+    where token = ${token}
+  `;
+
+  revalidatePath("/admin/dashboard");
+  revalidatePath("/admin");
+}
+
+export async function forceSharePasswordResetAction(formData: FormData): Promise<void> {
+  await requireOwnerAdmin();
+  const token = String(formData.get("token") || "").trim();
+  if (!token) throw new Error("Missing token.");
+
+  await sql`
+    update public.share_tokens
+    set password_hash = null
+    where token = ${token}
+  `;
+
+  // Also invalidate existing unlocks (if table exists).
+  try {
+    await sql`delete from public.share_unlocks where token = ${token}`;
+  } catch {
+    // ignore
+  }
+
+  revalidatePath("/admin/dashboard");
+  revalidatePath("/admin");
+}
+
+export async function bulkRevokeSharesAction(formData: FormData): Promise<void> {
+  await requireOwnerAdmin();
+  const raw = String(formData.get("tokens") || "").trim();
+  if (!raw) throw new Error("Missing tokens.");
+  const tokens = JSON.parse(raw) as string[];
+  if (!Array.isArray(tokens) || tokens.length === 0) return;
+
+  await sql`
+    update public.share_tokens
+    set revoked_at = now()
+    where token = any(${tokens}::text[])
+      and revoked_at is null
+  `;
+
+  revalidatePath("/admin/dashboard");
+  revalidatePath("/admin");
+}
+
+export async function bulkExtendSharesAction(formData: FormData): Promise<void> {
+  await requireOwnerAdmin();
+  const raw = String(formData.get("tokens") || "").trim();
+  const days = Number(formData.get("days") || 0);
+  if (!raw) throw new Error("Missing tokens.");
+  if (!Number.isFinite(days) || days <= 0) throw new Error("Invalid days.");
+  const tokens = JSON.parse(raw) as string[];
+  if (!Array.isArray(tokens) || tokens.length === 0) return;
+
+  await sql`
+    update public.share_tokens
+    set expires_at = greatest(coalesce(expires_at, now()), now()) + (${days}::int * interval '1 day')
+    where token = any(${tokens}::text[])
+  `;
+
+  revalidatePath("/admin/dashboard");
+  revalidatePath("/admin");
+}
+
+export async function bulkRevokeAllSharesForDocsAction(formData: FormData): Promise<void> {
+  await requireOwnerAdmin();
+  const raw = String(formData.get("docIds") || "").trim();
+  if (!raw) throw new Error("Missing docIds.");
+  const docIds = JSON.parse(raw) as string[];
+  if (!Array.isArray(docIds) || docIds.length === 0) return;
+
+  await sql`
+    update public.share_tokens
+    set revoked_at = now()
+    where doc_id = any(${docIds}::uuid[])
+      and revoked_at is null
+  `;
+
+  revalidatePath("/admin/dashboard");
+  revalidatePath("/admin");
+  for (const id of docIds) revalidatePath(`/admin/docs/${id}`);
+}
+
+export async function bulkDisableAliasesForDocsAction(formData: FormData): Promise<void> {
+  await requireOwnerAdmin();
+  const raw = String(formData.get("docIds") || "").trim();
+  if (!raw) throw new Error("Missing docIds.");
+  const docIds = JSON.parse(raw) as string[];
+  if (!Array.isArray(docIds) || docIds.length === 0) return;
+
+  try {
+    await sql`
+      update public.doc_aliases
+      set is_active = false
+      where doc_id = any(${docIds}::uuid[])
+    `;
+  } catch {
+    try {
+      await sql`
+        update public.doc_aliases
+        set revoked_at = now()
+        where doc_id = any(${docIds}::uuid[])
+          and revoked_at is null
+      `;
+    } catch {
+      await sql`
+        delete from public.doc_aliases
+        where doc_id = any(${docIds}::uuid[])
+      `;
+    }
+  }
+
+  revalidatePath("/admin/dashboard");
+  revalidatePath("/admin");
+  for (const id of docIds) revalidatePath(`/admin/docs/${id}`);
+}

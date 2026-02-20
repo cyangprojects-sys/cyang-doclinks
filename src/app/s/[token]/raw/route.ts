@@ -5,9 +5,16 @@ import { r2Client, r2Bucket } from "@/lib/r2";
 import { cookies } from "next/headers";
 import { consumeShareTokenView } from "@/lib/resolveDoc";
 import { getClientIpFromHeaders, getUserAgentFromHeaders, logDocAccess } from "@/lib/audit";
+import crypto from "crypto";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+function hashIp(ip: string | null) {
+  const salt = (process.env.VIEW_SALT || "").trim();
+  if (!salt || !ip) return null;
+  return crypto.createHmac("sha256", salt).update(ip).digest("hex").slice(0, 32);
+}
 
 /**
  * We only redirect to password gate when this is a browser navigation
@@ -168,6 +175,33 @@ export async function GET(
         ip: getClientIpFromHeaders(req.headers),
         userAgent: getUserAgentFromHeaders(req.headers),
       });
+    } catch {
+      // ignore
+    }
+
+    // Analytics (best-effort) — only on the first counted request
+    try {
+      const ip = getClientIpFromHeaders(req.headers);
+      const ua = getUserAgentFromHeaders(req.headers);
+      const ref = req.headers.get("referer") || null;
+      const ipHash = hashIp(ip);
+
+      // Try newer schema first (share_token + event_type). Fall back to legacy schema.
+      try {
+        await sql`
+          insert into public.doc_views
+            (doc_id, alias, path, kind, user_agent, referer, ip_hash, share_token, event_type)
+          values
+            (${share.doc_id}::uuid, null, ${new URL(req.url).pathname}, 'share_raw', ${ua}, ${ref}, ${ipHash}, ${token}, 'raw_served')
+        `;
+      } catch {
+        await sql`
+          insert into public.doc_views
+            (doc_id, alias, path, kind, user_agent, referer, ip_hash)
+          values
+            (${share.doc_id}::uuid, null, ${new URL(req.url).pathname}, 'share_raw', ${ua}, ${ref}, ${ipHash})
+        `;
+      }
     } catch {
       // ignore
     }
