@@ -476,3 +476,58 @@ export async function bulkDisableAliasesForDocsAction(formData: FormData): Promi
   revalidatePath("/admin");
   for (const id of docIds) revalidatePath(`/admin/docs/${id}`);
 }
+
+// Expiration warning email (best-effort; uses doc_aliases.expires_at)
+export async function sendExpirationAlertAction(formData: FormData): Promise<void> {
+  const ownerEmail = await requireOwnerAdmin();
+
+  const daysRaw = String(formData.get("days") || "3").trim();
+  const daysNum = Number(daysRaw);
+  const days = Number.isFinite(daysNum) ? Math.max(1, Math.min(30, Math.floor(daysNum))) : 3;
+
+  const base = getBaseUrl();
+
+  let rows: Array<{ doc_id: string; title: string | null; alias: string | null; expires_at: string | null }> = [];
+  try {
+    rows = (await sql`
+      select
+        d.id::text as doc_id,
+        d.title,
+        a.alias,
+        a.expires_at::text as expires_at
+      from public.doc_aliases a
+      join public.docs d on d.id = a.doc_id
+      where coalesce(a.is_active, true) = true
+        and a.revoked_at is null
+        and a.expires_at is not null
+        and a.expires_at > now()
+        and a.expires_at <= (now() + (${days}::int * interval '1 day'))
+      order by a.expires_at asc
+      limit 100
+    `) as unknown as Array<{ doc_id: string; title: string | null; alias: string | null; expires_at: string | null }>;
+  } catch {
+    rows = [];
+  }
+
+  const lines = rows.map((r) => {
+    const name = r.title || "Untitled";
+    const docUrl = `${base}/admin/docs/${encodeURIComponent(r.doc_id)}`;
+    const aliasUrl = r.alias ? `${base}/d/${encodeURIComponent(r.alias)}` : "";
+    const exp = r.expires_at || "";
+    return `- ${name} (${r.doc_id})\n  expires: ${exp}\n  admin: ${docUrl}${aliasUrl ? `\n  link: ${aliasUrl}` : ""}`;
+  });
+
+  const body =
+    rows.length === 0
+      ? `No aliases expiring in the next ${days} day(s).`
+      : `Aliases expiring in the next ${days} day(s):\n\n${lines.join("\n\n")}`;
+
+  await sendMail({
+    to: ownerEmail,
+    subject: `cyang.io: expiring in ${days} day(s)`,
+    text: body,
+  });
+
+  revalidatePath("/admin/dashboard");
+  revalidatePath("/admin");
+}

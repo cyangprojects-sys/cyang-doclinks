@@ -21,10 +21,12 @@ import {
     bulkRevokeAllSharesForDocsAction,
     bulkDisableAliasesForDocsAction,
     updateRetentionSettingsAction,
+    sendExpirationAlertAction,
 } from "../actions";
 import SharesTableClient, { type ShareRow as ShareRowClient } from "./SharesTableClient";
 import UploadPanel from "./UploadPanel";
 import ViewsByDocTableClient, { type ViewsByDocRow as ViewsByDocRowClient } from "./ViewsByDocTableClient";
+import UnifiedDocsTableClient, { type UnifiedDocRow as UnifiedDocRowClient } from "./UnifiedDocsTableClient";
 import { getRetentionSettings } from "@/lib/settings";
 
 export const runtime = "nodejs";
@@ -70,6 +72,18 @@ type ViewsByDocRow = {
     views: number;
     unique_ips: number;
     last_view: string | null;
+};
+
+type UnifiedDocRow = {
+    doc_id: string;
+    doc_title: string | null;
+    alias: string | null;
+    total_views: number;
+    last_view: string | null;
+    active_shares: number;
+    alias_expires_at: string | null;
+    alias_is_active: boolean | null;
+    alias_revoked_at: string | null;
 };
 
 type DailyAggRow = {
@@ -275,6 +289,79 @@ export default async function AdminDashboardPage() {
         viewsByDoc = [];
     }
 
+    // Unified documents table (best-effort)
+    let unifiedDocs: UnifiedDocRow[] = [];
+    try {
+        unifiedDocs = (await sql`
+      select
+        d.id::text as doc_id,
+        d.title as doc_title,
+        a.alias as alias,
+        coalesce(v.total_views, 0)::int as total_views,
+        v.last_view::text as last_view,
+        coalesce(s.active_shares, 0)::int as active_shares,
+        a.expires_at::text as alias_expires_at,
+        coalesce(a.is_active, true) as alias_is_active,
+        a.revoked_at::text as alias_revoked_at
+      from public.docs d
+      left join public.doc_aliases a on a.doc_id = d.id
+      left join lateral (
+        select
+          count(*)::int as total_views,
+          max(created_at)::timestamptz as last_view
+        from public.doc_views v
+        where v.doc_id = d.id
+      ) v on true
+      left join lateral (
+        select
+          count(*)::int as active_shares
+        from public.share_tokens st
+        where st.doc_id = d.id
+          and st.revoked_at is null
+          and (st.expires_at is null or st.expires_at > now())
+          and (st.max_views is null or st.views_count is null or st.views_count < st.max_views)
+      ) s on true
+      order by total_views desc, d.created_at desc
+      limit 500
+    `) as unknown as UnifiedDocRow[];
+    } catch {
+        // Fallback: show docs list without metrics
+        unifiedDocs = docs.map((d) => ({
+            doc_id: d.id,
+            doc_title: d.title,
+            alias: d.alias,
+            total_views: 0,
+            last_view: null,
+            active_shares: 0,
+            alias_expires_at: null,
+            alias_is_active: true,
+            alias_revoked_at: null,
+        }));
+    }
+
+    // Expiration warnings (aliases expiring in next 3 days)
+    let expiringSoon: Array<{ doc_id: string; doc_title: string | null; alias: string | null; expires_at: string | null }> = [];
+    try {
+        expiringSoon = (await sql`
+      select
+        d.id::text as doc_id,
+        d.title as doc_title,
+        a.alias as alias,
+        a.expires_at::text as expires_at
+      from public.doc_aliases a
+      join public.docs d on d.id = a.doc_id
+      where coalesce(a.is_active, true) = true
+        and a.revoked_at is null
+        and a.expires_at is not null
+        and a.expires_at > now()
+        and a.expires_at <= (now() + interval '3 days')
+      order by a.expires_at asc
+      limit 8
+    `) as unknown as Array<{ doc_id: string; doc_title: string | null; alias: string | null; expires_at: string | null }>;
+    } catch {
+        expiringSoon = [];
+    }
+
     // Fast analytics read layer (doc_view_daily)
     const hasDocViewDaily = await tableExists("public.doc_view_daily");
     let topDocs7d: TopDocRow[] = [];
@@ -395,6 +482,18 @@ export default async function AdminDashboardPage() {
         views: Number(r.views ?? 0),
         unique_ips: Number(r.unique_ips ?? 0),
         last_view: r.last_view,
+    }));
+
+    const unifiedDocsClient: UnifiedDocRowClient[] = unifiedDocs.map((r) => ({
+        doc_id: r.doc_id,
+        doc_title: r.doc_title,
+        alias: r.alias,
+        total_views: Number(r.total_views ?? 0),
+        last_view: r.last_view,
+        active_shares: Number(r.active_shares ?? 0),
+        alias_expires_at: r.alias_expires_at,
+        alias_is_active: (r as any).alias_is_active === null || (r as any).alias_is_active === undefined ? null : Boolean((r as any).alias_is_active),
+        alias_revoked_at: r.alias_revoked_at,
     }));
 
     // Widget metrics (best-effort)
@@ -520,63 +619,73 @@ export default async function AdminDashboardPage() {
                 </div>
             </div>
 
-            {/* DOCS */}
-            <div id="docs" className="mt-8 overflow-hidden rounded-lg border border-neutral-800">
-                <div className="max-h-[560px] overflow-auto">
-                    <table className="w-full text-sm">
-                        <thead className="sticky top-0 bg-neutral-900 text-neutral-300">
-                        <tr>
-                            <th className="px-4 py-3 text-left">Title</th>
-                            <th className="px-4 py-3 text-left">Alias</th>
-                            <th className="px-4 py-3 text-left">Created</th>
-                            <th className="px-4 py-3 text-right">Actions</th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        {docs.length === 0 ? (
-                            <tr>
-                                <td colSpan={4} className="px-4 py-6 text-neutral-400">
-                                    No documents found.
-                                </td>
-                            </tr>
-                        ) : (
-                            docs.map((doc) => (
-                                <tr key={doc.id} className="border-t border-neutral-800">
-                                    <td className="px-4 py-3">
-                                        {doc.title || "Untitled"}
-                                        <div className="text-xs text-neutral-500 font-mono">{doc.id}</div>
-                                    </td>
+            {/* UNIFIED DOCUMENTS */}
+            <div id="docs" className="mt-10">
+                <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+                    <div>
+                        <h2 className="text-lg font-semibold tracking-tight">Documents</h2>
+                        <p className="mt-1 text-sm text-neutral-400">
+                            Unified table: views + shares + alias status. Click a doc to open its detail page.
+                        </p>
+                    </div>
+                    <div className="text-xs text-neutral-500">Default page size: 10 · Scrollable table</div>
+                </div>
 
-                                    <td className="px-4 py-3">
-                                        {doc.alias ? (
-                                            <Link
-                                                href={`/d/${doc.alias}`}
-                                                className="text-blue-400 hover:underline"
-                                                target="_blank"
-                                            >
-                                                {doc.alias}
-                                            </Link>
-                                        ) : (
-                                            <span className="text-neutral-500">—</span>
-                                        )}
-                                    </td>
+                <div className="mt-4 grid gap-4 lg:grid-cols-3">
+                    <div className="lg:col-span-2">
+                        <UnifiedDocsTableClient rows={unifiedDocsClient} defaultPageSize={10} />
+                    </div>
 
-                                    <td className="px-4 py-3 text-neutral-400">
-                                        {new Date(doc.created_at).toLocaleString()}
-                                    </td>
+                    <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-4">
+                        <div className="flex items-start justify-between gap-3">
+                            <div>
+                                <h3 className="text-sm font-semibold text-neutral-200">Expiration warnings</h3>
+                                <p className="mt-1 text-xs text-neutral-500">Aliases expiring within 3 days.</p>
+                            </div>
+                            <form action={sendExpirationAlertAction}>
+                                <input type="hidden" name="days" value="3" />
+                                <button
+                                    type="submit"
+                                    className="rounded-md bg-neutral-800 px-3 py-1.5 text-xs text-neutral-100 hover:bg-neutral-700"
+                                    title="Email an expiration summary to the owner"
+                                >
+                                    Email owner
+                                </button>
+                            </form>
+                        </div>
 
-                                    <td className="px-4 py-3 text-right">
-                                        <DeleteDocForm
-                                            docId={doc.id}
-                                            title={doc.title || "Untitled"}
-                                            action={deleteDocAction}
-                                        />
-                                    </td>
-                                </tr>
-                            ))
-                        )}
-                        </tbody>
-                    </table>
+                        <div className="mt-3 rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2">
+                            <div className="text-2xl font-semibold text-neutral-100">{expiringSoon.length}</div>
+                            <div className="text-xs text-neutral-500">docs expiring soon</div>
+                        </div>
+
+                        <div className="mt-4 space-y-3">
+                            {expiringSoon.length === 0 ? (
+                                <div className="text-sm text-neutral-500">No aliases expiring soon.</div>
+                            ) : (
+                                expiringSoon.map((r) => (
+                                    <div key={r.doc_id} className="rounded-lg border border-neutral-800 bg-neutral-950 p-3">
+                                        <Link href={`/admin/docs/${r.doc_id}`} className="text-sm text-neutral-200 hover:underline">
+                                            {r.doc_title || "Untitled"}
+                                        </Link>
+                                        <div className="mt-1 text-xs text-neutral-500">Expires: {fmtDate(r.expires_at)}</div>
+                                        <div className="mt-1 flex flex-wrap gap-2 text-xs">
+                                            {r.alias ? (
+                                                <Link href={`/d/${r.alias}`} target="_blank" className="text-blue-400 hover:underline">
+                                                    /d/{r.alias}
+                                                </Link>
+                                            ) : null}
+                                            <span className="text-neutral-600 font-mono">{r.doc_id}</span>
+                                        </div>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+
+                        <div className="mt-4 text-xs text-neutral-500">
+                            Need to delete a doc? Use the legacy list on <Link href="/admin" className="text-blue-400 hover:underline">/admin</Link>.
+                        </div>
+                    </div>
                 </div>
             </div>
 

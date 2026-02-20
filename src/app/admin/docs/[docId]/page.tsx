@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { sql } from "@/lib/db";
 import { isOwnerAdmin } from "@/lib/admin";
+import { revokeAllSharesForDocAction } from "../../actions";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,6 +19,22 @@ async function tableExists(fqTable: string): Promise<boolean> {
   try {
     const rows = (await sql`select to_regclass(${fqTable})::text as reg`) as unknown as Array<{ reg: string | null }>;
     return !!rows?.[0]?.reg;
+  } catch {
+    return false;
+  }
+}
+
+async function columnExists(table: string, column: string): Promise<boolean> {
+  try {
+    const rows = (await sql`
+      select 1
+      from information_schema.columns
+      where table_schema = 'public'
+        and table_name = ${table}
+        and column_name = ${column}
+      limit 1
+    `) as unknown as Array<{ "?column?": number }>;
+    return rows.length > 0;
   } catch {
     return false;
   }
@@ -99,21 +116,32 @@ export default async function AdminDocInvestigatePage(props: { params: Promise<{
 
   const hasDocViewDaily = await tableExists("public.doc_view_daily");
   const hasDocViews = await tableExists("public.doc_views");
-  const hasShareTokenInDocViews = await (async () => {
-    try {
-      const rows = (await sql`
-        select 1
-        from information_schema.columns
-        where table_schema = 'public'
-          and table_name = 'doc_views'
-          and column_name = 'share_token'
-        limit 1
-      `) as unknown as Array<{ "?column?": number }>;
-      return rows.length > 0;
-    } catch {
-      return false;
+  const hasShareTokenInDocViews = await columnExists("doc_views", "share_token");
+  const hasPurposeInDocViews = await columnExists("doc_views", "purpose");
+
+  // Downloads (best-effort)
+  let downloads: { total: number; last30: number } | null = null;
+  try {
+    if (hasDocViews && hasPurposeInDocViews) {
+      const totalRows = (await sql`
+        select count(*)::int as c
+        from public.doc_views v
+        where v.doc_id = ${doc.id}::uuid
+          and v.purpose = 'file_download'
+      `) as unknown as Array<{ c: number }>;
+      const last30Rows = (await sql`
+        select count(*)::int as c
+        from public.doc_views v
+        where v.doc_id = ${doc.id}::uuid
+          and v.purpose = 'file_download'
+          and v.created_at >= (now() - interval '30 days')
+      `) as unknown as Array<{ c: number }>;
+
+      downloads = { total: totalRows?.[0]?.c ?? 0, last30: last30Rows?.[0]?.c ?? 0 };
     }
-  })();
+  } catch {
+    downloads = null;
+  }
 
   // 30-day series (views + uniques)
   let series: SeriesRow[] = [];
@@ -311,6 +339,17 @@ export default async function AdminDocInvestigatePage(props: { params: Promise<{
           </div>
         </div>
 
+        <form action={revokeAllSharesForDocAction} className="flex items-start justify-end">
+          <input type="hidden" name="docId" value={doc.id} />
+          <button
+            type="submit"
+            className="rounded-md border border-rose-500/20 bg-rose-500/10 px-3 py-2 text-sm text-rose-200 hover:bg-rose-500/15"
+            title="Revoke all shares for this doc"
+          >
+            Revoke all shares
+          </button>
+        </form>
+
         {isSpike ? (
           <div className="rounded-lg border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
             <div className="font-semibold">Spike detected</div>
@@ -354,6 +393,14 @@ export default async function AdminDocInvestigatePage(props: { params: Promise<{
             <div>
               <div className="text-neutral-300">Alias</div>
               <div>{doc.alias ? `/d/${doc.alias}` : "—"}</div>
+            </div>
+            <div>
+              <div className="text-neutral-300">Downloads (30d)</div>
+              <div>{downloads ? downloads.last30 : "—"}</div>
+            </div>
+            <div>
+              <div className="text-neutral-300">Downloads (total)</div>
+              <div>{downloads ? downloads.total : "—"}</div>
             </div>
           </div>
         </div>
