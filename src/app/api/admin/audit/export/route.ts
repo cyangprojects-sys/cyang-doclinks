@@ -22,22 +22,12 @@ function parseIntParam(raw: string | null, fallback: number, min: number, max: n
   return Math.max(min, Math.min(max, i));
 }
 
-async function getTimestampColumn(tableName: string): Promise<string | null> {
-  // Prefer common timestamp columns, fall back to null.
-  const preferred = ["created_at", "accessed_at", "viewed_at", "ts", "timestamp", "updated_at"];
-  try {
-    const cols = (await sql`
-      select column_name::text as name
-      from information_schema.columns
-      where table_schema = 'public'
-        and table_name = ${tableName}
-    `) as unknown as Array<{ name: string }>;
-    const names = cols.map((c) => c.name);
-    return preferred.find((p) => names.includes(p)) ?? null;
-  } catch {
-    return null;
-  }
-}
+// NOTE: Our DB client (Neon `sql`) is a *tagged template* function.
+// That means we can't pass a raw string query into it without fighting types.
+// For export we keep the query fully static (by `type`) and parameterize values.
+
+// All current audit/access/views tables use `created_at`.
+// We keep it static so the query stays fully typed and parameterized.
 
 export async function GET(req: NextRequest) {
   try {
@@ -58,30 +48,36 @@ export async function GET(req: NextRequest) {
   };
 
   const picked = map[type] ?? map.audit;
-  const tsCol = await getTimestampColumn(picked.table);
 
-  // Build query:
-  // - Use best-effort time window based on timestamp-like column.
-  // - If tsCol missing, export most recent by primary key-ish order is not guaranteed; still limit.
+  // Build query (static per table) so we can keep using the tagged template.
+  // We assume these tables have `created_at` (true for our schemas).
+  // If a table is missing the column, we'll surface a clean error.
   let rows: any[] = [];
   try {
-    if (tsCol) {
-      // Note: column name is injected as identifier, not as a parameter.
-      const q = `
+    if (type === "audit") {
+      rows = (await sql`
         select *
-        from public.${picked.table}
-        where ${tsCol} >= (now() - ($1::int * interval '1 day'))
-        order by ${tsCol} desc
-        limit $2
-      `;
-      rows = (await sql(q, [days, limit])) as any[];
+        from public.doc_audit
+        where created_at >= (now() - (${days}::int * interval '1 day'))
+        order by created_at desc
+        limit ${limit}
+      `) as any[];
+    } else if (type === "access") {
+      rows = (await sql`
+        select *
+        from public.doc_access_log
+        where created_at >= (now() - (${days}::int * interval '1 day'))
+        order by created_at desc
+        limit ${limit}
+      `) as any[];
     } else {
-      const q = `
+      rows = (await sql`
         select *
-        from public.${picked.table}
-        limit $1
-      `;
-      rows = (await sql(q, [limit])) as any[];
+        from public.doc_views
+        where created_at >= (now() - (${days}::int * interval '1 day'))
+        order by created_at desc
+        limit ${limit}
+      `) as any[];
     }
   } catch (err: any) {
     return new Response(`Export failed: ${err?.message || "unknown error"}`, { status: 500 });
