@@ -308,105 +308,176 @@ export default async function AdminDashboardPage() {
     }
 
     // Summary metrics (best-effort)
-    let accessSummary: { total: number; uniques: number; last: string | null } = {
-        total: 0,
-        uniques: 0,
-        last: null,
-    };
-    try {
-        const rows = hasDocAccessLog
-            ? ((await sql`
-        select
-          count(*)::int as total,
-          count(distinct coalesce(device_hash, ''))::int as uniques,
-          max(accessed_at)::text as last
-        from public.doc_access_log
-      `) as unknown as Array<{ total: number; uniques: number; last: string | null }> )
-            : hasDocAudit
-              ? ((await sql`
-        select
-          count(*)::int as total,
-          0::int as uniques,
-          max(created_at)::text as last
-        from public.doc_audit
-      `) as unknown as Array<{ total: number; uniques: number; last: string | null }> )
-              : ([] as Array<{ total: number; uniques: number; last: string | null }>);
-        if (rows?.[0]) accessSummary = rows[0];
-    } catch {
-        // ignore
-    }
+let accessSummary: { total: number; uniques: number; last: string | null } = {
+    total: 0,
+    uniques: 0,
+    last: null,
+};
+try {
+    const rows = hasDocAccessLog
+        ? ((await (canSeeAll
+            ? sql`
+    select
+      count(*)::int as total,
+      count(distinct coalesce(device_hash, ''))::int as uniques,
+      max(accessed_at)::text as last
+    from public.doc_access_log
+  `
+            : sql`
+    select
+      count(*)::int as total,
+      count(distinct coalesce(l.device_hash, ''))::int as uniques,
+      max(l.accessed_at)::text as last
+    from public.doc_access_log l
+    join public.docs d on d.id = l.doc_id
+    where d.owner_id = ${u.id}::uuid
+  `)) as unknown as Array<{ total: number; uniques: number; last: string | null }>)
+        : hasDocAudit
+          ? ((await (canSeeAll
+                ? sql`
+    select
+      count(*)::int as total,
+      0::int as uniques,
+      max(created_at)::text as last
+    from public.doc_audit
+  `
+                : sql`
+    select
+      count(*)::int as total,
+      0::int as uniques,
+      max(a.created_at)::text as last
+    from public.doc_audit a
+    join public.docs d on d.id = a.doc_id
+    where d.owner_id = ${u.id}::uuid
+  `)) as unknown as Array<{ total: number; uniques: number; last: string | null }>)
+          : ([] as Array<{ total: number; uniques: number; last: string | null }>);
+    if (rows?.[0]) accessSummary = rows[0];
+} catch {
+    // ignore
+}
 
     // View count per doc (best-effort; doc_views may not exist)
-    let viewsByDoc: ViewsByDocRow[] = [];
-    try {
-        viewsByDoc = (await sql`
-      select
-        v.doc_id::text as doc_id,
-        d.title as doc_title,
-        a.alias as alias,
-        count(*)::int as views,
-        count(distinct coalesce(v.ip_hash, ''))::int as unique_ips,
-        max(v.created_at)::text as last_view
-      from public.doc_views v
-      join public.docs d on d.id = v.doc_id
-      left join public.doc_aliases a on a.doc_id = v.doc_id
-      group by v.doc_id, d.title, a.alias
-      order by views desc
-      limit 50
-    `) as unknown as ViewsByDocRow[];
-    } catch {
-        viewsByDoc = [];
-    }
+let viewsByDoc: ViewsByDocRow[] = [];
+try {
+    viewsByDoc = (await (canSeeAll
+        ? sql`
+  select
+    v.doc_id::text as doc_id,
+    d.title as doc_title,
+    a.alias as alias,
+    count(*)::int as views,
+    count(distinct coalesce(v.ip_hash, ''))::int as unique_ips,
+    max(v.created_at)::text as last_view
+  from public.doc_views v
+  join public.docs d on d.id = v.doc_id
+  left join public.doc_aliases a on a.doc_id = v.doc_id
+  group by v.doc_id, d.title, a.alias
+  order by views desc
+  limit 50
+`
+        : sql`
+  select
+    v.doc_id::text as doc_id,
+    d.title as doc_title,
+    a.alias as alias,
+    count(*)::int as views,
+    count(distinct coalesce(v.ip_hash, ''))::int as unique_ips,
+    max(v.created_at)::text as last_view
+  from public.doc_views v
+  join public.docs d on d.id = v.doc_id
+  left join public.doc_aliases a on a.doc_id = v.doc_id
+  where d.owner_id = ${u.id}::uuid
+  group by v.doc_id, d.title, a.alias
+  order by views desc
+  limit 50
+`)) as unknown as ViewsByDocRow[];
+} catch {
+    viewsByDoc = [];
+}
 
     // Unified documents table (best-effort)
-    let unifiedDocs: UnifiedDocRow[] = [];
-    try {
-        unifiedDocs = (await sql`
-      select
-        d.id::text as doc_id,
-        d.title as doc_title,
-        a.alias as alias,
-        coalesce(v.total_views, 0)::int as total_views,
-        v.last_view::text as last_view,
-        coalesce(s.active_shares, 0)::int as active_shares,
-        a.expires_at::text as alias_expires_at,
-        coalesce(a.is_active, true) as alias_is_active,
-        a.revoked_at::text as alias_revoked_at
-      from public.docs d
-      left join public.doc_aliases a on a.doc_id = d.id
-      left join lateral (
-        select
-          count(*)::int as total_views,
-          max(created_at)::timestamptz as last_view
-        from public.doc_views v
-        where v.doc_id = d.id
-      ) v on true
-      left join lateral (
-        select
-          count(*)::int as active_shares
-        from public.share_tokens st
-        where st.doc_id = d.id
-          and st.revoked_at is null
-          and (st.expires_at is null or st.expires_at > now())
-          and (st.max_views is null or st.views_count is null or st.views_count < st.max_views)
-      ) s on true
-      order by total_views desc, d.created_at desc
-      limit 500
-    `) as unknown as UnifiedDocRow[];
-    } catch {
-        // Fallback: show docs list without metrics
-        unifiedDocs = docs.map((d) => ({
-            doc_id: d.id,
-            doc_title: d.title,
-            alias: d.alias,
-            total_views: 0,
-            last_view: null,
-            active_shares: 0,
-            alias_expires_at: null,
-            alias_is_active: true,
-            alias_revoked_at: null,
-        }));
-    }
+let unifiedDocs: UnifiedDocRow[] = [];
+try {
+    unifiedDocs = (await (canSeeAll
+        ? sql`
+  select
+    d.id::text as doc_id,
+    d.title as doc_title,
+    a.alias as alias,
+    coalesce(v.total_views, 0)::int as total_views,
+    v.last_view::text as last_view,
+    coalesce(s.active_shares, 0)::int as active_shares,
+    a.expires_at::text as alias_expires_at,
+    coalesce(a.is_active, true) as alias_is_active,
+    a.revoked_at::text as alias_revoked_at
+  from public.docs d
+  left join public.doc_aliases a on a.doc_id = d.id
+  left join lateral (
+    select
+      count(*)::int as total_views,
+      max(created_at)::timestamptz as last_view
+    from public.doc_views v
+    where v.doc_id = d.id
+  ) v on true
+  left join lateral (
+    select
+      count(*)::int as active_shares
+    from public.share_tokens st
+    where st.doc_id = d.id
+      and st.revoked_at is null
+      and (st.expires_at is null or st.expires_at > now())
+      and (st.max_views is null or st.views_count is null or st.views_count < st.max_views)
+  ) s on true
+  order by total_views desc, d.created_at desc
+  limit 500
+`
+        : sql`
+  select
+    d.id::text as doc_id,
+    d.title as doc_title,
+    a.alias as alias,
+    coalesce(v.total_views, 0)::int as total_views,
+    v.last_view::text as last_view,
+    coalesce(s.active_shares, 0)::int as active_shares,
+    a.expires_at::text as alias_expires_at,
+    coalesce(a.is_active, true) as alias_is_active,
+    a.revoked_at::text as alias_revoked_at
+  from public.docs d
+  left join public.doc_aliases a on a.doc_id = d.id
+  left join lateral (
+    select
+      count(*)::int as total_views,
+      max(created_at)::timestamptz as last_view
+    from public.doc_views v
+    where v.doc_id = d.id
+  ) v on true
+  left join lateral (
+    select
+      count(*)::int as active_shares
+    from public.share_tokens st
+    where st.doc_id = d.id
+      and st.revoked_at is null
+      and (st.expires_at is null or st.expires_at > now())
+      and (st.max_views is null or st.views_count is null or st.views_count < st.max_views)
+  ) s on true
+  where d.owner_id = ${u.id}::uuid
+  order by total_views desc, d.created_at desc
+  limit 500
+`)) as unknown as UnifiedDocRow[];
+} catch {
+    // Fallback: show docs list without metrics
+    unifiedDocs = docs.map((d) => ({
+        doc_id: d.id,
+        doc_title: d.title,
+        alias: d.alias,
+        total_views: 0,
+        last_view: null,
+        active_shares: 0,
+        alias_expires_at: null,
+        alias_is_active: true,
+        alias_revoked_at: null,
+    }));
+}
 
     // Expiration warnings (aliases expiring in next 3 days)
     let expiringSoon: Array<{ doc_id: string; doc_title: string | null; alias: string | null; expires_at: string | null }> = [];
