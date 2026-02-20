@@ -82,49 +82,49 @@ export async function logDocAccess(args: {
   docId: string;
   alias: string | null;
   /**
-   * Back-compat: older callers pass shareId. If you also have a share/token string,
-   * prefer passing it via `token` (optional) so it lands in doc_access_log.token.
+   * Legacy field used by older callers. If `token` is not provided, we will
+   * fall back to using `shareId` as `token` for doc_access_log.
    */
   shareId: string | null;
-  emailUsed: string | null;
-  /** Optional share token (preferred for doc_access_log.token). */
+  /** Optional (preferred) share token / access token */
   token?: string | null;
+  /** Optional (legacy) email used for access */
+  emailUsed?: string | null;
   ip: string;
   userAgent: string;
 }): Promise<void> {
-  const { docId, alias, shareId, emailUsed, token, ip, userAgent } = args;
+  const { docId, alias, shareId, token, emailUsed, ip, userAgent } = args;
   if (!docId) return;
 
-  // Keep storing hashed IP in doc_audit (privacy-friendly).
+  // Hash for doc_audit (privacy-friendly) if VIEW_SALT is configured.
   const ipHash = (() => {
     const salt = (process.env.VIEW_SALT || "").trim();
     if (!salt || !ip) return null;
     return crypto.createHmac("sha256", salt).update(ip).digest("hex").slice(0, 32);
   })();
 
-  // 1) Primary: doc_audit (richer event model)
+  // 1) Best-effort write to doc_audit (if your table matches these columns).
   try {
     await sql`
       insert into public.doc_audit
         (doc_id, alias, share_id, email_used, ip_hash, user_agent)
       values
-        (${docId}::uuid, ${alias}, ${shareId}, ${emailUsed}, ${ipHash}, ${userAgent})
+        (${docId}::uuid, ${alias}, ${shareId}, ${emailUsed ?? null}, ${ipHash}, ${userAgent})
     `;
   } catch {
     // best-effort
   }
 
-  // 2) Secondary: doc_access_log (simple access trail)
-  // Your production schema (per /admin/db-debug) is:
-  //   id, doc_id, alias, token, ip, user_agent, created_at
-  // So we write only those columns.
+  // 2) Best-effort write to doc_access_log using the schema confirmed in prod:
+  // columns: id, doc_id, alias, token, ip, user_agent, created_at (default)
+  // NOTE: Your prod table uses `created_at` (not accessed_at).
+  const tokenToStore = (token ?? null) || (shareId ?? null);
   try {
-    const tok = (token ?? shareId) || null;
     await sql`
       insert into public.doc_access_log
         (doc_id, alias, token, ip, user_agent)
       values
-        (${docId}::uuid, ${alias}, ${tok}, ${ip || null}, ${userAgent || null})
+        (${docId}::uuid, ${alias}, ${tokenToStore}, ${ip || null}, ${userAgent})
     `;
   } catch {
     // best-effort
