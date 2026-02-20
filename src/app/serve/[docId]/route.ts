@@ -38,17 +38,35 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ docId: stri
   try {
     const url = new URL(req.url);
     const alias = url.searchParams.get("alias");
+    const token = url.searchParams.get("token");
+
+    const ip = getClientIpFromHeaders(req.headers);
+    const userAgent = getUserAgentFromHeaders(req.headers);
+
+    // 1) High-level audit trail (writes to doc_audit if present)
     await logDocAccess({
       docId: resolved.docId,
       alias: alias || null,
       shareId: null,
       emailUsed: null,
-      ip: getClientIpFromHeaders(req.headers),
-      userAgent: getUserAgentFromHeaders(req.headers),
+      ip,
+      userAgent,
     });
+
+    // 2) Access logs (writes to doc_access_log with the schema we observed in prod)
+    //    columns: id, doc_id, alias, token, ip, user_agent, created_at
+    try {
+      await sql`
+        insert into public.doc_access_log (doc_id, alias, token, ip, user_agent)
+        values (${resolved.docId}::uuid, ${alias || null}, ${token || null}, ${ip || null}, ${userAgent || null})
+      `;
+    } catch {
+      // ignore (table may be missing or schema may differ)
+    }
   } catch {
     // ignore
   }
+
 
   // Analytics (best-effort)
   try {
