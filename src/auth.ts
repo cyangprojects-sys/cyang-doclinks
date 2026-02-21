@@ -1,6 +1,6 @@
 import type { NextAuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
-import OIDCProvider from "next-auth/providers/oidc";
+import OAuthProvider from "next-auth/providers/oauth";
 
 import { ensureUserByEmail } from "@/lib/authz";
 
@@ -20,12 +20,35 @@ export const authOptions: NextAuthOptions = {
     const clientSecret = (process.env.ENTERPRISE_OIDC_CLIENT_SECRET || "").trim();
     if (issuer && clientId && clientSecret) {
         providers.push(
-            OIDCProvider({
+            // next-auth v4 does not ship a generic "oidc" provider.
+            // This OAuth config works with OIDC-compliant IdPs (Okta / Azure AD / Auth0 / Keycloak / etc.).
+            OAuthProvider({
                 id: "enterprise-oidc",
                 name: "Enterprise SSO",
+
+                type: "oidc",
                 issuer,
                 clientId,
                 clientSecret,
+
+                // Most IdPs expose discovery at {issuer}/.well-known/openid-configuration
+                wellKnown: `${issuer.replace(/\/+$/, "")}/.well-known/openid-configuration`,
+
+                // Ensure we receive an ID token + standard claims
+                authorization: { params: { scope: "openid email profile" } },
+                idToken: true,
+                checks: ["pkce", "state"],
+
+                // Normalize profile shape for next-auth
+                profile(profile) {
+                    const p: any = profile;
+                    return {
+                        id: p.sub ?? p.id ?? "",
+                        name: p.name ?? p.preferred_username ?? p.email ?? "",
+                        email: p.email ?? "",
+                        image: p.picture ?? null,
+                    };
+                },
             })
         );
     }
