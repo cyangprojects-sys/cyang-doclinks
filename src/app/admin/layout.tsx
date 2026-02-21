@@ -1,11 +1,15 @@
-// src/app/admin/layout.tsx
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
 
-export default async function AdminLayout({
-    children,
+import AdminHeader from "./components/AdminHeader";
+
+export default function AdminLayout({
+  children,
 }: {
-    children: React.ReactNode;
+  children: React.ReactNode;
 }) {
-    return <>{children}</>;
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <AdminHeader />
+      <main className="max-w-7xl mx-auto px-6 py-8">{children}</main>
+    </div>
+  );
 }
