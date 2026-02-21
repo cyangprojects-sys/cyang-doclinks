@@ -10,7 +10,8 @@ import Credentials from "next-auth/providers/credentials";
  * - Enterprise SSO (BYO OIDC) (organizational logins)
  *
  * Landing behavior:
- * - ALWAYS land on /admin/dashboard after a successful sign-in, regardless of callbackUrl.
+ * - ALWAYS land on /admin/dashboard after a successful sign-in
+ * - Sign-out should land on /
  *
  * Safety:
  * - Providers are only enabled when their env vars exist (prevents /api/auth/signin 500s).
@@ -79,8 +80,6 @@ function enterpriseOidcProvider() {
 
 export const authOptions: NextAuthOptions = {
   providers: [
-    // Always include a no-op provider so NextAuth never has an empty providers[].
-    // This is not shown in UI (we use pages.signIn="/signin").
     Credentials({
       id: "disabled",
       name: "Disabled",
@@ -110,33 +109,32 @@ export const authOptions: NextAuthOptions = {
 
   callbacks: {
     /**
-     * Force post-auth navigation to the Admin Dashboard, regardless of callbackUrl.
-     *
-     * Note:
-     * - NextAuth uses redirect() for various flows (sign-in, sign-out, error pages).
-     * - We only hard-force to admin for normal post-sign-in redirects.
+     * Force post-auth navigation to the Admin Dashboard for typical sign-in redirects.
+     * But DO NOT break sign-out: signOut({ callbackUrl: "/" }) should go home.
      */
     async redirect({ url, baseUrl }) {
-      // If NextAuth is trying to send the user to sign-in or error pages, keep it in-app.
-      // Otherwise, force to admin dashboard.
       try {
         const u = new URL(url, baseUrl);
 
-        // If this is a sign-out flow, send to home (or keep baseUrl).
-        if (u.pathname.startsWith("/api/auth/signout")) return baseUrl;
+        // Allow explicit home redirects (used by sign-out).
+        if (u.origin === baseUrl && (u.pathname === "/" || u.pathname === "")) {
+          return baseUrl;
+        }
 
-        // If redirecting to auth system pages, don't break them.
-        if (
-          u.pathname.startsWith("/api/auth") ||
-          u.pathname === "/signin" ||
-          u.pathname === "/api/auth/error"
-        ) {
+        // Keep NextAuth system routes functioning.
+        if (u.origin === baseUrl && u.pathname.startsWith("/api/auth")) {
+          return `${baseUrl}${u.pathname}${u.search}`;
+        }
+
+        // If caller explicitly redirects into /admin, honor it.
+        if (u.origin === baseUrl && u.pathname.startsWith("/admin")) {
           return `${baseUrl}${u.pathname}${u.search}`;
         }
       } catch {
         // ignore parsing issues; fall through to forcing admin
       }
 
+      // Default: always send signed-in users to the admin dashboard
       return `${baseUrl}${POST_SIGN_IN_PATH}`;
     },
   },

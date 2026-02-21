@@ -1,18 +1,10 @@
-import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
-
+import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
+import AdminTopNav from "../_components/AdminTopNav";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const revalidate = 0;
-
-function isOwnerEmail(email: string | null | undefined): boolean {
-  const owner = (process.env.OWNER_EMAIL || "").trim().toLowerCase();
-  const user = (email || "").trim().toLowerCase();
-  if (!owner) return false;
-  return !!user && user === owner;
-}
 
 export default async function OwnerAdminLayout({
   children,
@@ -20,17 +12,16 @@ export default async function OwnerAdminLayout({
   children: React.ReactNode;
 }) {
   const session = await getServerSession(authOptions);
-  const email = session?.user?.email;
+  if (!session?.user) redirect("/signin");
 
-  if (!email) {
-    // Not signed in → go sign in, then return to admin.
-    redirect("/api/auth/signin?callbackUrl=/admin/dashboard");
-  }
+  // Your app appears to attach role to session user; keep this defensive.
+  const role = (session.user as any)?.role as string | undefined;
+  const isOwner = role === "owner";
 
-  if (!isOwnerEmail(email)) {
-    // Signed in but not owner → keep them in their normal dashboard.
-    redirect("/admin/dashboard");
-  }
-
-  return <>{children}</>;
+  return (
+    <div className="min-h-screen">
+      <AdminTopNav email={session.user.email} isOwner={isOwner} />
+      <main className="mx-auto max-w-6xl px-4 py-6">{children}</main>
+    </div>
+  );
 }
