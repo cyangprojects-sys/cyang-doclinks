@@ -3,6 +3,8 @@ export const dynamic = "force-dynamic";
 
 import Link from "next/link";
 import { cookies, headers } from "next/headers";
+import { redirect } from "next/navigation";
+import { requireRole } from "@/lib/authz";
 
 type DebugResponse =
   | {
@@ -41,6 +43,12 @@ export default async function AdminDebugPage({
 }: {
   searchParams: Promise<{ alias?: string }>;
 }) {
+  try {
+    await requireRole("admin");
+  } catch {
+    redirect("/api/auth/signin");
+  }
+
   const sp = await searchParams;
   const alias = (sp.alias || "").trim();
 

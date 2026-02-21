@@ -15,6 +15,8 @@ export default async function AuditPage() {
   const u = await getAuthedUser();
   if (!u) redirect("/api/auth/signin");
   const canSeeAll = u.role === "owner" || u.role === "admin";
+  // Security: audit logs are admin/owner only. Viewers should not access this page.
+  if (!canSeeAll) redirect("/admin/dashboard");
 
   let auditRows: any[] = [];
   let accessRows: any[] = [];
