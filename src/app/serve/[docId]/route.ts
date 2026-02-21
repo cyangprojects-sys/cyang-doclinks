@@ -48,6 +48,10 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ docId: stri
   const alias = url.searchParams.get("alias");
   const token = url.searchParams.get("token");
   const ip = getClientIpFromHeaders(req.headers) || "";
+  const aliasParam = (alias || "").trim() || null;
+  const tokenParam = (token || "").trim() || null;
+  const ipHash = hashIp(ip);
+  const dispositionForLog = parseDisposition(req);
   const ipKey = stableHash(ip, "VIEW_SALT");
 
   const ipRl = await rateLimit({
@@ -130,8 +134,6 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ docId: stri
     const ipHash = hashIp(ip);
     const ua = req.headers.get("user-agent") || null;
     const ref = req.headers.get("referer") || null;
-
-    const dispositionForLog = parseDisposition(req);
     const aliasParam = url.searchParams.get("alias") || null;
     const tokenParam = url.searchParams.get("token") || null;
 
@@ -175,7 +177,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ docId: stri
     docId: resolved.docId,
     shareToken: url.searchParams.get("token") || null,
     alias: url.searchParams.get("alias") || null,
-    purpose: dispositionForLog === "attachment" ? "file_download" : "preview_view",
+    purpose: disposition === "attachment" ? "file_download" : "preview_view",
     r2Bucket: resolved.bucket,
     r2Key: resolved.r2Key,
     responseContentType: contentType,
