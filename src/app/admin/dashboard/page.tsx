@@ -748,6 +748,13 @@ try {
     API keys
 </Link>
 
+<Link
+    href="/admin/webhooks"
+    className="text-sm text-neutral-400 hover:text-neutral-200 underline underline-offset-4"
+>
+    Webhooks
+</Link>
+
             </div>
 
             {/* ✅ UPLOAD */}

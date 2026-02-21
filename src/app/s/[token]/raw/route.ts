@@ -6,6 +6,7 @@ import { getClientIpFromHeaders, getUserAgentFromHeaders, logDocAccess } from "@
 import crypto from "crypto";
 import { rateLimit, rateLimitHeaders, stableHash } from "@/lib/rateLimit";
 import { mintAccessTicket } from "@/lib/accessTicket";
+import { geoDecisionForRequest, getCountryFromHeaders } from "@/lib/geo";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -153,6 +154,12 @@ export async function GET(
 
   const share = rows[0];
   if (!share) return new NextResponse("Not found", { status: 404 });
+
+  // Geo-based restriction (best-effort)
+  const country = getCountryFromHeaders(req.headers);
+  const geo = await geoDecisionForRequest({ country, docId: share.doc_id, token });
+  if (!geo.allowed) return new NextResponse("Forbidden", { status: 403 });
+
   if (share.revoked_at) return new NextResponse("Revoked", { status: 410 });
   if (isExpired(share.expires_at)) return new NextResponse("Link expired", { status: 410 });
 

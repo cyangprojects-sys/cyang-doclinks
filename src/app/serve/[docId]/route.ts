@@ -10,6 +10,7 @@ import { resolveDoc } from "@/lib/resolveDoc";
 import { getClientIpFromHeaders, getUserAgentFromHeaders, logDocAccess } from "@/lib/audit";
 import { rateLimit, rateLimitHeaders, stableHash } from "@/lib/rateLimit";
 import { emitWebhook } from "@/lib/webhooks";
+import { geoDecisionForRequest, getCountryFromHeaders } from "@/lib/geo";
 
 function getClientIp(req: NextRequest) {
   const xff = req.headers.get("x-forwarded-for") || "";
@@ -53,6 +54,13 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ docId: stri
   const ipHash = hashIp(ip);
   const dispositionForLog = parseDisposition(req);
   const ipKey = stableHash(ip, "VIEW_SALT");
+
+  // --- Geo-based restriction (best-effort) ---
+  const country = getCountryFromHeaders(req.headers);
+  const geo = await geoDecisionForRequest({ country, docId, token: tokenParam });
+  if (!geo.allowed) {
+    return new Response("Forbidden", { status: 403 });
+  }
 
   const ipRl = await rateLimit({
     scope: "ip:serve",

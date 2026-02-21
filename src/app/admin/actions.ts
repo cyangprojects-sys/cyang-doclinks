@@ -11,6 +11,7 @@ import { sendMail } from "@/lib/email";
 import { requireDocWrite, requireRole, requireUser } from "@/lib/authz";
 import { setRetentionSettings } from "@/lib/settings";
 import { generateApiKey, hashApiKey } from "@/lib/apiKeys";
+import { emitWebhook } from "@/lib/webhooks";
 
 function getBaseUrl() {
   const explicit = process.env.BASE_URL || process.env.NEXTAUTH_URL;
@@ -101,6 +102,8 @@ export async function createOrAssignAliasAction(formData: FormData): Promise<voi
     do update set doc_id = excluded.doc_id
   `;
 
+  emitWebhook("alias.created", { alias, doc_id: docId });
+
   revalidatePath("/admin");
   revalidatePath("/admin/dashboard");
 }
@@ -184,6 +187,14 @@ export async function deleteDocAction(formData: FormData): Promise<void> {
 
   await requireDocWrite(docId);
 
+  const drows = (await sql`
+    select title::text as title
+    from public.docs
+    where id = ${docId}::uuid
+    limit 1
+  `) as unknown as Array<{ title: string | null }>;
+  const title = drows?.[0]?.title ?? null;
+
   const { bucket, key } = await resolveR2LocationForDoc(docId);
 
   await r2Client.send(
@@ -203,6 +214,8 @@ export async function deleteDocAction(formData: FormData): Promise<void> {
 
   revalidatePath("/admin");
   revalidatePath("/admin/dashboard");
+
+  emitWebhook("doc.deleted", { doc_id: docId, title });
 }
 
 /**
@@ -217,12 +230,35 @@ export async function revokeDocShareAction(formData: FormData): Promise<void> {
 
   await requireShareWrite(token);
 
+  const before = (await sql`
+    select doc_id::text as doc_id, to_email, expires_at::text as expires_at, max_views, views_count
+    from public.share_tokens
+    where token = ${token}
+    limit 1
+  `) as unknown as Array<{
+    doc_id: string;
+    to_email: string | null;
+    expires_at: string | null;
+    max_views: number | null;
+    views_count: number | null;
+  }>;
+
   await sql`
     update share_tokens
     set revoked_at = now()
     where token = ${token}
       and revoked_at is null
   `;
+
+  // Webhook (best-effort)
+  emitWebhook("share.revoked", {
+    token,
+    doc_id: before?.[0]?.doc_id ?? null,
+    to_email: before?.[0]?.to_email ?? null,
+    expires_at: before?.[0]?.expires_at ?? null,
+    max_views: before?.[0]?.max_views ?? null,
+    views_count: before?.[0]?.views_count ?? null,
+  });
 
   revalidatePath("/admin/dashboard");
   revalidatePath("/admin");
@@ -292,6 +328,14 @@ export async function disableAliasForDocAction(formData: FormData): Promise<void
   const docId = String(formData.get("docId") || "").trim();
   if (!docId) throw new Error("Missing docId.");
 
+  const arows = (await sql`
+    select alias::text as alias
+    from public.doc_aliases
+    where doc_id = ${docId}::uuid
+    limit 1
+  `) as unknown as Array<{ alias: string }>;
+  const alias = arows?.[0]?.alias ?? null;
+
   // Best-effort: prefer is_active=false if the column exists; fall back to revoked_at.
   try {
     await sql`
@@ -315,6 +359,8 @@ export async function disableAliasForDocAction(formData: FormData): Promise<void
       `;
     }
   }
+
+  emitWebhook("alias.disabled", { doc_id: docId, alias });
 
   revalidatePath("/admin/dashboard");
   revalidatePath("/admin");

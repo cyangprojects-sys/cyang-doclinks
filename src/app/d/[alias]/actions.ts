@@ -5,6 +5,7 @@ import { sql } from "@/lib/db";
 import { requireDocWrite } from "@/lib/authz";
 import { randomBytes } from "crypto";
 import bcrypt from "bcryptjs";
+import { emitWebhook } from "@/lib/webhooks";
 
 /**
  * NOTE:
@@ -142,6 +143,17 @@ export async function createAndEmailShareToken(
       insert into public.share_tokens (token, doc_id, to_email, expires_at, max_views, password_hash)
       values (${token}, ${docId}::uuid, ${toEmail}, ${expiresAt}, ${maxViews}, ${passwordHash})
     `;
+
+    // Webhook (best-effort)
+    emitWebhook("share.created", {
+      token,
+      doc_id: docId,
+      alias: alias ?? null,
+      to_email: toEmail,
+      expires_at: expiresAt,
+      max_views: maxViews,
+      has_password: !!passwordHash,
+    });
 
     const url = buildShareUrl(token);
 
