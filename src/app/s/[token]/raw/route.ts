@@ -225,7 +225,8 @@ try {
 // Count view against the owner's monthly quota (best-effort).
 if (ownerIdForLimit) {
   try {
-    await incrementMonthlyViews(ownerIdForLimit, 1);
+    const ownerId = ownerIdForLimit as string;
+    await incrementMonthlyViews(ownerId, 1);
   } catch {
     // ignore
   }
