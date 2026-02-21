@@ -935,7 +935,7 @@ try {
                     </form>
 
                     {notifications.length ? (
-                        <form action={markAllAdminNotificationsReadAction}>
+                        <form action={async (fd) => { await markAllAdminNotificationsReadAction(fd); }}>
                             <button
                                 type="submit"
                                 className="rounded-md border border-neutral-800 bg-neutral-950 px-3 py-1.5 text-xs text-neutral-200 hover:bg-neutral-900"
@@ -992,7 +992,7 @@ try {
                                         </div>
                                     </div>
 
-                                    <form action={markAdminNotificationReadAction}>
+                                    <form action={async (fd) => { await markAdminNotificationReadAction(fd); }}>
                                         <input type="hidden" name="id" value={n.id} />
                                         <button
                                             type="submit"
