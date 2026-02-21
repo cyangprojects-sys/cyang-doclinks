@@ -691,9 +691,11 @@ if (hasAppSettings) {
 }
 
 // In-app notifications (best-effort; requires public.admin_notifications)
+let hasNotificationsTable = false;
 try {
     const hasNotifications = await tableExists("public.admin_notifications");
     if (hasNotifications) {
+        hasNotificationsTable = true;
         notifications = (await sql`
   select
     id::text as id,
