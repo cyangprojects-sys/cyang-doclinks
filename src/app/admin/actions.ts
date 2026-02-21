@@ -721,3 +721,39 @@ export async function revokeApiKeyAction(formData: FormData) {
   revalidatePath("/admin/api-keys");
   return { ok: true as const };
 }
+
+
+// --- Admin notifications (expiration alerts) ---
+
+export async function markAdminNotificationReadAction(formData: FormData) {
+  await requireRole("admin");
+  const u = await requireUser();
+
+  const id = String(formData.get("id") || "").trim();
+  if (!id) throw new Error("Missing id.");
+
+  await sql`
+    update public.admin_notifications
+    set read_at = now()
+    where id = ${id}::uuid
+      and owner_id = ${u.id}::uuid
+  `;
+
+  revalidatePath("/admin/dashboard");
+  return { ok: true as const };
+}
+
+export async function markAllAdminNotificationsReadAction(_: FormData) {
+  await requireRole("admin");
+  const u = await requireUser();
+
+  await sql`
+    update public.admin_notifications
+    set read_at = now()
+    where owner_id = ${u.id}::uuid
+      and read_at is null
+  `;
+
+  revalidatePath("/admin/dashboard");
+  return { ok: true as const };
+}
