@@ -183,15 +183,13 @@ const consumed = await consumeShareTokenView(token);
         return new NextResponse("Not found", { status: 404 });
     }
 
-// Best-effort usage counter
-{
-  const ownerIdForUsage = ownerIdForLimit;
-  if (ownerIdForUsage !== null) {
-    try {
-      await incrementMonthlyViews(ownerIdForUsage, 1);
-    } catch {
-      // ignore
-    }
+if (ownerIdForLimit) {
+  // ownerIdForLimit is typed as string | null; this cast is safe under the truthy guard.
+  const ownerId = ownerIdForLimit as string;
+  try {
+    await incrementMonthlyViews(ownerId, 1);
+  } catch {
+    // ignore
   }
 }
   }
