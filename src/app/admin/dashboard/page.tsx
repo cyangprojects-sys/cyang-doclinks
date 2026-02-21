@@ -691,11 +691,9 @@ if (hasAppSettings) {
 }
 
 // In-app notifications (best-effort; requires public.admin_notifications)
-let notificationsTableExists = false;
+// We intentionally avoid hard-failing if the table is missing.
 try {
-    notificationsTableExists = await tableExists("public.admin_notifications");
-    if (notificationsTableExists) {
-        notifications = (await sql`
+    notifications = (await sql`
   select
     id::text as id,
     kind,
@@ -711,12 +709,11 @@ try {
     and read_at is null
   order by expires_at asc nulls last, created_at desc
   limit 12
-`) as unknown as NotificationRow[];
-    }
+	`) as unknown as NotificationRow[];
 } catch {
     notifications = [];
 }
-    }
+
 
     const sharesClient: ShareRowClient[] = shares.map((s) => ({
         token: s.token,
@@ -958,53 +955,49 @@ try {
             </div>
 
             <div className="mt-4 space-y-3">
-                {notificationsTableExists ? (
-                    notifications.length === 0 ? (
-                        <div className="text-sm text-neutral-500">No unread notifications.</div>
-                    ) : (
-                        notifications.map((n) => (
-                            <div key={n.id} className="rounded-lg border border-neutral-800 bg-neutral-950 p-3">
-                                <div className="flex items-start justify-between gap-3">
-                                    <div className="min-w-0">
-                                        {n.doc_id ? (
-                                            <Link href={`/admin/docs/${n.doc_id}`} className="text-sm text-neutral-200 hover:underline">
-                                                {n.title || "Untitled"}
-                                            </Link>
-                                        ) : (
-                                            <div className="text-sm text-neutral-200">{n.title || "Untitled"}</div>
-                                        )}
-                                        <div className="mt-1 text-xs text-neutral-500">
-                                            {n.kind === "alias_expiring" ? "Alias expiring" : n.kind === "share_expiring" ? "Share expiring" : n.kind}
-                                            {n.expires_at ? ` · Expires: ${fmtDate(n.expires_at)}` : ""}
-                                        </div>
-                                        <div className="mt-1 flex flex-wrap gap-2 text-xs">
-                                            {n.alias ? (
-                                                <Link href={`/d/${n.alias}`} target="_blank" className="text-blue-400 hover:underline">
-                                                    /d/{n.alias}
-                                                </Link>
-                                            ) : null}
-                                            {n.share_token ? (
-                                                <Link href={`/s/${n.share_token}`} target="_blank" className="text-blue-400 hover:underline">
-                                                    /s/{n.share_token}
-                                                </Link>
-                                            ) : null}
-                                            {n.doc_id ? <span className="text-neutral-600 font-mono">{n.doc_id}</span> : null}
-                                        </div>
+                {notifications.length ? (
+                    notifications.map((n) => (
+                        <div key={n.id} className="rounded-lg border border-neutral-800 bg-neutral-950 p-3">
+                            <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                    {n.doc_id ? (
+                                        <Link href={`/admin/docs/${n.doc_id}`} className="text-sm text-neutral-200 hover:underline">
+                                            {n.title || "Untitled"}
+                                        </Link>
+                                    ) : (
+                                        <div className="text-sm text-neutral-200">{n.title || "Untitled"}</div>
+                                    )}
+                                    <div className="mt-1 text-xs text-neutral-500">
+                                        {n.kind === "alias_expiring" ? "Alias expiring" : n.kind === "share_expiring" ? "Share expiring" : n.kind}
+                                        {n.expires_at ? ` · Expires: ${fmtDate(n.expires_at)}` : ""}
                                     </div>
-
-                                    <form action={async (fd) => { await markAdminNotificationReadAction(fd); }}>
-                                        <input type="hidden" name="id" value={n.id} />
-                                        <button
-                                            type="submit"
-                                            className="shrink-0 rounded-md border border-neutral-800 bg-neutral-950 px-2 py-1 text-xs text-neutral-300 hover:bg-neutral-900"
-                                        >
-                                            Read
-                                        </button>
-                                    </form>
+                                    <div className="mt-1 flex flex-wrap gap-2 text-xs">
+                                        {n.alias ? (
+                                            <Link href={`/d/${n.alias}`} target="_blank" className="text-blue-400 hover:underline">
+                                                /d/{n.alias}
+                                            </Link>
+                                        ) : null}
+                                        {n.share_token ? (
+                                            <Link href={`/s/${n.share_token}`} target="_blank" className="text-blue-400 hover:underline">
+                                                /s/{n.share_token}
+                                            </Link>
+                                        ) : null}
+                                        {n.doc_id ? <span className="text-neutral-600 font-mono">{n.doc_id}</span> : null}
+                                    </div>
                                 </div>
+
+                                <form action={async (fd) => { await markAdminNotificationReadAction(fd); }}>
+                                    <input type="hidden" name="id" value={n.id} />
+                                    <button
+                                        type="submit"
+                                        className="shrink-0 rounded-md border border-neutral-800 bg-neutral-950 px-2 py-1 text-xs text-neutral-300 hover:bg-neutral-900"
+                                    >
+                                        Read
+                                    </button>
+                                </form>
                             </div>
-                        ))
-                    )
+                        </div>
+                    ))
                 ) : expiringSoon.length === 0 ? (
                     <div className="text-sm text-neutral-500">No aliases expiring soon.</div>
                 ) : (
@@ -1028,20 +1021,9 @@ try {
             </div>
 
             <div className="mt-4 text-xs text-neutral-500">
-                {notificationsTableExists ? (
-                    <>
-                        Stored in <span className="font-mono">admin_notifications</span>. Run{" "}
-                        <span className="font-mono">scripts/sql/admin_notifications.sql</span> if you haven’t.
-                    </>
-                ) : (
-                    <>
-                        Need to delete a doc? Use the legacy list on{" "}
-                        <Link href="/admin" className="text-blue-400 hover:underline">
-                            /admin
-                        </Link>
-                        .
-                    </>
-                )}
+                Stored in <span className="font-mono">admin_notifications</span> (optional). If you haven’t created it yet,
+                run <span className="font-mono">scripts/sql/admin_notifications.sql</span>. If you skip it, this widget will
+                simply fall back to the “expiring soon” list.
             </div>
         </div>
     </div>
