@@ -1,28 +1,30 @@
 import type { NextAuthOptions } from "next-auth";
+import GoogleProvider from "next-auth/providers/google";
 import Credentials from "next-auth/providers/credentials";
 
 /**
- * Enterprise SSO (BYO OIDC) — NextAuth v4-compatible
+ * Auth (NextAuth v4)
  *
- * Your repo is importing `authOptions` from "@/auth" (and uses getServerSession),
- * so we export a stable `authOptions` object.
+ * Sign-in UX:
+ * - Google OAuth for regular email accounts
+ * - Enterprise SSO (BYO OIDC) for organizational logins
  *
- * Also: your installed next-auth does NOT include `next-auth/providers/oidc`,
- * so we implement a generic OIDC provider using the built-in OAuth provider shape.
+ * Safety:
+ * - Providers are only enabled when their env vars exist (prevents /api/auth/signin 500s).
+ * - A no-op Credentials provider is always present so providers[] is never empty.
  *
- * This setup is SAFE when Enterprise SSO is not configured yet:
- * - The Enterprise OIDC provider is only registered if all required env vars exist.
- * - A no-op Credentials provider is always present so providers[] is never empty
- *   (prevents /api/auth/signin 500s in some configurations).
+ * Env vars (core):
+ * - NEXTAUTH_URL=https://www.cyang.io
+ * - NEXTAUTH_SECRET=<long random>
  *
- * Required env vars to ENABLE enterprise SSO:
+ * Google OAuth:
+ * - GOOGLE_CLIENT_ID
+ * - GOOGLE_CLIENT_SECRET
+ *
+ * Enterprise OIDC (BYO):
  * - OIDC_ISSUER
  * - OIDC_CLIENT_ID
  * - OIDC_CLIENT_SECRET
- *
- * Recommended env vars (Vercel):
- * - NEXTAUTH_URL = https://www.cyang.io
- * - NEXTAUTH_SECRET = long random
  */
 
 function hasEnv(...keys: string[]) {
@@ -32,6 +34,8 @@ function hasEnv(...keys: string[]) {
   });
 }
 
+export const isGoogleConfigured = hasEnv("GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET");
+
 export const isEnterpriseSsoConfigured = hasEnv(
   "OIDC_ISSUER",
   "OIDC_CLIENT_ID",
@@ -40,8 +44,6 @@ export const isEnterpriseSsoConfigured = hasEnv(
 
 function enterpriseOidcProvider() {
   const issuer = process.env.OIDC_ISSUER!;
-  // Most OIDC providers expose the standard well-known discovery endpoint:
-  // `${issuer}/.well-known/openid-configuration`
   const wellKnown = issuer.replace(/\/+$/, "") + "/.well-known/openid-configuration";
 
   return {
@@ -55,7 +57,6 @@ function enterpriseOidcProvider() {
     idToken: true,
     checks: ["pkce", "state"],
     profile(profile: any) {
-      // Keep it minimal and resilient across providers
       return {
         id: profile.sub ?? profile.id ?? profile.user_id ?? profile.oid ?? profile.uid,
         name:
@@ -73,8 +74,8 @@ function enterpriseOidcProvider() {
 
 export const authOptions: NextAuthOptions = {
   providers: [
-    // Always include a no-op provider so NextAuth doesn't choke on empty providers[].
-    // We do NOT expose this provider via UI (we use a custom /signin page).
+    // Always include a no-op provider so NextAuth never has an empty providers[].
+    // This is not shown in UI (we use pages.signIn="/signin").
     Credentials({
       id: "disabled",
       name: "Disabled",
@@ -83,6 +84,16 @@ export const authOptions: NextAuthOptions = {
         return null;
       },
     }),
+
+    ...(isGoogleConfigured
+      ? [
+          GoogleProvider({
+            clientId: process.env.GOOGLE_CLIENT_ID!,
+            clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+            // You can restrict to hosted domains later if desired via profile/callback checks.
+          }),
+        ]
+      : []),
 
     ...(isEnterpriseSsoConfigured ? [enterpriseOidcProvider() as any] : []),
   ],
