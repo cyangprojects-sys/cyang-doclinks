@@ -13,9 +13,9 @@ import Credentials from "next-auth/providers/credentials";
  * - ALWAYS land on /admin/dashboard after a successful sign-in
  * - Sign-out should land on /
  *
- * Safety:
- * - Providers are only enabled when their env vars exist (prevents /api/auth/signin 500s).
- * - A no-op Credentials provider is always present so providers[] is never empty.
+ * Owner role:
+ * - We compute `user.role` into the session so server layouts can hide/show owner-only nav.
+ * - Set OWNER_EMAILS (comma-separated) or OWNER_EMAIL in Vercel to control who is "owner".
  *
  * Env vars (core):
  * - NEXTAUTH_URL=https://www.cyang.io
@@ -29,6 +29,11 @@ import Credentials from "next-auth/providers/credentials";
  * - OIDC_ISSUER
  * - OIDC_CLIENT_ID
  * - OIDC_CLIENT_SECRET
+ *
+ * Owner allowlist:
+ * - OWNER_EMAILS="a@x.com,b@y.com"  (recommended)
+ *   OR
+ * - OWNER_EMAIL="a@x.com"
  */
 
 const POST_SIGN_IN_PATH = "/admin/dashboard";
@@ -47,6 +52,34 @@ export const isEnterpriseSsoConfigured = hasEnv(
   "OIDC_CLIENT_ID",
   "OIDC_CLIENT_SECRET"
 );
+
+function parseOwnerEmails(): Set<string> {
+  const single = (process.env.OWNER_EMAIL ?? "").trim().toLowerCase();
+  const list = (process.env.OWNER_EMAILS ?? "").trim();
+
+  const emails = new Set<string>();
+  if (single) emails.add(single);
+
+  if (list) {
+    for (const part of list.split(",")) {
+      const e = part.trim().toLowerCase();
+      if (e) emails.add(e);
+    }
+  }
+  return emails;
+}
+
+const OWNER_EMAIL_SET = parseOwnerEmails();
+
+function computeRole(email?: string | null): "owner" | "viewer" {
+  const e = (email ?? "").trim().toLowerCase();
+  if (!e) return "viewer";
+
+  // If no allowlist is configured, default to viewer for safety.
+  if (OWNER_EMAIL_SET.size === 0) return "viewer";
+
+  return OWNER_EMAIL_SET.has(e) ? "owner" : "viewer";
+}
 
 function enterpriseOidcProvider() {
   const issuer = process.env.OIDC_ISSUER!;
@@ -108,10 +141,19 @@ export const authOptions: NextAuthOptions = {
   session: { strategy: "jwt" },
 
   callbacks: {
-    /**
-     * Force post-auth navigation to the Admin Dashboard for typical sign-in redirects.
-     * But DO NOT break sign-out: signOut({ callbackUrl: "/" }) should go home.
-     */
+    async jwt({ token, user }) {
+      // On first sign-in, `user` is present. Afterwards rely on token.email.
+      const email = (user as any)?.email ?? (token as any)?.email ?? null;
+      (token as any).role = computeRole(email);
+      return token;
+    },
+
+    async session({ session, token }) {
+      // Expose role to server components (layouts) and client UI if needed.
+      (session.user as any).role = (token as any).role ?? "viewer";
+      return session;
+    },
+
     async redirect({ url, baseUrl }) {
       try {
         const u = new URL(url, baseUrl);
