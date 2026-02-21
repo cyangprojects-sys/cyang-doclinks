@@ -27,12 +27,16 @@ function NavLink({
   );
 }
 
+/**
+ * Admin top navigation
+ *
+ * Note: We show all admin nav links for any signed-in user to keep UX consistent.
+ * Actual authorization MUST be enforced by the page/route itself (e.g. (owner) route group checks).
+ */
 export default function AdminTopNav({
   email,
-  isOwner,
 }: {
   email?: string | null;
-  isOwner: boolean;
 }) {
   return (
     <header className="sticky top-0 z-50 border-b border-white/10 bg-black/60 backdrop-blur">
@@ -44,9 +48,9 @@ export default function AdminTopNav({
 
           <nav className="flex items-center gap-2">
             <NavLink href="/admin/dashboard" label="Dashboard" />
-            {isOwner && <NavLink href="/admin/audit" label="Audit" />}
-            {isOwner && <NavLink href="/admin/webhooks" label="Webhooks" />}
-            {isOwner && <NavLink href="/admin/api-keys" label="API Keys" />}
+            <NavLink href="/admin/audit" label="Audit" />
+            <NavLink href="/admin/webhooks" label="Webhooks" />
+            <NavLink href="/admin/api-keys" label="API Keys" />
           </nav>
         </div>
 
