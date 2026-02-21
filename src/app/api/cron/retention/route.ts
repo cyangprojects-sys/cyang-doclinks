@@ -2,10 +2,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 import { NextResponse, type NextRequest } from "next/server";
-import { aggregateDocViewDaily } from "@/lib/analytics";
 import { runRetention } from "@/lib/retention";
-import { sendExpirationAlerts } from "@/lib/expirationAlerts";
-
 import { isCronAuthorized } from "@/lib/cronAuth";
 
 export async function GET(req: NextRequest) {
@@ -22,22 +19,12 @@ export async function GET(req: NextRequest) {
   }
 
   const startedAt = Date.now();
-
-  // 1) Aggregate daily view counts
-  const aggregate = await aggregateDocViewDaily();
-
-  // 2) Retention cleanup for raw/high-volume tables
   const retention = await runRetention();
-
-  // 3) Expiration alert emails + in-app notifications
-  const expiration_alerts = await sendExpirationAlerts();
 
   return NextResponse.json({
     ok: true,
     now: new Date().toISOString(),
     duration_ms: Date.now() - startedAt,
-    aggregate,
     retention,
-    expiration_alerts,
   });
 }

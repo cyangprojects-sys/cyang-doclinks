@@ -1,19 +1,13 @@
 // src/app/admin/docs/[docId]/page.tsx
 import Link from "next/link";
-import { redirect } from "next/navigation";
+import { redirect, notFound } from "next/navigation";
 import { sql } from "@/lib/db";
-import { requireDocWrite } from "@/lib/authz";
-import { revokeAllSharesForDocAction } from "../../actions";
+import { requireUser, roleAtLeast } from "@/lib/authz";
+import Sparkline from "@/components/Sparkline";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-function fmtDate(s: string | null) {
-  if (!s) return "—";
-  const d = new Date(s);
-  if (Number.isNaN(d.getTime())) return s;
-  return d.toLocaleString();
-}
+export const revalidate = 0;
 
 async function tableExists(fqTable: string): Promise<boolean> {
   try {
@@ -40,523 +34,358 @@ async function columnExists(table: string, column: string): Promise<boolean> {
   }
 }
 
-function Bars({ values }: { values: Array<{ label: string; v: number }> }) {
-  const w = 720;
-  const h = 140;
-  const padX = 10;
-  const padY = 12;
-  const max = Math.max(1, ...values.map((x) => x.v));
-  const n = values.length;
-  const barW = n > 0 ? (w - padX * 2) / n : 0;
-
-  return (
-    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} className="block w-full">
-      {/* axis */}
-      <line x1={padX} y1={h - padY} x2={w - padX} y2={h - padY} stroke="currentColor" opacity={0.25} />
-      {values.map((x, i) => {
-        const bh = Math.round(((h - padY * 2) * x.v) / max);
-        const x0 = padX + i * barW;
-        const y0 = h - padY - bh;
-        return (
-          <g key={x.label}>
-            <rect x={x0 + 1} y={y0} width={Math.max(1, barW - 2)} height={bh} fill="currentColor" opacity={0.5} />
-          </g>
-        );
-      })}
-    </svg>
-  );
+function fmtInt(n: number) {
+  try {
+    return new Intl.NumberFormat().format(n);
+  } catch {
+    return String(n);
+  }
 }
 
-type DocMeta = {
-  id: string;
-  title: string | null;
-  created_at: string;
-  alias: string | null;
-  r2_key: string | null;
-  bucket: string | null;
-};
+function fmtDate(s: string | null) {
+  if (!s) return "—";
+  const d = new Date(s);
+  if (Number.isNaN(d.getTime())) return s;
+  return d.toLocaleString();
+}
 
-type SeriesRow = { day: string; views: number; uniques: number };
-type TopRow = { k: string; c: number };
-type ShareRow = {
-  token: string;
-  to_email: string | null;
-  created_at: string;
-  expires_at: string | null;
-  max_views: number | null;
-  views_count: number | null;
-  revoked_at: string | null;
-  has_password: boolean;
-};
-
-export default async function AdminDocInvestigatePage(props: { params: Promise<{ docId: string }> }) {
-  const { docId } = await props.params;
-  const id = (docId || "").trim();
-  if (!id) redirect("/admin/dashboard#views-by-doc");
-
+export default async function AdminDocDetailPage({ params }: { params: { docId: string } }) {
+  let u;
   try {
-    await requireDocWrite(id);
+    u = await requireUser();
   } catch {
     redirect("/api/auth/signin");
   }
 
+  const docId = params.docId;
+  if (!docId) notFound();
+
+  const canSeeAll = roleAtLeast(u.role, "admin");
+  const hasDocs = await tableExists("public.docs");
+  if (!hasDocs) notFound();
+
+  const hasOwnerId = await columnExists("docs", "owner_id");
+  const ownerGate = !canSeeAll && hasOwnerId ? sql`and d.owner_id = ${u.id}::uuid` : sql``;
+
   const docRows = (await sql`
     select
       d.id::text as id,
-      d.title,
-      d.created_at::text as created_at,
-      a.alias,
-      d.r2_key::text as r2_key,
-      coalesce(d.r2_bucket::text, null) as bucket
+      d.title::text as title,
+      d.created_at::text as created_at
     from public.docs d
-    left join public.doc_aliases a on a.doc_id = d.id
-    where d.id = ${id}::uuid
+    where d.id = ${docId}::uuid
+      ${ownerGate}
     limit 1
-  `) as unknown as DocMeta[];
+  `) as unknown as Array<{ id: string; title: string | null; created_at: string | null }>;
 
-  const doc = docRows[0];
-  if (!doc?.id) redirect("/admin/dashboard#views-by-doc");
+  const doc = docRows?.[0];
+  if (!doc) notFound();
 
+  // Alias (latest)
+  const hasDocAliases = await tableExists("public.doc_aliases");
+  let alias: string | null = null;
+  let aliasExpires: string | null = null;
+  let aliasActive: boolean | null = null;
+  let aliasRevokedAt: string | null = null;
+
+  if (hasDocAliases) {
+    try {
+      const rows = (await sql`
+        select alias::text as alias, expires_at::text as expires_at, is_active, revoked_at::text as revoked_at
+        from public.doc_aliases
+        where doc_id = ${docId}::uuid
+        order by created_at desc nulls last
+        limit 1
+      `) as unknown as Array<{ alias: string | null; expires_at: string | null; is_active: boolean | null; revoked_at: string | null }>;
+      alias = rows?.[0]?.alias ?? null;
+      aliasExpires = rows?.[0]?.expires_at ?? null;
+      aliasActive = rows?.[0]?.is_active ?? null;
+      aliasRevokedAt = rows?.[0]?.revoked_at ?? null;
+    } catch {
+      // ignore
+    }
+  }
+
+  // 30-day view series
   const hasDocViewDaily = await tableExists("public.doc_view_daily");
   const hasDocViews = await tableExists("public.doc_views");
-  const hasShareTokenInDocViews = await columnExists("doc_views", "share_token");
-  const hasPurposeInDocViews = await columnExists("doc_views", "purpose");
 
-  // Downloads (best-effort)
-  let downloads: { total: number; last30: number } | null = null;
-  try {
-    if (hasDocViews && hasPurposeInDocViews) {
-      const totalRows = (await sql`
-        select count(*)::int as c
-        from public.doc_views v
-        where v.doc_id = ${doc.id}::uuid
-          and v.purpose = 'file_download'
-      `) as unknown as Array<{ c: number }>;
-      const last30Rows = (await sql`
-        select count(*)::int as c
-        from public.doc_views v
-        where v.doc_id = ${doc.id}::uuid
-          and v.purpose = 'file_download'
-          and v.created_at >= (now() - interval '30 days')
-      `) as unknown as Array<{ c: number }>;
+  let series30: Array<{ day: string; views: number; unique_ips: number }> = [];
+  let views30 = 0;
+  let views7 = 0;
 
-      downloads = { total: totalRows?.[0]?.c ?? 0, last30: last30Rows?.[0]?.c ?? 0 };
-    }
-  } catch {
-    downloads = null;
-  }
-
-  // 30-day series (views + uniques)
-  let series: SeriesRow[] = [];
-  try {
-    if (hasDocViewDaily) {
-      series = (await sql`
+  if (hasDocViewDaily) {
+    try {
+      series30 = (await sql`
+        with days as (
+          select generate_series(current_date - interval '29 days', current_date, interval '1 day')::date as day
+        )
         select
-          x.date::text as day,
-          x.view_count::int as views,
-          x.unique_ip_count::int as uniques
-        from public.doc_view_daily x
-        where x.doc_id = ${doc.id}::uuid
-          and x.date >= (current_date - interval '29 days')
-        order by x.date asc
-      `) as unknown as SeriesRow[];
-    } else if (hasDocViews) {
-      series = (await sql`
-        select
-          date_trunc('day', v.created_at)::date::text as day,
-          count(*)::int as views,
-          count(distinct coalesce(v.ip_hash, ''))::int as uniques
-        from public.doc_views v
-        where v.doc_id = ${doc.id}::uuid
-          and v.created_at >= (now() - interval '30 days')
-        group by 1
+          days.day::text as day,
+          coalesce(dvd.view_count, 0)::int as views,
+          coalesce(dvd.unique_ip_count, 0)::int as unique_ips
+        from days
+        left join public.doc_view_daily dvd
+          on dvd.date = days.day
+         and dvd.doc_id = ${docId}::uuid
         order by 1 asc
-      `) as unknown as SeriesRow[];
+      `) as unknown as Array<{ day: string; views: number; unique_ips: number }>;
+    } catch {
+      series30 = [];
     }
-  } catch {
-    series = [];
+  } else if (hasDocViews) {
+    // Fallback: compute per-day from raw logs.
+    try {
+      series30 = (await sql`
+        with days as (
+          select generate_series(current_date - interval '29 days', current_date, interval '1 day')::date as day
+        ),
+        agg as (
+          select
+            date_trunc('day', v.created_at)::date as day,
+            count(*)::int as views,
+            count(distinct coalesce(v.ip_hash, ''))::int as unique_ips
+          from public.doc_views v
+          where v.doc_id = ${docId}::uuid
+            and v.created_at >= (now() - interval '30 days')
+          group by 1
+        )
+        select
+          days.day::text as day,
+          coalesce(agg.views, 0)::int as views,
+          coalesce(agg.unique_ips, 0)::int as unique_ips
+        from days
+        left join agg on agg.day = days.day
+        order by 1 asc
+      `) as unknown as Array<{ day: string; views: number; unique_ips: number }>;
+    } catch {
+      series30 = [];
+    }
   }
 
-  // Spike detection: last 24h vs baseline (previous 7 days avg/day)
-  let spike: { last24: number; baseline: number; ratio: number | null } = { last24: 0, baseline: 0, ratio: null };
-  try {
-    if (hasDocViews) {
-      const last24Rows = (await sql`
-        select count(*)::int as c
-        from public.doc_views v
-        where v.doc_id = ${doc.id}::uuid
-          and v.created_at >= (now() - interval '24 hours')
-      `) as unknown as Array<{ c: number }>;
-      const last24 = last24Rows?.[0]?.c ?? 0;
+  const sparkVals = series30.map((r) => r.views);
+  views30 = sparkVals.reduce((a, b) => a + b, 0);
+  views7 = sparkVals.slice(-7).reduce((a, b) => a + b, 0);
 
-      const baselineRows = (await sql`
-        select count(*)::int as c
-        from public.doc_views v
-        where v.doc_id = ${doc.id}::uuid
-          and v.created_at >= (now() - interval '8 days')
-          and v.created_at < (now() - interval '24 hours')
-      `) as unknown as Array<{ c: number }>;
-      const baselineTotal = baselineRows?.[0]?.c ?? 0;
-      const baseline = Math.round(baselineTotal / 7);
+  // Shares list + counts
+  const hasShareTokens = await tableExists("public.share_tokens");
+  type ShareRow = {
+    token: string;
+    created_at: string | null;
+    expires_at: string | null;
+    revoked_at: string | null;
+    views_count: number | null;
+    max_views: number | null;
+  };
+  let shares: ShareRow[] = [];
+  let activeShares = 0;
 
-      const ratio = baseline > 0 ? last24 / baseline : null;
-      spike = { last24, baseline, ratio };
+  if (hasShareTokens) {
+    try {
+      shares = (await sql`
+        select
+          st.token::text as token,
+          st.created_at::text as created_at,
+          st.expires_at::text as expires_at,
+          st.revoked_at::text as revoked_at,
+          st.views_count::int as views_count,
+          st.max_views::int as max_views
+        from public.share_tokens st
+        where st.doc_id = ${docId}::uuid
+        order by st.created_at desc nulls last
+        limit 50
+      `) as unknown as ShareRow[];
+
+      activeShares = shares.filter((s) => {
+        if (s.revoked_at) return false;
+        if (s.expires_at && new Date(s.expires_at).getTime() <= Date.now()) return false;
+        if (s.max_views && s.max_views > 0 && (s.views_count || 0) >= s.max_views) return false;
+        return true;
+      }).length;
+    } catch {
+      shares = [];
     }
-  } catch {
-    spike = { last24: 0, baseline: 0, ratio: null };
   }
 
-  // Unique devices (last 30 days)
-  let uniqueDevices: number | null = null;
-  let topIps: Array<{ ip_hash: string; views: number; last: string | null }> = [];
-  try {
-    if (hasDocViews) {
-      const u = (await sql`
-        select count(distinct coalesce(v.ip_hash, ''))::int as c
-        from public.doc_views v
-        where v.doc_id = ${doc.id}::uuid
-          and v.created_at >= (now() - interval '30 days')
-      `) as unknown as Array<{ c: number }>;
-      uniqueDevices = u?.[0]?.c ?? 0;
-
-      topIps = (await sql`
+  // IP breakdown (top 10) from doc_views (best-effort)
+  type IpRow = { ip_hash: string; views: number };
+  let ipRows: IpRow[] = [];
+  if (hasDocViews) {
+    try {
+      ipRows = (await sql`
         select
           coalesce(v.ip_hash, '')::text as ip_hash,
-          count(*)::int as views,
-          max(v.created_at)::text as last
+          count(*)::int as views
         from public.doc_views v
-        where v.doc_id = ${doc.id}::uuid
+        where v.doc_id = ${docId}::uuid
           and v.created_at >= (now() - interval '30 days')
         group by 1
         order by views desc
-        limit 12
-      `) as unknown as Array<{ ip_hash: string; views: number; last: string | null }>;
-    }
-  } catch {
-    uniqueDevices = null;
-    topIps = [];
-  }
-
-  // Top referers + user agents (last 30 days)
-  let topReferers: TopRow[] = [];
-  let topUserAgents: TopRow[] = [];
-  try {
-    if (hasDocViews) {
-      topReferers = (await sql`
-        select
-          coalesce(nullif(v.referer, ''), '(none)')::text as k,
-          count(*)::int as c
-        from public.doc_views v
-        where v.doc_id = ${doc.id}::uuid
-          and v.created_at >= (now() - interval '30 days')
-        group by 1
-        order by c desc
         limit 10
-      `) as unknown as TopRow[];
-
-      topUserAgents = (await sql`
-        select
-          coalesce(nullif(v.user_agent, ''), '(none)')::text as k,
-          count(*)::int as c
-        from public.doc_views v
-        where v.doc_id = ${doc.id}::uuid
-          and v.created_at >= (now() - interval '30 days')
-        group by 1
-        order by c desc
-        limit 10
-      `) as unknown as TopRow[];
+      `) as unknown as IpRow[];
+    } catch {
+      ipRows = [];
     }
-  } catch {
-    topReferers = [];
-    topUserAgents = [];
   }
-
-  // Shares for this doc
-  let shares: ShareRow[] = [];
-  try {
-    shares = (await sql`
-      select
-        s.token::text as token,
-        s.to_email,
-        s.created_at::text as created_at,
-        s.expires_at::text as expires_at,
-        s.max_views,
-        s.views_count,
-        s.revoked_at::text as revoked_at,
-        (s.password_hash is not null) as has_password
-      from public.share_tokens s
-      where s.doc_id = ${doc.id}::uuid
-      order by s.created_at desc
-      limit 250
-    `) as unknown as ShareRow[];
-  } catch {
-    shares = [];
-  }
-
-  // Per-share breakdown (requires doc_views.share_token)
-  let byShare: Array<{ token: string; views: number; uniques: number; last: string | null }> = [];
-  try {
-    if (hasDocViews && hasShareTokenInDocViews) {
-      byShare = (await sql`
-        select
-          v.share_token::text as token,
-          count(*)::int as views,
-          count(distinct coalesce(v.ip_hash, ''))::int as uniques,
-          max(v.created_at)::text as last
-        from public.doc_views v
-        where v.doc_id = ${doc.id}::uuid
-          and v.created_at >= (now() - interval '30 days')
-          and v.share_token is not null
-        group by 1
-        order by views desc
-        limit 50
-      `) as unknown as Array<{ token: string; views: number; uniques: number; last: string | null }>;
-    }
-  } catch {
-    byShare = [];
-  }
-
-  const chartValues = series.map((r) => ({ label: r.day, v: r.views }));
-
-  const isSpike = spike.ratio != null && spike.ratio >= 6 && spike.last24 >= 10;
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-10">
-      <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+    <div className="space-y-6">
+      <div className="flex items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Investigate</h1>
-          <div className="mt-2 text-sm text-neutral-300">{doc.title || "Untitled"}</div>
-          <div className="mt-1 text-xs text-neutral-500 font-mono">{doc.id}</div>
-          <div className="mt-2 flex flex-wrap gap-2 text-sm">
-            <Link href="/admin/dashboard#views-by-doc" className="text-blue-400 hover:underline">
-              ← Back to dashboard
+          <div className="text-sm text-neutral-500">Document</div>
+          <h1 className="text-2xl font-semibold">{doc.title || doc.id}</h1>
+          <div className="mt-1 text-xs text-neutral-500">Created: {fmtDate(doc.created_at)}</div>
+        </div>
+        <div className="flex items-center gap-2">
+          <Link className="rounded-xl border bg-white px-3 py-2 text-sm shadow-sm hover:bg-neutral-50" href="/admin/dashboard">
+            ← Back
+          </Link>
+          {alias ? (
+            <Link className="rounded-xl border bg-white px-3 py-2 text-sm shadow-sm hover:bg-neutral-50" href={`/d/${alias}`}>
+              Open
             </Link>
-            {doc.alias ? (
-              <>
-                <span className="text-neutral-700">·</span>
-                <Link href={`/d/${doc.alias}`} target="_blank" className="text-blue-400 hover:underline">
-                  Open alias
-                </Link>
-              </>
-            ) : null}
-          </div>
-        </div>
-
-        <form action={revokeAllSharesForDocAction} className="flex items-start justify-end">
-          <input type="hidden" name="docId" value={doc.id} />
-          <button
-            type="submit"
-            className="rounded-md border border-rose-500/20 bg-rose-500/10 px-3 py-2 text-sm text-rose-200 hover:bg-rose-500/15"
-            title="Revoke all shares for this doc"
-          >
-            Revoke all shares
-          </button>
-        </form>
-
-        {isSpike ? (
-          <div className="rounded-lg border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
-            <div className="font-semibold">Spike detected</div>
-            <div className="mt-1 text-xs text-amber-200/80">
-              Last 24h: {spike.last24} · Baseline/day (prev 7d): {spike.baseline} · Ratio: {spike.ratio?.toFixed(1)}×
-            </div>
-          </div>
-        ) : (
-          <div className="rounded-lg border border-neutral-800 bg-neutral-950 px-4 py-3 text-sm text-neutral-300">
-            <div className="font-semibold">24h vs baseline</div>
-            <div className="mt-1 text-xs text-neutral-400">
-              Last 24h: {spike.last24} · Baseline/day (prev 7d): {spike.baseline}
-              {spike.ratio != null ? <> · Ratio: {spike.ratio.toFixed(1)}×</> : null}
-            </div>
-          </div>
-        )}
-      </div>
-
-      <div className="mt-8 grid gap-4 md:grid-cols-3">
-        <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-4 md:col-span-2">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-neutral-200">Views (last 30 days)</h2>
-            <div className="text-xs text-neutral-500">{hasDocViewDaily ? "doc_view_daily" : "doc_views"}</div>
-          </div>
-          <div className="mt-3 text-neutral-200">
-            {chartValues.length ? <Bars values={chartValues} /> : <div className="text-sm text-neutral-500">No data</div>}
-          </div>
-          <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-neutral-500 md:grid-cols-4">
-            <div>
-              <div className="text-neutral-300">Total</div>
-              <div>{series.reduce((acc, r) => acc + (r.views || 0), 0)}</div>
-            </div>
-            <div>
-              <div className="text-neutral-300">Unique devices</div>
-              <div>{uniqueDevices ?? "—"}</div>
-            </div>
-            <div>
-              <div className="text-neutral-300">Created</div>
-              <div>{fmtDate(doc.created_at)}</div>
-            </div>
-            <div>
-              <div className="text-neutral-300">Alias</div>
-              <div>{doc.alias ? `/d/${doc.alias}` : "—"}</div>
-            </div>
-            <div>
-              <div className="text-neutral-300">Downloads (30d)</div>
-              <div>{downloads ? downloads.last30 : "—"}</div>
-            </div>
-            <div>
-              <div className="text-neutral-300">Downloads (total)</div>
-              <div>{downloads ? downloads.total : "—"}</div>
-            </div>
-          </div>
-        </div>
-
-        <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-4">
-          <h2 className="text-sm font-semibold text-neutral-200">Top devices (last 30d)</h2>
-          <div className="mt-3 space-y-2">
-            {topIps.length === 0 ? (
-              <div className="text-sm text-neutral-500">No data</div>
-            ) : (
-              topIps.map((r) => (
-                <div key={r.ip_hash} className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="truncate font-mono text-xs text-neutral-300">{r.ip_hash || "(none)"}</div>
-                    <div className="text-[11px] text-neutral-500">Last: {fmtDate(r.last)}</div>
-                  </div>
-                  <div className="text-xs text-neutral-200">{r.views}</div>
-                </div>
-              ))
-            )}
-          </div>
+          ) : null}
         </div>
       </div>
 
-      <div className="mt-8 grid gap-4 md:grid-cols-2">
-        <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-4">
-          <h2 className="text-sm font-semibold text-neutral-200">Top referers (last 30d)</h2>
-          <div className="mt-3 space-y-2">
-            {topReferers.length === 0 ? (
-              <div className="text-sm text-neutral-500">No data</div>
-            ) : (
-              topReferers.map((r) => (
-                <div key={r.k} className="flex items-start justify-between gap-3">
-                  <div className="min-w-0 truncate text-xs text-neutral-300">{r.k}</div>
-                  <div className="text-xs text-neutral-200">{r.c}</div>
-                </div>
-              ))
-            )}
+      <section className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+        <div className="rounded-2xl border bg-white p-4 shadow-sm">
+          <div className="text-xs text-neutral-500">Views</div>
+          <div className="mt-1 text-2xl font-semibold">{fmtInt(views30)}</div>
+          <div className="text-xs text-neutral-500">Last 30 days</div>
+          <div className="mt-2 flex items-center justify-between gap-3">
+            <div className="text-sm font-medium">{fmtInt(views7)} <span className="text-xs text-neutral-500">/ 7d</span></div>
+            <Sparkline values={sparkVals} ariaLabel="30 day views sparkline" />
           </div>
         </div>
 
-        <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-4">
-          <h2 className="text-sm font-semibold text-neutral-200">Top user agents (last 30d)</h2>
-          <div className="mt-3 space-y-2">
-            {topUserAgents.length === 0 ? (
-              <div className="text-sm text-neutral-500">No data</div>
-            ) : (
-              topUserAgents.map((r) => (
-                <div key={r.k} className="flex items-start justify-between gap-3">
-                  <div className="min-w-0 truncate text-xs text-neutral-300">{r.k}</div>
-                  <div className="text-xs text-neutral-200">{r.c}</div>
-                </div>
-              ))
-            )}
+        <div className="rounded-2xl border bg-white p-4 shadow-sm">
+          <div className="text-xs text-neutral-500">Alias</div>
+          <div className="mt-1 text-sm font-medium">{alias || "—"}</div>
+          <div className="mt-2 text-xs text-neutral-500">
+            Expires: {fmtDate(aliasExpires)} • Active: {String(aliasActive ?? true)} • Revoked: {fmtDate(aliasRevokedAt)}
           </div>
         </div>
-      </div>
 
-      <div className="mt-10">
-        <div className="flex items-end justify-between gap-3">
-          <div>
-            <h2 className="text-lg font-semibold tracking-tight">Shares for this doc</h2>
-            <p className="mt-1 text-sm text-neutral-400">Investigate whether specific share links are driving views.</p>
+        <div className="rounded-2xl border bg-white p-4 shadow-sm">
+          <div className="text-xs text-neutral-500">Shares</div>
+          <div className="mt-1 text-2xl font-semibold">{fmtInt(activeShares)}</div>
+          <div className="text-xs text-neutral-500">Active (top 50 listed)</div>
+        </div>
+      </section>
+
+      <section className="rounded-2xl border bg-white p-4 shadow-sm">
+        <div className="flex items-center justify-between">
+          <h2 className="text-base font-semibold">30-day view history</h2>
+          <div className="text-xs text-neutral-500">
+            {hasDocViewDaily ? "Using doc_view_daily" : hasDocViews ? "Using doc_views" : "No view tables found"}
           </div>
-          <div className="text-xs text-neutral-500">{shares.length} shares</div>
         </div>
 
-        <div className="mt-4 overflow-hidden rounded-lg border border-neutral-800">
-          <div className="max-h-[560px] overflow-auto">
-            <table className="w-full text-sm">
-              <thead className="sticky top-0 bg-neutral-900 text-neutral-300">
+        <div className="mt-3 overflow-x-auto">
+          <table className="min-w-[680px] w-full text-sm">
+            <thead className="text-left text-xs text-neutral-500">
+              <tr>
+                <th className="py-2 pr-4">Day</th>
+                <th className="py-2 pr-4">Views</th>
+                <th className="py-2 pr-4">Unique IPs</th>
+              </tr>
+            </thead>
+            <tbody>
+              {series30.length ? (
+                series30.slice().reverse().map((r) => (
+                  <tr key={r.day} className="border-t">
+                    <td className="py-2 pr-4">{r.day}</td>
+                    <td className="py-2 pr-4">{fmtInt(r.views)}</td>
+                    <td className="py-2 pr-4">{fmtInt(r.unique_ips)}</td>
+                  </tr>
+                ))
+              ) : (
+                <tr className="border-t">
+                  <td className="py-3 text-xs text-neutral-500" colSpan={3}>
+                    No data yet.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+        <div className="rounded-2xl border bg-white p-4 shadow-sm">
+          <h2 className="text-base font-semibold">Share history</h2>
+          <div className="mt-3 overflow-x-auto">
+            <table className="min-w-[760px] w-full text-sm">
+              <thead className="text-left text-xs text-neutral-500">
                 <tr>
-                  <th className="px-4 py-3 text-left">Token</th>
-                  <th className="px-4 py-3 text-left">Recipient</th>
-                  <th className="px-4 py-3 text-left">Created</th>
-                  <th className="px-4 py-3 text-left">Expires</th>
-                  <th className="px-4 py-3 text-right">Max</th>
-                  <th className="px-4 py-3 text-right">Views (counter)</th>
-                  <th className="px-4 py-3 text-right">Revoked</th>
+                  <th className="py-2 pr-4">Token</th>
+                  <th className="py-2 pr-4">Created</th>
+                  <th className="py-2 pr-4">Expires</th>
+                  <th className="py-2 pr-4">Views</th>
+                  <th className="py-2 pr-4">Max</th>
+                  <th className="py-2 pr-4">Revoked</th>
                 </tr>
               </thead>
               <tbody>
-                {shares.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="px-4 py-6 text-neutral-400">
-                      No shares found for this doc.
-                    </td>
-                  </tr>
-                ) : (
+                {shares.length ? (
                   shares.map((s) => (
-                    <tr key={s.token} className="border-t border-neutral-800">
-                      <td className="px-4 py-3">
-                        <Link href={`/s/${s.token}`} target="_blank" className="font-mono text-xs text-blue-400 hover:underline">
-                          {s.token}
-                        </Link>
-                      </td>
-                      <td className="px-4 py-3 text-neutral-200">{s.to_email || <span className="text-neutral-500">(public)</span>}</td>
-                      <td className="px-4 py-3 text-neutral-400 whitespace-nowrap">{fmtDate(s.created_at)}</td>
-                      <td className="px-4 py-3 text-neutral-400 whitespace-nowrap">{fmtDate(s.expires_at)}</td>
-                      <td className="px-4 py-3 text-right text-neutral-200">{s.max_views == null ? "—" : s.max_views === 0 ? "∞" : s.max_views}</td>
-                      <td className="px-4 py-3 text-right text-neutral-200">{Number(s.views_count ?? 0)}</td>
-                      <td className="px-4 py-3 text-right text-neutral-400 whitespace-nowrap">{s.revoked_at ? fmtDate(s.revoked_at) : "—"}</td>
+                    <tr key={s.token} className="border-t">
+                      <td className="py-2 pr-4 font-mono text-xs">{s.token.slice(0, 10)}…</td>
+                      <td className="py-2 pr-4">{fmtDate(s.created_at)}</td>
+                      <td className="py-2 pr-4">{fmtDate(s.expires_at)}</td>
+                      <td className="py-2 pr-4">{fmtInt(s.views_count ?? 0)}</td>
+                      <td className="py-2 pr-4">{s.max_views ?? "—"}</td>
+                      <td className="py-2 pr-4">{fmtDate(s.revoked_at)}</td>
                     </tr>
                   ))
+                ) : (
+                  <tr className="border-t">
+                    <td className="py-3 text-xs text-neutral-500" colSpan={6}>
+                      No shares found.
+                    </td>
+                  </tr>
                 )}
               </tbody>
             </table>
           </div>
         </div>
 
-        <div className="mt-6 rounded-lg border border-neutral-800 bg-neutral-950 p-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-neutral-200">Per-share view breakdown (last 30d)</h3>
-            <div className="text-xs text-neutral-500">{hasShareTokenInDocViews ? "enabled" : "requires doc_views.share_token"}</div>
-          </div>
-          {!hasShareTokenInDocViews ? (
-            <div className="mt-2 text-sm text-neutral-400">
-              To unlock this: run the SQL in <span className="font-mono">scripts/sql/doc_views_attribution.sql</span>.
-            </div>
-          ) : byShare.length === 0 ? (
-            <div className="mt-2 text-sm text-neutral-500">No attributed share views found.</div>
-          ) : (
-            <div className="mt-3 overflow-hidden rounded-lg border border-neutral-800">
-              <div className="max-h-[420px] overflow-auto">
-                <table className="w-full text-sm">
-                  <thead className="sticky top-0 bg-neutral-900 text-neutral-300">
-                    <tr>
-                      <th className="px-4 py-3 text-left">Token</th>
-                      <th className="px-4 py-3 text-right">Views</th>
-                      <th className="px-4 py-3 text-right">Unique devices</th>
-                      <th className="px-4 py-3 text-right">Last</th>
+        <div className="rounded-2xl border bg-white p-4 shadow-sm">
+          <h2 className="text-base font-semibold">IP breakdown (30d)</h2>
+          <div className="mt-1 text-xs text-neutral-500">Hashed IPs (privacy-preserving).</div>
+          <div className="mt-3 overflow-x-auto">
+            <table className="min-w-[520px] w-full text-sm">
+              <thead className="text-left text-xs text-neutral-500">
+                <tr>
+                  <th className="py-2 pr-4">IP hash</th>
+                  <th className="py-2 pr-4">Views</th>
+                </tr>
+              </thead>
+              <tbody>
+                {ipRows.length ? (
+                  ipRows.map((r) => (
+                    <tr key={r.ip_hash} className="border-t">
+                      <td className="py-2 pr-4 font-mono text-xs">{(r.ip_hash || "—").slice(0, 18)}…</td>
+                      <td className="py-2 pr-4">{fmtInt(r.views)}</td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {byShare.map((r) => (
-                      <tr key={r.token} className="border-t border-neutral-800">
-                        <td className="px-4 py-3">
-                          <Link href={`/s/${r.token}`} target="_blank" className="font-mono text-xs text-blue-400 hover:underline">
-                            {r.token}
-                          </Link>
-                        </td>
-                        <td className="px-4 py-3 text-right text-neutral-200">{r.views}</td>
-                        <td className="px-4 py-3 text-right text-neutral-200">{r.uniques}</td>
-                        <td className="px-4 py-3 text-right text-neutral-400 whitespace-nowrap">{fmtDate(r.last)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
+                  ))
+                ) : (
+                  <tr className="border-t">
+                    <td className="py-3 text-xs text-neutral-500" colSpan={2}>
+                      No data yet.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
+      </section>
+
+      <div className="text-xs text-neutral-500">
+        Note: download counts are not tracked separately yet; current page shows view/access activity only.
       </div>
-    </main>
+    </div>
   );
 }

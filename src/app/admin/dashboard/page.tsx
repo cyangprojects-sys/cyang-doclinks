@@ -4,6 +4,7 @@ import { sql } from "@/lib/db";
 import { requireUser, roleAtLeast } from "@/lib/authz";
 
 import UploadPanel from "./UploadPanel";
+import AnalyticsWidgets from "./AnalyticsWidgets";
 import ViewsByDocTableClient, { type ViewsByDocRow } from "./ViewsByDocTableClient";
 import SharesTableClient, { type ShareRow } from "./SharesTableClient";
 import UnifiedDocsTableClient, { type UnifiedDocRow } from "./UnifiedDocsTableClient";
@@ -189,6 +190,8 @@ export default async function AdminDashboardPage() {
           {u.email} · role: {u.role}
         </div>
       </div>
+
+      <AnalyticsWidgets ownerId={canSeeAll ? undefined : u.id} />
 
       {missingCoreTables ? (
         <div className="rounded-lg border border-neutral-800 bg-neutral-950 p-4 text-sm text-neutral-300">

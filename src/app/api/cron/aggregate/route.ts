@@ -3,9 +3,6 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse, type NextRequest } from "next/server";
 import { aggregateDocViewDaily } from "@/lib/analytics";
-import { runRetention } from "@/lib/retention";
-import { sendExpirationAlerts } from "@/lib/expirationAlerts";
-
 import { isCronAuthorized } from "@/lib/cronAuth";
 
 export async function GET(req: NextRequest) {
@@ -23,21 +20,17 @@ export async function GET(req: NextRequest) {
 
   const startedAt = Date.now();
 
-  // 1) Aggregate daily view counts
-  const aggregate = await aggregateDocViewDaily();
+  // Optional query param: ?daysBack=120
+  const url = new URL(req.url);
+  const daysBackRaw = (url.searchParams.get("daysBack") || "").trim();
+  const daysBack = daysBackRaw ? Math.max(1, Math.min(3650, Number(daysBackRaw) || 0)) : undefined;
 
-  // 2) Retention cleanup for raw/high-volume tables
-  const retention = await runRetention();
-
-  // 3) Expiration alert emails + in-app notifications
-  const expiration_alerts = await sendExpirationAlerts();
+  const aggregate = await aggregateDocViewDaily(daysBack ? { daysBack: Math.floor(daysBack) } : undefined);
 
   return NextResponse.json({
     ok: true,
     now: new Date().toISOString(),
     duration_ms: Date.now() - startedAt,
     aggregate,
-    retention,
-    expiration_alerts,
   });
 }
