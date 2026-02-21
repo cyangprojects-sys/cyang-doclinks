@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { sql } from "@/lib/db";
 import { getAuthedUser } from "@/lib/authz";
+import DeleteDocForm from "../DeleteDocForm";
 import {
     updateRetentionSettingsAction,
     sendExpirationAlertAction,
@@ -838,13 +839,7 @@ try {
 
                 <div className="mt-4 grid gap-4 lg:grid-cols-3">
                     <div className="lg:col-span-2">
-                        {/*
-                          Delete permissions are enforced server-side by deleteDocAction -> requireDocWrite().
-                          We show the delete UI to all signed-in users:
-                          - owner/admin can delete any doc
-                          - viewer can delete only docs they own
-                        */}
-                        <UnifiedDocsTableClient rows={unifiedDocsClient} defaultPageSize={10} showDelete={true} />
+                        <UnifiedDocsTableClient rows={unifiedDocsClient} defaultPageSize={10} />
                     </div>
 
                     <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-4">
@@ -865,37 +860,126 @@ try {
                             </form>
                         </div>
 
-                        <div className="mt-3 rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2">
-                            <div className="text-2xl font-semibold text-neutral-100">{expiringSoon.length}</div>
-                            <div className="text-xs text-neutral-500">docs expiring soon</div>
-                        </div>
+                        {(() => {
+                            const now = Date.now();
+                            const daysUntil = (iso: string | null) => {
+                                if (!iso) return null;
+                                const t = new Date(iso).getTime();
+                                if (!Number.isFinite(t)) return null;
+                                const ms = t - now;
+                                return Math.ceil(ms / (1000 * 60 * 60 * 24));
+                            };
 
-                        <div className="mt-4 space-y-3">
-                            {expiringSoon.length === 0 ? (
-                                <div className="text-sm text-neutral-500">No aliases expiring soon.</div>
-                            ) : (
-                                expiringSoon.map((r) => (
-                                    <div key={r.doc_id} className="rounded-lg border border-neutral-800 bg-neutral-950 p-3">
-                                        <Link href={`/admin/docs/${r.doc_id}`} className="text-sm text-neutral-200 hover:underline">
-                                            {r.doc_title || "Untitled"}
-                                        </Link>
-                                        <div className="mt-1 text-xs text-neutral-500">Expires: {fmtDate(r.expires_at)}</div>
-                                        <div className="mt-1 flex flex-wrap gap-2 text-xs">
-                                            {r.alias ? (
-                                                <Link href={`/d/${r.alias}`} target="_blank" className="text-blue-400 hover:underline">
-                                                    /d/{r.alias}
-                                                </Link>
-                                            ) : null}
-                                            <span className="text-neutral-600 font-mono">{r.doc_id}</span>
+                            const buckets = { today: 0, soon: 0 };
+                            for (const r of expiringSoon) {
+                                const d = daysUntil(r.expires_at);
+                                if (d === null) continue;
+                                if (d <= 0) buckets.today++;
+                                else if (d <= 3) buckets.soon++;
+                            }
+
+                            const total = expiringSoon.length;
+                            const pill = (label: string, count: number) => (
+                                <span className="inline-flex items-center gap-1 rounded-full border border-neutral-800 bg-neutral-950 px-2 py-0.5 text-[11px] text-neutral-300">
+                                    <span className="text-neutral-500">{label}</span>
+                                    <span className="font-semibold text-neutral-100">{count}</span>
+                                </span>
+                            );
+
+                            const urgentPct = total === 0 ? 0 : Math.min(100, Math.round(((buckets.today + buckets.soon) / total) * 100));
+
+                            return (
+                                <>
+                                    <div className="mt-3 rounded-lg border border-neutral-800 bg-neutral-950 p-3">
+                                        <div className="flex items-center justify-between gap-3">
+                                            <div>
+                                                <div className="text-2xl font-semibold text-neutral-100">{total}</div>
+                                                <div className="text-xs text-neutral-500">docs expiring soon</div>
+                                            </div>
+                                            <div className="flex flex-wrap items-center justify-end gap-2">
+                                                {pill("Today", buckets.today)}
+                                                {pill("1–3d", buckets.soon)}
+                                            </div>
+                                        </div>
+                                        <div className="mt-3 h-2 w-full overflow-hidden rounded-full border border-neutral-800 bg-neutral-950">
+                                            <div
+                                                className="h-full bg-neutral-200"
+                                                style={{ width: `${urgentPct}%` }}
+                                                aria-label="Percent expiring within 3 days"
+                                            />
+                                        </div>
+                                        <div className="mt-2 flex items-center justify-between text-[11px] text-neutral-500">
+                                            <span>More urgent →</span>
+                                            <span>{urgentPct}% within 3 days</span>
                                         </div>
                                     </div>
-                                ))
-                            )}
-                        </div>
 
-                        <div className="mt-4 text-xs text-neutral-500">
-                            Need to delete a doc? Use the legacy list on <Link href="/admin" className="text-blue-400 hover:underline">/admin</Link>.
-                        </div>
+                                    <div className="mt-4 space-y-2">
+                                        {total === 0 ? (
+                                            <div className="rounded-lg border border-neutral-800 bg-neutral-950 p-3 text-sm text-neutral-500">
+                                                No aliases expiring soon.
+                                                <div className="mt-1 text-xs text-neutral-600">
+                                                    Tip: Expirations live on aliases. Set them when you create / update shares.
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            expiringSoon
+                                                .slice(0, 8)
+                                                .map((r) => {
+                                                    const d = daysUntil(r.expires_at);
+                                                    const urgency = d === null ? "" : d <= 0 ? "Today" : d === 1 ? "1 day" : `${d} days`;
+
+                                                    return (
+                                                        <div key={r.doc_id} className="rounded-lg border border-neutral-800 bg-neutral-950 p-3">
+                                                            <div className="flex items-start justify-between gap-3">
+                                                                <div className="min-w-0">
+                                                                    <Link
+                                                                        href={`/admin/docs/${r.doc_id}`}
+                                                                        className="block truncate text-sm font-medium text-neutral-200 hover:underline"
+                                                                        title={r.doc_title || "Untitled"}
+                                                                    >
+                                                                        {r.doc_title || "Untitled"}
+                                                                    </Link>
+                                                                    <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
+                                                                        <span className="rounded-md border border-neutral-800 bg-neutral-950 px-2 py-0.5 text-neutral-300">
+                                                                            Expires: {fmtDate(r.expires_at)}
+                                                                        </span>
+                                                                        {urgency ? (
+                                                                            <span className="rounded-md border border-neutral-800 bg-neutral-950 px-2 py-0.5 text-neutral-400">
+                                                                                {urgency}
+                                                                            </span>
+                                                                        ) : null}
+                                                                    </div>
+                                                                </div>
+
+                                                                {r.alias ? (
+                                                                    <Link
+                                                                        href={`/d/${r.alias}`}
+                                                                        target="_blank"
+                                                                        className="shrink-0 rounded-md border border-neutral-800 bg-neutral-950 px-2 py-1 text-xs text-blue-400 hover:underline"
+                                                                        title="Open share link"
+                                                                    >
+                                                                        /d/{r.alias}
+                                                                    </Link>
+                                                                ) : null}
+                                                            </div>
+
+                                                            <div className="mt-2 text-[11px] text-neutral-600 font-mono truncate" title={r.doc_id}>
+                                                                {r.doc_id}
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })
+                                        )}
+                                    </div>
+
+                                    <div className="mt-3 text-xs text-neutral-500">
+                                        <a href="#docs" className="text-blue-400 hover:underline">Jump to docs</a> to manage expirations.
+                                        {total > 8 ? <> Showing 8 of {total}.</> : null}
+                                    </div>
+                                </>
+                            );
+                        })()}
                     </div>
                 </div>
             </div>
