@@ -1,4 +1,3 @@
-
 "use client";
 
 import Link from "next/link";
@@ -9,7 +8,8 @@ export default function AdminHeader() {
   const { data: session } = useSession();
   const pathname = usePathname();
 
-  const role = session?.user?.role ?? "viewer";
+  // Type-safe at runtime even if NextAuth type augmentation isn't picked up in some build environments.
+  const role = ((session?.user as any)?.role as string | undefined) ?? "viewer";
 
   function NavLink({ href, label }: { href: string; label: string }) {
     const active = pathname === href;
