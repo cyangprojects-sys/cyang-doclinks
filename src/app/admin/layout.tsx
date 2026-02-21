@@ -16,9 +16,12 @@ export default async function AdminLayout({
   // Require login for all /admin routes
   if (!session?.user) redirect("/signin");
 
+  const role = (session.user as any)?.role as string | undefined;
+  const isOwner = role === "owner";
+
   return (
     <div className="min-h-screen">
-      <AdminTopNav email={session.user.email} />
+      <AdminTopNav email={session.user.email} isOwner={isOwner} />
       <main className="mx-auto max-w-6xl px-4 py-6">{children}</main>
     </div>
   );
