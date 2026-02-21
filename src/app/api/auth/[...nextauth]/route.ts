@@ -1,46 +1,37 @@
 import NextAuth from "next-auth";
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { buildAuthOptions, ORG_COOKIE_NAME } from "@/src/auth";
+
+import { buildAuthOptions } from "@/auth";
+import { ORG_COOKIE_NAME } from "@/lib/tenant";
 
 /**
- * Next.js 16.1.x types `cookies()` as Promise<ReadonlyRequestCookies> in some contexts.
- * In route handlers we can safely `await cookies()` and read the org hint cookie.
+ * Multi-tenant Auth.js/NextAuth App Router handler.
  *
- * If a user hits /api/auth/signin directly (no org context), we redirect them to the
- * org-scoped sign-in route (Option 2): /org/default/login
+ * We bind auth to an org via the httpOnly `cyang_org` cookie set by:
+ *   /org/[slug]/auth/[provider]
+ *
+ * If someone hits /api/auth/signin directly (no org cookie), we redirect to:
+ *   /org/default/login
  */
-async function getOrgSlugCookie(): Promise<string | null> {
-  try {
-    const jar = await cookies();
-    const v = jar.get(ORG_COOKIE_NAME)?.value ?? "";
-    const slug = String(v || "").trim().toLowerCase();
-    return slug ? slug : null;
-  } catch {
-    return null;
-  }
-}
+async function handler(req: NextRequest) {
+  // Next.js 16.1.x types `cookies()` inconsistently; normalize via Promise.resolve.
+  const cookieJar: any = await Promise.resolve(cookies() as any);
+  const cookieSlug = cookieJar?.get?.(ORG_COOKIE_NAME)?.value ?? null;
+  const orgSlug = String(cookieSlug || "").trim().toLowerCase() || "default";
 
-export async function GET(req: NextRequest) {
-  const cookieSlug = await getOrgSlugCookie();
-
-  // If user hits NextAuth's built-in sign-in endpoint without org context, bounce to default org.
-  if (req.nextUrl.pathname.endsWith("/api/auth/signin") && !cookieSlug) {
-    const url = new URL("/org/default/login", req.url);
-    // Preserve callbackUrl if present
-    const callbackUrl = req.nextUrl.searchParams.get("callbackUrl");
-    if (callbackUrl) url.searchParams.set("callbackUrl", callbackUrl);
-    return NextResponse.redirect(url);
+  // Protect the common entrypoint.
+  if (req.nextUrl.pathname.endsWith("/signin")) {
+    const hasOrg = Boolean(String(cookieSlug || "").trim());
+    if (!hasOrg) {
+      const url = new URL(`/org/default/login`, req.nextUrl.origin);
+      return NextResponse.redirect(url);
+    }
   }
 
-  const orgSlug = cookieSlug ?? "default";
   const opts = await buildAuthOptions(orgSlug);
-  return (NextAuth(opts) as any)(req);
+  const nextAuthHandler = NextAuth(opts) as any;
+  return nextAuthHandler(req);
 }
 
-export async function POST(req: NextRequest) {
-  const cookieSlug = await getOrgSlugCookie();
-  const orgSlug = cookieSlug ?? "default";
-  const opts = await buildAuthOptions(orgSlug);
-  return (NextAuth(opts) as any)(req);
-}
+export { handler as GET, handler as POST };
