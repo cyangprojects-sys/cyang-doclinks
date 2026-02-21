@@ -838,7 +838,13 @@ try {
 
                 <div className="mt-4 grid gap-4 lg:grid-cols-3">
                     <div className="lg:col-span-2">
-                        <UnifiedDocsTableClient rows={unifiedDocsClient} defaultPageSize={10} showDelete={u.role === "owner" || u.role === "admin"} />
+                        {/*
+                          Delete permissions are enforced server-side by deleteDocAction -> requireDocWrite().
+                          We show the delete UI to all signed-in users:
+                          - owner/admin can delete any doc
+                          - viewer can delete only docs they own
+                        */}
+                        <UnifiedDocsTableClient rows={unifiedDocsClient} defaultPageSize={10} showDelete={true} />
                     </div>
 
                     <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-4">

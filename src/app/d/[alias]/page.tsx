@@ -9,12 +9,13 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import { sql } from "@/lib/db";
 import { isAliasUnlockedAction } from "./unlockActions";
+import { getAuthedUser, roleAtLeast } from "@/lib/authz";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-async function isOwner(): Promise<boolean> {
+async function isOwnerEmail(): Promise<boolean> {
   const owner = (process.env.OWNER_EMAIL || "").trim().toLowerCase();
   if (!owner) return false;
 
@@ -31,7 +32,7 @@ function isExpired(expiresAt: string | null): boolean {
 }
 
 /**
- * Owner-bypass alias resolution (gets doc_id without enforcing password).
+ * Privileged-bypass alias resolution (gets doc_id without enforcing password).
  * Supports both `doc_aliases` (new) and `document_aliases` (legacy).
  */
 async function resolveAliasDocIdBypass(alias: string): Promise<
@@ -47,7 +48,6 @@ async function resolveAliasDocIdBypass(alias: string): Promise<
         a.expires_at::text as expires_at
       from public.doc_aliases a
       where lower(a.alias) = ${alias}
-        and coalesce(a.is_active, true) = true
       limit 1
     `) as unknown as Array<{
       doc_id: string;
@@ -96,6 +96,22 @@ async function resolveAliasDocIdBypass(alias: string): Promise<
   }
 
   return { ok: false };
+}
+
+async function userOwnsDoc(userId: string, docId: string): Promise<boolean> {
+  try {
+    const rows = (await sql`
+      select 1
+      from public.docs
+      where id = ${docId}::uuid
+        and owner_id = ${userId}::uuid
+      limit 1
+    `) as unknown as Array<{ "?column?": number }>;
+
+    return rows.length > 0;
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -188,15 +204,21 @@ export default async function SharePage({
   const alias = decodeURIComponent(rawAlias || "").trim().toLowerCase();
   if (!alias) notFound();
 
-  const owner = await isOwner();
+  // Privileged bypass:
+  // - OWNER_EMAIL always bypasses
+  // - signed-in admin/owner bypasses
+  // - signed-in viewer bypasses for docs they own
+  const bypass = await resolveAliasDocIdBypass(alias);
+  if (!bypass.ok) notFound();
 
-  // Owner bypass stays: owner can always view regardless of alias password.
-  if (owner) {
-    const bypass = await resolveAliasDocIdBypass(alias);
-    if (!bypass.ok) notFound();
-    if (bypass.revokedAt) notFound();
-    if (isExpired(bypass.expiresAt)) notFound();
+  const ownerEmail = await isOwnerEmail();
+  const u = await getAuthedUser();
 
+  const isPrivileged =
+    ownerEmail ||
+    (u ? roleAtLeast(u.role, "admin") || (await userOwnsDoc(u.id, bypass.docId)) : false);
+
+  if (isPrivileged) {
     return (
       <main className="mx-auto max-w-5xl px-4 py-10">
         <ShareForm docId={bypass.docId} />
