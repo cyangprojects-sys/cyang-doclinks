@@ -8,6 +8,7 @@ import {
 } from "../actions";
 import UploadPanel from "./UploadPanel";
 import UnifiedDocsTableClient, { type UnifiedDocRow as UnifiedDocRowClient } from "./UnifiedDocsTableClient";
+import SharesTableClient, { type ShareRow as ShareRowClient } from "./SharesTableClient";
 import { getRetentionSettings } from "@/lib/settings";
 
 export const runtime = "nodejs";
