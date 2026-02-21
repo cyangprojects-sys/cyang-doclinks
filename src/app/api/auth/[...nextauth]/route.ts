@@ -1,7 +1,6 @@
 import { handlers } from "@/auth";
 
-// App Router route handlers for NextAuth/Auth.js
-export const { GET, POST } = handlers;
-
-// Ensure this runs on Node (not Edge) to avoid subtle crypto/provider issues.
+// Ensure Node.js runtime (OIDC + crypto + DB adapters are more reliable here than Edge)
 export const runtime = "nodejs";
+
+export const { GET, POST } = handlers;
