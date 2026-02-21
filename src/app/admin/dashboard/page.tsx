@@ -803,7 +803,7 @@ try {
                         </>
                     ) : null}
                 </div>
-            </div></div>
+            </div>
 
             {/* ✅ UPLOAD */}
             <UploadPanel />
