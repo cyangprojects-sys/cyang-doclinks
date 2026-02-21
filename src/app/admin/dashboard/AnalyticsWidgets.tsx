@@ -217,29 +217,31 @@ export default async function AnalyticsWidgets({ ownerId }: { ownerId?: string; 
   return (
     <section className="mb-6">
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <div className="rounded-2xl border bg-white p-4 shadow-sm">
-          <div className="text-xs text-neutral-500">Total views (all time)</div>
-          <div className="mt-1 text-2xl font-semibold">{fmtInt(totalViews)}</div>
-          <div className="mt-2 text-xs text-neutral-500">Last 30 days</div>
+        <div className="rounded-2xl border border-neutral-800 bg-neutral-950 p-4 shadow-sm">
+          <div className="text-xs text-neutral-400">Total views (all time)</div>
+          <div className="mt-1 text-2xl font-semibold text-neutral-100">{fmtInt(totalViews)}</div>
+          <div className="mt-2 text-xs text-neutral-400">Last 30 days</div>
           <div className="mt-1 flex items-center justify-between gap-3">
-            <div className="text-sm font-medium">{fmtInt(views30)}</div>
-            <Sparkline values={series30} ariaLabel="30 day views sparkline" />
+            <div className="text-sm font-medium text-neutral-200">{fmtInt(views30)}</div>
+            <div className="text-neutral-400">
+              <Sparkline values={series30} ariaLabel="30 day views sparkline" />
+            </div>
           </div>
         </div>
 
-        <div className="rounded-2xl border bg-white p-4 shadow-sm">
-          <div className="text-xs text-neutral-500">Rolling views</div>
+        <div className="rounded-2xl border border-neutral-800 bg-neutral-950 p-4 shadow-sm">
+          <div className="text-xs text-neutral-400">Rolling views</div>
           <div className="mt-2 flex items-baseline justify-between">
             <div>
-              <div className="text-2xl font-semibold">{fmtInt(views7)}</div>
-              <div className="text-xs text-neutral-500">Last 7 days</div>
+              <div className="text-2xl font-semibold text-neutral-100">{fmtInt(views7)}</div>
+              <div className="text-xs text-neutral-400">Last 7 days</div>
             </div>
             <div>
-              <div className="text-2xl font-semibold">{fmtInt(views30)}</div>
-              <div className="text-xs text-neutral-500">Last 30 days</div>
+              <div className="text-2xl font-semibold text-neutral-100">{fmtInt(views30)}</div>
+              <div className="text-xs text-neutral-400">Last 30 days</div>
             </div>
           </div>
-          <div className="mt-3 text-xs text-neutral-500">
+          <div className="mt-3 text-xs text-neutral-400">
             {hasDocViewDaily ? (
               <span>Using daily aggregates (fast).</span>
             ) : (
@@ -248,39 +250,39 @@ export default async function AnalyticsWidgets({ ownerId }: { ownerId?: string; 
           </div>
         </div>
 
-        <div className="rounded-2xl border bg-white p-4 shadow-sm">
-          <div className="text-xs text-neutral-500">Shares</div>
+        <div className="rounded-2xl border border-neutral-800 bg-neutral-950 p-4 shadow-sm">
+          <div className="text-xs text-neutral-400">Shares</div>
           <div className="mt-2 grid grid-cols-3 gap-2">
             <div>
-              <div className="text-xl font-semibold">{fmtInt(activeShares)}</div>
-              <div className="text-xs text-neutral-500">Active</div>
+              <div className="text-xl font-semibold text-neutral-100">{fmtInt(activeShares)}</div>
+              <div className="text-xs text-neutral-400">Active</div>
             </div>
             <div>
-              <div className="text-xl font-semibold">{fmtInt(revokedShares)}</div>
-              <div className="text-xs text-neutral-500">Revoked</div>
+              <div className="text-xl font-semibold text-neutral-100">{fmtInt(revokedShares)}</div>
+              <div className="text-xs text-neutral-400">Revoked</div>
             </div>
             <div>
-              <div className="text-xl font-semibold">{fmtInt(expiringShares)}</div>
-              <div className="text-xs text-neutral-500">Expiring (3d)</div>
+              <div className="text-xl font-semibold text-neutral-100">{fmtInt(expiringShares)}</div>
+              <div className="text-xs text-neutral-400">Expiring (3d)</div>
             </div>
           </div>
-          <div className="mt-3 text-xs text-neutral-500">Alias expiring (3d): {fmtInt(expiringAliases)}</div>
+          <div className="mt-3 text-xs text-neutral-400">Alias expiring (3d): {fmtInt(expiringAliases)}</div>
         </div>
 
-        <div className="rounded-2xl border bg-white p-4 shadow-sm">
-          <div className="text-xs text-neutral-500">Top docs (30d)</div>
+        <div className="rounded-2xl border border-neutral-800 bg-neutral-950 p-4 shadow-sm">
+          <div className="text-xs text-neutral-400">Top docs (30d)</div>
           <ol className="mt-2 space-y-1 text-sm">
             {topDocs.length ? (
               topDocs.map((d) => (
                 <li key={d.doc_id} className="flex items-center justify-between gap-2">
-                  <Link className="truncate underline-offset-2 hover:underline" href={`/admin/docs/${d.doc_id}`}>
+                  <Link className="truncate text-neutral-200 underline-offset-2 hover:underline" href={`/admin/docs/${d.doc_id}`}>
                     {d.doc_title || d.doc_id.slice(0, 8)}
                   </Link>
-                  <span className="shrink-0 text-xs text-neutral-500">{fmtInt(d.views_30)}</span>
+                  <span className="shrink-0 text-xs text-neutral-400">{fmtInt(d.views_30)}</span>
                 </li>
               ))
             ) : (
-              <li className="text-xs text-neutral-500">No data yet.</li>
+              <li className="text-xs text-neutral-400">No data yet.</li>
             )}
           </ol>
         </div>

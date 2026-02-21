@@ -1,5 +1,4 @@
 // src/app/admin/webhooks/page.tsx
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { unstable_noStore as noStore } from "next/cache";
 import { sql } from "@/lib/db";
@@ -129,14 +128,6 @@ export default async function WebhooksPage() {
     <div className="mx-auto max-w-6xl p-6 text-white">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold">Webhooks</h1>
-        <div className="flex items-center gap-3">
-          <Link
-            href="/admin/dashboard"
-            className="rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm text-neutral-200 hover:bg-neutral-900"
-          >
-            ← Back to dashboard
-          </Link>
-        </div>
       </div>
 
       <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-4">

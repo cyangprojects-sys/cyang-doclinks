@@ -1,5 +1,4 @@
 // src/app/admin/audit/page.tsx
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { sql } from "@/lib/db";
 import { unstable_noStore as noStore } from "next/cache";
@@ -133,12 +132,6 @@ export default async function AuditPage() {
           >
             Export Views CSV
           </a>
-          <Link
-          href="/admin/dashboard"
-          className="rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm text-neutral-200 hover:bg-neutral-900"
-        >
-          ← Back to dashboard
-        </Link>
         </div>
 
       </div>
