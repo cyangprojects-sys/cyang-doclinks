@@ -47,14 +47,16 @@ export async function POST(req: NextRequest) {
   // Enqueue a test event for each (preferred). If queue is unavailable, return 501.
   try {
     for (const h of hooks) {
+      const payload = {
+        test: true,
+        message: body?.message || "Hello from cyang.io",
+        requested_at: new Date().toISOString(),
+        api_key_prefix: auth.prefix,
+      };
+
       await sql`
         insert into public.webhook_deliveries (webhook_id, owner_id, event, payload)
-        values (${h.id}::uuid, ${auth.ownerId}::uuid, 'webhook.test', ${sql.json({
-          test: true,
-          message: body?.message || "Hello from cyang.io",
-          requested_at: new Date().toISOString(),
-          api_key_prefix: auth.prefix,
-        })})
+        values (${h.id}::uuid, ${auth.ownerId}::uuid, 'webhook.test', ${JSON.stringify(payload)}::jsonb)
       `;
     }
 
