@@ -1,15 +1,17 @@
 // src/app/admin/dashboard/page.tsx
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { sql } from "@/lib/db";
 import { getAuthedUser } from "@/lib/authz";
+import DeleteDocForm from "../DeleteDocForm";
 import {
     updateRetentionSettingsAction,
     sendExpirationAlertAction,
 } from "../actions";
-import UploadPanel from "./UploadPanel";
-import UnifiedDocsTableClient, { type UnifiedDocRow as UnifiedDocRowClient } from "./UnifiedDocsTableClient";
 import SharesTableClient, { type ShareRow as ShareRowClient } from "./SharesTableClient";
+import UploadPanel from "./UploadPanel";
 import ViewsByDocTableClient from "./ViewsByDocTableClient";
+import UnifiedDocsTableClient, { type UnifiedDocRow as UnifiedDocRowClient } from "./UnifiedDocsTableClient";
 import { getRetentionSettings } from "@/lib/settings";
 
 export const runtime = "nodejs";
@@ -139,50 +141,9 @@ async function tableExists(fqTable: string): Promise<boolean> {
 }
 
 export default async function AdminDashboardPage() {
-    
     const u = await getAuthedUser();
-
-    if (!u) {
-        return (
-            <main className="mx-auto max-w-3xl px-4 py-12">
-                <div className="flex items-center justify-between">
-                    <h1 className="text-xl font-semibold tracking-tight">Dashboard</h1>
-                    <Link
-                        href="/"
-                        className="text-sm text-neutral-400 hover:text-neutral-200 underline underline-offset-4"
-                    >
-                        Home
-                    </Link>
-                </div>
-
-                <p className="mt-3 text-sm text-neutral-300">Sign in to access your dashboard.</p>
-
-                <div className="mt-6 flex flex-wrap gap-3">
-                    <Link
-                        href="/api/auth/signin"
-                        className="inline-block rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm font-semibold text-neutral-100 hover:bg-neutral-800"
-                    >
-                        Sign in
-                    </Link>
-
-                    <Link
-                        href="/"
-                        className="inline-block rounded-lg border border-neutral-800 bg-neutral-950/40 px-3 py-2 text-sm font-semibold text-neutral-200 hover:bg-neutral-900"
-                    >
-                        Back home
-                    </Link>
-                </div>
-
-                <div className="mt-4 text-xs text-neutral-500">
-                    You’ll be placed in the <span className="font-mono">viewer</span> role by default. Only the{" "}
-                    <span className="font-mono">owner</span> can access site-wide admin tools.
-                </div>
-            </main>
-        );
-    }
-
+    if (!u) redirect("/api/auth/signin");
     const canSeeAll = u.role === "owner" || u.role === "admin";
-
 
     const docs = (await (canSeeAll
         ? sql`
@@ -706,7 +667,7 @@ try {
         has_password: Boolean((s as any).has_password),
     }));
 
-    const viewsByDocClient: ViewsByDocRowClient[] = viewsByDoc.map((r) => ({
+    const viewsByDocClient: ViewsByDocRow[] = viewsByDoc.map((r) => ({
         doc_id: r.doc_id,
         doc_title: r.doc_title,
         alias: r.alias,
@@ -746,65 +707,39 @@ try {
 
     return (
         <main className="mx-auto max-w-6xl px-4 py-12">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex items-center justify-between gap-3">
                 <div>
                     <h1 className="text-xl font-semibold tracking-tight">Dashboard</h1>
-                    <p className="mt-1 text-sm text-neutral-400">
-                        Signed in as <span className="font-mono">{u.email}</span> · role:{" "}
-                        <span className="font-mono">{u.role}</span>
-                        {canSeeAll ? (
-                            <span className="ml-2 text-neutral-500">· site-wide tools enabled</span>
-                        ) : (
-                            <span className="ml-2 text-neutral-500">· your documents only</span>
-                        )}
-                    </p>
+                    <p className="mt-1 text-sm text-neutral-400">Owner-only tools.</p>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-                    <Link
-                        href="/"
-                        className="text-sm text-neutral-400 hover:text-neutral-200 underline underline-offset-4"
-                    >
-                        Home
-                    </Link>
+                <Link
+                    href="/admin"
+                    className="text-sm text-neutral-400 hover:text-neutral-200 underline underline-offset-4"
+                >
+                    Back to Admin
+                </Link>
 
-                    <Link
-                        href="/api/auth/signin"
-                        className="text-sm text-neutral-400 hover:text-neutral-200 underline underline-offset-4"
-                    >
-                        Switch account
-                    </Link>
+                <Link
+                    href="/admin/audit"
+                    className="text-sm text-neutral-400 hover:text-neutral-200 underline underline-offset-4"
+                >
+                    Audit logs
+                </Link>
+<Link
+    href="/admin/api-keys"
+    className="text-sm text-neutral-400 hover:text-neutral-200 underline underline-offset-4"
+>
+    API keys
+</Link>
 
-                    <Link
-                        href="/api/auth/signout"
-                        className="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm font-semibold text-neutral-100 hover:bg-neutral-800"
-                    >
-                        Sign out
-                    </Link>
+<Link
+    href="/admin/webhooks"
+    className="text-sm text-neutral-400 hover:text-neutral-200 underline underline-offset-4"
+>
+    Webhooks
+</Link>
 
-                    {canSeeAll ? (
-                        <>
-                            <Link
-                                href="/admin/audit"
-                                className="text-sm text-neutral-400 hover:text-neutral-200 underline underline-offset-4"
-                            >
-                                Audit logs
-                            </Link>
-                            <Link
-                                href="/admin/api-keys"
-                                className="text-sm text-neutral-400 hover:text-neutral-200 underline underline-offset-4"
-                            >
-                                API keys
-                            </Link>
-                            <Link
-                                href="/admin/webhooks"
-                                className="text-sm text-neutral-400 hover:text-neutral-200 underline underline-offset-4"
-                            >
-                                Webhooks
-                            </Link>
-                        </>
-                    ) : null}
-                </div>
             </div>
 
             {/* ✅ UPLOAD */}
