@@ -90,14 +90,16 @@ export async function testWebhookAction(formData: FormData): Promise<void> {
 
   // Prefer queue (if table exists), fall back to setting last_error.
   try {
+    const payload = {
+      test: true,
+      message: "Hello from cyang.io",
+      requested_by: u.email,
+      requested_at: new Date().toISOString(),
+    };
+
     await sql`
       insert into public.webhook_deliveries (webhook_id, owner_id, event, payload)
-      values (${id}::uuid, ${u.id}::uuid, 'webhook.test', ${sql.json({
-        test: true,
-        message: "Hello from cyang.io",
-        requested_by: u.email,
-        requested_at: new Date().toISOString(),
-      })})
+      values (${id}::uuid, ${u.id}::uuid, 'webhook.test', ${JSON.stringify(payload)}::jsonb)
     `;
 
     // Try to deliver immediately for nicer UX.
