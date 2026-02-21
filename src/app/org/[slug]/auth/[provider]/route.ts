@@ -7,9 +7,15 @@ export const dynamic = "force-dynamic";
 
 const ALLOWED = new Set(["google", "enterprise-oidc"]);
 
-export async function GET(req: NextRequest, ctx: { params: { slug: string; provider: string } }) {
-  const slug = String(ctx?.params?.slug || "").trim().toLowerCase();
-  const provider = String(ctx?.params?.provider || "").trim();
+type RouteCtx = {
+  // Next.js typings changed in recent versions: `params` may be a Promise.
+  params: { slug: string; provider: string } | Promise<{ slug: string; provider: string }>;
+};
+
+export async function GET(req: NextRequest, ctx: RouteCtx) {
+  const params = await Promise.resolve(ctx?.params as any);
+  const slug = String(params?.slug || "").trim().toLowerCase();
+  const provider = String(params?.provider || "").trim();
 
   if (!slug) {
     return NextResponse.redirect(new URL("/login", req.url));
@@ -21,7 +27,10 @@ export async function GET(req: NextRequest, ctx: { params: { slug: string; provi
 
   // Bind org to this browser (httpOnly so JS can't tamper with it).
   const res = NextResponse.redirect(
-    new URL(`/api/auth/signin/${encodeURIComponent(provider)}?callbackUrl=${encodeURIComponent("/admin/dashboard")}`, req.url)
+    new URL(
+      `/api/auth/signin/${encodeURIComponent(provider)}?callbackUrl=${encodeURIComponent("/admin/dashboard")}`,
+      req.url
+    )
   );
 
   res.cookies.set(ORG_COOKIE_NAME, slug, {
