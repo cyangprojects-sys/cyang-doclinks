@@ -46,7 +46,10 @@ export async function POST(req: NextRequest) {
 
   const maxViewsRaw = body?.max_views ?? body?.maxViews;
   const maxViewsNum = maxViewsRaw === null || maxViewsRaw === undefined ? null : Number(maxViewsRaw);
-  const maxViews = Number.isFinite(maxViewsNum) ? Math.max(0, Math.floor(maxViewsNum)) : null;
+  let maxViews: number | null = null;
+  if (maxViewsNum !== null && Number.isFinite(maxViewsNum)) {
+    maxViews = Math.max(0, Math.floor(maxViewsNum));
+  }
 
   const passwordRaw = String(body?.password || "").trim();
   const passwordHash = passwordRaw ? await bcrypt.hash(passwordRaw, 12) : null;
