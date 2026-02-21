@@ -185,7 +185,7 @@ if (shouldCountView(req)) {
     if (ownerId) {
       const allowed = await assertCanServeView(ownerId);
       if (!allowed.ok) {
-        return new NextResponse("Temporarily unavailable", { status: 429 });
+        return new Response("Temporarily unavailable", { status: 429 });
       }
 
       // Best-effort usage counter
