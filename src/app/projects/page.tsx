@@ -2,6 +2,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { SiteShell } from "../components/SiteShell";
+import { DemoDocButton } from "@/components/DemoDocButton";
+import { DEMO_DOC_URL } from "@/lib/demo";
 
 export const metadata: Metadata = {
   title: "Projects — cyang.io",
@@ -119,9 +121,10 @@ export default function ProjectsPage() {
 
               <div className="mt-6 rounded-2xl bg-black/40 p-4 ring-1 ring-white/10">
                 <div className="text-xs text-white/60">Quick demo</div>
-                <Link href="/d/welcome" className="mt-1 inline-flex text-sm text-white/85 hover:underline">
-                  Open /d/welcome →
-                </Link>
+                <DemoDocButton
+                  label="Open demo document →"
+                  className="mt-1 inline-flex text-sm text-white/85 hover:underline"
+                />
               </div>
             </div>
           </div>
@@ -161,9 +164,9 @@ export default function ProjectsPage() {
                   href="/admin"
                 />
                 <QuickLink
-                  name="Open an example magic link"
-                  desc="Try /d/welcome (swap to your real alias anytime)."
-                  href="/d/welcome"
+                  name="Open a demo document"
+                  desc="View a live shared document (opens in a new tab)."
+                  href={DEMO_DOC_URL}
                 />
                 <QuickLink
                   name="Read the approach"
@@ -273,6 +276,26 @@ function Pill({ title, desc }: { title: string; desc: string }) {
 }
 
 function QuickLink(props: { name: string; desc: string; href: string }) {
+  const isExternal = /^https?:\/\//i.test(props.href);
+
+  if (isExternal) {
+    return (
+      <a
+        href={props.href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="flex items-center justify-between gap-6 rounded-2xl bg-white/5 p-5 ring-1 ring-white/10 hover:bg-white/10"
+        aria-label={`${props.name} (opens in a new tab)`}
+      >
+        <div>
+          <div className="text-sm font-medium text-white/90">{props.name}</div>
+          <div className="mt-1 text-xs text-white/60">{props.desc}</div>
+        </div>
+        <span className="text-white/50">↗</span>
+      </a>
+    );
+  }
+
   return (
     <Link
       href={props.href}

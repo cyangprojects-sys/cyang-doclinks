@@ -2,6 +2,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { SiteShell } from "./components/SiteShell";
+import { DemoDocButton } from "@/components/DemoDocButton";
 
 export const metadata: Metadata = {
   title: "cyang.io — Chang Yang",
@@ -10,8 +11,6 @@ export const metadata: Metadata = {
 };
 
 export default function HomePage() {
-  const exampleMagicLink = "/d/welcome";
-
   return (
     <SiteShell maxWidth="6xl">
       {/* Hero */}
@@ -54,12 +53,10 @@ export default function HomePage() {
                 Explore Doclinks →
               </Link>
 
-              <Link
-                href={exampleMagicLink}
+              <DemoDocButton
+                label="Open demo document →"
                 className="rounded-2xl px-6 py-3 text-sm font-medium text-white/70 hover:text-white"
-              >
-                Open example magic link →
-              </Link>
+              />
             </div>
 
             <div className="mt-12 grid gap-4 sm:grid-cols-3">
@@ -201,18 +198,15 @@ export default function HomePage() {
             <div className="md:col-span-5">
               <div className="rounded-2xl bg-black/40 p-5 ring-1 ring-white/10">
                 <div className="text-xs text-white/60">Try it</div>
-                <div className="mt-1 text-lg font-semibold">Open a sample link</div>
+                <div className="mt-1 text-lg font-semibold">Open a demo document</div>
                 <p className="mt-2 text-sm text-white/70">
-                  If a document is shared, it can be opened via a short URL like{" "}
-                  <span className="text-white/80">{exampleMagicLink}</span>.
+                  See the share flow in action with a live demo document.
                 </p>
                 <div className="mt-4">
-                  <Link
-                    href={exampleMagicLink}
+                  <DemoDocButton
+                    label="Open demo →"
                     className="inline-flex rounded-xl bg-white px-4 py-2 text-sm font-medium text-black hover:bg-white/90"
-                  >
-                    Open example →
-                  </Link>
+                  />
                 </div>
               </div>
             </div>

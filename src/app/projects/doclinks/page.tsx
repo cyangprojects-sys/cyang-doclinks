@@ -2,6 +2,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { SiteShell } from "../../components/SiteShell";
+import { DemoDocButton } from "@/components/DemoDocButton";
+import { DEMO_DOC_URL } from "@/lib/demo";
 
 export const metadata: Metadata = {
   title: "Doclinks — cyang.io",
@@ -10,8 +12,6 @@ export const metadata: Metadata = {
 };
 
 export default function DoclinksPage() {
-  const exampleAlias = "/d/welcome";
-
   return (
     <SiteShell maxWidth="6xl">
       <section className="relative mt-16 grid gap-10 md:grid-cols-12 md:items-end">
@@ -53,12 +53,10 @@ export default function DoclinksPage() {
               Upload a PDF
             </Link>
 
-            <Link
-              href={exampleAlias}
+            <DemoDocButton
+              label="Open demo document →"
               className="rounded-2xl bg-white/10 px-6 py-3 text-sm font-medium text-white ring-1 ring-white/10 hover:bg-white/15"
-            >
-              Try an example link
-            </Link>
+            />
           </div>
 
           <div className="mt-10 grid gap-4 sm:grid-cols-3">
@@ -92,8 +90,12 @@ export default function DoclinksPage() {
 
             <div className="mt-6 rounded-2xl bg-black/40 p-4 ring-1 ring-white/10">
               <p className="text-xs leading-relaxed text-white/60">
-                Example link: <span className="text-white/80">{exampleAlias}</span>. You can
-                swap it to any alias you’ve created for a document.
+                Live demo: {" "}
+                <DemoDocButton
+                  label="Open the demo document"
+                  className="text-white/85 hover:underline"
+                />
+                .
               </p>
             </div>
           </div>
@@ -265,10 +267,11 @@ export default function DoclinksPage() {
             cta="Open Admin Upload →"
           />
           <Callout
-            title="Open a document"
-            desc="Use /d/<docId> or /d/<alias> to retrieve a document."
-            href={exampleAlias}
-            cta="Try an example →"
+            title="Open a demo document"
+            desc="See a live shared document behind server-side enforcement."
+            href={DEMO_DOC_URL}
+            external
+            cta="Open demo →"
           />
         </div>
       </section>
@@ -330,12 +333,34 @@ function Feature({ title, desc }: { title: string; desc: string }) {
   );
 }
 
-function Callout(props: { title: string; desc: string; href: string; cta: string }) {
+function Callout(props: {
+  title: string;
+  desc: string;
+  href: string;
+  cta: string;
+  external?: boolean;
+}) {
+  const className =
+    "group rounded-3xl bg-white/5 p-6 ring-1 ring-white/10 hover:bg-white/10";
+
+  if (props.external) {
+    return (
+      <a
+        href={props.href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={className}
+        aria-label={`${props.title} (opens in a new tab)`}
+      >
+        <div className="text-lg font-semibold">{props.title}</div>
+        <p className="mt-2 text-sm leading-relaxed text-white/70">{props.desc}</p>
+        <div className="mt-4 text-sm text-white/80 group-hover:text-white">{props.cta}</div>
+      </a>
+    );
+  }
+
   return (
-    <Link
-      href={props.href}
-      className="group rounded-3xl bg-white/5 p-6 ring-1 ring-white/10 hover:bg-white/10"
-    >
+    <Link href={props.href} className={className}>
       <div className="text-lg font-semibold">{props.title}</div>
       <p className="mt-2 text-sm leading-relaxed text-white/70">{props.desc}</p>
       <div className="mt-4 text-sm text-white/80 group-hover:text-white">{props.cta}</div>
