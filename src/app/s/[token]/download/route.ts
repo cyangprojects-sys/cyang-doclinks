@@ -183,15 +183,17 @@ const consumed = await consumeShareTokenView(token);
         return new NextResponse("Not found", { status: 404 });
     }
 
-const ownerIdForUsage = ownerIdForLimit;
-if (typeof ownerIdForUsage === "string" && ownerIdForUsage.length > 0) {
-  try {
-    await incrementMonthlyViews(ownerIdForUsage, 1);
-  } catch {
-    // ignore
+// Best-effort usage counter
+{
+  const ownerIdForUsage = ownerIdForLimit;
+  if (ownerIdForUsage !== null) {
+    try {
+      await incrementMonthlyViews(ownerIdForUsage, 1);
+    } catch {
+      // ignore
+    }
   }
 }
-
   }
 
   // Audit log (best-effort)
