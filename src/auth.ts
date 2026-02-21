@@ -5,9 +5,12 @@ import Credentials from "next-auth/providers/credentials";
 /**
  * Auth (NextAuth v4)
  *
- * Sign-in UX:
- * - Google OAuth for regular email accounts
- * - Enterprise SSO (BYO OIDC) for organizational logins
+ * Sign-in methods:
+ * - Google OAuth (regular email accounts)
+ * - Enterprise SSO (BYO OIDC) (organizational logins)
+ *
+ * Landing behavior:
+ * - ALWAYS land on /admin/dashboard after a successful sign-in, regardless of callbackUrl.
  *
  * Safety:
  * - Providers are only enabled when their env vars exist (prevents /api/auth/signin 500s).
@@ -26,6 +29,8 @@ import Credentials from "next-auth/providers/credentials";
  * - OIDC_CLIENT_ID
  * - OIDC_CLIENT_SECRET
  */
+
+const POST_SIGN_IN_PATH = "/admin/dashboard";
 
 function hasEnv(...keys: string[]) {
   return keys.every((k) => {
@@ -90,7 +95,6 @@ export const authOptions: NextAuthOptions = {
           GoogleProvider({
             clientId: process.env.GOOGLE_CLIENT_ID!,
             clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-            // You can restrict to hosted domains later if desired via profile/callback checks.
           }),
         ]
       : []),
@@ -105,14 +109,35 @@ export const authOptions: NextAuthOptions = {
   session: { strategy: "jwt" },
 
   callbacks: {
+    /**
+     * Force post-auth navigation to the Admin Dashboard, regardless of callbackUrl.
+     *
+     * Note:
+     * - NextAuth uses redirect() for various flows (sign-in, sign-out, error pages).
+     * - We only hard-force to admin for normal post-sign-in redirects.
+     */
     async redirect({ url, baseUrl }) {
-      if (url.startsWith("/")) return `${baseUrl}${url}`;
+      // If NextAuth is trying to send the user to sign-in or error pages, keep it in-app.
+      // Otherwise, force to admin dashboard.
       try {
-        if (new URL(url).origin === baseUrl) return url;
+        const u = new URL(url, baseUrl);
+
+        // If this is a sign-out flow, send to home (or keep baseUrl).
+        if (u.pathname.startsWith("/api/auth/signout")) return baseUrl;
+
+        // If redirecting to auth system pages, don't break them.
+        if (
+          u.pathname.startsWith("/api/auth") ||
+          u.pathname === "/signin" ||
+          u.pathname === "/api/auth/error"
+        ) {
+          return `${baseUrl}${u.pathname}${u.search}`;
+        }
       } catch {
-        // ignore
+        // ignore parsing issues; fall through to forcing admin
       }
-      return `${baseUrl}/dashboard`;
+
+      return `${baseUrl}${POST_SIGN_IN_PATH}`;
     },
   },
 };
