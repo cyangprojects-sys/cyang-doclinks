@@ -54,13 +54,45 @@ export async function POST(req: NextRequest) {
   const passwordRaw = String(body?.password || "").trim();
   const passwordHash = passwordRaw ? await bcrypt.hash(passwordRaw, 12) : null;
 
-  const token = newToken();
+  const allowedCountriesRaw = body?.allowed_countries ?? body?.allowedCountries ?? null;
+const blockedCountriesRaw = body?.blocked_countries ?? body?.blockedCountries ?? null;
+
+const normCountries = (v: any): string[] | null => {
+  if (v == null) return null;
+  const arr = Array.isArray(v) ? v : String(v).split(/[,\s]+/g);
+  const out = arr
+    .map((x) => String(x || "").trim().toUpperCase())
+    .filter((x) => /^[A-Z]{2}$/.test(x));
+  return out.length ? out : [];
+};
+
+const allowedCountries = normCountries(allowedCountriesRaw);
+const blockedCountries = normCountries(blockedCountriesRaw);
+
+const watermarkEnabledRaw = body?.watermark_enabled ?? body?.watermarkEnabled ?? null;
+const watermarkEnabled =
+  watermarkEnabledRaw == null ? null : Boolean(watermarkEnabledRaw);
+
+const watermarkTextRaw = String(body?.watermark_text ?? body?.watermarkText ?? "").trim();
+const watermarkText = watermarkTextRaw ? watermarkTextRaw.slice(0, 400) : null;
+
+const token = newToken();
+  // Newer schema supports geo + watermark columns; fall back silently if not present.
+try {
+  await sql`
+    insert into public.share_tokens
+      (token, doc_id, to_email, expires_at, max_views, password_hash, allowed_countries, blocked_countries, watermark_enabled, watermark_text)
+    values
+      (${token}, ${docId}::uuid, ${toEmail}, ${expiresAt}, ${maxViews}, ${passwordHash}, ${allowedCountries}, ${blockedCountries}, ${watermarkEnabled ?? false}, ${watermarkText})
+  `;
+} catch {
   await sql`
     insert into public.share_tokens (token, doc_id, to_email, expires_at, max_views, password_hash)
     values (${token}, ${docId}::uuid, ${toEmail}, ${expiresAt}, ${maxViews}, ${passwordHash})
   `;
+}
 
-  const base = (process.env.BASE_URL || process.env.NEXTAUTH_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000")).replace(/\/+$/, "");
+const base = (process.env.BASE_URL || process.env.NEXTAUTH_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000")).replace(/\/+$/, "");
   const url = `${base}/s/${token}`;
 
   emitWebhook("share.created", {

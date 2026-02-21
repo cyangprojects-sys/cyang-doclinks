@@ -13,6 +13,7 @@ export default function LoginPage() {
                     <h1 className="mt-2 text-2xl font-semibold">Sign in</h1>
                     <p className="mt-2 text-sm text-white/70">
                         This admin area is restricted to the site owner.
+                        <span className="ml-1 text-white/40">(Enterprise SSO appears only if configured.)</span>
                     </p>
 
                     <button
@@ -21,6 +22,13 @@ export default function LoginPage() {
                     >
                         Sign in with Google
                     </button>
+
+<button
+    onClick={() => signIn("enterprise-oidc", { callbackUrl: "/admin" })}
+    className="mt-3 w-full rounded-2xl bg-white/10 px-5 py-3 text-sm font-medium text-white hover:bg-white/15"
+>
+    Sign in with Enterprise SSO
+</button>
 
                     <div className="mt-6 text-xs text-white/50">
                         <p>

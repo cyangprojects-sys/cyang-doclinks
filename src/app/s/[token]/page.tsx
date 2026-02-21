@@ -99,7 +99,7 @@ export default async function ShareTokenPage(props: {
   }
 
   const unlocked = await isShareUnlockedAction(t);
-  if (unlocked) redirect(`/s/${encodeURIComponent(t)}/raw`);
+  if (unlocked) redirect(`/s/${encodeURIComponent(t)}/view`);
 
   const requireEmail = !!meta.toEmail;
 

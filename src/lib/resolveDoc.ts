@@ -56,6 +56,9 @@ export type ShareMeta =
 
         hasPassword: boolean;
         passwordHash: string | null;
+
+        watermarkEnabled?: boolean;
+        watermarkText?: string | null;
     }
     | { ok: false };
 
@@ -295,6 +298,7 @@ export async function resolveShareMeta(tokenInput: string): Promise<ShareMeta> {
     const { raw: token, dashed } = tokenVariants(tokenInput);
     if (!token) return { ok: false };
 
+    // Try newer schema first (watermark_* columns present), then fall back.
     try {
         const rows = (await sql`
       select
@@ -306,7 +310,9 @@ export async function resolveShareMeta(tokenInput: string): Promise<ShareMeta> {
         max_views,
         views_count,
         revoked_at::text as revoked_at,
-        password_hash
+        password_hash,
+        coalesce(watermark_enabled, false) as watermark_enabled,
+        watermark_text
       from public.share_tokens
       where token = ${token}
         ${dashed ? sql`or token = ${dashed}` : sql``}
@@ -321,6 +327,8 @@ export async function resolveShareMeta(tokenInput: string): Promise<ShareMeta> {
             views_count: number | null;
             revoked_at: string | null;
             password_hash: string | null;
+            watermark_enabled: boolean;
+            watermark_text: string | null;
         }>;
 
         const r = rows?.[0];
@@ -340,9 +348,62 @@ export async function resolveShareMeta(tokenInput: string): Promise<ShareMeta> {
             revokedAt: r.revoked_at ?? null,
             hasPassword: Boolean(r.password_hash),
             passwordHash: r.password_hash ?? null,
+            watermarkEnabled: Boolean(r.watermark_enabled),
+            watermarkText: r.watermark_text ?? null,
         };
     } catch {
-        return { ok: false };
+        // Fall back to older schema without watermark columns.
+        try {
+            const rows = (await sql`
+        select
+          token::text as token,
+          doc_id::text as doc_id,
+          to_email,
+          created_at::text as created_at,
+          expires_at::text as expires_at,
+          max_views,
+          views_count,
+          revoked_at::text as revoked_at,
+          password_hash
+        from public.share_tokens
+        where token = ${token}
+          ${dashed ? sql`or token = ${dashed}` : sql``}
+        limit 1
+      `) as unknown as Array<{
+                token: string;
+                doc_id: string;
+                to_email: string | null;
+                created_at: string;
+                expires_at: string | null;
+                max_views: number | null;
+                views_count: number | null;
+                revoked_at: string | null;
+                password_hash: string | null;
+            }>;
+
+            const r = rows?.[0];
+            if (!r?.token) return { ok: false };
+
+            return {
+                ok: true,
+                table: "share_tokens",
+                shareId: r.token,
+                token: r.token,
+                docId: r.doc_id,
+                toEmail: r.to_email ?? null,
+                createdAt: r.created_at,
+                expiresAt: r.expires_at ?? null,
+                maxViews: r.max_views ?? null,
+                viewCount: Number(r.views_count ?? 0),
+                revokedAt: r.revoked_at ?? null,
+                hasPassword: Boolean(r.password_hash),
+                passwordHash: r.password_hash ?? null,
+                watermarkEnabled: false,
+                watermarkText: null,
+            };
+        } catch {
+            return { ok: false };
+        }
     }
 }
 

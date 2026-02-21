@@ -1,15 +1,38 @@
 import type { NextAuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
+import OIDCProvider from "next-auth/providers/oidc";
 
 import { ensureUserByEmail } from "@/lib/authz";
 
 export const authOptions: NextAuthOptions = {
-    providers: [
+    providers: (() => {
+    const providers = [
         GoogleProvider({
             clientId: process.env.GOOGLE_CLIENT_ID!,
             clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
         }),
-    ],
+    ];
+
+    // Optional enterprise SSO via OIDC (Okta / Azure AD / Auth0 / etc.)
+    // Set ENTERPRISE_OIDC_ISSUER + ENTERPRISE_OIDC_CLIENT_ID + ENTERPRISE_OIDC_CLIENT_SECRET.
+    const issuer = (process.env.ENTERPRISE_OIDC_ISSUER || "").trim();
+    const clientId = (process.env.ENTERPRISE_OIDC_CLIENT_ID || "").trim();
+    const clientSecret = (process.env.ENTERPRISE_OIDC_CLIENT_SECRET || "").trim();
+    if (issuer && clientId && clientSecret) {
+        providers.push(
+            OIDCProvider({
+                id: "enterprise-oidc",
+                name: "Enterprise SSO",
+                issuer,
+                clientId,
+                clientSecret,
+            })
+        );
+    }
+
+    return providers;
+})(),
+
 
     session: { strategy: "jwt" },
 
