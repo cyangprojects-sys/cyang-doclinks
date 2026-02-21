@@ -68,7 +68,7 @@ export default async function AdminDocDetailPage({ params }: { params: { docId: 
   const hasOrgId = await columnExists("docs", "org_id");
   const orgGate = hasOrgId && u.orgId ? sql`and d.org_id = ${u.orgId}::uuid` : sql``;
   const ownerGate = !canSeeAll && hasOwnerId ? sql`and d.owner_id = ${u.id}::uuid` : sql``;
-  const scopeGate = sql`${orgGate} ${scopeGate}`;
+  const scopeGate = sql`${orgGate} ${ownerGate}`;
 
   const docRows = (await sql`
     select
