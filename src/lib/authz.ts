@@ -248,9 +248,11 @@ export async function requireRole(minRole: Role): Promise<AuthedUser> {
  * Returns the org slug requested (cookie) if present.
  * Useful for pages that need to render /org/[slug] experiences.
  */
-export function getOrgSlugHint(): string | null {
+export async function getOrgSlugHint(): Promise<string | null> {
   try {
-    const v = cookies().get(ORG_COOKIE_NAME)?.value ?? "";
+    // In Next.js App Router, cookies() may be async depending on version.
+    const c = await cookies();
+    const v = c.get(ORG_COOKIE_NAME)?.value ?? "";
     const slug = String(v || "").trim().toLowerCase();
     return slug ? slug : null;
   } catch {
