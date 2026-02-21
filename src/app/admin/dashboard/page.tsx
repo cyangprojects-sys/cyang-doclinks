@@ -705,7 +705,7 @@ try {
         has_password: Boolean((s as any).has_password),
     }));
 
-    const viewsByDocClient: ViewsByDocRowClient[] = viewsByDoc.map((r) => ({
+    const viewsByDocClient: ViewsByDocRow[] = viewsByDoc.map((r) => ({
         doc_id: r.doc_id,
         doc_title: r.doc_title,
         alias: r.alias,
