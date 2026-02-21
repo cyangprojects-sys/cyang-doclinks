@@ -1,15 +1,21 @@
 import NextAuth from "next-auth";
 import type { NextRequest } from "next/server";
-
 import { buildAuthOptions } from "@/auth";
-import { ORG_COOKIE_NAME } from "@/lib/tenant";
 
-async function handler(req: NextRequest) {
-  const orgSlug = req.cookies.get(ORG_COOKIE_NAME)?.value?.trim()?.toLowerCase() ?? null;
+async function handle(req: NextRequest) {
+  // org slug is set by /org/[slug]/auth/[provider] before redirecting into NextAuth
+  const orgSlug = req.cookies.get("cyang_org")?.value ?? "default";
   const opts = await buildAuthOptions(orgSlug);
-  // NextAuth v4 App Router handler
-  // @ts-expect-error next-auth types don't model NextRequest perfectly here
-  return NextAuth(opts)(req);
+
+  // NextAuth v4 App Router handler expects a Request-like object; NextRequest works at runtime.
+  const handler = NextAuth(opts);
+  return handler(req as any);
 }
 
-export { handler as GET, handler as POST };
+export async function GET(req: NextRequest) {
+  return handle(req);
+}
+
+export async function POST(req: NextRequest) {
+  return handle(req);
+}
