@@ -53,9 +53,16 @@ export default async function AdminDashboardPage() {
   const hasShareTokens = await tableExists("public.share_tokens");
   const hasDocAliases = await tableExists("public.doc_aliases");
   const hasOwnerId = await columnExists("docs", "owner_id");
+  const hasOrgId = await columnExists("docs", "org_id");
 
-  // For viewers, show only their docs if docs.owner_id exists.
-  const docFilter = !canSeeAll && hasOwnerId ? sql`and d.owner_id = ${u.id}::uuid` : sql``;
+  // Tenant scope: if docs.org_id exists, always restrict to the user's org.
+// This prevents cross-tenant data leaks in multi-tenant mode.
+const orgFilter = hasOrgId && u.orgId ? sql`and d.org_id = ${u.orgId}::uuid` : sql``;
+
+// For viewers, show only their docs if docs.owner_id exists.
+const ownerFilter = !canSeeAll && hasOwnerId ? sql`and d.owner_id = ${u.id}::uuid` : sql``;
+
+const docFilter = sql`${orgFilter} ${ownerFilter}`;
 
   // --- Unified docs table (doc meta + totals + shares + alias status)
   let unifiedRows: UnifiedDocRow[] = [];

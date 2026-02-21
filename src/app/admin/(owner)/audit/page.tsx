@@ -8,12 +8,31 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
+
+async function columnExists(table: string, column: string): Promise<boolean> {
+  try {
+    const rows = (await sql`
+      select 1
+      from information_schema.columns
+      where table_schema = 'public'
+        and table_name = ${table}
+        and column_name = ${column}
+      limit 1
+    `) as unknown as Array<{ "?column?": number }>;
+    return rows.length > 0;
+  } catch {
+    return false;
+  }
+}
+
 export default async function AuditPage() {
   noStore();
 
   const u = await getAuthedUser();
   if (!u) redirect("/api/auth/signin");
   const canSeeAll = u.role === "owner" || u.role === "admin";
+  const hasOrgId = await columnExists("docs", "org_id");
+  const orgDocScope = hasOrgId && u.orgId ? sql`where d.org_id = ${u.orgId}::uuid` : sql``;
   // Security: audit logs are admin/owner only. Viewers should not access this page.
   if (!canSeeAll) redirect("/admin/dashboard");
 
@@ -26,14 +45,24 @@ export default async function AuditPage() {
     auditRows = await (canSeeAll
       ? sql`
         select *
-        from public.doc_audit
-        order by created_at desc
+        from public.doc_audit a
+        where a.doc_id in (
+          select d.id
+          from public.docs d
+          ${orgDocScope}
+        )
+        order by a.created_at desc
         limit 50
       `
       : sql`
         select *
         from public.doc_audit a
-        where a.doc_id in (select d.id from public.docs d where d.owner_id = ${u.id}::uuid)
+        where a.doc_id in (
+          select d.id
+          from public.docs d
+          where d.owner_id = ${u.id}::uuid
+          ${hasOrgId && u.orgId ? sql`and d.org_id = ${u.orgId}::uuid` : sql``}
+        )
         order by a.created_at desc
         limit 50
       `);
@@ -48,8 +77,24 @@ export default async function AuditPage() {
       limit 200
     `) as unknown as any[];
 
+    // Tenant scope for admins/owners in multi-tenant mode.
+    let allowedDocIds: Set<string> | null = null;
+    if (canSeeAll && hasOrgId && u.orgId) {
+      try {
+        const ids = (await sql`
+          select id::text as id
+          from public.docs
+          where org_id = ${u.orgId}::uuid
+          limit 5000
+        `) as unknown as Array<{ id: string }>;
+        allowedDocIds = new Set((ids || []).map((x) => x.id));
+      } catch {
+        allowedDocIds = null;
+      }
+    }
+
     const filtered = canSeeAll
-      ? raw
+      ? (allowedDocIds ? raw.filter((r) => allowedDocIds!.has(String(r?.doc_id || r?.docId || '').trim())) : raw)
       : raw.filter((r) => {
         const docId = String(r?.doc_id || r?.docId || "").trim();
         return !!docId;

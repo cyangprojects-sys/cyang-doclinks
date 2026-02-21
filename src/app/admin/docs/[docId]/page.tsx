@@ -65,7 +65,10 @@ export default async function AdminDocDetailPage({ params }: { params: { docId: 
   if (!hasDocs) notFound();
 
   const hasOwnerId = await columnExists("docs", "owner_id");
+  const hasOrgId = await columnExists("docs", "org_id");
+  const orgGate = hasOrgId && u.orgId ? sql`and d.org_id = ${u.orgId}::uuid` : sql``;
   const ownerGate = !canSeeAll && hasOwnerId ? sql`and d.owner_id = ${u.id}::uuid` : sql``;
+  const scopeGate = sql`${orgGate} ${scopeGate}`;
 
   const docRows = (await sql`
     select
@@ -74,7 +77,7 @@ export default async function AdminDocDetailPage({ params }: { params: { docId: 
       d.created_at::text as created_at
     from public.docs d
     where d.id = ${docId}::uuid
-      ${ownerGate}
+      ${scopeGate}
     limit 1
   `) as unknown as Array<{ id: string; title: string | null; created_at: string | null }>;
 

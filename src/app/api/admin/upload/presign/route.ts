@@ -57,6 +57,7 @@ export async function POST(req: Request) {
         await sql`
       insert into docs (
         id,
+        org_id,
         owner_id,
         title,
         original_filename,
@@ -69,6 +70,7 @@ export async function POST(req: Request) {
       )
       values (
         ${docId}::uuid,
+        ${user.orgId ? user.orgId : null}::uuid,
         ${user.id}::uuid,
         ${title ?? filename},
         ${filename},
