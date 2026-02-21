@@ -183,9 +183,10 @@ const consumed = await consumeShareTokenView(token);
         return new NextResponse("Not found", { status: 404 });
     }
 
-if (ownerIdForLimit) {
+const ownerIdForUsage = ownerIdForLimit;
+if (typeof ownerIdForUsage === "string" && ownerIdForUsage.length > 0) {
   try {
-    await incrementMonthlyViews(ownerIdForLimit, 1);
+    await incrementMonthlyViews(ownerIdForUsage, 1);
   } catch {
     // ignore
   }
