@@ -32,3 +32,15 @@ values (
   )
 )
 on conflict (key) do nothing;
+
+-- Seed default expiration alert settings (idempotent)
+insert into public.app_settings (key, value)
+values (
+  'expiration_alerts',
+  jsonb_build_object(
+    'enabled', true,
+    'days', 3,
+    'emailEnabled', true
+  )
+)
+on conflict (key) do nothing;

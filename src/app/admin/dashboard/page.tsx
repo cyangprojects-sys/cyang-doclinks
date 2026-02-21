@@ -21,13 +21,16 @@ import {
     bulkRevokeAllSharesForDocsAction,
     bulkDisableAliasesForDocsAction,
     updateRetentionSettingsAction,
+    updateExpirationAlertSettingsAction,
     sendExpirationAlertAction,
+    markAdminNotificationReadAction,
+    markAllAdminNotificationsReadAction,
 } from "../actions";
 import SharesTableClient, { type ShareRow as ShareRowClient } from "./SharesTableClient";
 import UploadPanel from "./UploadPanel";
 import ViewsByDocTableClient, { type ViewsByDocRow as ViewsByDocRowClient } from "./ViewsByDocTableClient";
 import UnifiedDocsTableClient, { type UnifiedDocRow as UnifiedDocRowClient } from "./UnifiedDocsTableClient";
-import { getRetentionSettings } from "@/lib/settings";
+import { getRetentionSettings, getExpirationAlertSettings } from "@/lib/settings";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -637,6 +640,25 @@ try {
         | { ok: false; error: string }
         | null = null;
 
+let expirationSettings:
+    | { ok: true; settings: { enabled: boolean; days: number; emailEnabled: boolean } }
+    | { ok: false; error: string }
+    | null = null;
+
+type NotificationRow = {
+    id: string;
+    kind: string;
+    doc_id: string | null;
+    alias: string | null;
+    share_token: string | null;
+    title: string | null;
+    expires_at: string | null;
+    created_at: string;
+    read_at: string | null;
+};
+
+let notifications: NotificationRow[] = [];
+
     if (canSeeAll) {
         retentionInfo = { oldest: null, scheduled: null };
         try {
@@ -661,11 +683,38 @@ try {
             retentionInfo = { oldest: null, scheduled: null };
         }
 
-        // Retention toggle/settings (best-effort; requires public.app_settings)
-        const hasAppSettings = await tableExists("public.app_settings");
-        if (hasAppSettings) {
-            retentionSettings = await getRetentionSettings();
-        }
+// Retention + expiration settings (best-effort; requires public.app_settings)
+const hasAppSettings = await tableExists("public.app_settings");
+if (hasAppSettings) {
+    retentionSettings = await getRetentionSettings();
+    expirationSettings = await getExpirationAlertSettings();
+}
+
+// In-app notifications (best-effort; requires public.admin_notifications)
+try {
+    const hasNotifications = await tableExists("public.admin_notifications");
+    if (hasNotifications) {
+        notifications = (await sql`
+  select
+    id::text as id,
+    kind,
+    doc_id::text as doc_id,
+    alias,
+    share_token,
+    title,
+    expires_at::text as expires_at,
+    created_at::text as created_at,
+    read_at::text as read_at
+  from public.admin_notifications
+  where owner_id = ${u.id}::uuid
+    and read_at is null
+  order by expires_at asc nulls last, created_at desc
+  limit 12
+`) as unknown as NotificationRow[];
+    }
+} catch {
+    notifications = [];
+}
     }
 
     const sharesClient: ShareRowClient[] = shares.map((s) => ({
@@ -857,58 +906,145 @@ try {
                         <UnifiedDocsTableClient rows={unifiedDocsClient} defaultPageSize={10} />
                     </div>
 
-                    <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-4">
-                        <div className="flex items-start justify-between gap-3">
-                            <div>
-                                <h3 className="text-sm font-semibold text-neutral-200">Expiration warnings</h3>
-                                <p className="mt-1 text-xs text-neutral-500">Aliases expiring within 3 days.</p>
-                            </div>
-                            <form action={sendExpirationAlertAction}>
-                                <input type="hidden" name="days" value="3" />
-                                <button
-                                    type="submit"
-                                    className="rounded-md bg-neutral-800 px-3 py-1.5 text-xs text-neutral-100 hover:bg-neutral-700"
-                                    title="Email an expiration summary to the owner"
-                                >
-                                    Email owner
-                                </button>
-                            </form>
-                        </div>
+                            <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-4">
+            <div className="flex items-start justify-between gap-3">
+                <div>
+                    <h3 className="text-sm font-semibold text-neutral-200">Admin notifications</h3>
+                    <p className="mt-1 text-xs text-neutral-500">
+                        {expirationSettings && expirationSettings.ok
+                            ? `Expiring within ${expirationSettings.settings.days} day(s).`
+                            : "Expiring soon."}
+                    </p>
+                </div>
 
-                        <div className="mt-3 rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2">
-                            <div className="text-2xl font-semibold text-neutral-100">{expiringSoon.length}</div>
-                            <div className="text-xs text-neutral-500">docs expiring soon</div>
-                        </div>
+                <div className="flex items-center gap-2">
+                    <form action={sendExpirationAlertAction}>
+                        <input
+                            type="hidden"
+                            name="days"
+                            value={expirationSettings && expirationSettings.ok ? String(expirationSettings.settings.days) : "3"}
+                        />
+                        <button
+                            type="submit"
+                            className="rounded-md bg-neutral-800 px-3 py-1.5 text-xs text-neutral-100 hover:bg-neutral-700"
+                            title="Email an expiration summary to the owner"
+                        >
+                            Email owner
+                        </button>
+                    </form>
 
-                        <div className="mt-4 space-y-3">
-                            {expiringSoon.length === 0 ? (
-                                <div className="text-sm text-neutral-500">No aliases expiring soon.</div>
-                            ) : (
-                                expiringSoon.map((r) => (
-                                    <div key={r.doc_id} className="rounded-lg border border-neutral-800 bg-neutral-950 p-3">
-                                        <Link href={`/admin/docs/${r.doc_id}`} className="text-sm text-neutral-200 hover:underline">
-                                            {r.doc_title || "Untitled"}
-                                        </Link>
-                                        <div className="mt-1 text-xs text-neutral-500">Expires: {fmtDate(r.expires_at)}</div>
-                                        <div className="mt-1 flex flex-wrap gap-2 text-xs">
-                                            {r.alias ? (
-                                                <Link href={`/d/${r.alias}`} target="_blank" className="text-blue-400 hover:underline">
-                                                    /d/{r.alias}
-                                                </Link>
-                                            ) : null}
-                                            <span className="text-neutral-600 font-mono">{r.doc_id}</span>
-                                        </div>
-                                    </div>
-                                ))
-                            )}
-                        </div>
-
-                        <div className="mt-4 text-xs text-neutral-500">
-                            Need to delete a doc? Use the legacy list on <Link href="/admin" className="text-blue-400 hover:underline">/admin</Link>.
-                        </div>
-                    </div>
+                    {hasNotificationsTable && notifications.length ? (
+                        <form action={markAllAdminNotificationsReadAction}>
+                            <button
+                                type="submit"
+                                className="rounded-md border border-neutral-800 bg-neutral-950 px-3 py-1.5 text-xs text-neutral-200 hover:bg-neutral-900"
+                                title="Mark all notifications as read"
+                            >
+                                Mark all read
+                            </button>
+                        </form>
+                    ) : null}
                 </div>
             </div>
+
+            <div className="mt-3 rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2">
+                <div className="text-2xl font-semibold text-neutral-100">
+                    {hasNotificationsTable ? notifications.length : expiringSoon.length}
+                </div>
+                <div className="text-xs text-neutral-500">
+                    {hasNotificationsTable ? "unread notifications" : "docs expiring soon"}
+                </div>
+            </div>
+
+            <div className="mt-4 space-y-3">
+                {hasNotificationsTable ? (
+                    notifications.length === 0 ? (
+                        <div className="text-sm text-neutral-500">No unread notifications.</div>
+                    ) : (
+                        notifications.map((n) => (
+                            <div key={n.id} className="rounded-lg border border-neutral-800 bg-neutral-950 p-3">
+                                <div className="flex items-start justify-between gap-3">
+                                    <div className="min-w-0">
+                                        {n.doc_id ? (
+                                            <Link href={`/admin/docs/${n.doc_id}`} className="text-sm text-neutral-200 hover:underline">
+                                                {n.title || "Untitled"}
+                                            </Link>
+                                        ) : (
+                                            <div className="text-sm text-neutral-200">{n.title || "Untitled"}</div>
+                                        )}
+                                        <div className="mt-1 text-xs text-neutral-500">
+                                            {n.kind === "alias_expiring" ? "Alias expiring" : n.kind === "share_expiring" ? "Share expiring" : n.kind}
+                                            {n.expires_at ? ` · Expires: ${fmtDate(n.expires_at)}` : ""}
+                                        </div>
+                                        <div className="mt-1 flex flex-wrap gap-2 text-xs">
+                                            {n.alias ? (
+                                                <Link href={`/d/${n.alias}`} target="_blank" className="text-blue-400 hover:underline">
+                                                    /d/{n.alias}
+                                                </Link>
+                                            ) : null}
+                                            {n.share_token ? (
+                                                <Link href={`/s/${n.share_token}`} target="_blank" className="text-blue-400 hover:underline">
+                                                    /s/{n.share_token}
+                                                </Link>
+                                            ) : null}
+                                            {n.doc_id ? <span className="text-neutral-600 font-mono">{n.doc_id}</span> : null}
+                                        </div>
+                                    </div>
+
+                                    <form action={markAdminNotificationReadAction}>
+                                        <input type="hidden" name="id" value={n.id} />
+                                        <button
+                                            type="submit"
+                                            className="shrink-0 rounded-md border border-neutral-800 bg-neutral-950 px-2 py-1 text-xs text-neutral-300 hover:bg-neutral-900"
+                                        >
+                                            Read
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                        ))
+                    )
+                ) : expiringSoon.length === 0 ? (
+                    <div className="text-sm text-neutral-500">No aliases expiring soon.</div>
+                ) : (
+                    expiringSoon.map((r) => (
+                        <div key={r.doc_id} className="rounded-lg border border-neutral-800 bg-neutral-950 p-3">
+                            <Link href={`/admin/docs/${r.doc_id}`} className="text-sm text-neutral-200 hover:underline">
+                                {r.doc_title || "Untitled"}
+                            </Link>
+                            <div className="mt-1 text-xs text-neutral-500">Expires: {fmtDate(r.expires_at)}</div>
+                            <div className="mt-1 flex flex-wrap gap-2 text-xs">
+                                {r.alias ? (
+                                    <Link href={`/d/${r.alias}`} target="_blank" className="text-blue-400 hover:underline">
+                                        /d/{r.alias}
+                                    </Link>
+                                ) : null}
+                                <span className="text-neutral-600 font-mono">{r.doc_id}</span>
+                            </div>
+                        </div>
+                    ))
+                )}
+            </div>
+
+            <div className="mt-4 text-xs text-neutral-500">
+                {hasNotificationsTable ? (
+                    <>
+                        Stored in <span className="font-mono">admin_notifications</span>. Run{" "}
+                        <span className="font-mono">scripts/sql/admin_notifications.sql</span> if you haven’t.
+                    </>
+                ) : (
+                    <>
+                        Need to delete a doc? Use the legacy list on{" "}
+                        <Link href="/admin" className="text-blue-400 hover:underline">
+                            /admin
+                        </Link>
+                        .
+                    </>
+                )}
+            </div>
+        </div>
+    </div>
+</div>
 
             {/* SHARES */}
             <div id="shares" className="mt-10">
@@ -1218,6 +1354,63 @@ try {
                                 </div>
                             )
                         ) : null}
+
+{canSeeAll ? (
+    expirationSettings ? (
+        expirationSettings.ok ? (
+            <form action={updateExpirationAlertSettingsAction} className="mt-3 flex flex-wrap items-end gap-3 text-xs">
+                <label className="flex items-center gap-2 text-neutral-300">
+                    <input
+                        type="checkbox"
+                        name="expiration_alerts_enabled"
+                        defaultChecked={expirationSettings.settings.enabled}
+                        className="h-4 w-4 rounded border-neutral-700 bg-neutral-950 text-neutral-200"
+                    />
+                    <span>Expiration alerts enabled</span>
+                </label>
+
+                <label className="flex items-center gap-2 text-neutral-300">
+                    <input
+                        type="checkbox"
+                        name="expiration_alert_email_enabled"
+                        defaultChecked={expirationSettings.settings.emailEnabled}
+                        className="h-4 w-4 rounded border-neutral-700 bg-neutral-950 text-neutral-200"
+                    />
+                    <span>Email alerts enabled</span>
+                </label>
+
+                <label className="flex items-center gap-2 text-neutral-300">
+                    <span>Threshold (days)</span>
+                    <input
+                        type="number"
+                        name="expiration_alert_days"
+                        min={1}
+                        max={30}
+                        defaultValue={expirationSettings.settings.days}
+                        className="w-20 rounded-md border border-neutral-800 bg-neutral-950 px-2 py-1 text-neutral-100"
+                    />
+                </label>
+
+                <button type="submit" className="rounded-md bg-neutral-800 px-3 py-1.5 text-neutral-100 hover:bg-neutral-700">
+                    Save
+                </button>
+
+                <div className="text-neutral-500">
+                    Stored in <span className="font-mono">app_settings</span> (key: <span className="font-mono">expiration_alerts</span>).
+                </div>
+            </form>
+        ) : (
+            <div className="mt-3 text-xs text-neutral-500">
+                Expiration alert settings unavailable (settings read error).
+            </div>
+        )
+    ) : (
+        <div className="mt-3 text-xs text-neutral-500">
+            Optional settings not installed. Run <span className="font-mono">scripts/sql/app_settings.sql</span> to enable.
+        </div>
+    )
+) : null}
+
                     </div>
                     <div className="text-xs text-neutral-500">
                         {canSeeAll ? (

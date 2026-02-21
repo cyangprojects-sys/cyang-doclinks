@@ -17,6 +17,18 @@ const DEFAULT_RETENTION: RetentionSettings = {
   shareGraceDays: 0,
 };
 
+export type ExpirationAlertSettings = {
+  enabled: boolean;
+  days: number; // threshold days (default 3)
+  emailEnabled: boolean; // whether to send emails at all
+};
+
+const DEFAULT_EXPIRATION_ALERTS: ExpirationAlertSettings = {
+  enabled: true,
+  days: 3,
+  emailEnabled: true,
+};
+
 function asBool(v: unknown, fallback: boolean) {
   if (typeof v === "boolean") return v;
   if (typeof v === "string") {
@@ -87,6 +99,68 @@ export async function setRetentionSettings(next: Partial<RetentionSettings>): Pr
     await sql`
       insert into public.app_settings (key, value)
       values ('retention', ${merged as any}::jsonb)
+      on conflict (key) do update set value = excluded.value
+    `;
+    return { ok: true, settings: merged };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return { ok: false, error: msg };
+  }
+}
+
+export async function getExpirationAlertSettings(): Promise<
+  | { ok: true; settings: ExpirationAlertSettings }
+  | { ok: false; error: string }
+> {
+  try {
+    const rows = (await sql`
+      select value
+      from public.app_settings
+      where key = 'expiration_alerts'
+      limit 1
+    `) as unknown as Array<{ value: any }>;
+
+    const value = rows?.[0]?.value ?? null;
+    if (!value || typeof value !== "object") {
+      return { ok: true, settings: { ...DEFAULT_EXPIRATION_ALERTS } };
+    }
+
+    const days = Math.max(1, Math.min(30, asInt(value.days, DEFAULT_EXPIRATION_ALERTS.days)));
+
+    return {
+      ok: true,
+      settings: {
+        enabled: asBool(value.enabled, DEFAULT_EXPIRATION_ALERTS.enabled),
+        days,
+        emailEnabled: asBool(value.emailEnabled, DEFAULT_EXPIRATION_ALERTS.emailEnabled),
+      },
+    };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return { ok: false, error: msg };
+  }
+}
+
+export async function setExpirationAlertSettings(next: Partial<ExpirationAlertSettings>): Promise<
+  | { ok: true; settings: ExpirationAlertSettings }
+  | { ok: false; error: string }
+> {
+  const currentRes = await getExpirationAlertSettings();
+  const current = currentRes.ok ? currentRes.settings : { ...DEFAULT_EXPIRATION_ALERTS };
+
+  const merged: ExpirationAlertSettings = {
+    enabled: typeof next.enabled === "boolean" ? next.enabled : current.enabled,
+    emailEnabled: typeof next.emailEnabled === "boolean" ? next.emailEnabled : current.emailEnabled,
+    days:
+      typeof next.days === "number" && Number.isFinite(next.days)
+        ? Math.max(1, Math.min(30, Math.floor(next.days)))
+        : current.days,
+  };
+
+  try {
+    await sql`
+      insert into public.app_settings (key, value)
+      values ('expiration_alerts', ${merged as any}::jsonb)
       on conflict (key) do update set value = excluded.value
     `;
     return { ok: true, settings: merged };

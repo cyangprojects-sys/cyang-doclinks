@@ -4,6 +4,7 @@ export const dynamic = "force-dynamic";
 import { NextResponse, type NextRequest } from "next/server";
 import { aggregateDocViewDaily } from "@/lib/analytics";
 import { runRetention } from "@/lib/retention";
+import { sendExpirationAlerts } from "@/lib/expirationAlerts";
 
 function isAuthorized(req: NextRequest): boolean {
   const secret = (process.env.CRON_SECRET || "").trim();
@@ -41,11 +42,15 @@ export async function GET(req: NextRequest) {
   // 2) Retention cleanup for raw/high-volume tables
   const retention = await runRetention();
 
+  // 3) Expiration alert emails + in-app notifications
+  const expiration_alerts = await sendExpirationAlerts();
+
   return NextResponse.json({
     ok: true,
     now: new Date().toISOString(),
     duration_ms: Date.now() - startedAt,
     aggregate,
     retention,
+    expiration_alerts,
   });
 }

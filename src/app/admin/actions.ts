@@ -9,7 +9,7 @@ import { sql } from "@/lib/db";
 import { r2Bucket, r2Client, r2Prefix } from "@/lib/r2";
 import { sendMail } from "@/lib/email";
 import { requireDocWrite, requireRole, requireUser } from "@/lib/authz";
-import { setRetentionSettings } from "@/lib/settings";
+import { setRetentionSettings, setExpirationAlertSettings, getExpirationAlertSettings } from "@/lib/settings";
 import { generateApiKey, hashApiKey } from "@/lib/apiKeys";
 import { emitWebhook } from "@/lib/webhooks";
 
@@ -179,6 +179,28 @@ export async function updateRetentionSettingsAction(formData: FormData): Promise
 
   revalidatePath("/admin/dashboard");
 }
+
+
+// Expiration alert settings (admin toggle)
+export async function updateExpirationAlertSettingsAction(formData: FormData): Promise<void> {
+  await requireRole("admin");
+
+  const enabledRaw = String(formData.get("expiration_alerts_enabled") ?? "");
+  const emailEnabledRaw = String(formData.get("expiration_alert_email_enabled") ?? "");
+  const daysRaw = String(formData.get("expiration_alert_days") ?? "");
+
+  const enabled = enabledRaw === "on" || enabledRaw === "true" || enabledRaw === "1";
+  const emailEnabled = emailEnabledRaw === "on" || emailEnabledRaw === "true" || emailEnabledRaw === "1";
+
+  const daysNum = Number(daysRaw);
+  const days = Number.isFinite(daysNum) ? Math.max(1, Math.min(30, Math.floor(daysNum))) : 3;
+
+  const res = await setExpirationAlertSettings({ enabled, emailEnabled, days });
+  if (!res.ok) throw new Error(`Failed to save expiration settings: ${res.error}`);
+
+  revalidatePath("/admin/dashboard");
+}
+
 
 // Used as <form action={deleteDocAction}> — must return void
 export async function deleteDocAction(formData: FormData): Promise<void> {
@@ -555,19 +577,31 @@ export async function bulkDisableAliasesForDocsAction(formData: FormData): Promi
   for (const id of docIds) revalidatePath(`/admin/docs/${id}`);
 }
 
-// Expiration warning email (best-effort; uses doc_aliases.expires_at)
+// Expiration warning email (best-effort; uses doc_aliases.expires_at + share_tokens.expires_at)
 export async function sendExpirationAlertAction(formData: FormData): Promise<void> {
   const u = await requireRole("admin");
 
-  const daysRaw = String(formData.get("days") || "3").trim();
+  const settingsRes = await getExpirationAlertSettings();
+  const settings = settingsRes.ok ? settingsRes.settings : { enabled: true, days: 3, emailEnabled: true };
+
+  const daysRaw = String(formData.get("days") || settings.days || "3").trim();
   const daysNum = Number(daysRaw);
-  const days = Number.isFinite(daysNum) ? Math.max(1, Math.min(30, Math.floor(daysNum))) : 3;
+  const days = Number.isFinite(daysNum) ? Math.max(1, Math.min(30, Math.floor(daysNum))) : settings.days;
+
+  if (!settings.enabled || !settings.emailEnabled) {
+    // Still revalidate, but do nothing.
+    revalidatePath("/admin/dashboard");
+    revalidatePath("/admin");
+    return;
+  }
 
   const base = getBaseUrl();
 
-  let rows: Array<{ doc_id: string; title: string | null; alias: string | null; expires_at: string | null }> = [];
+  let aliasRows: Array<{ doc_id: string; title: string | null; alias: string | null; expires_at: string | null }> = [];
+  let shareRows: Array<{ token: string; doc_id: string; title: string | null; to_email: string | null; expires_at: string | null }> = [];
+
   try {
-    rows = (await sql`
+    aliasRows = (await sql`
       select
         d.id::text as doc_id,
         d.title,
@@ -575,7 +609,8 @@ export async function sendExpirationAlertAction(formData: FormData): Promise<voi
         a.expires_at::text as expires_at
       from public.doc_aliases a
       join public.docs d on d.id = a.doc_id
-      where coalesce(a.is_active, true) = true
+      where d.owner_id = ${u.id}::uuid
+        and coalesce(a.is_active, true) = true
         and a.revoked_at is null
         and a.expires_at is not null
         and a.expires_at > now()
@@ -584,31 +619,70 @@ export async function sendExpirationAlertAction(formData: FormData): Promise<voi
       limit 100
     `) as unknown as Array<{ doc_id: string; title: string | null; alias: string | null; expires_at: string | null }>;
   } catch {
-    rows = [];
+    aliasRows = [];
   }
 
-  const lines = rows.map((r) => {
-    const name = r.title || "Untitled";
-    const docUrl = `${base}/admin/docs/${encodeURIComponent(r.doc_id)}`;
-    const aliasUrl = r.alias ? `${base}/d/${encodeURIComponent(r.alias)}` : "";
-    const exp = r.expires_at || "";
-    return `- ${name} (${r.doc_id})\n  expires: ${exp}\n  admin: ${docUrl}${aliasUrl ? `\n  link: ${aliasUrl}` : ""}`;
-  });
+  try {
+    shareRows = (await sql`
+      select
+        st.token::text as token,
+        d.id::text as doc_id,
+        d.title,
+        st.to_email,
+        st.expires_at::text as expires_at
+      from public.share_tokens st
+      join public.docs d on d.id = st.doc_id
+      where d.owner_id = ${u.id}::uuid
+        and st.revoked_at is null
+        and st.expires_at is not null
+        and st.expires_at > now()
+        and st.expires_at <= (now() + (${days}::int * interval '1 day'))
+      order by st.expires_at asc
+      limit 100
+    `) as unknown as Array<{ token: string; doc_id: string; title: string | null; to_email: string | null; expires_at: string | null }>;
+  } catch {
+    shareRows = [];
+  }
+
+  const lines: string[] = [];
+
+  if (aliasRows.length) {
+    lines.push(`Aliases expiring in the next ${days} day(s):`);
+    for (const r of aliasRows) {
+      const name = r.title || "Untitled";
+      const docUrl = `${base}/admin/docs/${encodeURIComponent(r.doc_id)}`;
+      const aliasUrl = r.alias ? `${base}/d/${encodeURIComponent(r.alias)}` : "";
+      const exp = r.expires_at || "";
+      lines.push(`- ${name} (${r.doc_id})\n  expires: ${exp}\n  admin: ${docUrl}${aliasUrl ? `\n  link: ${aliasUrl}` : ""}`);
+    }
+    lines.push("");
+  }
+
+  if (shareRows.length) {
+    lines.push(`Shares expiring in the next ${days} day(s):`);
+    for (const r of shareRows) {
+      const name = r.title || "Untitled";
+      const docUrl = `${base}/admin/docs/${encodeURIComponent(r.doc_id)}`;
+      const shareUrl = `${base}/s/${encodeURIComponent(r.token)}`;
+      const exp = r.expires_at || "";
+      lines.push(`- ${name} (${r.doc_id})\n  expires: ${exp}\n  token: ${r.token}${r.to_email ? `\n  to: ${r.to_email}` : ""}\n  admin: ${docUrl}\n  link: ${shareUrl}`);
+    }
+    lines.push("");
+  }
 
   const body =
-    rows.length === 0
-      ? `No aliases expiring in the next ${days} day(s).`
-      : `Aliases expiring in the next ${days} day(s):\n\n${lines.join("\n\n")}`;
+    lines.length === 0 ? `No items expiring in the next ${days} day(s).` : lines.join("\n\n");
 
   await sendMail({
     to: u.email,
-    subject: `cyang.io: expiring in ${days} day(s)`,
+    subject: `cyang.io: expirations in ${days} day(s)`,
     text: body,
   });
 
   revalidatePath("/admin/dashboard");
   revalidatePath("/admin");
 }
+
 
 // =========================
 // API Keys (admin/owner)
