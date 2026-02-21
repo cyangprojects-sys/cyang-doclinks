@@ -48,23 +48,87 @@ const PROJECTS: Project[] = [
 export default function ProjectsPage() {
   return (
     <SiteShell maxWidth="6xl">
-      <section className="mt-16">
+      <section className="relative mt-16">
+        <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
+          <div className="absolute -top-28 left-1/3 h-72 w-72 -translate-x-1/2 rounded-full bg-emerald-500/12 blur-3xl" />
+          <div className="absolute -bottom-40 right-0 h-80 w-80 rounded-full bg-white/10 blur-3xl" />
+        </div>
+
         <p className="inline-flex items-center gap-2 rounded-full bg-white/5 px-4 py-2 text-xs text-white/70 ring-1 ring-white/10">
           <span className="h-2 w-2 rounded-full bg-emerald-400" />
           Projects
         </p>
 
         <h1 className="mt-6 text-4xl font-semibold tracking-tight md:text-5xl">
-          Working projects & experiments
+          A small studio of maintained tools
         </h1>
 
         <p className="mt-5 max-w-2xl text-base leading-relaxed text-white/70">
-          A small set of builds I keep maintained. The goal isn’t a huge catalog — it’s a
-          clean list of things that actually ship and improve.
+          I keep the list short on purpose. If it’s here, it’s either live or actively
+          being pushed toward “safe defaults + great UX.”
         </p>
 
+        <div className="mt-10 grid gap-4 md:grid-cols-12">
+          <div className="md:col-span-7">
+            <div className="rounded-3xl bg-white/5 p-6 ring-1 ring-white/10">
+              <div className="flex items-start justify-between gap-6">
+                <div>
+                  <div className="text-xs text-white/60">Flagship</div>
+                  <div className="mt-1 text-2xl font-semibold">Doclinks</div>
+                  <p className="mt-2 text-sm leading-relaxed text-white/70">
+                    Secure document sharing with short links — built for
+                    DocSend-level polish, with a smaller attack surface and server-side
+                    enforcement.
+                  </p>
+                </div>
+                <StatusBadge status="Live" />
+              </div>
+
+              <div className="mt-6 grid gap-3 sm:grid-cols-2">
+                <Micro title="Controls" desc="Expiration, max views, revocation." />
+                <Micro title="Observability" desc="Audit trail, analytics rollups." />
+                <Micro title="Security" desc="R2 private objects, server checks." />
+                <Micro title="UX" desc="Fast pages, minimal UI, predictable flows." />
+              </div>
+
+              <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+                <Link
+                  href="/projects/doclinks"
+                  className="rounded-2xl bg-white px-6 py-3 text-sm font-medium text-black hover:bg-white/90"
+                >
+                  See Doclinks →
+                </Link>
+                <Link
+                  href="/admin"
+                  className="rounded-2xl bg-white/10 px-6 py-3 text-sm font-medium text-white ring-1 ring-white/10 hover:bg-white/15"
+                >
+                  Upload a PDF
+                </Link>
+              </div>
+            </div>
+          </div>
+
+          <div className="md:col-span-5">
+            <div className="rounded-3xl bg-white/5 p-6 ring-1 ring-white/10">
+              <h2 className="text-sm font-medium text-white/90">Now shipping</h2>
+              <div className="mt-4 space-y-3">
+                <NowRow title="Magic links" desc="Friendly aliases, strict server checks." />
+                <NowRow title="Audit logs" desc="Operational clarity: who/when/how." />
+                <NowRow title="Guardrails" desc="Rate limiting and safer defaults." />
+              </div>
+
+              <div className="mt-6 rounded-2xl bg-black/40 p-4 ring-1 ring-white/10">
+                <div className="text-xs text-white/60">Quick demo</div>
+                <Link href="/d/welcome" className="mt-1 inline-flex text-sm text-white/85 hover:underline">
+                  Open /d/welcome →
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div className="mt-10 grid gap-4 md:grid-cols-3">
-          {PROJECTS.map((p) => (
+          {PROJECTS.filter((p) => p.title !== "Doclinks").map((p) => (
             <ProjectCard key={p.title} project={p} />
           ))}
         </div>
@@ -110,8 +174,44 @@ export default function ProjectsPage() {
             </div>
           </div>
         </div>
+
+        <div className="mt-10 rounded-3xl bg-white/5 p-6 ring-1 ring-white/10">
+          <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
+            <div>
+              <h2 className="text-lg font-semibold">Building like a product, not a demo</h2>
+              <p className="mt-2 text-sm leading-relaxed text-white/70">
+                The goal is competitor-level polish: clean UI, predictable policy behavior, and
+                security that holds up under real usage.
+              </p>
+            </div>
+            <Link
+              href="/projects/doclinks"
+              className="rounded-2xl bg-white px-5 py-3 text-sm font-medium text-black hover:bg-white/90"
+            >
+              Go to Doclinks →
+            </Link>
+          </div>
+        </div>
       </section>
     </SiteShell>
+  );
+}
+
+function Micro(props: { title: string; desc: string }) {
+  return (
+    <div className="rounded-2xl bg-white/5 p-4 ring-1 ring-white/10">
+      <div className="text-sm font-medium text-white/90">{props.title}</div>
+      <div className="mt-1 text-xs leading-relaxed text-white/60">{props.desc}</div>
+    </div>
+  );
+}
+
+function NowRow(props: { title: string; desc: string }) {
+  return (
+    <div className="rounded-2xl bg-white/5 p-4 ring-1 ring-white/10">
+      <div className="text-sm font-medium text-white/90">{props.title}</div>
+      <div className="mt-1 text-xs leading-relaxed text-white/60">{props.desc}</div>
+    </div>
   );
 }
 

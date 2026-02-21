@@ -24,20 +24,21 @@ export default function AboutPage() {
         </p>
 
         <h1 className="mt-6 text-4xl font-semibold tracking-tight md:text-5xl">
-          Hi, I’m Chang Yang.
+          About
+          <span className="block text-white/70">How I build and what I’m optimizing for.</span>
         </h1>
 
         <p className="mt-6 max-w-3xl text-base leading-relaxed text-white/70">
-          I build useful tools — usually the kind that makes day-to-day work feel smoother.
-          cyang.io is my personal hub: a place to host working projects, small experiments,
-          and utilities I actually use.
+          cyang.io is a small, product-minded portfolio — a handful of tools that stay
+          maintained, get safer over time, and feel professional to use. I’m especially
+          interested in secure sharing, operational clarity, and fast UX.
         </p>
 
         <div className="mt-10 grid gap-4 md:grid-cols-12">
           <div className="md:col-span-7">
             <Card
               title="How I build"
-              desc="A small set of habits that keeps projects shippable and maintainable."
+              desc="A short playbook that keeps things shipping and hard to misuse."
               items={[
                 "Start minimal → iterate quickly",
                 "Prefer boring tech that scales",
@@ -62,10 +63,18 @@ export default function AboutPage() {
                   href="/admin"
                 />
                 <FocusRow
-                  title="Project list"
-                  desc="A curated, maintained list (no clutter)."
-                  href="/projects"
+                  title="Hardening"
+                  desc="Smaller surface area, stronger defaults, fewer foot-guns."
+                  href="/projects/doclinks"
                 />
+              </div>
+
+              <div className="mt-6 rounded-2xl bg-black/40 p-4 ring-1 ring-white/10">
+                <div className="text-xs text-white/60">Guiding constraint</div>
+                <div className="mt-1 text-sm font-medium text-white/90">Security is the priority.</div>
+                <p className="mt-2 text-xs leading-relaxed text-white/60">
+                  If a feature increases risk or ambiguity, it needs guardrails or it doesn’t ship.
+                </p>
               </div>
             </div>
           </div>
@@ -92,6 +101,37 @@ export default function AboutPage() {
               "Minimal UI and predictable behavior",
             ]}
           />
+        </div>
+
+        <div className="mt-10 grid gap-4 md:grid-cols-12">
+          <div className="md:col-span-7">
+            <div className="rounded-3xl bg-white/5 p-6 ring-1 ring-white/10">
+              <h2 className="text-lg font-semibold">What “competitor-level” means here</h2>
+              <p className="mt-2 text-sm leading-relaxed text-white/70">
+                Clean UX is table stakes. The differentiator is safer defaults and operational
+                confidence: logs you can trust, policies you can reason about, and fewer places
+                to be wrong.
+              </p>
+
+              <div className="mt-6 grid gap-3 sm:grid-cols-2">
+                <Pill title="Predictable policy" desc="Expiry/max views/revocation behave the same everywhere." />
+                <Pill title="Observable" desc="Audit events + analytics rollups make behavior reviewable." />
+                <Pill title="Secure by default" desc="Server-side enforcement, private storage posture." />
+                <Pill title="Fast" desc="Minimal pages and snappy interactions." />
+              </div>
+            </div>
+          </div>
+
+          <div className="md:col-span-5">
+            <div className="rounded-3xl bg-white/5 p-6 ring-1 ring-white/10">
+              <h2 className="text-lg font-semibold">Where to start</h2>
+              <div className="mt-4 grid gap-3">
+                <StartCard title="Doclinks product page" desc="Controls, security model, roadmap." href="/projects/doclinks" />
+                <StartCard title="Upload a PDF" desc="Create a doc and generate a share link." href="/admin" />
+                <StartCard title="Project list" desc="Everything else that’s maintained." href="/projects" />
+              </div>
+            </div>
+          </div>
         </div>
 
         <div className="mt-10 rounded-3xl bg-white/5 p-6 ring-1 ring-white/10">
@@ -168,6 +208,30 @@ function FocusRow(props: { title: string; desc: string; href: string }) {
     <Link
       href={props.href}
       className="flex items-start justify-between gap-6 rounded-2xl bg-white/5 p-4 ring-1 ring-white/10 hover:bg-white/10"
+    >
+      <div>
+        <div className="text-sm font-medium text-white/90">{props.title}</div>
+        <div className="mt-1 text-xs leading-relaxed text-white/60">{props.desc}</div>
+      </div>
+      <span className="mt-0.5 text-white/50">→</span>
+    </Link>
+  );
+}
+
+function Pill(props: { title: string; desc: string }) {
+  return (
+    <div className="rounded-2xl bg-white/5 p-4 ring-1 ring-white/10">
+      <div className="text-sm font-medium text-white/90">{props.title}</div>
+      <div className="mt-1 text-xs leading-relaxed text-white/60">{props.desc}</div>
+    </div>
+  );
+}
+
+function StartCard(props: { title: string; desc: string; href: string }) {
+  return (
+    <Link
+      href={props.href}
+      className="flex items-start justify-between gap-6 rounded-2xl bg-white/5 p-5 ring-1 ring-white/10 hover:bg-white/10"
     >
       <div>
         <div className="text-sm font-medium text-white/90">{props.title}</div>

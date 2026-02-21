@@ -37,6 +37,14 @@ export default function DoclinksPage() {
             smaller, safer surface area.
           </p>
 
+          <div className="mt-6 flex flex-wrap gap-2 text-xs text-white/60">
+            <Pill>Expires shares</Pill>
+            <Pill>Max views</Pill>
+            <Pill>Revocation</Pill>
+            <Pill>Audit logs</Pill>
+            <Pill>Rate limiting</Pill>
+          </div>
+
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
             <Link
               href="/admin"
@@ -164,6 +172,89 @@ export default function DoclinksPage() {
         </div>
       </section>
 
+      {/* Competitive angle */}
+      <section className="mt-16">
+        <div className="flex items-end justify-between gap-6">
+          <div>
+            <h2 className="text-2xl font-semibold tracking-tight">Why it’s built this way</h2>
+            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-white/70">
+              Most “document sharing” products lean heavily on the secrecy of a link. Doclinks
+              treats links as convenience — and enforces policy on every request.
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-6 grid gap-4 md:grid-cols-12">
+          <div className="md:col-span-7">
+            <div className="rounded-3xl bg-white/5 p-6 ring-1 ring-white/10">
+              <h3 className="text-sm font-medium text-white/90">Doclinks vs typical share links</h3>
+              <div className="mt-4 space-y-3">
+                <Compare
+                  leftTitle="Policy"
+                  left="Server-side checks every time (expiry, max views, rate limits)."
+                  rightTitle="Typical"
+                  right="Often: “If you have the link, you’re in.”"
+                />
+                <Compare
+                  leftTitle="Observability"
+                  left="Audit logs + rollups so you can review access."
+                  rightTitle="Typical"
+                  right="Little-to-no reliable access history."
+                />
+                <Compare
+                  leftTitle="Surface area"
+                  left="Keep endpoints minimal; harden the critical path."
+                  rightTitle="Typical"
+                  right="Many features → more places to be wrong."
+                />
+              </div>
+
+              <div className="mt-6 rounded-2xl bg-black/40 p-4 ring-1 ring-white/10">
+                <p className="text-xs leading-relaxed text-white/60">
+                  Note: “better than competitor” here means a design target — smaller surface
+                  area, stronger defaults, and more operational clarity.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="md:col-span-5">
+            <div className="rounded-3xl bg-white/5 p-6 ring-1 ring-white/10">
+              <h3 className="text-sm font-medium text-white/90">What you can control</h3>
+              <div className="mt-4 grid gap-3">
+                <Control title="Time-box access" desc="Reduce risk with expiration." />
+                <Control title="Cap usage" desc="Max views stops infinite forwarding." />
+                <Control title="Revoke instantly" desc="Disable a token server-side." />
+                <Control title="Review access" desc="Logs help you validate behavior." />
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* FAQ */}
+      <section className="mt-16">
+        <h2 className="text-2xl font-semibold tracking-tight">FAQ</h2>
+        <div className="mt-6 grid gap-4 md:grid-cols-2">
+          <Faq
+            q="Is this secure if someone forwards the link?"
+            a="Forwarding a link is expected. Doclinks relies on server-side enforcement (expiry, max views, rate limits, policy checks) rather than treating the URL as a password."
+          />
+          <Faq
+            q="Do R2 objects ever become public?"
+            a="The intended posture is private objects with access mediated by the app. The app decides if a request is allowed, then serves the content."
+          />
+          <Faq
+            q="Is this a DocSend clone?"
+            a="No. It’s a focused subset with a smaller surface area: fast sharing + strong defaults + auditability."
+          />
+          <Faq
+            q="What’s next?"
+            a="Hardening the share model (one-time tickets, stronger viewer controls) and making analytics/retention fully automated."
+          />
+        </div>
+      </section>
+
       <section className="mt-16">
         <h2 className="text-2xl font-semibold tracking-tight">Use it</h2>
         <div className="mt-6 grid gap-4 md:grid-cols-2">
@@ -257,6 +348,45 @@ function Control(props: { title: string; desc: string }) {
     <div className="rounded-2xl bg-white/5 p-4 ring-1 ring-white/10">
       <div className="text-sm font-medium text-white/90">{props.title}</div>
       <div className="mt-1 text-xs leading-relaxed text-white/60">{props.desc}</div>
+    </div>
+  );
+}
+
+function Pill({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="rounded-full bg-white/5 px-3 py-1 text-[11px] text-white/60 ring-1 ring-white/10">
+      {children}
+    </span>
+  );
+}
+
+function Compare(props: {
+  leftTitle: string;
+  left: string;
+  rightTitle: string;
+  right: string;
+}) {
+  return (
+    <div className="rounded-2xl bg-white/5 p-4 ring-1 ring-white/10">
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div>
+          <div className="text-xs font-medium text-white/80">{props.leftTitle}</div>
+          <div className="mt-1 text-xs leading-relaxed text-white/60">{props.left}</div>
+        </div>
+        <div>
+          <div className="text-xs font-medium text-white/80">{props.rightTitle}</div>
+          <div className="mt-1 text-xs leading-relaxed text-white/60">{props.right}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Faq(props: { q: string; a: string }) {
+  return (
+    <div className="rounded-3xl bg-white/5 p-6 ring-1 ring-white/10">
+      <div className="text-sm font-medium text-white/90">{props.q}</div>
+      <p className="mt-2 text-sm leading-relaxed text-white/70">{props.a}</p>
     </div>
   );
 }

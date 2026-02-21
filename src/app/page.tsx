@@ -29,14 +29,14 @@ export default function HomePage() {
             </p>
 
             <h1 className="mt-6 text-4xl font-semibold leading-tight tracking-tight md:text-6xl">
-              Hi, I’m Chang Yang.
-              <span className="block text-white/70">I build useful tools.</span>
+              Build in public.
+              <span className="block text-white/70">Ship like a security team is watching.</span>
             </h1>
 
             <p className="mt-6 max-w-xl text-base leading-relaxed text-white/70">
-              cyang.io is my home base — a small set of practical projects that I keep
-              maintained. Minimal UI, strict defaults, and a focus on security where it
-              matters.
+              cyang.io is my home base — a small set of maintained projects that ship
+              quickly without getting sloppy. The theme is consistent: minimal UI,
+              strict defaults, and security where it matters.
             </p>
 
             <div className="mt-10 flex flex-col gap-3 sm:flex-row">
@@ -66,6 +66,14 @@ export default function HomePage() {
               <Stat title="Build style" value="Small & reliable" />
               <Stat title="Default posture" value="Secure-first" />
               <Stat title="Focus" value="Fast UX" />
+            </div>
+
+            <div className="mt-8 flex flex-wrap items-center gap-2 text-xs text-white/60">
+              <TrustPill>Server-side enforcement</TrustPill>
+              <TrustPill>Audit logs</TrustPill>
+              <TrustPill>Rate limits</TrustPill>
+              <TrustPill>R2 private objects</TrustPill>
+              <TrustPill>Postgres-backed policies</TrustPill>
             </div>
           </div>
 
@@ -108,6 +116,17 @@ export default function HomePage() {
                     </Link>
                   }
                 />
+              </div>
+
+              <div className="mt-5 rounded-2xl bg-black/40 p-5 ring-1 ring-white/10">
+                <div className="text-xs text-white/60">Positioning</div>
+                <div className="mt-1 text-sm font-medium text-white/90">
+                  DocSend-level UX, with a smaller surface area.
+                </div>
+                <p className="mt-2 text-xs leading-relaxed text-white/60">
+                  Designed to be easy for viewers and hard to misuse: server checks, limits,
+                  and clean failure modes.
+                </p>
               </div>
             </div>
           </div>
@@ -200,6 +219,59 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+
+      {/* Why this exists */}
+      <section className="mt-16 md:mt-24">
+        <div className="grid gap-4 md:grid-cols-12">
+          <div className="md:col-span-7">
+            <div className="rounded-3xl bg-white/5 p-6 ring-1 ring-white/10">
+              <h2 className="text-2xl font-semibold tracking-tight">Why cyang.io</h2>
+              <p className="mt-3 text-sm leading-relaxed text-white/70">
+                I want the site to read like a small product studio: a handful of tools that
+                stay maintained, get safer over time, and feel professional to use.
+              </p>
+
+              <div className="mt-6 grid gap-3 sm:grid-cols-2">
+                <Bullet
+                  title="Better than “link secrecy”"
+                  desc="Doclinks treats links as convenience, not security — enforcement happens server-side."
+                />
+                <Bullet
+                  title="Operational confidence"
+                  desc="Audit trails, rate limits, and predictable policies help you trust what’s live."
+                />
+                <Bullet
+                  title="Performance as a feature"
+                  desc="Fast pages, minimal JS, and tight UI so the product stays snappy."
+                />
+                <Bullet
+                  title="Security-first roadmap"
+                  desc="Smaller surface area, stronger controls, and gradual hardening over time."
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="md:col-span-5">
+            <div className="rounded-3xl bg-white/5 p-6 ring-1 ring-white/10">
+              <h3 className="text-sm font-medium text-white/90">Next steps</h3>
+              <div className="mt-4 space-y-3">
+                <NextStep title="Try Doclinks" desc="Upload a PDF and generate a short link." href="/admin" />
+                <NextStep
+                  title="Read the product page"
+                  desc="Understand the access model and controls."
+                  href="/projects/doclinks"
+                />
+                <NextStep
+                  title="See the project list"
+                  desc="A curated set of maintained builds."
+                  href="/projects"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
     </SiteShell>
   );
 }
@@ -240,6 +312,29 @@ function MiniCard(props: { title: string; desc: string; href: string; cta: strin
       <div className="text-lg font-semibold">{props.title}</div>
       <p className="mt-2 text-sm leading-relaxed text-white/70">{props.desc}</p>
       <div className="mt-4 text-sm text-white/80 group-hover:text-white">{props.cta}</div>
+    </Link>
+  );
+}
+
+function TrustPill({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="rounded-full bg-white/5 px-3 py-1 text-[11px] text-white/60 ring-1 ring-white/10">
+      {children}
+    </span>
+  );
+}
+
+function NextStep(props: { title: string; desc: string; href: string }) {
+  return (
+    <Link
+      href={props.href}
+      className="flex items-start justify-between gap-6 rounded-2xl bg-white/5 p-4 ring-1 ring-white/10 hover:bg-white/10"
+    >
+      <div>
+        <div className="text-sm font-medium text-white/90">{props.title}</div>
+        <div className="mt-1 text-xs leading-relaxed text-white/60">{props.desc}</div>
+      </div>
+      <span className="mt-0.5 text-white/50">→</span>
     </Link>
   );
 }
