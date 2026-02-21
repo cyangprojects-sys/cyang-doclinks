@@ -2,7 +2,7 @@
 
 // src/app/admin/api-keys/CreateApiKeyForm.tsx
 import { useState, useTransition } from "react";
-import { createApiKeyAction } from "../actions";
+import { createApiKeyAction } from "../../actions";
 
 export default function CreateApiKeyForm() {
   const [name, setName] = useState("");

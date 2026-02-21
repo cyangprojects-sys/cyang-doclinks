@@ -2,7 +2,7 @@
 
 // src/app/admin/api-keys/RevokeApiKeyButton.tsx
 import { useTransition } from "react";
-import { revokeApiKeyAction } from "../actions";
+import { revokeApiKeyAction } from "../../actions";
 
 export default function RevokeApiKeyButton({ id }: { id: string }) {
   const [pending, start] = useTransition();
