@@ -6,6 +6,17 @@ import { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import RevokeShareForm from "./RevokeShareForm";
 import SharePasswordForm from "./SharePasswordForm";
+import {
+    revokeDocShareAction,
+    setSharePasswordAction,
+    clearSharePasswordAction,
+    extendShareExpirationAction,
+    setShareMaxViewsAction,
+    resetShareViewsCountAction,
+    forceSharePasswordResetAction,
+    bulkRevokeSharesAction,
+    bulkExtendSharesAction,
+} from "../actions";
 
 export type ShareRow = {
     token: string;
@@ -59,15 +70,8 @@ function statusBadge(status: Exclude<Status, "all">) {
 
 export default function SharesTableClient(props: {
     shares: ShareRow[];
-    revokeAction: (formData: FormData) => Promise<void>;
-    setPasswordAction: (formData: FormData) => Promise<void>;
-    clearPasswordAction: (formData: FormData) => Promise<void>;
-    extendShareExpirationAction: (formData: FormData) => Promise<void>;
-    setShareMaxViewsAction: (formData: FormData) => Promise<void>;
-    resetShareViewsCountAction: (formData: FormData) => Promise<void>;
-    forceSharePasswordResetAction: (formData: FormData) => Promise<void>;
-    bulkRevokeSharesAction: (formData: FormData) => Promise<void>;
-    bulkExtendSharesAction: (formData: FormData) => Promise<void>;
+    // Server actions are imported directly in this Client Component.
+    // (Next.js disallows passing functions from Server Components to Client Components.)
 }) {
     const sp = useSearchParams();
     const router = useRouter();
@@ -392,8 +396,8 @@ export default function SharesTableClient(props: {
                                                 <SharePasswordForm
                                                     token={s.token}
                                                     hasPassword={Boolean(s.has_password)}
-                                                    setAction={props.setPasswordAction}
-                                                    clearAction={props.clearPasswordAction}
+                                                    setAction={setSharePasswordAction}
+                                                    clearAction={clearSharePasswordAction}
                                                 />
                                             </td>
 
@@ -410,7 +414,7 @@ export default function SharesTableClient(props: {
                                                         Copy
                                                     </button>
 
-                                                    <form action={props.extendShareExpirationAction}>
+                                                    <form action={extendShareExpirationAction}>
                                                         <input type="hidden" name="token" value={s.token} />
                                                         <input type="hidden" name="days" value="7" />
                                                         <button
@@ -422,7 +426,7 @@ export default function SharesTableClient(props: {
                                                         </button>
                                                     </form>
 
-                                                    <form action={props.extendShareExpirationAction}>
+                                                    <form action={extendShareExpirationAction}>
                                                         <input type="hidden" name="token" value={s.token} />
                                                         <input type="hidden" name="days" value="30" />
                                                         <button
@@ -434,7 +438,7 @@ export default function SharesTableClient(props: {
                                                         </button>
                                                     </form>
 
-                                                    <form action={props.resetShareViewsCountAction}>
+                                                    <form action={resetShareViewsCountAction}>
                                                         <input type="hidden" name="token" value={s.token} />
                                                         <button
                                                             type="submit"
@@ -445,7 +449,7 @@ export default function SharesTableClient(props: {
                                                         </button>
                                                     </form>
 
-                                                    <form action={props.forceSharePasswordResetAction}>
+                                                    <form action={forceSharePasswordResetAction}>
                                                         <input type="hidden" name="token" value={s.token} />
                                                         <button
                                                             type="submit"
@@ -457,7 +461,7 @@ export default function SharesTableClient(props: {
                                                     </form>
 
                                                     <form
-                                                        action={props.setShareMaxViewsAction}
+                                                        action={setShareMaxViewsAction}
                                                         onSubmit={(e) => {
                                                             const input =
                                                                 (e.currentTarget.querySelector(
@@ -487,7 +491,7 @@ export default function SharesTableClient(props: {
                                                         </button>
                                                     </form>
 
-                                                    <RevokeShareForm token={s.token} revoked={Boolean(s.revoked_at)} action={props.revokeAction} />
+                                                    <RevokeShareForm token={s.token} revoked={Boolean(s.revoked_at)} action={revokeDocShareAction} />
                                                 </div>
                                             </td>
                                         </tr>
@@ -507,7 +511,7 @@ export default function SharesTableClient(props: {
 
                 <div className="flex flex-wrap gap-2">
                     <form
-                        action={props.bulkRevokeSharesAction}
+                        action={bulkRevokeSharesAction}
                         onSubmit={(e) => {
                             if (!anySelected) e.preventDefault();
                         }}
@@ -523,7 +527,7 @@ export default function SharesTableClient(props: {
                     </form>
 
                     <form
-                        action={props.bulkExtendSharesAction}
+                        action={bulkExtendSharesAction}
                         onSubmit={(e) => {
                             if (!anySelected) {
                                 e.preventDefault();

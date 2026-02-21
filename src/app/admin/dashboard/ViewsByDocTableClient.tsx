@@ -4,6 +4,13 @@
 import Link from "next/link";
 import { useMemo, useState, useEffect } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import {
+    revokeAllSharesForDocAction,
+    disableAliasForDocAction,
+    extendAliasExpirationAction,
+    bulkRevokeAllSharesForDocsAction,
+    bulkDisableAliasesForDocsAction,
+} from "../actions";
 
 export type ViewsByDocRow = {
     doc_id: string;
@@ -23,11 +30,7 @@ function fmtDate(s: string | null) {
 
 export default function ViewsByDocTableClient(props: {
     rows: ViewsByDocRow[];
-    revokeAllSharesForDocAction: (formData: FormData) => Promise<void>;
-    disableAliasForDocAction: (formData: FormData) => Promise<void>;
-    extendAliasExpirationAction: (formData: FormData) => Promise<void>;
-    bulkRevokeAllSharesForDocsAction: (formData: FormData) => Promise<void>;
-    bulkDisableAliasesForDocsAction: (formData: FormData) => Promise<void>;
+    // Server actions are imported directly in this Client Component.
 }) {
     const sp = useSearchParams();
     const router = useRouter();
@@ -258,7 +261,7 @@ export default function ViewsByDocTableClient(props: {
                                                     Copy link
                                                 </button>
 
-                                                <form action={props.revokeAllSharesForDocAction}>
+                                                <form action={revokeAllSharesForDocAction}>
                                                     <input type="hidden" name="docId" value={r.doc_id} />
                                                     <button
                                                         type="submit"
@@ -268,7 +271,7 @@ export default function ViewsByDocTableClient(props: {
                                                     </button>
                                                 </form>
 
-                                                <form action={props.extendAliasExpirationAction}>
+                                                <form action={extendAliasExpirationAction}>
                                                     <input type="hidden" name="docId" value={r.doc_id} />
                                                     <input type="hidden" name="days" value="7" />
                                                     <button
@@ -279,7 +282,7 @@ export default function ViewsByDocTableClient(props: {
                                                     </button>
                                                 </form>
 
-                                                <form action={props.disableAliasForDocAction}>
+                                                <form action={disableAliasForDocAction}>
                                                     <input type="hidden" name="docId" value={r.doc_id} />
                                                     <button
                                                         type="submit"
@@ -306,7 +309,7 @@ export default function ViewsByDocTableClient(props: {
 
                 <div className="flex flex-wrap gap-2">
                     <form
-                        action={props.bulkRevokeAllSharesForDocsAction}
+                        action={bulkRevokeAllSharesForDocsAction}
                         onSubmit={(e) => {
                             if (!anySelected) e.preventDefault();
                         }}
@@ -322,7 +325,7 @@ export default function ViewsByDocTableClient(props: {
                     </form>
 
                     <form
-                        action={props.bulkDisableAliasesForDocsAction}
+                        action={bulkDisableAliasesForDocsAction}
                         onSubmit={(e) => {
                             if (!anySelected) e.preventDefault();
                         }}
