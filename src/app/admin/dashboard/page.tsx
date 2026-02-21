@@ -3,7 +3,6 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { sql } from "@/lib/db";
 import { getAuthedUser } from "@/lib/authz";
-import DeleteDocForm from "../DeleteDocForm";
 import {
     updateRetentionSettingsAction,
     sendExpirationAlertAction,
@@ -839,7 +838,7 @@ try {
 
                 <div className="mt-4 grid gap-4 lg:grid-cols-3">
                     <div className="lg:col-span-2">
-                        <UnifiedDocsTableClient rows={unifiedDocsClient} defaultPageSize={10} />
+                        <UnifiedDocsTableClient rows={unifiedDocsClient} defaultPageSize={10} showDelete={u.role === "owner" || u.role === "admin"} />
                     </div>
 
                     <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-4">

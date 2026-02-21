@@ -2,6 +2,8 @@
 "use client";
 
 import Link from "next/link";
+import DeleteDocForm from "../DeleteDocForm";
+import { deleteDocAction } from "../actions";
 import { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
@@ -77,10 +79,12 @@ function Badge({ label, tone }: { label: string; tone: "good" | "warn" | "bad" |
 export default function UnifiedDocsTableClient(props: {
     rows: UnifiedDocRow[];
     defaultPageSize?: number;
+    showDelete?: boolean;
 }) {
     const sp = useSearchParams();
     const router = useRouter();
     const pathname = usePathname();
+    const showDelete = !!props.showDelete;
 
     const [q, setQ] = useState("");
     const [page, setPage] = useState(1);
@@ -257,6 +261,9 @@ export default function UnifiedDocsTableClient(props: {
                                     Status
                                 </button>
                             </th>
+                            {showDelete ? (
+                                <th className="px-4 py-3 text-right">Actions</th>
+                            ) : null}
                         </tr>
                     </thead>
                     <tbody>
@@ -300,6 +307,15 @@ export default function UnifiedDocsTableClient(props: {
                                         <td className="px-4 py-3">
                                             <Badge label={st.label} tone={st.tone} />
                                         </td>
+                                        {showDelete ? (
+                                            <td className="px-4 py-3 text-right">
+                                                <DeleteDocForm
+                                                    docId={r.doc_id}
+                                                    title={r.doc_title || r.alias || r.doc_id}
+                                                    action={deleteDocAction}
+                                                />
+                                            </td>
+                                        ) : null}
                                     </tr>
                                 );
                             })
