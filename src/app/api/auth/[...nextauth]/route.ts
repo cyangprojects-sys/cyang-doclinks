@@ -1,6 +1,8 @@
-import { handlers } from "@/auth";
+import NextAuth from "next-auth/next";
+import { authOptions } from "@/auth";
 
-// Ensure Node.js runtime (OIDC + crypto + DB adapters are more reliable here than Edge)
 export const runtime = "nodejs";
 
-export const { GET, POST } = handlers;
+const handler = NextAuth(authOptions);
+
+export { handler as GET, handler as POST };

@@ -2,15 +2,12 @@
 
 import { signIn } from "next-auth/react";
 
-// Client-side check only (no secrets). This mirrors server-side gating.
-const enterpriseConfigured =
+// Optional UI toggle: set NEXT_PUBLIC_ENTERPRISE_SSO_ENABLED=true once configured.
+const configured =
   typeof process !== "undefined" &&
-  !!process.env.NEXT_PUBLIC_OIDC_CONFIGURED &&
-  process.env.NEXT_PUBLIC_OIDC_CONFIGURED === "true";
+  process.env.NEXT_PUBLIC_ENTERPRISE_SSO_ENABLED === "true";
 
 export default function SignInPage() {
-  const configured = enterpriseConfigured;
-
   return (
     <div className="min-h-[calc(100vh-64px)] flex items-center justify-center px-4">
       <div className="w-full max-w-md rounded-2xl border border-white/10 bg-black/30 backdrop-blur p-6 shadow-lg">
@@ -51,20 +48,19 @@ export default function SignInPage() {
             Configure env vars in Vercel:
           </p>
           <ul className="mt-2 text-xs text-white/70 list-disc pl-5 space-y-1">
-            <li><code>AUTH_URL</code> = https://www.cyang.io</li>
-            <li><code>AUTH_SECRET</code> = long random</li>
-            <li><code>AUTH_TRUST_HOST</code> = true (recommended)</li>
+            <li><code>NEXTAUTH_URL</code> = https://www.cyang.io</li>
+            <li><code>NEXTAUTH_SECRET</code> = long random</li>
             <li><code>OIDC_ISSUER</code> (from IdP)</li>
             <li><code>OIDC_CLIENT_ID</code> (from IdP)</li>
             <li><code>OIDC_CLIENT_SECRET</code> (from IdP)</li>
-            <li><code>NEXT_PUBLIC_OIDC_CONFIGURED</code> = true (optional; enables button UI)</li>
+            <li><code>NEXT_PUBLIC_ENTERPRISE_SSO_ENABLED</code> = true (optional; enables button UI)</li>
           </ul>
-        </div>
 
-        <p className="mt-6 text-xs text-white/50">
-          If you don&apos;t have an issuer yet, leave the OIDC env vars unset—this page will remain visible,
-          and SSO will show as not configured until your customer provides their IdP details.
-        </p>
+          <p className="mt-3 text-xs text-white/70">
+            If you don&apos;t have an issuer yet, leave the OIDC env vars unset. Keep the SSO button disabled
+            until your customer provides their IdP details.
+          </p>
+        </div>
       </div>
     </div>
   );
