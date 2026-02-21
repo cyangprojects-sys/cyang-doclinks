@@ -6,6 +6,7 @@ import bcrypt from "bcryptjs";
 import { sql } from "@/lib/db";
 import { verifyApiKeyFromRequest } from "@/lib/apiAuth";
 import { emitWebhook } from "@/lib/webhooks";
+import { assertCanCreateShare, getPlanForUser, normalizeExpiresAtForPlan } from "@/lib/monetization";
 import crypto from "crypto";
 
 function newToken(): string {
@@ -38,11 +39,21 @@ export async function POST(req: NextRequest) {
   `) as unknown as Array<{ "?column?": number }>;
   if (!owns.length) return NextResponse.json({ ok: false, error: "FORBIDDEN" }, { status: 403 });
 
+
+// --- Monetization / plan limits (hidden) ---
+const shareAllowed = await assertCanCreateShare(auth.ownerId);
+if (!shareAllowed.ok) {
+  return NextResponse.json({ ok: false, error: shareAllowed.error, message: shareAllowed.message }, { status: 403 });
+}
+const plan = await getPlanForUser(auth.ownerId);
+
   const toEmailRaw = String(body?.to_email || body?.toEmail || "").trim();
   const toEmail = toEmailRaw ? toEmailRaw.toLowerCase() : null;
 
   const expiresAtRaw = String(body?.expires_at || body?.expiresAt || "").trim();
   const expiresAt = expiresAtRaw && !Number.isNaN(Date.parse(expiresAtRaw)) ? new Date(expiresAtRaw).toISOString() : null;
+
+  const normalizedExpiresAt = normalizeExpiresAtForPlan({ plan, requestedExpiresAtIso: expiresAt, defaultDaysIfNotAllowed: 14 });
 
   const maxViewsRaw = body?.max_views ?? body?.maxViews;
   const maxViewsNum = maxViewsRaw === null || maxViewsRaw === undefined ? null : Number(maxViewsRaw);
@@ -83,12 +94,12 @@ try {
     insert into public.share_tokens
       (token, doc_id, to_email, expires_at, max_views, password_hash, allowed_countries, blocked_countries, watermark_enabled, watermark_text)
     values
-      (${token}, ${docId}::uuid, ${toEmail}, ${expiresAt}, ${maxViews}, ${passwordHash}, ${allowedCountries}, ${blockedCountries}, ${watermarkEnabled ?? false}, ${watermarkText})
+      (${token}, ${docId}::uuid, ${toEmail}, ${normalizedExpiresAt}, ${maxViews}, ${passwordHash}, ${allowedCountries}, ${blockedCountries}, ${watermarkEnabled ?? false}, ${watermarkText})
   `;
 } catch {
   await sql`
     insert into public.share_tokens (token, doc_id, to_email, expires_at, max_views, password_hash)
-    values (${token}, ${docId}::uuid, ${toEmail}, ${expiresAt}, ${maxViews}, ${passwordHash})
+    values (${token}, ${docId}::uuid, ${toEmail}, ${normalizedExpiresAt}, ${maxViews}, ${passwordHash})
   `;
 }
 

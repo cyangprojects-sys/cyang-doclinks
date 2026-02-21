@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { slugify } from "@/lib/slug";
 import { requireDocWrite } from "@/lib/authz";
+import { incrementUploads } from "@/lib/monetization";
 
 type CompleteRequest = {
   // Newer flow: doc_id from /presign response
@@ -86,6 +87,25 @@ export async function POST(req: NextRequest) {
         status = 'ready'
       where id = ${docId}::uuid
     `;
+
+// --- Monetization counters (hidden) ---
+// Count this as an upload for the doc owner (usually the signed-in user).
+try {
+  const usageRows = (await sql`
+    select owner_id::text as owner_id
+    from public.docs
+    where id = ${docId}::uuid
+    limit 1
+  `) as unknown as Array<{ owner_id: string | null }>;
+  const ownerId = usageRows?.[0]?.owner_id ?? null;
+  if (ownerId) {
+    await incrementUploads(ownerId, 1);
+  }
+} catch (e) {
+  // best-effort; do not block completion
+  console.warn("Failed to increment upload usage:", e);
+}
+
 
     // 4) Generate alias base
     let base = slugify(title || originalFilename || existingName || "document");

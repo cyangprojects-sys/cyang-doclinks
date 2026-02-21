@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { cookies } from "next/headers";
 import { consumeShareTokenView } from "@/lib/resolveDoc";
+import { assertCanServeView, incrementMonthlyViews } from "@/lib/monetization";
 import { getClientIpFromHeaders, getUserAgentFromHeaders, logDocAccess } from "@/lib/audit";
 import crypto from "crypto";
 import { rateLimit, rateLimitHeaders, stableHash } from "@/lib/rateLimit";
@@ -183,6 +184,31 @@ export async function GET(
   // Enforce + increment max views here too (raw link is often what the PDF viewer hits).
   // We only count once per initial range request to avoid burning views on chunked fetches.
   if (shouldCountView(req)) {
+// --- Monetization / plan limits (hidden) ---
+// Enforce the *document owner's* monthly view cap before consuming a share view.
+let ownerIdForLimit: string | null = null;
+try {
+  const ownerRows = (await sql`
+    select d.owner_id::text as owner_id
+    from public.share_tokens st
+    join public.docs d on d.id = st.doc_id
+    where st.token = ${token}
+    limit 1
+  `) as unknown as Array<{ owner_id: string | null }>;
+  ownerIdForLimit = ownerRows?.[0]?.owner_id ?? null;
+
+  if (ownerIdForLimit) {
+    const allowed = await assertCanServeView(ownerIdForLimit);
+    if (!allowed.ok) {
+      return new NextResponse("Temporarily unavailable", { status: 429 });
+    }
+  }
+} catch (e) {
+  // best-effort; do not block on lookup failure
+  ownerIdForLimit = null;
+}
+
+
     const consumed = await consumeShareTokenView(token);
     if (!consumed.ok) {
       switch (consumed.error) {
@@ -195,6 +221,16 @@ export async function GET(
         default:
           return new NextResponse("Not found", { status: 404 });
       }
+
+// Count view against the owner's monthly quota (best-effort).
+if (ownerIdForLimit) {
+  try {
+    await incrementMonthlyViews(ownerIdForLimit, 1);
+  } catch {
+    // ignore
+  }
+}
+
     }
 
     // Audit log (best-effort) — only on the first counted request

@@ -6,6 +6,7 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { sql } from "@/lib/db";
 import { r2Client, r2Bucket } from "@/lib/r2";
 import { requireUser } from "@/lib/authz";
+import { assertCanUpload } from "@/lib/monetization";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -45,7 +46,16 @@ export async function POST(req: Request) {
             return NextResponse.json({ ok: false, error: "NOT_PDF" }, { status: 400 });
         }
 
-        const docId = crypto.randomUUID();
+        // --- Monetization / plan limits (hidden) ---
+const canUpload = await assertCanUpload({ userId: user.id, sizeBytes: sizeBytes ?? null });
+if (!canUpload.ok) {
+    return NextResponse.json(
+        { ok: false, error: canUpload.error, message: canUpload.message },
+        { status: 403 }
+    );
+}
+
+const docId = crypto.randomUUID();
         const keyPrefix = getKeyPrefix();
         const safeName = safeKeyPart(
             filename.toLowerCase().endsWith(".pdf") ? filename : `${filename}.pdf`

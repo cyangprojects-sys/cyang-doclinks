@@ -8,6 +8,8 @@ import { sql } from "@/lib/db";
 import { aliasTrustCookieName, isAliasTrusted } from "@/lib/deviceTrust";
 import { rateLimit, rateLimitHeaders, stableHash } from "@/lib/rateLimit";
 import { mintAccessTicket } from "@/lib/accessTicket";
+import { assertCanServeView, incrementMonthlyViews } from "@/lib/monetization";
+import crypto from "crypto";
 
 function normAlias(alias: string): string {
   return decodeURIComponent(String(alias || "")).trim().toLowerCase();
@@ -17,6 +19,19 @@ function isExpired(expiresAt: string | null): boolean {
   if (!expiresAt) return false;
   const t = new Date(expiresAt).getTime();
   return Number.isFinite(t) && t <= Date.now();
+}
+
+
+function hashIp(ip: string) {
+  const salt = (process.env.VIEW_SALT || "").trim();
+  if (!salt || !ip) return null;
+  return crypto.createHmac("sha256", salt).update(ip).digest("hex").slice(0, 32);
+}
+
+function shouldCountView(req: NextRequest): boolean {
+  // Avoid burning views on Range/chunk fetches
+  const range = req.headers.get("range") || "";
+  return !range;
 }
 
 async function getAliasRow(aliasInput: string): Promise<
@@ -155,6 +170,59 @@ export async function GET(
 
     const filename = pickFilename(resolved.title, resolved.originalFilename, alias) + ".pdf";
     const contentType = resolved.contentType || "application/pdf";
+// --- Monetization / plan limits (hidden) ---
+// Enforce the document owner's monthly view quota.
+if (shouldCountView(req)) {
+  try {
+    const ownerRows = (await sql`
+      select owner_id::text as owner_id
+      from public.docs
+      where id = ${row.docId}::uuid
+      limit 1
+    `) as unknown as Array<{ owner_id: string | null }>;
+    const ownerId = ownerRows?.[0]?.owner_id ?? null;
+
+    if (ownerId) {
+      const allowed = await assertCanServeView(ownerId);
+      if (!allowed.ok) {
+        return new NextResponse("Temporarily unavailable", { status: 429 });
+      }
+
+      // Best-effort usage counter
+      await incrementMonthlyViews(ownerId, 1);
+    }
+  } catch {
+    // best-effort
+  }
+
+  // Best-effort view log (analytics)
+  try {
+    const ua = req.headers.get("user-agent") || null;
+    const ref = req.headers.get("referer") || null;
+    const ip = (req.headers.get("x-forwarded-for") || "").split(",")[0]?.trim() || "";
+    const ipHash = hashIp(ip);
+
+    try {
+      await sql`
+        insert into public.doc_views
+          (doc_id, alias, path, kind, user_agent, referer, ip_hash, share_token, event_type)
+        values
+          (${row.docId}::uuid, ${alias}, ${new URL(req.url).pathname}, 'alias', ${ua}, ${ref}, ${ipHash}, null, 'preview_view')
+      `;
+    } catch {
+      await sql`
+        insert into public.doc_views
+          (doc_id, alias, path, kind, user_agent, referer, ip_hash)
+        values
+          (${row.docId}::uuid, ${alias}, ${new URL(req.url).pathname}, 'alias', ${ua}, ${ref}, ${ipHash})
+      `;
+    }
+  } catch {
+    // ignore
+  }
+}
+
+
 
     const ticketId = await mintAccessTicket({
       req,

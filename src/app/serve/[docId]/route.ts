@@ -11,6 +11,7 @@ import { getClientIpFromHeaders, getUserAgentFromHeaders, logDocAccess } from "@
 import { rateLimit, rateLimitHeaders, stableHash } from "@/lib/rateLimit";
 import { emitWebhook } from "@/lib/webhooks";
 import { geoDecisionForRequest, getCountryFromHeaders } from "@/lib/geo";
+import { assertCanServeView, incrementMonthlyViews } from "@/lib/monetization";
 
 function getClientIp(req: NextRequest) {
   const xff = req.headers.get("x-forwarded-for") || "";
@@ -41,6 +42,28 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ docId: stri
   if (!resolved.ok) {
     return new Response("Not found", { status: 404 });
   }
+
+// --- Monetization / plan limits (hidden) ---
+// Enforce the document owner's monthly view quota (best-effort).
+try {
+  const ownerRows = (await sql`
+    select owner_id::text as owner_id
+    from public.docs
+    where id = ${resolved.docId}::uuid
+    limit 1
+  `) as unknown as Array<{ owner_id: string | null }>;
+  const ownerId = ownerRows?.[0]?.owner_id ?? null;
+  if (ownerId) {
+    const allowed = await assertCanServeView(ownerId);
+    if (!allowed.ok) {
+      return new Response("Temporarily unavailable", { status: 429 });
+    }
+    await incrementMonthlyViews(ownerId, 1);
+  }
+} catch {
+  // ignore
+}
+
 
   // --- Rate limiting (best-effort) ---
   // 1) Global IP throttling for the serve endpoint

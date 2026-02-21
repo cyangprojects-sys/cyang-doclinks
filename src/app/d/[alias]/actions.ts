@@ -6,6 +6,7 @@ import { requireDocWrite } from "@/lib/authz";
 import { randomBytes } from "crypto";
 import bcrypt from "bcryptjs";
 import { emitWebhook } from "@/lib/webhooks";
+import { assertCanCreateShare, getPlanForUser, normalizeExpiresAtForPlan } from "@/lib/monetization";
 
 /**
  * NOTE:
@@ -115,7 +116,7 @@ export async function createAndEmailShareToken(
 
     const toEmail = toEmailRaw ? toEmailRaw.toLowerCase() : null;
 
-    const expiresAt =
+    let expiresAt =
       expiresAtRaw && !Number.isNaN(Date.parse(expiresAtRaw))
         ? new Date(expiresAtRaw).toISOString()
         : null;
@@ -127,7 +128,7 @@ export async function createAndEmailShareToken(
     const passwordHash = password ? await bcrypt.hash(password, 10) : null;
 
     const docRows = (await sql`
-      select id::text as id, title::text as title
+      select id::text as id, title::text as title, owner_id::text as owner_id
       from public.docs
       where id = ${docId}::uuid
       limit 1
@@ -136,6 +137,23 @@ export async function createAndEmailShareToken(
     if (!docRows || docRows.length === 0) {
       return { ok: false, error: "not_found", message: "Document not found" };
     }
+
+
+const ownerId = (docRows as any)?.[0]?.owner_id ?? null;
+if (ownerId) {
+  const shareAllowed = await assertCanCreateShare(ownerId);
+  if (!shareAllowed.ok) {
+    return { ok: false, error: shareAllowed.error, message: shareAllowed.message };
+  }
+}
+
+// --- Monetization: custom expiration is currently hidden ---
+// If plan disallows, clamp to <= 14 days.
+if (ownerId) {
+  const plan = await getPlanForUser(ownerId);
+  const normalized = normalizeExpiresAtForPlan({ plan, requestedExpiresAtIso: expiresAt, defaultDaysIfNotAllowed: 14 });
+      expiresAt = normalized;
+}
 
     const token = newToken();
 
