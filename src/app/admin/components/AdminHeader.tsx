@@ -8,19 +8,21 @@ export default function AdminHeader() {
   const { data: session } = useSession();
   const pathname = usePathname();
 
-  // Type-safe at runtime even if NextAuth type augmentation isn't picked up in some build environments.
-  const role = ((session?.user as any)?.role as string | undefined) ?? "viewer";
+  // NOTE: role is injected into the session in src/auth.ts (JWT/session callbacks).
+  // Keep this resilient in case the type augmentation isn't loaded somewhere.
+  const role = (session?.user as any)?.role ?? "viewer";
 
   function NavLink({ href, label }: { href: string; label: string }) {
     const active = pathname === href;
     return (
       <Link
         href={href}
-        className={`px-3 py-2 text-sm font-medium rounded-md ${
+        className={[
+          "px-3 py-2 text-sm font-medium rounded-md transition-colors",
           active
-            ? "bg-black text-white"
-            : "text-gray-600 hover:bg-gray-100 hover:text-black"
-        }`}
+            ? "bg-foreground text-background"
+            : "text-foreground/70 hover:bg-foreground/5 hover:text-foreground",
+        ].join(" ")}
       >
         {label}
       </Link>
@@ -28,47 +30,34 @@ export default function AdminHeader() {
   }
 
   return (
-    <header className="sticky top-0 z-50 bg-white border-b">
+    <header className="sticky top-0 z-50 border-b border-foreground/10 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-6">
-          <Link href="/admin/dashboard" className="font-semibold text-lg">
+        <div className="flex items-center gap-4">
+          <Link href="/" className="text-sm font-semibold tracking-wide">
             CYANG.IO
           </Link>
 
-          <nav className="flex gap-2">
+          <nav className="flex items-center gap-1">
             <NavLink href="/admin/dashboard" label="Dashboard" />
-            {(role === "owner" || role === "admin") && (
-              <>
-                <NavLink href="/admin/audit" label="Audit" />
-                <NavLink href="/admin/api-keys" label="API Keys" />
-                <NavLink href="/admin/webhooks" label="Webhooks" />
-              </>
-            )}
+            <NavLink href="/admin/audit" label="Audit" />
+            <NavLink href="/admin/api-keys" label="API Keys" />
+            <NavLink href="/admin/webhooks" label="Webhooks" />
           </nav>
         </div>
 
-        <div className="flex items-center gap-4 text-sm">
-          {session ? (
-            <>
-              <div className="text-right">
-                <div className="font-medium">{session.user?.email}</div>
-                <div className="text-gray-500">role: {role}</div>
-              </div>
-              <button
-                onClick={() => signOut({ callbackUrl: "/" })}
-                className="px-3 py-2 rounded-md border text-gray-700 hover:bg-gray-100"
-              >
-                Sign out
-              </button>
-            </>
-          ) : (
-            <Link
-              href="/api/auth/signin"
-              className="px-3 py-2 rounded-md border text-gray-700 hover:bg-gray-100"
-            >
-              Sign in
-            </Link>
-          )}
+        <div className="flex items-center gap-3">
+          <div className="hidden sm:block text-right leading-tight">
+            <div className="text-xs text-foreground/70">{session?.user?.email ?? ""}</div>
+            <div className="text-xs text-foreground/50">role: {role}</div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => signOut({ callbackUrl: "/" })}
+            className="px-3 py-2 text-sm rounded-md border border-foreground/15 hover:bg-foreground/5 transition-colors"
+          >
+            Sign out
+          </button>
         </div>
       </div>
     </header>
