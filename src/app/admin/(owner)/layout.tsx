@@ -14,13 +14,11 @@ export default async function OwnerAdminLayout({
   const session = await getServerSession(authOptions);
   if (!session?.user) redirect("/signin");
 
-  // Your app appears to attach role to session user; keep this defensive.
-  const role = (session.user as any)?.role as string | undefined;
-  const isOwner = role === "owner";
-
+  // Owner gating is still enforced by this (owner) route group pages/actions.
+  // The top nav no longer takes an `isOwner` prop.
   return (
     <div className="min-h-screen">
-      <AdminTopNav email={session.user.email} isOwner={isOwner} />
+      <AdminTopNav email={session.user.email} />
       <main className="mx-auto max-w-6xl px-4 py-6">{children}</main>
     </div>
   );
