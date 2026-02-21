@@ -8,7 +8,11 @@ function getKeyBytes(): Buffer {
   const raw = (process.env.OIDC_SECRETS_KEY || "").trim();
   if (!raw) {
     throw new Error(
-      "Missing OIDC_SECRETS_KEY. Generate a 32-byte base64 key (e.g. `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`)."
+      [
+        "Missing OIDC_SECRETS_KEY.",
+        "Generate a 32-byte base64 key, e.g.:",
+        "node -e \"console.log(require('crypto').randomBytes(32).toString('base64'))\".",
+      ].join(" ")
     );
   }
   const buf = Buffer.from(raw, "base64");
