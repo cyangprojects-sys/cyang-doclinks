@@ -691,11 +691,10 @@ if (hasAppSettings) {
 }
 
 // In-app notifications (best-effort; requires public.admin_notifications)
-let hasNotificationsTable = false;
+let notificationsTableExists = false;
 try {
-    const hasNotifications = await tableExists("public.admin_notifications");
-    if (hasNotifications) {
-        hasNotificationsTable = true;
+    notificationsTableExists = await tableExists("public.admin_notifications");
+    if (notificationsTableExists) {
         notifications = (await sql`
   select
     id::text as id,
@@ -935,7 +934,7 @@ try {
                         </button>
                     </form>
 
-                    {hasNotificationsTable && notifications.length ? (
+                    {notifications.length ? (
                         <form action={markAllAdminNotificationsReadAction}>
                             <button
                                 type="submit"
@@ -951,15 +950,15 @@ try {
 
             <div className="mt-3 rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2">
                 <div className="text-2xl font-semibold text-neutral-100">
-                    {hasNotificationsTable ? notifications.length : expiringSoon.length}
+                    {notifications.length ? notifications.length : expiringSoon.length}
                 </div>
                 <div className="text-xs text-neutral-500">
-                    {hasNotificationsTable ? "unread notifications" : "docs expiring soon"}
+                    {notifications.length ? "unread notifications" : "docs expiring soon"}
                 </div>
             </div>
 
             <div className="mt-4 space-y-3">
-                {hasNotificationsTable ? (
+                {notificationsTableExists ? (
                     notifications.length === 0 ? (
                         <div className="text-sm text-neutral-500">No unread notifications.</div>
                     ) : (
@@ -1029,7 +1028,7 @@ try {
             </div>
 
             <div className="mt-4 text-xs text-neutral-500">
-                {hasNotificationsTable ? (
+                {notificationsTableExists ? (
                     <>
                         Stored in <span className="font-mono">admin_notifications</span>. Run{" "}
                         <span className="font-mono">scripts/sql/admin_notifications.sql</span> if you haven’t.
