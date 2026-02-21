@@ -7,8 +7,12 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-export default async function OrgLoginPage({ params }: { params: { slug: string } }) {
-  const slug = String(params?.slug || "").trim().toLowerCase();
+export default async function OrgLoginPage(
+  { params }: { params: Promise<{ slug: string }> }
+) {
+  const { slug: rawSlug } = await params;
+  const slug = String(rawSlug || "").trim().toLowerCase();
+
   const org = await getOrgBySlug(slug);
 
   if (!org) {
@@ -32,7 +36,11 @@ export default async function OrgLoginPage({ params }: { params: { slug: string 
     );
   }
 
-  const showEnterprise = org.oidcEnabled && !!org.oidcIssuer && !!org.oidcClientId && !!org.oidcClientSecretEnc;
+  const showEnterprise =
+    org.oidcEnabled &&
+    !!org.oidcIssuer &&
+    !!org.oidcClientId &&
+    !!org.oidcClientSecretEnc;
 
   return (
     <main className="min-h-screen bg-black text-white">
@@ -56,7 +64,9 @@ export default async function OrgLoginPage({ params }: { params: { slug: string 
           <a
             href={`/org/${org.slug}/auth/enterprise-oidc`}
             className={`mt-3 block w-full rounded-2xl px-5 py-3 text-center text-sm font-medium ${
-              showEnterprise ? "bg-white/10 text-white hover:bg-white/15" : "bg-white/5 text-white/30 cursor-not-allowed"
+              showEnterprise
+                ? "bg-white/10 text-white hover:bg-white/15"
+                : "bg-white/5 text-white/30 cursor-not-allowed"
             }`}
             aria-disabled={!showEnterprise}
           >
@@ -70,9 +80,7 @@ export default async function OrgLoginPage({ params }: { params: { slug: string 
           ) : null}
 
           <div className="mt-6 text-xs text-white/50">
-            <p>
-              Need access? Contact your organization admin.
-            </p>
+            <p>Need access? Contact your organization admin.</p>
             <p className="mt-2">
               <Link href="/" className="text-white/70 hover:underline">
                 Back to home
