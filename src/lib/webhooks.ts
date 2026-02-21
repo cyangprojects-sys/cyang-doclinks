@@ -118,11 +118,12 @@ async function enqueueDeliveries(event: WebhookEvent, payload: any): Promise<boo
   if (!selected.length) return true;
 
   try {
+    const payloadJson = JSON.stringify(payload ?? null);
     // Bulk insert.
     for (const h of selected) {
       await sql`
         insert into public.webhook_deliveries (webhook_id, owner_id, event, payload)
-        values (${h.id}::uuid, ${h.owner_id}::uuid, ${event}, ${sql.json(payload)})
+        values (${h.id}::uuid, ${h.owner_id}::uuid, ${event}, ${payloadJson}::jsonb)
       `;
     }
     return true;
