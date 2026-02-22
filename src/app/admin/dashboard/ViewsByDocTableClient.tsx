@@ -195,7 +195,7 @@ export default function ViewsByDocTableClient(props: {
                                     />
                                 </th>
                                 <th className="px-4 py-3 text-left">Doc</th>
-                                <th className="px-4 py-3 text-left">Alias</th>
+                                <th className="px-4 py-3 text-left">View</th>
                                 <th className="px-4 py-3 text-right">Views</th>
                                 <th className="px-4 py-3 text-right">Unique IPs</th>
                                 <th className="px-4 py-3 text-right">Last view</th>

@@ -38,6 +38,7 @@ function fmtDate(s: string | null): string {
 
 type RecentShare = {
   token: string;
+  doc_id: string;
   doc_title: string | null;
   alias: string | null;
   created_at: string | null;
@@ -46,6 +47,7 @@ type RecentShare = {
 type ExpiringItem = {
   kind: "share" | "alias";
   token_or_alias: string;
+  doc_id: string;
   doc_title: string | null;
   expires_at: string | null;
 };
@@ -87,6 +89,7 @@ export default async function ViewerHelpfulTiles(props: { userId: string; orgId:
       recentShares = (await sql`
         select
           st.token::text as token,
+          d.id::text as doc_id,
           d.title::text as doc_title,
           da.alias::text as alias,
           st.created_at::text as created_at
@@ -117,6 +120,7 @@ export default async function ViewerHelpfulTiles(props: { userId: string; orgId:
       const srows = (await sql`
         select
           st.token::text as token_or_alias,
+          d.id::text as doc_id,
           d.title::text as doc_title,
           st.expires_at::text as expires_at
         from public.share_tokens st
@@ -144,6 +148,7 @@ export default async function ViewerHelpfulTiles(props: { userId: string; orgId:
       const arows = (await sql`
         select
           da.alias::text as token_or_alias,
+          d.id::text as doc_id,
           d.title::text as doc_title,
           da.expires_at::text as expires_at
         from public.doc_aliases da
@@ -243,8 +248,24 @@ export default async function ViewerHelpfulTiles(props: { userId: string; orgId:
               {recentShares.map((s) => (
                 <div key={s.token} className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <div className="truncate text-sm text-neutral-100">{s.doc_title || s.alias || "Untitled"}</div>
-                    <div className="mt-0.5 truncate font-mono text-[11px] text-neutral-500">/s/{s.token}</div>
+                    <div className="truncate text-sm text-neutral-100">
+                      <Link
+                        href={`/s/${encodeURIComponent(s.token)}`}
+                        target="_blank"
+                        className="hover:underline"
+                      >
+                        {s.doc_title || s.alias || "Untitled"}
+                      </Link>
+                    </div>
+                    <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[11px] text-neutral-500">
+                      <span>/s/{s.token}</span>
+                      <Link
+                        href={`/admin/docs/${encodeURIComponent(s.doc_id)}`}
+                        className="font-sans text-xs text-blue-400 hover:underline"
+                      >
+                        Manage →
+                      </Link>
+                    </div>
                   </div>
                   <div className="shrink-0 text-[11px] text-neutral-500">{fmtDate(s.created_at)}</div>
                 </div>
@@ -254,7 +275,7 @@ export default async function ViewerHelpfulTiles(props: { userId: string; orgId:
             <div className="mt-2 text-sm text-neutral-400">No shares created yet.</div>
           )}
           <div className="mt-3">
-            <a className="text-xs text-blue-400 hover:underline" href="#shares">
+            <a className="text-xs text-blue-400 hover:underline" href="/admin/dashboard#shares">
               Go to shares →
             </a>
           </div>
@@ -265,17 +286,30 @@ export default async function ViewerHelpfulTiles(props: { userId: string; orgId:
           <div className="text-xs text-neutral-500">Expiring soon (7 days)</div>
           {expiringSoon.length ? (
             <div className="mt-2 space-y-2">
-              {expiringSoon.map((x) => (
-                <div key={`${x.kind}:${x.token_or_alias}`} className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="truncate text-sm text-neutral-100">{x.doc_title || "Untitled"}</div>
-                    <div className="mt-0.5 truncate font-mono text-[11px] text-neutral-500">
-                      {x.kind === "share" ? `/s/${x.token_or_alias}` : `/d/${x.token_or_alias}`}
+              {expiringSoon.map((x) => {
+                const href = x.kind === "share" ? `/s/${encodeURIComponent(x.token_or_alias)}` : `/d/${encodeURIComponent(x.token_or_alias)}`;
+                return (
+                  <div key={`${x.kind}:${x.token_or_alias}`} className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="truncate text-sm text-neutral-100">
+                        <Link href={href} target="_blank" className="hover:underline">
+                          {x.doc_title || "Untitled"}
+                        </Link>
+                      </div>
+                      <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[11px] text-neutral-500">
+                        <span>{x.kind === "share" ? `/s/${x.token_or_alias}` : `/d/${x.token_or_alias}`}</span>
+                        <Link
+                          href={`/admin/docs/${encodeURIComponent(x.doc_id)}`}
+                          className="font-sans text-xs text-blue-400 hover:underline"
+                        >
+                          Manage →
+                        </Link>
+                      </div>
                     </div>
+                    <div className="shrink-0 text-[11px] text-neutral-500">{fmtDate(x.expires_at)}</div>
                   </div>
-                  <div className="shrink-0 text-[11px] text-neutral-500">{fmtDate(x.expires_at)}</div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
             <div className="mt-2 text-sm text-neutral-400">Nothing expiring soon.</div>

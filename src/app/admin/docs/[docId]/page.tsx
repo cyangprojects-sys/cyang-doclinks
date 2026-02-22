@@ -49,7 +49,7 @@ function fmtDate(s: string | null) {
   return d.toLocaleString();
 }
 
-export default async function AdminDocDetailPage({ params }: { params: { docId: string } }) {
+export default async function AdminDocDetailPage({ params }: { params: Promise<{ docId?: string }> | { docId?: string } }) {
   let u;
   try {
     u = await requireUser();
@@ -57,7 +57,8 @@ export default async function AdminDocDetailPage({ params }: { params: { docId: 
     redirect("/api/auth/signin");
   }
 
-  const docId = params.docId;
+  const resolved = await Promise.resolve(params as any);
+  const docId = (resolved?.docId ? String(resolved.docId) : "").trim();
   if (!docId) notFound();
 
   const canSeeAll = roleAtLeast(u.role, "admin");
