@@ -1,28 +1,21 @@
 // src/app/admin/dashboard/ViewerUsageWidget.tsx
-import Link from "next/link";
 import { sql } from "@/lib/db";
-import {
-  getActiveShareCountForOwner,
-  getDailyUploadCount,
-  getMonthlyViewCount,
-  getPlanForUser,
-  getStorageBytesForOwner,
-  type Plan,
-} from "@/lib/monetization";
+import { getPlanForUser, getActiveShareCountForOwner, getStorageBytesForOwner, getMonthlyViewCount, getDailyUploadCount } from "@/lib/monetization";
 
 export const runtime = "nodejs";
 
-function formatBytes(bytes: number): string {
-  if (!Number.isFinite(bytes) || bytes <= 0) return "0 B";
+function fmtBytes(n: number | null): string {
+  if (n == null) return "—";
+  if (!Number.isFinite(n) || n < 0) return "—";
   const units = ["B", "KB", "MB", "GB", "TB"];
-  let v = bytes;
+  let v = n;
   let i = 0;
   while (v >= 1024 && i < units.length - 1) {
     v /= 1024;
     i++;
   }
-  const decimals = i <= 1 ? 0 : i === 2 ? 1 : 2;
-  return `${v.toFixed(decimals)} ${units[i]}`;
+  const digits = i === 0 ? 0 : i <= 2 ? 1 : 2;
+  return `${v.toFixed(digits)} ${units[i]}`;
 }
 
 async function tableExists(fqTable: string): Promise<boolean> {
@@ -34,49 +27,39 @@ async function tableExists(fqTable: string): Promise<boolean> {
   }
 }
 
-type Usage = {
-  plan: Plan;
-  storageUsedBytes: number;
-  activeShares: number;
-  monthlyViews: number | null;
-  dailyUploads: number | null;
-};
-
-async function getUsage(userId: string): Promise<Usage> {
-  // Plan / usage tables are optional (kept "hidden" until pricing is finalized).
-  // We render best-effort data: if a table is missing, we fall back to safe defaults.
-  let plan: Plan = {
-    id: "free",
-    name: "Free",
-    maxViewsPerMonth: 100,
-    maxActiveShares: 3,
-    maxStorageBytes: 524288000,
-    maxUploadsPerDay: 10,
-    maxFileSizeBytes: 26214400,
-    allowCustomExpiration: false,
-    allowAuditExport: false,
-  };
+export default async function ViewerUsageWidget(props: { userId: string }) {
+  const userId = String(props.userId || "").trim();
+  if (!userId) return null;
 
   const hasPlans = await tableExists("public.plans");
   const hasUsers = await tableExists("public.users");
   const hasMonthly = await tableExists("public.user_usage_monthly");
   const hasDaily = await tableExists("public.user_usage_daily");
 
-  if (hasPlans && hasUsers) {
-    try {
-      plan = await getPlanForUser(userId);
-    } catch {
-      // ignore
+  // Plan + usage are best-effort (widget must not break if tables aren't deployed yet)
+  let planName = "Free";
+  let maxActiveShares: number | null = 3;
+  let maxStorageBytes: number | null = 524288000; // 500MB
+  let maxViewsPerMonth: number | null = 100;
+  let maxUploadsPerDay: number | null = 10;
+
+  try {
+    if (hasPlans && hasUsers) {
+      const plan = await getPlanForUser(userId);
+      planName = plan.name;
+      maxActiveShares = plan.maxActiveShares;
+      maxStorageBytes = plan.maxStorageBytes;
+      maxViewsPerMonth = plan.maxViewsPerMonth;
+      maxUploadsPerDay = plan.maxUploadsPerDay;
     }
+  } catch {
+    // keep defaults
   }
 
-  let storageUsedBytes = 0;
   let activeShares = 0;
-  try {
-    storageUsedBytes = await getStorageBytesForOwner(userId);
-  } catch {
-    storageUsedBytes = 0;
-  }
+  let usedStorage = 0;
+  let monthlyViews: number | null = null;
+  let dailyUploads: number | null = null;
 
   try {
     activeShares = await getActiveShareCountForOwner(userId);
@@ -84,126 +67,109 @@ async function getUsage(userId: string): Promise<Usage> {
     activeShares = 0;
   }
 
-  let monthlyViews: number | null = null;
-  if (hasMonthly) {
-    try {
-      monthlyViews = await getMonthlyViewCount(userId);
-    } catch {
-      monthlyViews = null;
-    }
+  try {
+    usedStorage = await getStorageBytesForOwner(userId);
+  } catch {
+    usedStorage = 0;
   }
 
-  let dailyUploads: number | null = null;
-  if (hasDaily) {
-    try {
-      dailyUploads = await getDailyUploadCount(userId);
-    } catch {
-      dailyUploads = null;
-    }
+  try {
+    monthlyViews = hasMonthly ? await getMonthlyViewCount(userId) : null;
+  } catch {
+    monthlyViews = null;
   }
 
-  return { plan, storageUsedBytes, activeShares, monthlyViews, dailyUploads };
-}
+  try {
+    dailyUploads = hasDaily ? await getDailyUploadCount(userId) : null;
+  } catch {
+    dailyUploads = null;
+  }
 
-export default async function ViewerUsageWidget(props: { userId: string }) {
-  const u = await getUsage(props.userId);
+  const sharesLeft = maxActiveShares == null ? null : Math.max(0, maxActiveShares - activeShares);
+  const storageLeft = maxStorageBytes == null ? null : Math.max(0, maxStorageBytes - usedStorage);
 
-  const storageLimit = u.plan.maxStorageBytes;
-  const sharesLimit = u.plan.maxActiveShares;
-  const viewsLimit = u.plan.maxViewsPerMonth;
-  const uploadsLimit = u.plan.maxUploadsPerDay;
-
-  const storageRemaining =
-    storageLimit == null ? null : Math.max(0, storageLimit - u.storageUsedBytes);
-  const sharesRemaining = sharesLimit == null ? null : Math.max(0, sharesLimit - u.activeShares);
-  const viewsRemaining =
-    viewsLimit == null || u.monthlyViews == null ? null : Math.max(0, viewsLimit - u.monthlyViews);
-  const uploadsRemaining =
-    uploadsLimit == null || u.dailyUploads == null ? null : Math.max(0, uploadsLimit - u.dailyUploads);
+  const viewsLeft =
+    maxViewsPerMonth == null || monthlyViews == null ? null : Math.max(0, maxViewsPerMonth - monthlyViews);
+  const uploadsLeft =
+    maxUploadsPerDay == null || dailyUploads == null ? null : Math.max(0, maxUploadsPerDay - dailyUploads);
 
   return (
-    <section className="rounded-2xl border border-neutral-800 bg-neutral-950 p-4 shadow-sm">
-      <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+    <section className="rounded-xl border border-neutral-800 bg-neutral-950 p-4">
+      <div className="flex items-center justify-between gap-3">
         <div>
-          <div className="text-sm text-neutral-400">Your account</div>
-          <h2 className="text-lg font-semibold text-neutral-50">Usage & limits</h2>
+          <div className="text-sm font-medium text-neutral-100">Your usage</div>
+          <div className="mt-0.5 text-xs text-neutral-500">Plan: {planName}</div>
         </div>
-        <div className="text-xs text-neutral-500">
-          Plan: <span className="text-neutral-300">{u.plan.name}</span>
-        </div>
+        <a
+          href="#shares"
+          className="rounded-md border border-neutral-800 bg-neutral-950 px-3 py-1.5 text-xs text-neutral-200 hover:bg-neutral-900"
+        >
+          Manage shares
+        </a>
       </div>
 
-      <div className="mt-4 grid gap-3 md:grid-cols-3">
-        <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-3">
-          <div className="text-xs text-neutral-500">Storage</div>
-          <div className="mt-1 text-sm text-neutral-200">
-            <span className="font-medium">{formatBytes(u.storageUsedBytes)}</span> used
-            {storageLimit != null ? (
-              <>
-                {" "}
-                / <span className="text-neutral-300">{formatBytes(storageLimit)}</span>
-              </>
-            ) : null}
-          </div>
-          {storageRemaining != null ? (
-            <div className="mt-1 text-xs text-neutral-400">
-              {formatBytes(storageRemaining)} free space left
-            </div>
-          ) : (
-            <div className="mt-1 text-xs text-neutral-500">Unlimited</div>
-          )}
-        </div>
-
-        <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-3">
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <div className="rounded-lg border border-neutral-800 bg-neutral-950 p-3">
           <div className="text-xs text-neutral-500">Active shares</div>
-          <div className="mt-1 text-sm text-neutral-200">
-            <span className="font-medium">{u.activeShares}</span> active
-            {sharesLimit != null ? (
-              <>
-                {" "}
-                / <span className="text-neutral-300">{sharesLimit}</span>
-              </>
-            ) : null}
+          <div className="mt-1 text-lg font-semibold text-neutral-100">
+            {activeShares}
+            {maxActiveShares == null ? (
+              <span className="text-sm font-normal text-neutral-500"> / ∞</span>
+            ) : (
+              <span className="text-sm font-normal text-neutral-500"> / {maxActiveShares}</span>
+            )}
           </div>
-          {sharesRemaining != null ? (
-            <div className="mt-1 text-xs text-neutral-400">{sharesRemaining} shares left</div>
-          ) : (
-            <div className="mt-1 text-xs text-neutral-500">Unlimited</div>
-          )}
+          <div className="mt-1 text-xs text-neutral-500">
+            {sharesLeft == null ? "Unlimited shares" : `${sharesLeft} share${sharesLeft === 1 ? "" : "s"} left`}
+          </div>
         </div>
 
-        <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-3">
-          <div className="text-xs text-neutral-500">Views (this month)</div>
-          {u.monthlyViews == null || viewsLimit == null ? (
-            <div className="mt-1 text-sm text-neutral-500">Tracking not enabled</div>
-          ) : (
-            <>
-              <div className="mt-1 text-sm text-neutral-200">
-                <span className="font-medium">{u.monthlyViews}</span> used /{" "}
-                <span className="text-neutral-300">{viewsLimit}</span>
-              </div>
-              <div className="mt-1 text-xs text-neutral-400">{viewsRemaining} views left</div>
-            </>
-          )}
+        <div className="rounded-lg border border-neutral-800 bg-neutral-950 p-3">
+          <div className="text-xs text-neutral-500">Storage</div>
+          <div className="mt-1 text-lg font-semibold text-neutral-100">
+            {fmtBytes(usedStorage)}
+            {maxStorageBytes == null ? (
+              <span className="text-sm font-normal text-neutral-500"> / ∞</span>
+            ) : (
+              <span className="text-sm font-normal text-neutral-500"> / {fmtBytes(maxStorageBytes)}</span>
+            )}
+          </div>
+          <div className="mt-1 text-xs text-neutral-500">
+            {storageLeft == null ? "Unlimited storage" : `${fmtBytes(storageLeft)} free`}
+          </div>
         </div>
-      </div>
 
-      <div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-neutral-400">
-        <span className="rounded-full border border-neutral-800 bg-neutral-950 px-2 py-1">
-          Tip: upload → share link from your doc row
-        </span>
-        <span className="rounded-full border border-neutral-800 bg-neutral-950 px-2 py-1">
-          Keep shares short-lived for security
-        </span>
-        {u.dailyUploads != null && uploadsLimit != null ? (
-          <span className="rounded-full border border-neutral-800 bg-neutral-950 px-2 py-1">
-            Today: {u.dailyUploads}/{uploadsLimit} uploads
-            {uploadsRemaining != null ? ` (${uploadsRemaining} left)` : ""}
-          </span>
-        ) : null}
-        <Link className="ml-auto text-neutral-300 hover:underline" href="#docs">
-          Jump to documents →
-        </Link>
+        <div className="rounded-lg border border-neutral-800 bg-neutral-950 p-3">
+          <div className="text-xs text-neutral-500">Monthly views</div>
+          <div className="mt-1 text-lg font-semibold text-neutral-100">
+            {monthlyViews == null ? "—" : monthlyViews}
+            {maxViewsPerMonth == null ? (
+              <span className="text-sm font-normal text-neutral-500"> / ∞</span>
+            ) : monthlyViews == null ? (
+              <span className="text-sm font-normal text-neutral-500"> (tracking not enabled)</span>
+            ) : (
+              <span className="text-sm font-normal text-neutral-500"> / {maxViewsPerMonth}</span>
+            )}
+          </div>
+          <div className="mt-1 text-xs text-neutral-500">
+            {viewsLeft == null ? "" : `${viewsLeft} left this month`}
+          </div>
+        </div>
+
+        <div className="rounded-lg border border-neutral-800 bg-neutral-950 p-3">
+          <div className="text-xs text-neutral-500">Uploads today</div>
+          <div className="mt-1 text-lg font-semibold text-neutral-100">
+            {dailyUploads == null ? "—" : dailyUploads}
+            {maxUploadsPerDay == null ? (
+              <span className="text-sm font-normal text-neutral-500"> / ∞</span>
+            ) : dailyUploads == null ? (
+              <span className="text-sm font-normal text-neutral-500"> (tracking not enabled)</span>
+            ) : (
+              <span className="text-sm font-normal text-neutral-500"> / {maxUploadsPerDay}</span>
+            )}
+          </div>
+          <div className="mt-1 text-xs text-neutral-500">{uploadsLeft == null ? "" : `${uploadsLeft} left today`}</div>
+        </div>
       </div>
     </section>
   );

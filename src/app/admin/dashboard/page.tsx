@@ -4,11 +4,12 @@ import { sql } from "@/lib/db";
 import { requireUser, roleAtLeast } from "@/lib/authz";
 
 import UploadPanel from "./UploadPanel";
-import ViewerUsageWidget from "./ViewerUsageWidget";
 import AnalyticsWidgets from "./AnalyticsWidgets";
 import ViewsByDocTableClient, { type ViewsByDocRow } from "./ViewsByDocTableClient";
 import SharesTableClient, { type ShareRow } from "./SharesTableClient";
 import UnifiedDocsTableClient, { type UnifiedDocRow } from "./UnifiedDocsTableClient";
+import ViewerUsageWidget from "./ViewerUsageWidget";
+import ViewerHelpfulTiles from "./ViewerHelpfulTiles";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -199,9 +200,15 @@ const docFilter = sql`${orgFilter} ${ownerFilter}`;
         </div>
       </div>
 
-      {u.role === "viewer" ? <ViewerUsageWidget userId={u.id} /> : null}
-
       <AnalyticsWidgets ownerId={canSeeAll ? undefined : u.id} />
+
+      {/* Viewer-facing usage + quick actions */}
+      {!canSeeAll ? (
+        <div className="grid gap-4 lg:grid-cols-2">
+          <ViewerUsageWidget userId={u.id} />
+          <ViewerHelpfulTiles userId={u.id} orgId={u.orgId} hasOrgId={hasOrgId} />
+        </div>
+      ) : null}
 
       {missingCoreTables ? (
         <div className="rounded-lg border border-neutral-800 bg-neutral-950 p-4 text-sm text-neutral-300">
@@ -232,7 +239,8 @@ const docFilter = sql`${orgFilter} ${ownerFilter}`;
             jump to views →
           </a>
         </div>
-        <UnifiedDocsTableClient rows={unifiedRows} defaultPageSize={10} showDelete={canSeeAll} />
+        {/* Viewers can delete their own documents only when ownership is enabled (docs.owner_id) */}
+        <UnifiedDocsTableClient rows={unifiedRows} defaultPageSize={10} showDelete={canSeeAll || hasOwnerId} />
       </section>
 
       {/* Views by doc */}
