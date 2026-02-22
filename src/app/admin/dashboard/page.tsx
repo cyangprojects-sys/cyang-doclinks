@@ -4,6 +4,7 @@ import { sql } from "@/lib/db";
 import { requireUser, roleAtLeast } from "@/lib/authz";
 
 import UploadPanel from "./UploadPanel";
+import ViewerUsageWidget from "./ViewerUsageWidget";
 import AnalyticsWidgets from "./AnalyticsWidgets";
 import ViewsByDocTableClient, { type ViewsByDocRow } from "./ViewsByDocTableClient";
 import SharesTableClient, { type ShareRow } from "./SharesTableClient";
@@ -197,6 +198,8 @@ const docFilter = sql`${orgFilter} ${ownerFilter}`;
           {u.email} · role: {u.role}
         </div>
       </div>
+
+      {u.role === "viewer" ? <ViewerUsageWidget userId={u.id} /> : null}
 
       <AnalyticsWidgets ownerId={canSeeAll ? undefined : u.id} />
 
