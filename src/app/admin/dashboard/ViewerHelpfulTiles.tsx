@@ -50,6 +50,8 @@ type ExpiringItem = {
   expires_at: string | null;
 };
 
+type ExpiringRow = Omit<ExpiringItem, "kind">;
+
 export default async function ViewerHelpfulTiles(props: { userId: string; orgId: string | null; hasOrgId: boolean }) {
   const userId = String(props.userId || "").trim();
   if (!userId) return null;
@@ -114,7 +116,6 @@ export default async function ViewerHelpfulTiles(props: { userId: string; orgId:
     if (hasShares) {
       const srows = (await sql`
         select
-          'share'::text as kind,
           st.token::text as token_or_alias,
           d.title::text as doc_title,
           st.expires_at::text as expires_at
@@ -128,14 +129,20 @@ export default async function ViewerHelpfulTiles(props: { userId: string; orgId:
           and st.expires_at <= now() + interval '7 days'
         order by st.expires_at asc
         limit 5
-      `) as unknown as ExpiringItem[];
-      items.push(...srows.map((r) => ({ ...r, kind: "share" })));
+      `) as unknown as ExpiringRow[];
+      items.push(
+        ...srows.map((r) => ({
+          kind: "share" as const,
+          token_or_alias: r.token_or_alias,
+          doc_title: r.doc_title,
+          expires_at: r.expires_at,
+        }))
+      );
     }
 
     if (hasAliases) {
       const arows = (await sql`
         select
-          'alias'::text as kind,
           da.alias::text as token_or_alias,
           d.title::text as doc_title,
           da.expires_at::text as expires_at
@@ -150,8 +157,15 @@ export default async function ViewerHelpfulTiles(props: { userId: string; orgId:
           and da.expires_at <= now() + interval '7 days'
         order by da.expires_at asc
         limit 5
-      `) as unknown as ExpiringItem[];
-      items.push(...arows.map((r) => ({ ...r, kind: "alias" })));
+      `) as unknown as ExpiringRow[];
+      items.push(
+        ...arows.map((r) => ({
+          kind: "alias" as const,
+          token_or_alias: r.token_or_alias,
+          doc_title: r.doc_title,
+          expires_at: r.expires_at,
+        }))
+      );
     }
 
     items.sort((x, y) => {
