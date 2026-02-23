@@ -49,7 +49,15 @@ function fmtDate(s: string | null) {
   return d.toLocaleString();
 }
 
-export default async function AdminDocDetailPage({ params }: { params: Promise<{ docId?: string }> | { docId?: string } }) {
+const card = "rounded-2xl border border-neutral-800 bg-neutral-950 p-4 shadow-sm";
+const subtle = "text-xs text-neutral-400";
+
+export default async function AdminDocDetailPage({
+  params,
+}: {
+  // Next.js 16 App Router: params can be async in production builds.
+  params: Promise<{ docId: string }> | { docId: string };
+}) {
   let u;
   try {
     u = await requireUser();
@@ -57,8 +65,8 @@ export default async function AdminDocDetailPage({ params }: { params: Promise<{
     redirect("/api/auth/signin");
   }
 
-  const resolved = await Promise.resolve(params as any);
-  const docId = (resolved?.docId ? String(resolved.docId) : "").trim();
+  const resolvedParams = (await (params as any)) as { docId?: string };
+  const docId = resolvedParams?.docId;
   if (!docId) notFound();
 
   const canSeeAll = roleAtLeast(u.role, "admin");
@@ -236,16 +244,22 @@ export default async function AdminDocDetailPage({ params }: { params: Promise<{
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <div className="text-sm text-neutral-500">Document</div>
-          <h1 className="text-2xl font-semibold">{doc.title || doc.id}</h1>
-          <div className="mt-1 text-xs text-neutral-500">Created: {fmtDate(doc.created_at)}</div>
+          <div className={subtle}>Document</div>
+          <h1 className="text-2xl font-semibold text-neutral-100">{doc.title || doc.id}</h1>
+          <div className="mt-1 text-xs text-neutral-400">Created: {fmtDate(doc.created_at)}</div>
         </div>
         <div className="flex items-center gap-2">
-          <Link className="rounded-xl border bg-white px-3 py-2 text-sm shadow-sm hover:bg-neutral-50" href="/admin/dashboard">
+          <Link
+            className="rounded-xl border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm text-neutral-100 shadow-sm hover:bg-neutral-900"
+            href="/admin/dashboard"
+          >
             ← Back
           </Link>
           {alias ? (
-            <Link className="rounded-xl border bg-white px-3 py-2 text-sm shadow-sm hover:bg-neutral-50" href={`/d/${alias}`}>
+            <Link
+              className="rounded-xl border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm text-neutral-100 shadow-sm hover:bg-neutral-900"
+              href={`/d/${alias}`}
+            >
               Open
             </Link>
           ) : null}
@@ -253,60 +267,65 @@ export default async function AdminDocDetailPage({ params }: { params: Promise<{
       </div>
 
       <section className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-        <div className="rounded-2xl border bg-white p-4 shadow-sm">
-          <div className="text-xs text-neutral-500">Views</div>
-          <div className="mt-1 text-2xl font-semibold">{fmtInt(views30)}</div>
-          <div className="text-xs text-neutral-500">Last 30 days</div>
+        <div className={card}>
+          <div className={subtle}>Views</div>
+          <div className="mt-1 text-2xl font-semibold text-neutral-100">{fmtInt(views30)}</div>
+          <div className={subtle}>Last 30 days</div>
           <div className="mt-2 flex items-center justify-between gap-3">
-            <div className="text-sm font-medium">{fmtInt(views7)} <span className="text-xs text-neutral-500">/ 7d</span></div>
-            <Sparkline values={sparkVals} ariaLabel="30 day views sparkline" />
+            <div className="text-sm font-medium text-neutral-200">
+              {fmtInt(views7)} <span className="text-xs text-neutral-400">/ 7d</span>
+            </div>
+            <div className="text-neutral-400">
+              <Sparkline values={sparkVals} ariaLabel="30 day views sparkline" />
+            </div>
           </div>
         </div>
 
-        <div className="rounded-2xl border bg-white p-4 shadow-sm">
-          <div className="text-xs text-neutral-500">Alias</div>
-          <div className="mt-1 text-sm font-medium">{alias || "—"}</div>
-          <div className="mt-2 text-xs text-neutral-500">
+        <div className={card}>
+          <div className={subtle}>Alias</div>
+          <div className="mt-1 text-sm font-medium text-neutral-200">{alias || "—"}</div>
+          <div className="mt-2 text-xs text-neutral-400">
             Expires: {fmtDate(aliasExpires)} • Active: {String(aliasActive ?? true)} • Revoked: {fmtDate(aliasRevokedAt)}
           </div>
         </div>
 
-        <div className="rounded-2xl border bg-white p-4 shadow-sm">
-          <div className="text-xs text-neutral-500">Shares</div>
-          <div className="mt-1 text-2xl font-semibold">{fmtInt(activeShares)}</div>
-          <div className="text-xs text-neutral-500">Active (top 50 listed)</div>
+        <div className={card}>
+          <div className={subtle}>Shares</div>
+          <div className="mt-1 text-2xl font-semibold text-neutral-100">{fmtInt(activeShares)}</div>
+          <div className={subtle}>Active (top 50 listed)</div>
         </div>
       </section>
 
-      <section className="rounded-2xl border bg-white p-4 shadow-sm">
+      <section className={card}>
         <div className="flex items-center justify-between">
-          <h2 className="text-base font-semibold">30-day view history</h2>
-          <div className="text-xs text-neutral-500">
-            {hasDocViewDaily ? "Using doc_view_daily" : hasDocViews ? "Using doc_views" : "No view tables found"}
-          </div>
+          <h2 className="text-base font-semibold text-neutral-100">30-day view history</h2>
+          <div className={subtle}>{hasDocViewDaily ? "Using doc_view_daily" : hasDocViews ? "Using doc_views" : "No view tables found"}</div>
         </div>
 
         <div className="mt-3 overflow-x-auto">
           <table className="min-w-[680px] w-full text-sm">
-            <thead className="text-left text-xs text-neutral-500">
+            <thead className="text-left text-xs text-neutral-400">
               <tr>
                 <th className="py-2 pr-4">Day</th>
                 <th className="py-2 pr-4">Views</th>
                 <th className="py-2 pr-4">Unique IPs</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="text-neutral-200">
               {series30.length ? (
-                series30.slice().reverse().map((r) => (
-                  <tr key={r.day} className="border-t">
-                    <td className="py-2 pr-4">{r.day}</td>
-                    <td className="py-2 pr-4">{fmtInt(r.views)}</td>
-                    <td className="py-2 pr-4">{fmtInt(r.unique_ips)}</td>
-                  </tr>
-                ))
+                series30
+                  .slice()
+                  .reverse()
+                  .map((r) => (
+                    <tr key={r.day} className="border-t border-neutral-800">
+                      <td className="py-2 pr-4">{r.day}</td>
+                      <td className="py-2 pr-4">{fmtInt(r.views)}</td>
+                      <td className="py-2 pr-4">{fmtInt(r.unique_ips)}</td>
+                    </tr>
+                  ))
               ) : (
-                <tr className="border-t">
-                  <td className="py-3 text-xs text-neutral-500" colSpan={3}>
+                <tr className="border-t border-neutral-800">
+                  <td className="py-3 text-xs text-neutral-400" colSpan={3}>
                     No data yet.
                   </td>
                 </tr>
@@ -317,11 +336,11 @@ export default async function AdminDocDetailPage({ params }: { params: Promise<{
       </section>
 
       <section className="grid grid-cols-1 gap-3 xl:grid-cols-2">
-        <div className="rounded-2xl border bg-white p-4 shadow-sm">
-          <h2 className="text-base font-semibold">Share history</h2>
+        <div className={card}>
+          <h2 className="text-base font-semibold text-neutral-100">Share history</h2>
           <div className="mt-3 overflow-x-auto">
             <table className="min-w-[760px] w-full text-sm">
-              <thead className="text-left text-xs text-neutral-500">
+              <thead className="text-left text-xs text-neutral-400">
                 <tr>
                   <th className="py-2 pr-4">Token</th>
                   <th className="py-2 pr-4">Created</th>
@@ -331,10 +350,10 @@ export default async function AdminDocDetailPage({ params }: { params: Promise<{
                   <th className="py-2 pr-4">Revoked</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="text-neutral-200">
                 {shares.length ? (
                   shares.map((s) => (
-                    <tr key={s.token} className="border-t">
+                    <tr key={s.token} className="border-t border-neutral-800">
                       <td className="py-2 pr-4 font-mono text-xs">{s.token.slice(0, 10)}…</td>
                       <td className="py-2 pr-4">{fmtDate(s.created_at)}</td>
                       <td className="py-2 pr-4">{fmtDate(s.expires_at)}</td>
@@ -344,8 +363,8 @@ export default async function AdminDocDetailPage({ params }: { params: Promise<{
                     </tr>
                   ))
                 ) : (
-                  <tr className="border-t">
-                    <td className="py-3 text-xs text-neutral-500" colSpan={6}>
+                  <tr className="border-t border-neutral-800">
+                    <td className="py-3 text-xs text-neutral-400" colSpan={6}>
                       No shares found.
                     </td>
                   </tr>
@@ -355,28 +374,28 @@ export default async function AdminDocDetailPage({ params }: { params: Promise<{
           </div>
         </div>
 
-        <div className="rounded-2xl border bg-white p-4 shadow-sm">
-          <h2 className="text-base font-semibold">IP breakdown (30d)</h2>
-          <div className="mt-1 text-xs text-neutral-500">Hashed IPs (privacy-preserving).</div>
+        <div className={card}>
+          <h2 className="text-base font-semibold text-neutral-100">IP breakdown (30d)</h2>
+          <div className="mt-1 text-xs text-neutral-400">Hashed IPs (privacy-preserving).</div>
           <div className="mt-3 overflow-x-auto">
             <table className="min-w-[520px] w-full text-sm">
-              <thead className="text-left text-xs text-neutral-500">
+              <thead className="text-left text-xs text-neutral-400">
                 <tr>
                   <th className="py-2 pr-4">IP hash</th>
                   <th className="py-2 pr-4">Views</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="text-neutral-200">
                 {ipRows.length ? (
                   ipRows.map((r) => (
-                    <tr key={r.ip_hash} className="border-t">
+                    <tr key={r.ip_hash} className="border-t border-neutral-800">
                       <td className="py-2 pr-4 font-mono text-xs">{(r.ip_hash || "—").slice(0, 18)}…</td>
                       <td className="py-2 pr-4">{fmtInt(r.views)}</td>
                     </tr>
                   ))
                 ) : (
-                  <tr className="border-t">
-                    <td className="py-3 text-xs text-neutral-500" colSpan={2}>
+                  <tr className="border-t border-neutral-800">
+                    <td className="py-3 text-xs text-neutral-400" colSpan={2}>
                       No data yet.
                     </td>
                   </tr>
@@ -387,7 +406,7 @@ export default async function AdminDocDetailPage({ params }: { params: Promise<{
         </div>
       </section>
 
-      <div className="text-xs text-neutral-500">
+      <div className="text-xs text-neutral-400">
         Note: download counts are not tracked separately yet; current page shows view/access activity only.
       </div>
     </div>
