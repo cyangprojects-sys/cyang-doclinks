@@ -138,6 +138,7 @@ export default async function ViewerHelpfulTiles(props: { userId: string; orgId:
         ...srows.map((r) => ({
           kind: "share" as const,
           token_or_alias: r.token_or_alias,
+          doc_id: r.doc_id,
           doc_title: r.doc_title,
           expires_at: r.expires_at,
         }))
@@ -163,12 +164,13 @@ export default async function ViewerHelpfulTiles(props: { userId: string; orgId:
         order by da.expires_at asc
         limit 5
       `) as unknown as ExpiringRow[];
-      items.push(
         ...arows.map((r) => ({
           kind: "alias" as const,
           token_or_alias: r.token_or_alias,
+          doc_id: r.doc_id,
           doc_title: r.doc_title,
           expires_at: r.expires_at,
+        }))
         }))
       );
     }
