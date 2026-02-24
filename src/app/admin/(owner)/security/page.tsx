@@ -1,4 +1,5 @@
 import { sql } from "@/lib/db";
+import KeyManagementPanel from "./KeyManagementPanel";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -83,6 +84,10 @@ export default async function SecurityTelemetryPage() {
             <div className="text-xs text-white/50">Docs: {fmt(decryptDocs)}</div>
           </div>
         </div>
+      </div>
+
+      <div className="mt-6">
+        <KeyManagementPanel />
       </div>
 
       <div className="mt-6 grid gap-4 lg:grid-cols-3">

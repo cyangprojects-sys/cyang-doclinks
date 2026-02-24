@@ -1,248 +1,273 @@
 // src/app/admin/dashboard/UploadPanel.tsx
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
 type PresignResponse =
-    | {
-        ok: true;
-        doc_id: string;
-        upload_url: string;
-        r2_key: string;
-        bucket: string;
-        expires_in: number;
-        encryption?:
-            | { enabled: false }
-            | { enabled: true; alg: string | null; iv_b64: string | null; data_key_b64: string | null };
+  | {
+      ok: true;
+      doc_id: string;
+      upload_url: string;
+      r2_key: string;
+      bucket: string;
+      expires_in: number;
+      encryption: { enabled: true; alg: string | null; iv_b64: string | null; data_key_b64: string | null };
     }
-    | { ok: false; error: string; message?: string };
+  | { ok: false; error: string; message?: string };
 
 type CompleteResponse =
-    | { ok: true; doc_id: string; alias: string; view_url: string; target_url?: string }
-    | { ok: false; error: string; message?: string };
+  | { ok: true; doc_id: string; alias: string; view_url: string; target_url?: string }
+  | { ok: false; error: string; message?: string };
+
+type KeyStatusResponse =
+  | { ok: true; configured: boolean; active_key_id: string | null; revoked_active: boolean }
+  | { ok: false; error: string; message?: string };
 
 function fmtBytes(n: number) {
-    if (!Number.isFinite(n)) return "";
-    if (n < 1024) return `${n} B`;
-    if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
-    return `${(n / (1024 * 1024)).toFixed(2)} MB`;
+  if (!Number.isFinite(n)) return "";
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / (1024 * 1024)).toFixed(2)} MB`;
+}
+
+function b64ToU8(b64: string) {
+  return Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
 }
 
 export default function UploadPanel() {
-    const router = useRouter();
+  const router = useRouter();
 
-    const [title, setTitle] = useState("");
-    const [file, setFile] = useState<File | null>(null);
-    const [busy, setBusy] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+  const [title, setTitle] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-    const [encrypt, setEncrypt] = useState(false);
+  const [docId, setDocId] = useState<string | null>(null);
+  const [viewUrl, setViewUrl] = useState<string | null>(null);
 
-    const [docId, setDocId] = useState<string | null>(null);
-    const [viewUrl, setViewUrl] = useState<string | null>(null);
+  const [encryptionReady, setEncryptionReady] = useState<boolean | null>(null);
+  const [encryptionMsg, setEncryptionMsg] = useState<string | null>(null);
 
-    const fileLabel = useMemo(() => {
-        if (!file) return "Choose a PDF…";
-        return `${file.name} (${fmtBytes(file.size)})`;
-    }, [file]);
+  const fileLabel = useMemo(() => {
+    if (!file) return "Choose a PDF…";
+    return `${file.name} (${fmtBytes(file.size)})`;
+  }, [file]);
 
-    async function onUpload() {
-        setError(null);
-        setDocId(null);
-        setViewUrl(null);
+  useEffect(() => {
+    let cancelled = false;
 
-        if (!file) {
-            setError("Choose a PDF first.");
-            return;
+    async function loadKeyStatus() {
+      try {
+        const r = await fetch("/api/admin/security/keys", { method: "GET" });
+        const j = (await r.json().catch(() => null)) as KeyStatusResponse | null;
+        if (cancelled) return;
+
+        if (!r.ok || !j || (j as any).ok === false) {
+          setEncryptionReady(false);
+          setEncryptionMsg("Encryption status unavailable.");
+          return;
         }
 
-        const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
-        if (!isPdf) {
-            setError("Only PDFs are allowed.");
-            return;
+        if (!j.configured || j.revoked_active) {
+          setEncryptionReady(false);
+          setEncryptionMsg(
+            !j.configured
+              ? "Missing DOC_MASTER_KEYS"
+              : "Active master key is revoked (rotate to a new key)."
+          );
+          return;
         }
 
-        setBusy(true);
-        try {
-            // 1) Presign
-            const presignRes = await fetch("/api/admin/upload/presign", {
-                method: "POST",
-                headers: { "content-type": "application/json" },
-                body: JSON.stringify({
-                    title: title || file.name,
-                    filename: file.name,
-                    contentType: "application/pdf",
-                    sizeBytes: file.size,
-                    encrypt,
-                }),
-            });
-
-            const presignJson = (await presignRes.json().catch(() => null)) as PresignResponse | null;
-            if (!presignRes.ok || !presignJson || presignJson.ok === false) {
-                const msg =
-                    (presignJson as any)?.message ||
-                    (presignJson as any)?.error ||
-                    `Init failed (${presignRes.status})`;
-                throw new Error(msg);
-            }
-
-            // 2) Optional client-side encryption
-            let putBody: Blob | File = file;
-            let putContentType = "application/pdf";
-
-            if (encrypt) {
-                const enc = (presignJson as any)?.encryption as any;
-                if (!enc?.enabled || !enc?.data_key_b64 || !enc?.iv_b64) {
-                    throw new Error("Encryption requested but server did not provide encryption params.");
-                }
-
-                const keyBytes = Uint8Array.from(atob(enc.data_key_b64), (c) => c.charCodeAt(0));
-                const ivBytes = Uint8Array.from(atob(enc.iv_b64), (c) => c.charCodeAt(0));
-                const cryptoKey = await crypto.subtle.importKey(
-                    "raw",
-                    keyBytes,
-                    { name: "AES-GCM" },
-                    false,
-                    ["encrypt"]
-                );
-
-                const plain = await file.arrayBuffer();
-                const cipher = await crypto.subtle.encrypt({ name: "AES-GCM", iv: ivBytes }, cryptoKey, plain);
-                putBody = new Blob([new Uint8Array(cipher)], { type: "application/octet-stream" });
-                putContentType = "application/octet-stream";
-            }
-
-            // 3) PUT to R2
-            const putRes = await fetch(presignJson.upload_url, {
-                method: "PUT",
-                headers: { "content-type": putContentType },
-                body: putBody,
-            });
-
-            if (!putRes.ok) {
-                const txt = await putRes.text().catch(() => "");
-                throw new Error(`R2 upload failed (${putRes.status})${txt ? `: ${txt}` : ""}`);
-            }
-
-            // 4) Complete
-            const completeRes = await fetch("/api/admin/upload/complete", {
-                method: "POST",
-                headers: { "content-type": "application/json" },
-                body: JSON.stringify({
-                    doc_id: presignJson.doc_id,
-                    title: title || file.name,
-                    original_filename: file.name,
-                    r2_bucket: presignJson.bucket,
-                    r2_key: presignJson.r2_key,
-                }),
-            });
-
-            const completeJson = (await completeRes.json().catch(() => null)) as CompleteResponse | null;
-            if (!completeRes.ok || !completeJson || completeJson.ok === false) {
-                const msg =
-                    (completeJson as any)?.message ||
-                    (completeJson as any)?.error ||
-                    `Complete failed (${completeRes.status})`;
-                throw new Error(msg);
-            }
-
-            setDocId(completeJson.doc_id);
-            setViewUrl(completeJson.view_url);
-
-            // Clear inputs (optional, but nice)
-            setTitle("");
-            setFile(null);
-            setEncrypt(false);
-
-            // ✅ Re-run server component queries so the docs table updates
-            router.refresh();
-        } catch (e: any) {
-            setError(String(e?.message || e));
-        } finally {
-            setBusy(false);
-        }
+        setEncryptionReady(true);
+        setEncryptionMsg(null);
+      } catch {
+        if (cancelled) return;
+        setEncryptionReady(false);
+        setEncryptionMsg("Encryption status unavailable.");
+      }
     }
 
-    return (
-        <section className="mt-8 rounded-lg border border-neutral-800 bg-neutral-950/40 p-4">
-            <div className="flex flex-wrap items-end justify-between gap-3">
-                <div>
-                    <h2 className="text-lg font-semibold tracking-tight">Upload document</h2>
-                    <p className="mt-1 text-sm text-neutral-400">
-                        Direct-to-R2 signed PUT. Creates doc row first, then finalizes and generates alias.
-                    </p>
-                </div>
+    loadKeyStatus();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
-                <button
-                    onClick={onUpload}
-                    disabled={busy || !file}
-                    className="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm font-semibold text-neutral-100 hover:bg-neutral-800 disabled:opacity-50 disabled:hover:bg-neutral-900"
-                >
-                    {busy ? "Uploading…" : "Upload"}
-                </button>
-            </div>
+  async function onUpload() {
+    setError(null);
+    setDocId(null);
+    setViewUrl(null);
 
-            <div className="mt-4 grid gap-3 md:grid-cols-2">
-                <div>
-                    <label className="block text-xs font-medium text-neutral-400">Title (optional)</label>
-                    <input
-                        value={title}
-                        onChange={(e) => setTitle(e.target.value)}
-                        placeholder="Shown in admin list / emails"
-                        disabled={busy}
-                        className="mt-2 w-full rounded-lg border border-neutral-800 bg-black/40 px-3 py-2 text-sm text-neutral-100 outline-none focus:border-neutral-600 disabled:opacity-70"
-                    />
-                </div>
+    if (encryptionReady === false) {
+      setError(encryptionMsg || "Encryption is not configured.");
+      return;
+    }
 
-                <div>
-                    <label className="block text-xs font-medium text-neutral-400">PDF file</label>
-                    <input
-                        type="file"
-                        accept="application/pdf,.pdf"
-                        onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-                        disabled={busy}
-                        className="mt-2 w-full rounded-lg border border-neutral-800 bg-black/40 px-3 py-2 text-sm text-neutral-100 file:mr-3 file:rounded-md file:border-0 file:bg-neutral-800 file:px-3 file:py-1 file:text-sm file:text-neutral-100 hover:file:bg-neutral-700 disabled:opacity-70"
-                    />
-                    <div className="mt-2 text-xs text-neutral-500">{fileLabel}</div>
-                </div>
+    if (!file) {
+      setError("Choose a PDF first.");
+      return;
+    }
 
-                <div className="md:col-span-2">
-                    <label className="inline-flex items-center gap-2 text-sm text-neutral-300">
-                        <input
-                            type="checkbox"
-                            checked={encrypt}
-                            onChange={(e) => setEncrypt(e.target.checked)}
-                            disabled={busy}
-                            className="h-4 w-4 rounded border-neutral-700 bg-black/40"
-                        />
-                        Encrypt this document (AES-256-GCM)
-                    </label>
-                    <div className="mt-1 text-xs text-neutral-500">
-                        When enabled, the PDF is encrypted in your browser before uploading. The server decrypts only when serving.
-                    </div>
-                </div>
-            </div>
+    const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+    if (!isPdf) {
+      setError("Only PDFs are allowed.");
+      return;
+    }
 
-            {error ? <div className="mt-3 text-sm font-semibold text-red-400">{error}</div> : null}
+    setBusy(true);
+    try {
+      // 1) Presign (encryption is mandatory)
+      const presignRes = await fetch("/api/admin/upload/presign", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          title: title || file.name,
+          filename: file.name,
+          contentType: "application/pdf",
+          sizeBytes: file.size,
+          encrypt: true,
+        }),
+      });
 
-            {docId ? (
-                <div className="mt-4 rounded-lg border border-neutral-800 bg-black/30 p-3">
-                    <div className="text-sm font-semibold text-emerald-300">Uploaded ✅</div>
-                    <div className="mt-2 text-xs text-neutral-400 font-mono">{docId}</div>
+      const presignJson = (await presignRes.json().catch(() => null)) as PresignResponse | null;
+      if (!presignRes.ok || !presignJson || (presignJson as any).ok === false) {
+        const msg =
+          (presignJson as any)?.message ||
+          (presignJson as any)?.error ||
+          `Init failed (${presignRes.status})`;
+        throw new Error(msg);
+      }
 
-                    {viewUrl ? (
-                        <a
-                            href={viewUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="mt-3 inline-block rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm font-semibold text-neutral-100 hover:bg-neutral-800"
-                        >
-                            Open magic link
-                        </a>
-                    ) : null}
-                </div>
-            ) : null}
-        </section>
-    );
+      const enc = presignJson.encryption as any;
+      if (!enc?.enabled || !enc?.data_key_b64 || !enc?.iv_b64) {
+        throw new Error("Server did not provide encryption parameters.");
+      }
+
+      // 2) Client-side encryption (AES-256-GCM)
+      const keyBytes = b64ToU8(enc.data_key_b64);
+      const ivBytes = b64ToU8(enc.iv_b64);
+
+      const cryptoKey = await crypto.subtle.importKey("raw", keyBytes, { name: "AES-GCM" }, false, ["encrypt"]);
+      const plain = await file.arrayBuffer();
+      const cipher = await crypto.subtle.encrypt({ name: "AES-GCM", iv: ivBytes }, cryptoKey, plain);
+
+      const putBody = new Blob([new Uint8Array(cipher)], { type: "application/octet-stream" });
+
+      // 3) PUT to R2
+      const putRes = await fetch(presignJson.upload_url, {
+        method: "PUT",
+        headers: { "content-type": "application/octet-stream" },
+        body: putBody,
+      });
+
+      if (!putRes.ok) {
+        const txt = await putRes.text().catch(() => "");
+        throw new Error(`R2 upload failed (${putRes.status})${txt ? `: ${txt}` : ""}`);
+      }
+
+      // 4) Complete
+      const completeRes = await fetch("/api/admin/upload/complete", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          doc_id: presignJson.doc_id,
+          title: title || file.name,
+          original_filename: file.name,
+          r2_bucket: presignJson.bucket,
+          r2_key: presignJson.r2_key,
+        }),
+      });
+
+      const completeJson = (await completeRes.json().catch(() => null)) as CompleteResponse | null;
+      if (!completeRes.ok || !completeJson || (completeJson as any).ok === false) {
+        const msg =
+          (completeJson as any)?.message ||
+          (completeJson as any)?.error ||
+          `Finalize failed (${completeRes.status})`;
+        throw new Error(msg);
+      }
+
+      setDocId(completeJson.doc_id);
+      setViewUrl(completeJson.view_url);
+
+      setTitle("");
+      setFile(null);
+
+      router.refresh();
+    } catch (e: any) {
+      setError(e?.message || "Upload failed.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="rounded-xl border border-white/10 bg-white/5 p-5">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold">Upload document</h2>
+          <p className="mt-1 text-sm text-white/60">
+            Direct-to-R2 signed PUT. Creates doc row first, then finalizes and generates alias.
+          </p>
+        </div>
+
+        <button
+          onClick={onUpload}
+          disabled={busy || !file || encryptionReady === false}
+          className="rounded-lg border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold hover:bg-white/10 disabled:opacity-50"
+        >
+          {busy ? "Uploading…" : "Upload"}
+        </button>
+      </div>
+
+      <div className="mt-4 grid gap-3 md:grid-cols-2">
+        <div>
+          <div className="text-xs font-medium text-white/70">Title (optional)</div>
+          <input
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="Shown in admin list / emails"
+            className="mt-1 w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm outline-none focus:border-white/20"
+          />
+        </div>
+
+        <div>
+          <div className="text-xs font-medium text-white/70">PDF file</div>
+          <label className="mt-1 flex cursor-pointer items-center justify-between gap-3 rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm hover:border-white/20">
+            <span className="truncate text-white/80">{fileLabel}</span>
+            <span className="rounded-md border border-white/10 bg-white/5 px-2 py-1 text-xs font-semibold">Browse…</span>
+            <input
+              type="file"
+              accept="application/pdf"
+              className="hidden"
+              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+            />
+          </label>
+        </div>
+      </div>
+
+      <div className="mt-3 rounded-lg border border-emerald-400/10 bg-emerald-400/5 px-3 py-2 text-xs text-emerald-200/90">
+        🔐 Documents are encrypted end-to-end (AES-256-GCM). The server only decrypts when serving.
+      </div>
+
+      {encryptionReady === false && (
+        <div className="mt-2 text-sm text-red-300">
+          {encryptionMsg ?? "Encryption not configured."}
+        </div>
+      )}
+
+      {error && <div className="mt-3 text-sm text-red-300">{error}</div>}
+
+      {docId && viewUrl && (
+        <div className="mt-4 rounded-lg border border-white/10 bg-black/30 px-3 py-3 text-sm">
+          <div className="text-xs text-white/50">Uploaded</div>
+          <div className="mt-1 font-mono text-xs text-white/70">{docId}</div>
+          <a className="mt-2 inline-block text-sm text-sky-300 hover:underline" href={viewUrl}>
+            {viewUrl}
+          </a>
+        </div>
+      )}
+    </div>
+  );
 }

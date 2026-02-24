@@ -5,7 +5,8 @@ import { r2Client } from "@/lib/r2";
 import { consumeAccessTicket, signedUrlTtlSeconds } from "@/lib/accessTicket";
 import { sql } from "@/lib/db";
 import { clientIpKey, enforceGlobalApiRateLimit, logSecurityEvent } from "@/lib/securityTelemetry";
-import { decryptAes256Gcm, getMasterKeyById, unwrapDataKey } from "@/lib/encryption";
+import { decryptAes256Gcm, unwrapDataKey } from "@/lib/encryption";
+import { getMasterKeyByIdOrThrow } from "@/lib/masterKeys";
 import { hashUserAgent, hashIpForTicket } from "@/lib/accessTicket";
 
 export const runtime = "nodejs";
@@ -106,8 +107,7 @@ export async function GET(
 
   if (enc.enabled) {
     try {
-      const mk = getMasterKeyById(enc.keyVersion);
-      if (!mk) throw new Error("Missing master key for encrypted document");
+      const mk = await getMasterKeyByIdOrThrow(enc.keyVersion);
       const dataKey = unwrapDataKey({
         wrapped: enc.wrappedKey,
         wrapIv: enc.wrapIv,

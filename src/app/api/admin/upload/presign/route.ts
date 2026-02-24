@@ -10,11 +10,14 @@ import { requireUser } from "@/lib/authz";
 import { assertCanUpload } from "@/lib/monetization";
 import { enforcePlanLimitsEnabled } from "@/lib/billingFlags";
 import { enforceGlobalApiRateLimit, clientIpKey, logSecurityEvent } from "@/lib/securityTelemetry";
-import { generateDataKey, generateIv, getActiveMasterKey, wrapDataKey } from "@/lib/encryption";
+import { generateDataKey, generateIv, wrapDataKey } from "@/lib/encryption";
+import { getActiveMasterKeyOrThrow } from "@/lib/masterKeys";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+// Enterprise: encryption is mandatory.
+// We keep "encrypt" in the schema for backward compatibility, but it must be true (or omitted).
 const BodySchema = z.object({
   title: z.string().optional(),
   filename: z.string().min(1),
@@ -86,7 +89,17 @@ export async function POST(req: Request) {
     }
 
     const { title, filename } = parsed.data;
-    const encrypt = Boolean(parsed.data.encrypt);
+
+    // Enterprise mode: ignore false; require encryption
+    const encryptRequested = parsed.data.encrypt;
+    if (encryptRequested === false) {
+      return NextResponse.json(
+        { ok: false, error: "ENCRYPTION_REQUIRED", message: "Encryption is mandatory." },
+        { status: 400 }
+      );
+    }
+    const encrypt = true;
+
     const contentType = parsed.data.contentType ?? "application/pdf";
     const sizeBytes = parsed.data.sizeBytes ?? null;
 
@@ -105,6 +118,18 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: canUpload.error, message: canUpload.message }, { status: 403 });
     }
 
+    // --- Mandatory encryption configuration ---
+    let mk;
+    try {
+      mk = await getActiveMasterKeyOrThrow();
+    } catch (e: any) {
+      const msg = e?.message === "MASTER_KEY_REVOKED" ? "Active master key is revoked." : "Missing DOC_MASTER_KEYS.";
+      return NextResponse.json(
+        { ok: false, error: "ENCRYPTION_NOT_CONFIGURED", message: msg },
+        { status: 500 }
+      );
+    }
+
     const docId = crypto.randomUUID();
     const keyPrefix = getKeyPrefix();
     const safeName = safeKeyPart(filename.toLowerCase().endsWith(".pdf") ? filename : `${filename}.pdf`);
@@ -112,35 +137,13 @@ export async function POST(req: Request) {
 
     const createdByEmail = user.email;
 
-    // Optional per-document encryption metadata
-    let encryptionEnabled = false;
-    let encAlg: string | null = null;
-    let encIv: Buffer | null = null;
-    let encKeyVersion: string | null = null;
-    let encWrappedKey: Buffer | null = null;
-    let encWrapIv: Buffer | null = null;
-    let encWrapTag: Buffer | null = null;
-    let encDataKeyForClient: string | null = null;
+    // Per-document encryption metadata (always enabled)
+    const dataKey = generateDataKey();
+    const wrap = wrapDataKey({ dataKey, masterKey: mk.key });
 
-    if (encrypt) {
-      const mk = getActiveMasterKey();
-      if (!mk) {
-        return NextResponse.json(
-          { ok: false, error: "ENCRYPTION_NOT_CONFIGURED", message: "Server encryption is not configured." },
-          { status: 500 }
-        );
-      }
-      const dataKey = generateDataKey();
-      const wrap = wrapDataKey({ dataKey, masterKey: mk.key });
-      encryptionEnabled = true;
-      encAlg = "AES-256-GCM";
-      encIv = generateIv();
-      encKeyVersion = mk.id;
-      encWrappedKey = wrap.wrapped;
-      encWrapIv = wrap.iv;
-      encWrapTag = wrap.tag;
-      encDataKeyForClient = dataKey.toString("base64");
-    }
+    const encAlg = "AES-256-GCM";
+    const encIv = generateIv();
+    const encKeyVersion = mk.id;
 
     await sql`
       insert into docs (
@@ -175,13 +178,13 @@ export async function POST(req: Request) {
         ${key},
         ${createdByEmail},
         'uploading',
-        ${encryptionEnabled},
+        true,
         ${encAlg},
         ${encIv},
         ${encKeyVersion},
-        ${encWrappedKey},
-        ${encWrapIv},
-        ${encWrapTag}
+        ${wrap.wrapped},
+        ${wrap.iv},
+        ${wrap.tag}
       )
     `;
 
@@ -190,13 +193,8 @@ export async function POST(req: Request) {
     const putParams: any = {
       Bucket: r2Bucket,
       Key: key,
-      ContentType: encrypt ? "application/octet-stream" : "application/pdf",
+      ContentType: "application/octet-stream",
     };
-
-    // IMPORTANT:
-    // Do NOT include ServerSideEncryption in a browser presigned PUT.
-    // If present, the signature requires x-amz-server-side-encryption to be sent by the browser.
-    // R2 encrypts at rest by default; enforce object-level policies via server-side finalize/copy if needed.
 
     const uploadUrl = await getSignedUrl(r2Client, new PutObjectCommand(putParams), { expiresIn });
 
@@ -207,9 +205,7 @@ export async function POST(req: Request) {
       r2_key: key,
       bucket: r2Bucket,
       expires_in: expiresIn,
-      encryption: encryptionEnabled
-        ? { enabled: true, alg: encAlg, iv_b64: encIv?.toString("base64"), data_key_b64: encDataKeyForClient }
-        : { enabled: false },
+      encryption: { enabled: true, alg: encAlg, iv_b64: encIv.toString("base64"), data_key_b64: dataKey.toString("base64") },
     });
   } catch (err: any) {
     console.error("PRESIGN ERROR:", err);
