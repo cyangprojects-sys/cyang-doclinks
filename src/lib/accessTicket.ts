@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 import { sql } from "@/lib/db";
 import { getClientIp } from "@/lib/view";
 
-export type AccessTicketPurpose = "preview_view" | "file_download";
+export type AccessTicketPurpose = "preview_view" | "file_download" | "watermarked_file_download";
 
 function hmacHex(value: string, salt: string) {
   return crypto.createHmac("sha256", salt).update(value).digest("hex");
