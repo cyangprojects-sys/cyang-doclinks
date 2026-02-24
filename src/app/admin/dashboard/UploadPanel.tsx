@@ -212,9 +212,35 @@ export default function UploadPanel({
       setFile(null);
 
       router.refresh();
-    } catch (e: any) {
-      setError(e?.message || "Upload failed.");
-    } finally {
+    
+} catch (e: any) {
+  // When R2 bucket CORS is not configured (or the presigned PUT preflight is blocked),
+  // browsers throw a generic network error (often "Failed to fetch" / "NetworkError").
+  const msg = String(e?.message ?? "");
+  const name = String(e?.name ?? "");
+  const looksLikeCors =
+    name === "TypeError" ||
+    /Failed to fetch/i.test(msg) ||
+    /NetworkError/i.test(msg) ||
+    /CORS/i.test(msg) ||
+    /blocked/i.test(msg);
+
+  if (looksLikeCors) {
+    setError(
+      [
+        "Upload failed due to a browser CORS/network block when PUT-ing to Cloudflare R2.",
+        "",
+        "Fix: add a CORS rule on your R2 bucket to allow PUT from https://www.cyang.io (and your preview domains),",
+        "and allow headers: content-type, x-amz-meta-doc-id, x-amz-meta-orig-content-type (or simply allow all headers).",
+        "",
+        "See: scripts/r2/CORS_SETUP.md in this repo.",
+      ].join("
+")
+    );
+  } else {
+    setError(msg || "Upload failed.");
+  }
+} finally {
       setBusy(false);
     }
   }
