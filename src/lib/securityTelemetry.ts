@@ -1,5 +1,6 @@
 import crypto from "crypto";
 import { sql } from "@/lib/db";
+import { rateLimit } from "@/lib/rateLimit";
 
 /**
  * Hash IP address (privacy safe logging)
@@ -121,23 +122,16 @@ export async function enforceGlobalApiRateLimit(args: {
   const { req, scope, limit, windowSeconds, actorUserId, orgId } = args;
   const { ip, ipHash } = clientIpKey(req);
 
-  const nowMs = Date.now();
-  const bucket = Math.floor(nowMs / (windowSeconds * 1000));
+  const rl = await rateLimit({
+    scope,
+    id: ipHash,
+    limit,
+    windowSeconds,
+  });
 
-  // Increment the counter for this (scope, ipHash, bucket)
-  const rows = (await sql`
-    insert into public.rate_limit_counters (scope, id, bucket, count)
-    values (${scope}, ${ipHash}, ${String(bucket)}, 1)
-    on conflict (scope, id, bucket)
-    do update set count = public.rate_limit_counters.count + 1, updated_at = now()
-    returning count
-  `) as unknown as Array<{ count: number }>;
+  const retryAfterSeconds = Math.max(1, rl.resetSeconds);
 
-  const count = Number(rows?.[0]?.count ?? 1);
-  const windowEndMs = (bucket + 1) * windowSeconds * 1000;
-  const retryAfterSeconds = Math.max(1, Math.ceil((windowEndMs - nowMs) / 1000));
-
-  if (count > limit) {
+  if (!rl.ok) {
     // best-effort telemetry
     void logSecurityEvent({
       type: "rate_limit",
@@ -147,7 +141,7 @@ export async function enforceGlobalApiRateLimit(args: {
       orgId: orgId ?? null,
       scope,
       message: "Rate limit exceeded",
-      meta: { count, limit, windowSeconds },
+      meta: { count: rl.count, limit: rl.limit, windowSeconds },
     });
 
     return { ok: false as const, status: 429 as const, retryAfterSeconds };

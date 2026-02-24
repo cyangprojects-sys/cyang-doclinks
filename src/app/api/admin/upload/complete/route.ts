@@ -2,11 +2,13 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
+import { HeadObjectCommand } from "@aws-sdk/client-s3";
 import { sql } from "@/lib/db";
 import { slugify } from "@/lib/slug";
 import { requireDocWrite } from "@/lib/authz";
 import { incrementUploads } from "@/lib/monetization";
 import { enforceGlobalApiRateLimit, clientIpKey, logSecurityEvent, detectStorageSpike } from "@/lib/securityTelemetry";
+import { r2Client, r2Bucket } from "@/lib/r2";
 
 type CompleteRequest = {
   // Newer flow: doc_id from /presign response
@@ -115,7 +117,135 @@ export async function POST(req: NextRequest) {
 
     const existingName = docRows[0].name;
 
-    // 3) Mark doc ready + update metadata (best-effort)
+    const docBucket = docRows[0].r2_bucket;
+    const docKey = docRows[0].r2_key;
+    if (!docBucket || !docKey) {
+      return NextResponse.json({ ok: false, error: "missing_r2_pointer" }, { status: 409 });
+    }
+
+    // Defensive: ensure this doc points at the configured bucket.
+    // (Prevents any future cross-bucket pointer mistakes from becoming a data exfil path.)
+    if (docBucket !== r2Bucket) {
+      await logSecurityEvent({
+        type: "upload_complete_bucket_mismatch",
+        severity: "high",
+        ip: ipInfo.ip,
+        docId,
+        scope: "upload_complete",
+        message: "Doc bucket does not match configured R2 bucket",
+        meta: { docBucket, configuredBucket: r2Bucket },
+      });
+      return NextResponse.json({ ok: false, error: "bucket_mismatch" }, { status: 409 });
+    }
+
+    // 3) Verify the object exists in R2 and matches expected constraints.
+    // This closes the bypass where a client can lie about size/type during presign.
+    const absMax = Number(process.env.UPLOAD_ABSOLUTE_MAX_BYTES || 1_000_000_000); // ~1GB default
+
+    // Pull expected size and encryption flag from DB.
+    const verifyRows = (await sql`
+      select
+        size_bytes::bigint as size_bytes,
+        encryption_enabled::boolean as encryption_enabled
+      from public.docs
+      where id = ${docId}::uuid
+      limit 1
+    `) as unknown as Array<{ size_bytes: number | string | null; encryption_enabled: boolean | null }>;
+
+    const expectedPlain = Number(verifyRows?.[0]?.size_bytes ?? 0);
+    const encryptionEnabled = Boolean(verifyRows?.[0]?.encryption_enabled);
+
+    let head;
+    try {
+      head = await r2Client.send(
+        new HeadObjectCommand({
+          Bucket: docBucket,
+          Key: docKey,
+        })
+      );
+    } catch (e: any) {
+      await logSecurityEvent({
+        type: "upload_complete_missing_object",
+        severity: "high",
+        ip: ipInfo.ip,
+        docId,
+        scope: "upload_complete",
+        message: "Upload complete called but R2 object missing",
+        meta: { err: e?.name ?? e?.message ?? String(e) },
+      });
+      return NextResponse.json({ ok: false, error: "object_missing" }, { status: 409 });
+    }
+
+    const contentLength = Number((head as any)?.ContentLength ?? 0);
+    const ct = String((head as any)?.ContentType ?? "");
+    const meta = ((head as any)?.Metadata ?? {}) as Record<string, string>;
+
+    if (!Number.isFinite(contentLength) || contentLength <= 0) {
+      return NextResponse.json({ ok: false, error: "invalid_object" }, { status: 409 });
+    }
+    if (Number.isFinite(absMax) && absMax > 0 && contentLength > absMax) {
+      await logSecurityEvent({
+        type: "upload_complete_too_large",
+        severity: "high",
+        ip: ipInfo.ip,
+        docId,
+        scope: "upload_complete",
+        message: "Uploaded object exceeds absolute max",
+        meta: { contentLength, absMax },
+      });
+      return NextResponse.json({ ok: false, error: "object_too_large" }, { status: 413 });
+    }
+
+    // If encryption is enabled, the uploaded ciphertext includes a 16-byte GCM tag appended.
+    // Some clients may also send unencrypted bytes in the future; accept exact match as well.
+    if (Number.isFinite(expectedPlain) && expectedPlain > 0) {
+      const allowedSizes = new Set<number>([expectedPlain, expectedPlain + 16]);
+      if (!allowedSizes.has(contentLength)) {
+        await logSecurityEvent({
+          type: "upload_complete_size_mismatch",
+          severity: "high",
+          ip: ipInfo.ip,
+          docId,
+          scope: "upload_complete",
+          message: "Uploaded object size mismatch",
+          meta: { expectedPlain, contentLength, encryptionEnabled },
+        });
+        return NextResponse.json({ ok: false, error: "size_mismatch" }, { status: 409 });
+      }
+    }
+
+    // Verify signed metadata we attached during presign.
+    const metaDocId = (meta["doc-id"] || meta["doc_id"] || "").toString();
+    const metaOrigCt = (meta["orig-content-type"] || meta["orig_content_type"] || "").toString();
+
+    if (metaDocId && metaDocId !== docId) {
+      await logSecurityEvent({
+        type: "upload_complete_meta_mismatch",
+        severity: "high",
+        ip: ipInfo.ip,
+        docId,
+        scope: "upload_complete",
+        message: "R2 object metadata doc-id mismatch",
+        meta: { metaDocId, docId },
+      });
+      return NextResponse.json({ ok: false, error: "metadata_mismatch" }, { status: 409 });
+    }
+
+    // If present, require original to be PDF.
+    if (metaOrigCt && metaOrigCt !== "application/pdf") {
+      await logSecurityEvent({
+        type: "upload_complete_not_pdf",
+        severity: "high",
+        ip: ipInfo.ip,
+        docId,
+        scope: "upload_complete",
+        message: "R2 metadata orig-content-type is not application/pdf",
+        meta: { metaOrigCt, ct },
+      });
+      return NextResponse.json({ ok: false, error: "not_pdf" }, { status: 409 });
+    }
+
+    // 4) Mark doc ready + update metadata (best-effort)
     await sql`
       update public.docs
       set

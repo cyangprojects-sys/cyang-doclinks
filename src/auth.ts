@@ -38,6 +38,11 @@ import Credentials from "next-auth/providers/credentials";
 
 const POST_SIGN_IN_PATH = "/admin/dashboard";
 
+const useSecureCookies =
+  (process.env.NEXTAUTH_URL || "").toLowerCase().startsWith("https://") ||
+  (process.env.VERCEL || "").toLowerCase() === "1" ||
+  (process.env.VERCEL_ENV || "").length > 0;
+
 function hasEnv(...keys: string[]) {
   return keys.every((k) => {
     const v = process.env[k];
@@ -112,6 +117,40 @@ function enterpriseOidcProvider() {
 }
 
 export const authOptions: NextAuthOptions = {
+  // Make cookie security explicit (prod-safe defaults).
+  useSecureCookies,
+  cookies: useSecureCookies
+    ? {
+        // Note: __Host- requires Path=/, Secure, and no Domain.
+        csrfToken: {
+          name: "__Host-next-auth.csrf-token",
+          options: {
+            httpOnly: true,
+            sameSite: "lax",
+            path: "/",
+            secure: true,
+          },
+        },
+        sessionToken: {
+          name: "__Secure-next-auth.session-token",
+          options: {
+            httpOnly: true,
+            sameSite: "lax",
+            path: "/",
+            secure: true,
+          },
+        },
+        callbackUrl: {
+          name: "__Secure-next-auth.callback-url",
+          options: {
+            sameSite: "lax",
+            path: "/",
+            secure: true,
+          },
+        },
+      }
+    : undefined,
+
   providers: [
     Credentials({
       id: "disabled",

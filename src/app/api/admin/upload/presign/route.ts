@@ -193,7 +193,14 @@ export async function POST(req: Request) {
     const putParams: any = {
       Bucket: r2Bucket,
       Key: key,
+      // The uploaded object is encrypted bytes (ciphertext), not a literal PDF.
+      // We still enforce that the *original* file is a PDF via request validation,
+      // and bind that fact into signed metadata.
       ContentType: "application/octet-stream",
+      Metadata: {
+        "doc-id": docId,
+        "orig-content-type": "application/pdf",
+      },
     };
 
     const uploadUrl = await getSignedUrl(r2Client, new PutObjectCommand(putParams), { expiresIn });

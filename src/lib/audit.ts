@@ -9,13 +9,21 @@ import crypto from "crypto";
 import { sql } from "@/lib/db";
 
 export function getClientIpFromHeaders(h: Headers): string {
-  // Vercel/Next generally forwards client IP via x-forwarded-for.
+  // Keep this consistent with src/lib/securityTelemetry.ts (single source of truth for IP extraction)
+  // Cloudflare
+  const cf = (h.get("cf-connecting-ip") || "").trim();
+  if (cf) return cf;
+
+  // Common reverse-proxy headers
   const xff = (h.get("x-forwarded-for") || "").trim();
   if (xff) return xff.split(",")[0]?.trim() || "";
 
-  // Fallbacks that sometimes appear depending on infra.
   const realIp = (h.get("x-real-ip") || "").trim();
   if (realIp) return realIp;
+
+  // Vercel
+  const vercel = (h.get("x-vercel-forwarded-for") || "").trim();
+  if (vercel) return vercel.split(",")[0]?.trim() || "";
 
   return "";
 }
