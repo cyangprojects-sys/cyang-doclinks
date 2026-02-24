@@ -3,11 +3,15 @@
 // Cloudflare R2 (S3-compatible) client + shared constants.
 //
 // IMPORTANT:
-// - Browser-based presigned PUT uploads are extremely sensitive to which headers are included
-//   in the signature. If we sign x-amz-checksum-* or x-amz-server-side-encryption headers,
-//   the browser must send them exactly, or R2 will return SignatureDoesNotMatch.
-// - For reliability, we disable checksum calculation/validation at the SDK layer and avoid
-//   signing SSE headers on presigned browser PUTs (handled elsewhere if needed).
+// Browser presigned PUT uploads are sensitive to which headers are included in the signature.
+// If the SDK injects x-amz-checksum-* (or you sign x-amz-server-side-encryption), browsers
+// won't send those headers by default and R2 returns SignatureDoesNotMatch.
+//
+// Recommended approach:
+// 1) Avoid signing SSE headers for browser presigned PUTs (handled in presign route).
+// 2) Ask AWS SDK to NOT calculate/validate checksums (if supported by your SDK version).
+//    Some @aws-sdk versions don't include the newer checksum config keys in TypeScript
+//    types yet, so we apply them behind a safe `as any` cast.
 
 import { S3Client } from "@aws-sdk/client-s3";
 
@@ -27,20 +31,13 @@ export const r2Prefix = (() => {
   return p.endsWith("/") ? p : `${p}/`;
 })();
 
-if (!R2_ENDPOINT) {
-  // Fail fast in server environments; but keep message explicit.
-  throw new Error("Missing R2_ENDPOINT env var");
-}
-if (!R2_ACCESS_KEY_ID) {
-  throw new Error("Missing R2_ACCESS_KEY_ID env var");
-}
-if (!R2_SECRET_ACCESS_KEY) {
-  throw new Error("Missing R2_SECRET_ACCESS_KEY env var");
-}
-if (!r2Bucket) {
-  throw new Error("Missing R2_BUCKET env var");
-}
+if (!R2_ENDPOINT) throw new Error("Missing R2_ENDPOINT env var");
+if (!R2_ACCESS_KEY_ID) throw new Error("Missing R2_ACCESS_KEY_ID env var");
+if (!R2_SECRET_ACCESS_KEY) throw new Error("Missing R2_SECRET_ACCESS_KEY env var");
+if (!r2Bucket) throw new Error("Missing R2_BUCKET env var");
 
+// NOTE: We intentionally cast to `any` to allow newer checksum-related config keys
+// even when the installed SDK's TypeScript types don't expose them.
 export const r2Client = new S3Client({
   region: "auto",
   endpoint: R2_ENDPOINT,
@@ -49,10 +46,8 @@ export const r2Client = new S3Client({
     secretAccessKey: R2_SECRET_ACCESS_KEY,
   },
 
-  // Prevent AWS SDK from adding x-amz-checksum-* requirements to presigned URLs.
-  // This is supported by modern @aws-sdk/* versions; if your version is older,
-  // TypeScript may complain — but your build uses Turbopack + TS, so this should
-  // remain compatible with the version in package-lock.
+  // Prevent AWS SDK from injecting checksum requirements into presigned PUT URLs.
+  // (If unsupported by this SDK version at runtime, it will be ignored.)
   requestChecksumCalculation: "NEVER",
   responseChecksumValidation: "NEVER",
-});
+} as any);
