@@ -234,8 +234,7 @@ export default function UploadPanel({
         "and allow headers: content-type, x-amz-meta-doc-id, x-amz-meta-orig-content-type (or simply allow all headers).",
         "",
         "See: scripts/r2/CORS_SETUP.md in this repo.",
-      ].join("
-")
+      ].join("\n")
     );
   } else {
     setError(msg || "Upload failed.");
