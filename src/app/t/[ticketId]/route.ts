@@ -153,11 +153,13 @@ export async function GET(
         meta: { keyVersion: enc.keyVersion },
       });
 
-      // NextResponse expects a Web `BodyInit` type. Node `Buffer` isn't assignable in TS,
-      // even though it's a Uint8Array at runtime. Convert explicitly.
-      const responseBody = new Uint8Array(decrypted.buffer, decrypted.byteOffset, decrypted.byteLength);
+      // NextResponse expects a Web `BodyInit` type. Convert Node Buffer -> ArrayBuffer slice.
+      const responseArrayBuffer = decrypted.buffer.slice(
+        decrypted.byteOffset,
+        decrypted.byteOffset + decrypted.byteLength
+      );
 
-      return new NextResponse(responseBody, {
+      return new NextResponse(responseArrayBuffer, {
         status: 200,
         headers: {
           "Content-Type": t.response_content_type || "application/pdf",
