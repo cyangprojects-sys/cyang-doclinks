@@ -1,39 +1,58 @@
+// src/lib/r2.ts
+//
+// Cloudflare R2 (S3-compatible) client + shared constants.
+//
+// IMPORTANT:
+// - Browser-based presigned PUT uploads are extremely sensitive to which headers are included
+//   in the signature. If we sign x-amz-checksum-* or x-amz-server-side-encryption headers,
+//   the browser must send them exactly, or R2 will return SignatureDoesNotMatch.
+// - For reliability, we disable checksum calculation/validation at the SDK layer and avoid
+//   signing SSE headers on presigned browser PUTs (handled elsewhere if needed).
+
 import { S3Client } from "@aws-sdk/client-s3";
 
-/**
- * Cloudflare R2 S3-compatible client.
- *
- * Recommended path for browser presigned PUT uploads:
- * - Disable checksum calculation/validation so presigned URLs do not require x-amz-checksum-* headers.
- *   Browsers typically do not send these headers, which causes SignatureDoesNotMatch.
- */
+const R2_ENDPOINT = process.env.R2_ENDPOINT;
+const R2_ACCESS_KEY_ID = process.env.R2_ACCESS_KEY_ID;
+const R2_SECRET_ACCESS_KEY = process.env.R2_SECRET_ACCESS_KEY;
 
-export const r2Bucket = process.env.R2_BUCKET || "";
+// Keep existing exports used throughout the app.
+export const r2Bucket = process.env.R2_BUCKET || process.env.R2_BUCKET_NAME || "";
+export const R2_BUCKET = r2Bucket;
 
-const endpoint = process.env.R2_ENDPOINT;
-if (!endpoint) {
-  // Keep this as a hard failure so misconfig is caught early in logs.
-  throw new Error("R2_ENDPOINT is required");
+// Optional object key prefix (defaults to "docs/").
+// Some parts of the codebase reference `r2Prefix`.
+export const r2Prefix = (() => {
+  const p = process.env.R2_PREFIX || "docs/";
+  if (p.startsWith("r2://")) return "docs/";
+  return p.endsWith("/") ? p : `${p}/`;
+})();
+
+if (!R2_ENDPOINT) {
+  // Fail fast in server environments; but keep message explicit.
+  throw new Error("Missing R2_ENDPOINT env var");
 }
-
-const accessKeyId = process.env.R2_ACCESS_KEY_ID;
-const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY;
-if (!accessKeyId || !secretAccessKey) {
-  throw new Error("R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY are required");
+if (!R2_ACCESS_KEY_ID) {
+  throw new Error("Missing R2_ACCESS_KEY_ID env var");
+}
+if (!R2_SECRET_ACCESS_KEY) {
+  throw new Error("Missing R2_SECRET_ACCESS_KEY env var");
+}
+if (!r2Bucket) {
+  throw new Error("Missing R2_BUCKET env var");
 }
 
 export const r2Client = new S3Client({
   region: "auto",
-  endpoint,
+  endpoint: R2_ENDPOINT,
   credentials: {
-    accessKeyId,
-    secretAccessKey,
+    accessKeyId: R2_ACCESS_KEY_ID,
+    secretAccessKey: R2_SECRET_ACCESS_KEY,
   },
 
-  // These options exist on newer AWS SDK v3 builds.
-  // Cast to any so we can be compatible across minor versions without breaking TypeScript.
-  ...( {
-    requestChecksumCalculation: "NEVER",
-    responseChecksumValidation: "NEVER",
-  } as any ),
+  // Prevent AWS SDK from adding x-amz-checksum-* requirements to presigned URLs.
+  // This is supported by modern @aws-sdk/* versions; if your version is older,
+  // TypeScript may complain — but your build uses Turbopack + TS, so this should
+  // remain compatible with the version in package-lock.
+  requestChecksumCalculation: "NEVER",
+  responseChecksumValidation: "NEVER",
 });

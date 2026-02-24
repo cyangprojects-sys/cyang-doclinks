@@ -92,10 +92,7 @@ export async function POST(req: Request) {
 
     // Hard enforcement needs an explicit sizeBytes to prevent bypassing storage/file-size caps.
     if (enforcePlanLimitsEnabled() && (sizeBytes == null || !Number.isFinite(sizeBytes) || sizeBytes <= 0)) {
-      return NextResponse.json(
-        { ok: false, error: "MISSING_SIZE", message: "sizeBytes is required." },
-        { status: 400 }
-      );
+      return NextResponse.json({ ok: false, error: "MISSING_SIZE", message: "sizeBytes is required." }, { status: 400 });
     }
 
     if (contentType !== "application/pdf") {
@@ -105,10 +102,7 @@ export async function POST(req: Request) {
     // --- Monetization / plan limits (hidden) ---
     const canUpload = await assertCanUpload({ userId: user.id, sizeBytes: sizeBytes ?? null });
     if (!canUpload.ok) {
-      return NextResponse.json(
-        { ok: false, error: canUpload.error, message: canUpload.message },
-        { status: 403 }
-      );
+      return NextResponse.json({ ok: false, error: canUpload.error, message: canUpload.message }, { status: 403 });
     }
 
     const docId = crypto.randomUUID();
@@ -132,11 +126,7 @@ export async function POST(req: Request) {
       const mk = getActiveMasterKey();
       if (!mk) {
         return NextResponse.json(
-          {
-            ok: false,
-            error: "ENCRYPTION_NOT_CONFIGURED",
-            message: "Server encryption is not configured.",
-          },
+          { ok: false, error: "ENCRYPTION_NOT_CONFIGURED", message: "Server encryption is not configured." },
           { status: 500 }
         );
       }
@@ -203,10 +193,10 @@ export async function POST(req: Request) {
       ContentType: encrypt ? "application/octet-stream" : "application/pdf",
     };
 
-    // IMPORTANT (recommended path):
-    // Do NOT include ServerSideEncryption or checksum-related headers in browser presigned PUTs.
-    // If these headers are signed, the browser must send them exactly, otherwise R2 returns
-    // SignatureDoesNotMatch (403). R2 encrypts at rest by default.
+    // IMPORTANT:
+    // Do NOT include ServerSideEncryption in a browser presigned PUT.
+    // If present, the signature requires x-amz-server-side-encryption to be sent by the browser.
+    // R2 encrypts at rest by default; enforce object-level policies via server-side finalize/copy if needed.
 
     const uploadUrl = await getSignedUrl(r2Client, new PutObjectCommand(putParams), { expiresIn });
 
@@ -224,11 +214,7 @@ export async function POST(req: Request) {
   } catch (err: any) {
     console.error("PRESIGN ERROR:", err);
     return NextResponse.json(
-      {
-        ok: false,
-        error: "SERVER_ERROR",
-        message: err?.message ?? String(err),
-      },
+      { ok: false, error: "SERVER_ERROR", message: err?.message ?? String(err) },
       { status: 500 }
     );
   }
