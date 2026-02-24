@@ -153,8 +153,7 @@ export async function GET(
         meta: { keyVersion: enc.keyVersion },
       });
 
-      // NextResponse expects a Web `BodyInit` type. Use a Blob so TS accepts the body across runtimes.
-      const responseBlob = new Blob([decrypted]);
+      const responseBlob = new Blob([new Uint8Array(decrypted)]);
 
       return new NextResponse(responseBlob, {
         status: 200,
