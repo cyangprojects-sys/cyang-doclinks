@@ -86,7 +86,7 @@ export async function stampPdfWithWatermark(inputPdf: Buffer, spec: WatermarkSpe
         });
         page.drawText(line2, {
           x,
-          y - bigSize - 6,
+          y: y - bigSize - 6,
           size: smallSize,
           font,
           color,
