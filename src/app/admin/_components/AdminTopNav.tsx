@@ -45,6 +45,7 @@ export default function AdminTopNav({
                 <NavLink href="/admin/webhooks" label="Webhooks" />
                 <NavLink href="/admin/api-keys" label="API Keys" />
                 <NavLink href="/admin/billing" label="Billing" />
+                <NavLink href="/admin/security" label="Security" />
               </>
             )}
           </nav>

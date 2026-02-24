@@ -6,6 +6,7 @@ import { sql } from "@/lib/db";
 import { slugify } from "@/lib/slug";
 import { requireDocWrite } from "@/lib/authz";
 import { incrementUploads } from "@/lib/monetization";
+import { enforceGlobalApiRateLimit, clientIpKey, logSecurityEvent, detectStorageSpike } from "@/lib/securityTelemetry";
 
 type CompleteRequest = {
   // Newer flow: doc_id from /presign response
@@ -21,6 +22,42 @@ type CompleteRequest = {
 
 export async function POST(req: NextRequest) {
   try {
+    // Global API throttle (best-effort)
+    const globalRl = await enforceGlobalApiRateLimit({
+      req,
+      scope: "ip:api",
+      limit: Number(process.env.RATE_LIMIT_API_IP_PER_MIN || 240),
+      windowSeconds: 60,
+    });
+    if (!globalRl.ok) {
+      return NextResponse.json(
+        { ok: false, error: "RATE_LIMIT" },
+        { status: globalRl.status, headers: { "Retry-After": String(globalRl.retryAfterSeconds) } }
+      );
+    }
+
+    // Upload complete throttle per-IP
+    const ipInfo = clientIpKey(req);
+    const completeRl = await enforceGlobalApiRateLimit({
+      req,
+      scope: "ip:upload_complete",
+      limit: Number(process.env.RATE_LIMIT_UPLOAD_COMPLETE_IP_PER_MIN || 30),
+      windowSeconds: 60,
+    });
+    if (!completeRl.ok) {
+      await logSecurityEvent({
+        type: "upload_throttle",
+        severity: "medium",
+        ip: ipInfo.ip,
+        scope: "ip:upload_complete",
+        message: "Upload complete throttled",
+      });
+      return NextResponse.json(
+        { ok: false, error: "RATE_LIMIT" },
+        { status: completeRl.status, headers: { "Retry-After": String(completeRl.retryAfterSeconds) } }
+      );
+    }
+
     const body = (await req.json()) as CompleteRequest;
 
     const title = body.title ?? null;
@@ -93,13 +130,22 @@ export async function POST(req: NextRequest) {
 try {
   const usageRows = (await sql`
     select owner_id::text as owner_id
+         , org_id::text as org_id
+         , size_bytes::bigint as size_bytes
     from public.docs
     where id = ${docId}::uuid
     limit 1
-  `) as unknown as Array<{ owner_id: string | null }>;
+  `) as unknown as Array<{ owner_id: string | null; org_id: string | null; size_bytes: number | string | null }>;
   const ownerId = usageRows?.[0]?.owner_id ?? null;
+  const orgId = usageRows?.[0]?.org_id ?? null;
+  const sizeBytes = Number(usageRows?.[0]?.size_bytes ?? 0);
   if (ownerId) {
     await incrementUploads(ownerId, 1);
+
+    // Storage spike detection (best-effort)
+    if (Number.isFinite(sizeBytes) && sizeBytes > 0) {
+      await detectStorageSpike({ ownerId, sizeBytes, ip: ipInfo.ip, orgId, docId });
+    }
   }
 } catch (e) {
   // best-effort; do not block completion
