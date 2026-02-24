@@ -1,32 +1,39 @@
-// src/lib/r2.ts
 import { S3Client } from "@aws-sdk/client-s3";
 
-function required(name: string): string {
-  const v = process.env[name];
-  if (!v) throw new Error(`Missing ${name}`);
-  return v;
+/**
+ * Cloudflare R2 S3-compatible client.
+ *
+ * Recommended path for browser presigned PUT uploads:
+ * - Disable checksum calculation/validation so presigned URLs do not require x-amz-checksum-* headers.
+ *   Browsers typically do not send these headers, which causes SignatureDoesNotMatch.
+ */
+
+export const r2Bucket = process.env.R2_BUCKET || "";
+
+const endpoint = process.env.R2_ENDPOINT;
+if (!endpoint) {
+  // Keep this as a hard failure so misconfig is caught early in logs.
+  throw new Error("R2_ENDPOINT is required");
 }
 
-export const R2_BUCKET = required("R2_BUCKET");
-export const R2_ACCOUNT_ID = required("R2_ACCOUNT_ID");
+const accessKeyId = process.env.R2_ACCESS_KEY_ID;
+const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY;
+if (!accessKeyId || !secretAccessKey) {
+  throw new Error("R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY are required");
+}
 
-export const r2 = new S3Client({
+export const r2Client = new S3Client({
   region: "auto",
-  endpoint: `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
-  forcePathStyle: true,
+  endpoint,
   credentials: {
-    accessKeyId: required("R2_ACCESS_KEY_ID"),
-    secretAccessKey: required("R2_SECRET_ACCESS_KEY"),
+    accessKeyId,
+    secretAccessKey,
   },
+
+  // These options exist on newer AWS SDK v3 builds.
+  // Cast to any so we can be compatible across minor versions without breaking TypeScript.
+  ...( {
+    requestChecksumCalculation: "NEVER",
+    responseChecksumValidation: "NEVER",
+  } as any ),
 });
-
-// Back-compat exports
-export const r2Client = r2;
-export const r2Bucket = R2_BUCKET;
-
-// Optional pointer helpers (you can ignore if not used)
-export const r2Prefix = `r2://${R2_BUCKET}/` as const;
-
-export function r2PointerForKey(key: string) {
-  return `r2://${R2_BUCKET}/${key}`;
-}
