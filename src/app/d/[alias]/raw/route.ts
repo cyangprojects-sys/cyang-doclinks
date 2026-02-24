@@ -9,6 +9,7 @@ import { aliasTrustCookieName, isAliasTrusted } from "@/lib/deviceTrust";
 import { rateLimit, rateLimitHeaders, stableHash } from "@/lib/rateLimit";
 import { mintAccessTicket } from "@/lib/accessTicket";
 import { assertCanServeView, incrementMonthlyViews } from "@/lib/monetization";
+import { enforcePlanLimitsEnabled } from "@/lib/billingFlags";
 import crypto from "crypto";
 
 function normAlias(alias: string): string {
@@ -173,26 +174,35 @@ export async function GET(
 // --- Monetization / plan limits (hidden) ---
 // Enforce the document owner's monthly view quota.
 if (shouldCountView(req)) {
+  let ownerId: string | null = null;
   try {
     const ownerRows = (await sql`
-      select owner_id::text as owner_id
-      from public.docs
-      where id = ${row.docId}::uuid
-      limit 1
-    `) as unknown as Array<{ owner_id: string | null }>;
-    const ownerId = ownerRows?.[0]?.owner_id ?? null;
-
-    if (ownerId) {
-      const allowed = await assertCanServeView(ownerId);
-      if (!allowed.ok) {
-        return new Response("Temporarily unavailable", { status: 429 });
-      }
-
-      // Best-effort usage counter
-      await incrementMonthlyViews(ownerId, 1);
-    }
+        select owner_id::text as owner_id
+        from public.docs
+        where id = ${row.docId}::uuid
+        limit 1
+      `) as unknown as Array<{ owner_id: string | null }>;
+    ownerId = ownerRows?.[0]?.owner_id ?? null;
   } catch {
-    // best-effort
+    if (enforcePlanLimitsEnabled()) {
+      return new Response("Temporarily unavailable", { status: 503 });
+    }
+    ownerId = null;
+  }
+
+  if (ownerId) {
+    const allowed = await assertCanServeView(ownerId);
+    if (!allowed.ok) {
+      return new Response("Temporarily unavailable", { status: 429 });
+    }
+
+    try {
+      await incrementMonthlyViews(ownerId, 1);
+    } catch {
+      if (enforcePlanLimitsEnabled()) {
+        return new Response("Temporarily unavailable", { status: 503 });
+      }
+    }
   }
 
   // Best-effort view log (analytics)

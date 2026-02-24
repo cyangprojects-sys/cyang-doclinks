@@ -1,4 +1,5 @@
 import { sql } from "@/lib/db";
+import { enforcePlanLimitsEnabled, proPlanEnabled, pricingUiEnabled } from "@/lib/billingFlags";
 
 export type Plan = {
   id: "free" | "pro" | (string & {});
@@ -13,37 +14,45 @@ export type Plan = {
 };
 
 export async function getPlanForUser(userId: string): Promise<Plan> {
+  const freeFallback: Plan = {
+    id: "free",
+    name: "Free",
+    maxViewsPerMonth: 100,
+    maxActiveShares: 3,
+    maxStorageBytes: 524288000,
+    maxUploadsPerDay: 10,
+    maxFileSizeBytes: 26214400,
+    allowCustomExpiration: false,
+    allowAuditExport: false,
+  };
+
   const rows = (await sql`
-    select
-      p.id::text as id,
-      p.name::text as name,
-      p.max_views_per_month::int as max_views_per_month,
-      p.max_active_shares::int as max_active_shares,
-      p.max_storage_bytes::bigint as max_storage_bytes,
-      p.max_uploads_per_day::int as max_uploads_per_day,
-      p.max_file_size_bytes::bigint as max_file_size_bytes,
-      p.allow_custom_expiration::bool as allow_custom_expiration,
-      p.allow_audit_export::bool as allow_audit_export
-    from public.users u
-    join public.plans p on p.id = u.plan_id
-    where u.id = ${userId}::uuid
-    limit 1
-  `) as unknown as Array<any>;
+      select
+        p.id::text as id,
+        p.name::text as name,
+        p.max_views_per_month::int as max_views_per_month,
+        p.max_active_shares::int as max_active_shares,
+        p.max_storage_bytes::bigint as max_storage_bytes,
+        p.max_uploads_per_day::int as max_uploads_per_day,
+        p.max_file_size_bytes::bigint as max_file_size_bytes,
+        p.allow_custom_expiration::bool as allow_custom_expiration,
+        p.allow_audit_export::bool as allow_audit_export
+      from public.users u
+      join public.plans p on p.id = u.plan_id
+      where u.id = ${userId}::uuid
+      limit 1
+    `) as unknown as Array<any>;
 
   const r = rows?.[0];
   if (!r) {
     // Fail closed to Free if user row exists but plan missing.
-    return {
-      id: "free",
-      name: "Free",
-      maxViewsPerMonth: 100,
-      maxActiveShares: 3,
-      maxStorageBytes: 524288000,
-      maxUploadsPerDay: 10,
-      maxFileSizeBytes: 26214400,
-      allowCustomExpiration: false,
-      allowAuditExport: false,
-    };
+    return freeFallback;
+  }
+
+  // Pro is "unlimited" by design (null limits), but we keep it behind a feature flag
+  // until pricing is ready.
+  if (String(r.id) === "pro" && !proPlanEnabled()) {
+    return freeFallback;
   }
 
   return {
@@ -147,55 +156,82 @@ export type LimitResult =
   | { ok: true }
   | { ok: false; error: "LIMIT_REACHED"; message: string };
 
+function limitMessage(base: string): string {
+  // Keep pricing hidden by default.
+  if (pricingUiEnabled()) return `${base} Upgrade to Pro to remove limits.`;
+  return base;
+}
+
 export async function assertCanUpload(args: {
   userId: string;
   sizeBytes: number | null;
 }): Promise<LimitResult> {
-  const plan = await getPlanForUser(args.userId);
+  if (!enforcePlanLimitsEnabled()) return { ok: true };
+
+  try {
+    const plan = await getPlanForUser(args.userId);
 
   const size = args.sizeBytes ?? 0;
 
-  if (plan.maxFileSizeBytes != null && size > plan.maxFileSizeBytes) {
-    return { ok: false, error: "LIMIT_REACHED", message: "File is too large for this account." };
-  }
+    if (plan.maxFileSizeBytes != null && size > plan.maxFileSizeBytes) {
+      return {
+        ok: false,
+        error: "LIMIT_REACHED",
+        message: limitMessage("File is too large for this account."),
+      };
+    }
 
   if (plan.maxUploadsPerDay != null) {
     const used = await getDailyUploadCount(args.userId);
-    if (used >= plan.maxUploadsPerDay) {
-      return { ok: false, error: "LIMIT_REACHED", message: "Daily upload limit reached." };
-    }
+      if (used >= plan.maxUploadsPerDay) {
+        return { ok: false, error: "LIMIT_REACHED", message: limitMessage("Daily upload limit reached.") };
+      }
   }
 
   if (plan.maxStorageBytes != null) {
     const used = await getStorageBytesForOwner(args.userId);
-    if (used + size > plan.maxStorageBytes) {
-      return { ok: false, error: "LIMIT_REACHED", message: "Storage limit reached." };
-    }
+      if (used + size > plan.maxStorageBytes) {
+        return { ok: false, error: "LIMIT_REACHED", message: limitMessage("Storage limit reached.") };
+      }
   }
 
-  return { ok: true };
+    return { ok: true };
+  } catch {
+    // Fail closed when enforcement is enabled.
+    return { ok: false, error: "LIMIT_REACHED", message: "Temporarily unavailable" };
+  }
 }
 
 export async function assertCanCreateShare(ownerId: string): Promise<LimitResult> {
-  const plan = await getPlanForUser(ownerId);
-  if (plan.maxActiveShares == null) return { ok: true };
+  if (!enforcePlanLimitsEnabled()) return { ok: true };
+  try {
+    const plan = await getPlanForUser(ownerId);
+    if (plan.maxActiveShares == null) return { ok: true };
 
-  const active = await getActiveShareCountForOwner(ownerId);
-  if (active >= plan.maxActiveShares) {
-    return { ok: false, error: "LIMIT_REACHED", message: "Active share limit reached." };
+    const active = await getActiveShareCountForOwner(ownerId);
+    if (active >= plan.maxActiveShares) {
+      return { ok: false, error: "LIMIT_REACHED", message: limitMessage("Active share limit reached.") };
+    }
+    return { ok: true };
+  } catch {
+    return { ok: false, error: "LIMIT_REACHED", message: "Temporarily unavailable" };
   }
-  return { ok: true };
 }
 
 export async function assertCanServeView(ownerId: string): Promise<LimitResult> {
-  const plan = await getPlanForUser(ownerId);
-  if (plan.maxViewsPerMonth == null) return { ok: true };
+  if (!enforcePlanLimitsEnabled()) return { ok: true };
+  try {
+    const plan = await getPlanForUser(ownerId);
+    if (plan.maxViewsPerMonth == null) return { ok: true };
 
-  const used = await getMonthlyViewCount(ownerId);
-  if (used >= plan.maxViewsPerMonth) {
-    return { ok: false, error: "LIMIT_REACHED", message: "Monthly view limit reached." };
+    const used = await getMonthlyViewCount(ownerId);
+    if (used >= plan.maxViewsPerMonth) {
+      return { ok: false, error: "LIMIT_REACHED", message: limitMessage("Monthly view limit reached.") };
+    }
+    return { ok: true };
+  } catch {
+    return { ok: false, error: "LIMIT_REACHED", message: "Temporarily unavailable" };
   }
-  return { ok: true };
 }
 
 /**

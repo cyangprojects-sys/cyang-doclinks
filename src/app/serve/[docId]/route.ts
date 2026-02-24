@@ -43,28 +43,6 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ docId: stri
     return new Response("Not found", { status: 404 });
   }
 
-// --- Monetization / plan limits (hidden) ---
-// Enforce the document owner's monthly view quota (best-effort).
-try {
-  const ownerRows = (await sql`
-    select owner_id::text as owner_id
-    from public.docs
-    where id = ${resolved.docId}::uuid
-    limit 1
-  `) as unknown as Array<{ owner_id: string | null }>;
-  const ownerId = ownerRows?.[0]?.owner_id ?? null;
-  if (ownerId) {
-    const allowed = await assertCanServeView(ownerId);
-    if (!allowed.ok) {
-      return new Response("Temporarily unavailable", { status: 429 });
-    }
-    await incrementMonthlyViews(ownerId, 1);
-  }
-} catch {
-  // ignore
-}
-
-
   // --- Rate limiting (best-effort) ---
   // 1) Global IP throttling for the serve endpoint
   // 2) Optional token abuse protection if a share token is provided
@@ -118,6 +96,27 @@ try {
         },
       });
     }
+  }
+
+  // --- Monetization / plan limits (hidden) ---
+  // Enforce the document owner's monthly view quota.
+  try {
+    const ownerRows = (await sql`
+      select owner_id::text as owner_id
+      from public.docs
+      where id = ${resolved.docId}::uuid
+      limit 1
+    `) as unknown as Array<{ owner_id: string | null }>;
+    const ownerId = ownerRows?.[0]?.owner_id ?? null;
+    if (ownerId) {
+      const allowed = await assertCanServeView(ownerId);
+      if (!allowed.ok) {
+        return new Response("Temporarily unavailable", { status: 429 });
+      }
+      await incrementMonthlyViews(ownerId, 1);
+    }
+  } catch {
+    // Fail closed behavior is handled inside assertCanServeView when enforcement is enabled.
   }
 
   // Audit log (best-effort)

@@ -7,6 +7,7 @@ import { sql } from "@/lib/db";
 import { r2Client, r2Bucket } from "@/lib/r2";
 import { requireUser } from "@/lib/authz";
 import { assertCanUpload } from "@/lib/monetization";
+import { enforcePlanLimitsEnabled } from "@/lib/billingFlags";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -41,6 +42,14 @@ export async function POST(req: Request) {
         const { title, filename } = parsed.data;
         const contentType = parsed.data.contentType ?? "application/pdf";
         const sizeBytes = parsed.data.sizeBytes ?? null;
+
+        // Hard enforcement needs an explicit sizeBytes to prevent bypassing storage/file-size caps.
+        if (enforcePlanLimitsEnabled() && (sizeBytes == null || !Number.isFinite(sizeBytes) || sizeBytes <= 0)) {
+            return NextResponse.json(
+                { ok: false, error: "MISSING_SIZE", message: "sizeBytes is required." },
+                { status: 400 }
+            );
+        }
 
         if (contentType !== "application/pdf") {
             return NextResponse.json({ ok: false, error: "NOT_PDF" }, { status: 400 });
