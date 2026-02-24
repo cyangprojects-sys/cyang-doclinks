@@ -35,7 +35,11 @@ function b64ToU8(b64: string) {
   return Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
 }
 
-export default function UploadPanel() {
+export default function UploadPanel({
+  canCheckEncryptionStatus,
+}: {
+  canCheckEncryptionStatus: boolean;
+}) {
   const router = useRouter();
 
   const [title, setTitle] = useState("");
@@ -55,6 +59,13 @@ export default function UploadPanel() {
   }, [file]);
 
   useEffect(() => {
+    if (!canCheckEncryptionStatus) {
+      // Don't render encryption status for non-owner accounts.
+      setEncryptionReady(null);
+      setEncryptionMsg(null);
+      return;
+    }
+
     let cancelled = false;
 
     async function loadKeyStatus() {
@@ -92,7 +103,7 @@ export default function UploadPanel() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [canCheckEncryptionStatus]);
 
   async function onUpload() {
     setError(null);
@@ -251,7 +262,7 @@ export default function UploadPanel() {
         🔐 Documents are encrypted end-to-end (AES-256-GCM). The server only decrypts when serving.
       </div>
 
-      {encryptionReady === false && (
+      {canCheckEncryptionStatus && encryptionReady === false && (
         <div className="mt-2 text-sm text-red-300">
           {encryptionMsg ?? "Encryption not configured."}
         </div>

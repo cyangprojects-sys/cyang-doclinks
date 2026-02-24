@@ -49,6 +49,7 @@ export default async function AdminDashboardPage() {
   }
 
   const canSeeAll = roleAtLeast(u.role, "admin");
+  const canCheckEncryptionStatus = roleAtLeast(u.role, "owner");
 
   const hasDocs = await tableExists("public.docs");
   const hasDocViews = await tableExists("public.doc_views");
@@ -228,7 +229,7 @@ const docFilter = sql`${orgFilter} ${ownerFilter}`;
       {/* Upload */}
       <section className="space-y-3">
         <h2 className="text-lg font-semibold">Upload</h2>
-        <UploadPanel />
+        <UploadPanel canCheckEncryptionStatus={canCheckEncryptionStatus} />
       </section>
 
       {/* Unified docs */}
