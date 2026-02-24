@@ -153,13 +153,10 @@ export async function GET(
         meta: { keyVersion: enc.keyVersion },
       });
 
-      // NextResponse expects a Web `BodyInit` type. Convert Node Buffer -> ArrayBuffer slice.
-      const responseArrayBuffer = decrypted.buffer.slice(
-        decrypted.byteOffset,
-        decrypted.byteOffset + decrypted.byteLength
-      );
+      // NextResponse expects a Web `BodyInit` type. Use a Blob so TS accepts the body across runtimes.
+      const responseBlob = new Blob([decrypted]);
 
-      return new NextResponse(responseArrayBuffer, {
+      return new NextResponse(responseBlob, {
         status: 200,
         headers: {
           "Content-Type": t.response_content_type || "application/pdf",
