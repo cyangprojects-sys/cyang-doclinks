@@ -63,7 +63,7 @@ export default function UploadPanel() {
         const j = (await r.json().catch(() => null)) as KeyStatusResponse | null;
         if (cancelled) return;
 
-        if (!r.ok || !j || (j as any).ok === false) {
+        if (!r.ok || !j || j.ok !== true) {
           setEncryptionReady(false);
           setEncryptionMsg("Encryption status unavailable.");
           return;
@@ -131,7 +131,7 @@ export default function UploadPanel() {
       });
 
       const presignJson = (await presignRes.json().catch(() => null)) as PresignResponse | null;
-      if (!presignRes.ok || !presignJson || (presignJson as any).ok === false) {
+      if (!presignRes.ok || !presignJson || presignJson.ok !== true) {
         const msg =
           (presignJson as any)?.message ||
           (presignJson as any)?.error ||
@@ -180,7 +180,7 @@ export default function UploadPanel() {
       });
 
       const completeJson = (await completeRes.json().catch(() => null)) as CompleteResponse | null;
-      if (!completeRes.ok || !completeJson || (completeJson as any).ok === false) {
+      if (!completeRes.ok || !completeJson || completeJson.ok !== true) {
         const msg =
           (completeJson as any)?.message ||
           (completeJson as any)?.error ||
