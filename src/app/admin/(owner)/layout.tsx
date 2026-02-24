@@ -19,6 +19,8 @@ export default async function OwnerAdminLayout({
   const role = (session.user as any)?.role as string | undefined;
   const isOwner = role === "owner";
 
+  if (!isOwner) redirect("/admin/dashboard");
+
   return (
     <div className="min-h-screen">
       <AdminTopNav email={session.user.email} isOwner={isOwner} />
