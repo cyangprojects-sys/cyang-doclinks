@@ -3,7 +3,6 @@ import { unstable_noStore as noStore } from "next/cache";
 
 import { getAuthedUser } from "@/lib/authz";
 import { getBillingFlags } from "@/lib/settings";
-import { saveBillingFlagsAction } from "./actions";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -79,7 +78,7 @@ export default async function BillingSettingsPage({
       )}
 
       <Card>
-        <form action={saveBillingFlagsAction} className="space-y-3">
+        <form action="/api/admin/billing" method="post" className="space-y-3">
           <ToggleRow
             name="enforcePlanLimits"
             title="Enforce plan limits"
