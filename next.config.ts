@@ -6,7 +6,7 @@ const isProd = process.env.NODE_ENV === "production";
 // We set conservative, production-safe security headers globally.
 // If you later embed docs in iframes, you'll need to relax frame-ancestors / X-Frame-Options.
 
-function cspValue() {
+function cspValue(frameAncestors: string) {
   // Keep this CSP compatible with Next.js + PDF rendering.
   // We allow https: for images/connect (e.g., fonts/analytics) and blob: for PDF rendering.
   // "unsafe-eval" is included to avoid accidental breakage (some builds/tooling may rely on it).
@@ -14,7 +14,7 @@ function cspValue() {
     "default-src 'self'",
     "base-uri 'self'",
     "object-src 'none'",
-    "frame-ancestors 'none'",
+    `frame-ancestors ${frameAncestors}`,
     "form-action 'self'",
     "img-src 'self' data: blob: https:",
     "media-src 'self' blob:",
@@ -32,7 +32,7 @@ function cspValue() {
 
 const nextConfig: NextConfig = {
   async headers() {
-    const headers: Array<{ key: string; value: string }> = [
+    const strictHeaders: Array<{ key: string; value: string }> = [
       { key: "X-Content-Type-Options", value: "nosniff" },
       { key: "X-Frame-Options", value: "DENY" },
       { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
@@ -40,21 +40,43 @@ const nextConfig: NextConfig = {
         key: "Permissions-Policy",
         value: "camera=(), microphone=(), geolocation=(), interest-cohort=()",
       },
-      { key: "Content-Security-Policy", value: cspValue() },
+      { key: "Content-Security-Policy", value: cspValue("'none'") },
+    ];
+
+    // The doc viewer embeds /serve/* in an iframe on first-party pages.
+    // Allow SAMEORIGIN framing for /serve/* only.
+    const serveHeaders: Array<{ key: string; value: string }> = [
+      { key: "X-Content-Type-Options", value: "nosniff" },
+      { key: "X-Frame-Options", value: "SAMEORIGIN" },
+      { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+      {
+        key: "Permissions-Policy",
+        value: "camera=(), microphone=(), geolocation=(), interest-cohort=()",
+      },
+      { key: "Content-Security-Policy", value: cspValue("'self'") },
     ];
 
     if (isProd) {
       // 2 years, preload-ready.
-      headers.push({
+      strictHeaders.push({
         key: "Strict-Transport-Security",
         value: "max-age=63072000; includeSubDomains; preload",
       });
-    }
+      serveHeaders.push({
+        key: "Strict-Transport-Security",
+        value: "max-age=63072000; includeSubDomains; preload",
+      });
+}
 
     return [
       {
-        source: "/:path*",
-        headers,
+        source: "/serve/:path*",
+        headers: serveHeaders,
+      },
+      {
+        // Everything else is locked down against framing.
+        source: "/((?!serve).*)",
+        headers: strictHeaders,
       },
     ];
   },
