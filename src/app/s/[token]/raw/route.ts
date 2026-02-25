@@ -60,15 +60,10 @@ async function isUnlocked(token: string): Promise<boolean> {
 
 const R2_BUCKET = (process.env.R2_BUCKET || "").trim();
 
-type ShareLookupRow = {
-  token: string;
-  doc_id: string;
-  expires_at: string | null;
-  max_views: number | null;
-  views_count: number | null;
-  revoked_at: string | null;
-  password_hash: string | null;
-  r2_key: string;
+\1
+  moderation_status: string;
+  scan_status: string;
+  risk_level: string;
 };
 
 function isExpired(expires_at: string | null) {
@@ -147,7 +142,10 @@ export async function GET(
       s.views_count,
       s.revoked_at::text as revoked_at,
       s.password_hash::text as password_hash,
-      d.r2_key::text as r2_key
+      d.r2_key::text as r2_key,
+      coalesce(d.moderation_status::text, 'active') as moderation_status,
+      coalesce(d.scan_status::text, 'unscanned') as scan_status,
+      coalesce(d.risk_level::text, 'low') as risk_level
     from public.share_tokens s
     join public.docs d on d.id = s.doc_id
     where s.token = ${token}
@@ -156,6 +154,16 @@ export async function GET(
 
   const share = rows[0];
   if (!share) return new NextResponse("Not found", { status: 404 });
+  const moderation = (share.moderation_status || "active").toLowerCase();
+  if (moderation !== "active") return new NextResponse("Unavailable", { status: 404 });
+
+  const risk = (share.risk_level || "low").toLowerCase();
+  const riskyInline = risk === "high" || (share.scan_status || "").toLowerCase() === "risky";
+  if (riskyInline) {
+    // Inline viewing is disabled for high-risk docs; download route can still serve as attachment.
+    return new NextResponse("Inline viewing disabled", { status: 403 });
+  }
+
 
   // Geo-based restriction (best-effort)
   const country = getCountryFromHeaders(req.headers);

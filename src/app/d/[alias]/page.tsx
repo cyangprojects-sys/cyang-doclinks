@@ -296,6 +296,10 @@ function DocumentViewer({ docId, alias }: { docId: string; alias?: string }) {
         >
           Download
         </a>
+        .{" "}
+        <a href={`/report?alias=${encodeURIComponent(alias)}`} className="ml-2 text-neutral-200 underline">
+          Report abuse
+        </a>
         .
       </div>
     </div>

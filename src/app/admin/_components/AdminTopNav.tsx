@@ -46,6 +46,7 @@ export default function AdminTopNav({
                 <NavLink href="/admin/api-keys" label="API Keys" />
                 <NavLink href="/admin/billing" label="Billing" />
                 <NavLink href="/admin/security" label="Security" />
+                <NavLink href="/admin/abuse" label="Abuse" />
               </>
             )}
           </nav>

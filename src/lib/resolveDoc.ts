@@ -59,6 +59,12 @@ export type ShareMeta =
 
         watermarkEnabled?: boolean;
         watermarkText?: string | null;
+
+        // Doc moderation / safety snapshot
+        docModerationStatus?: string;
+        scanStatus?: string;
+        riskLevel?: string;
+        riskFlags?: any;
     }
     | { ok: false };
 
@@ -138,7 +144,8 @@ async function getDocPointer(
       d.original_filename::text as original_filename,
       d.content_type::text as content_type,
       d.size_bytes::bigint as size_bytes,
-      coalesce(d.status::text, '') as status
+      coalesce(d.status::text, '') as status,
+      coalesce(d.moderation_status::text, 'active') as moderation_status
     from public.docs d
     where d.id = ${id}::uuid
     limit 1
@@ -151,12 +158,17 @@ async function getDocPointer(
         content_type: string | null;
         size_bytes: string | number | null;
         status: string;
+        moderation_status: string;
     }>;
 
     const r = rows?.[0];
     if (!r?.id) return { ok: false };
 
-    if ((r.status || "").toLowerCase() === "deleted") return { ok: false };
+    const lifecycle = (r.status || "").toLowerCase();
+    const moderation = (r.moderation_status || "active").toLowerCase();
+
+    if (lifecycle === "deleted") return { ok: false };
+    if (moderation === "disabled" || moderation === "quarantined" || moderation === "deleted") return { ok: false };
     if (!r.bucket || !r.r2_key) return { ok: false };
 
     return {
@@ -302,20 +314,25 @@ export async function resolveShareMeta(tokenInput: string): Promise<ShareMeta> {
     try {
         const rows = (await sql`
       select
-        token::text as token,
-        doc_id::text as doc_id,
-        to_email,
-        created_at::text as created_at,
-        expires_at::text as expires_at,
-        max_views,
-        views_count,
-        revoked_at::text as revoked_at,
-        password_hash,
-        coalesce(watermark_enabled, false) as watermark_enabled,
-        watermark_text
-      from public.share_tokens
-      where token = ${token}
-        ${dashed ? sql`or token = ${dashed}` : sql``}
+        st.token::text as token,
+        st.doc_id::text as doc_id,
+        st.to_email,
+        st.created_at::text as created_at,
+        st.expires_at::text as expires_at,
+        st.max_views,
+        st.views_count,
+        st.revoked_at::text as revoked_at,
+        st.password_hash,
+        coalesce(st.watermark_enabled, false) as watermark_enabled,
+        st.watermark_text,
+        coalesce(d.moderation_status::text, 'active') as doc_moderation_status,
+        coalesce(d.scan_status::text, 'unscanned') as scan_status,
+        coalesce(d.risk_level::text, 'low') as risk_level,
+        d.risk_flags as risk_flags
+      from public.share_tokens st
+      left join public.docs d on d.id = st.doc_id
+      where st.token = ${token}
+        ${dashed ? sql`or st.token = ${dashed}` : sql``}
       limit 1
     `) as unknown as Array<{
             token: string;
@@ -329,6 +346,10 @@ export async function resolveShareMeta(tokenInput: string): Promise<ShareMeta> {
             password_hash: string | null;
             watermark_enabled: boolean;
             watermark_text: string | null;
+            doc_moderation_status: string;
+            scan_status: string;
+            risk_level: string;
+            risk_flags: any;
         }>;
 
         const r = rows?.[0];
@@ -366,8 +387,8 @@ export async function resolveShareMeta(tokenInput: string): Promise<ShareMeta> {
           revoked_at::text as revoked_at,
           password_hash
         from public.share_tokens
-        where token = ${token}
-          ${dashed ? sql`or token = ${dashed}` : sql``}
+        where st.token = ${token}
+          ${dashed ? sql`or st.token = ${dashed}` : sql``}
         limit 1
       `) as unknown as Array<{
                 token: string;

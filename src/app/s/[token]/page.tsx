@@ -144,6 +144,11 @@ export default async function ShareTokenPage(props: {
           emailHint={meta.toEmail ? maskEmail(meta.toEmail) : null}
         />
       )}
+          <div className="mt-8 text-xs text-white/50">
+        <Link href={`/report?token=${encodeURIComponent(t)}`} className="underline hover:text-white">
+          Report abuse
+        </Link>
+      </div>
     </main>
   );
 }

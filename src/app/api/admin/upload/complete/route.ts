@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
 import { HeadObjectCommand } from "@aws-sdk/client-s3";
+import { validatePdfInR2 } from "@/lib/pdfSafety";
 import { sql } from "@/lib/db";
 import { slugify } from "@/lib/slug";
 import { requireDocWrite } from "@/lib/authz";
@@ -245,13 +246,55 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: "not_pdf" }, { status: 409 });
     }
 
-    // 4) Mark doc ready + update metadata (best-effort)
+    
+    // 4) Lightweight PDF safety validation (unencrypted only).
+    // If encryption is enabled, server cannot cheaply validate magic bytes without downloading & decrypting the full object.
+    // In that case, we mark scan_status as skipped_encrypted.
+    let scanStatus: string = "unscanned";
+    let riskLevel: string = "low";
+    let riskFlags: any = null;
+
+    if (!encryptionEnabled) {
+      const safety = await validatePdfInR2({
+        bucket: docBucket,
+        key: docKey,
+        sampleBytes: Number(process.env.PDF_SAFETY_SAMPLE_BYTES || 262144),
+        absMaxBytes: absMax,
+      });
+
+      if (!safety.ok) {
+        await logSecurityEvent({
+          type: "upload_complete_pdf_validation_failed",
+          severity: "high",
+          ip: ipInfo.ip,
+          docId,
+          scope: "upload_complete",
+          message: "PDF validation failed",
+          meta: { error: safety.error, message: safety.message, details: safety.details ?? null },
+        });
+        return NextResponse.json({ ok: false, error: safety.error, message: safety.message }, { status: 409 });
+      }
+
+      scanStatus = safety.riskLevel === "low" ? "clean" : "risky";
+      riskLevel = safety.riskLevel;
+      riskFlags = { flags: safety.flags, details: safety.details };
+    } else {
+      scanStatus = "skipped_encrypted";
+      riskLevel = "low";
+      riskFlags = { flags: ["encrypted:skipped_validation"] };
+    }
+
+// 4) Mark doc ready + update metadata (best-effort)
     await sql`
       update public.docs
       set
         title = coalesce(${title}, title),
         original_filename = coalesce(${originalFilename}, original_filename),
-        status = 'ready'
+        status = 'ready',
+        scan_status = ${scanStatus}::text,
+        risk_level = ${riskLevel}::text,
+        risk_flags = ${riskFlags}::jsonb,
+        moderation_status = coalesce(moderation_status, 'active')
       where id = ${docId}::uuid
     `;
 

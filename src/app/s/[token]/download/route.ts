@@ -75,15 +75,10 @@ async function isUnlocked(token: string): Promise<boolean> {
   return rows.length > 0;
 }
 
-type ShareLookupRow = {
-  token: string;
-  doc_id: string;
-  expires_at: string | null;
-  max_views: number | null;
-  views_count: number | null;
-  revoked_at: string | null;
-  password_hash: string | null;
-  r2_key: string;
+\1
+  moderation_status: string;
+  scan_status: string;
+  risk_level: string;
 
   // Watermark policy
   share_watermark_enabled: boolean | null;
@@ -190,6 +185,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ toke
       s.revoked_at::text as revoked_at,
       s.password_hash::text as password_hash,
       d.r2_key::text as r2_key,
+      coalesce(d.moderation_status::text, 'active') as moderation_status,
+      coalesce(d.scan_status::text, 'unscanned') as scan_status,
+      coalesce(d.risk_level::text, 'low') as risk_level,
 
       s.watermark_enabled as share_watermark_enabled,
       s.watermark_text::text as share_watermark_text,
@@ -203,6 +201,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ toke
 
   const share = rows[0];
   if (!share) return new NextResponse("Not found", { status: 404 });
+  const moderation = (share.moderation_status || "active").toLowerCase();
+  if (moderation !== "active") return new NextResponse("Unavailable", { status: 404 });
+
   if (share.revoked_at) return new NextResponse("Revoked", { status: 410 });
   if (isExpired(share.expires_at)) return new NextResponse("Link expired", { status: 410 });
 
