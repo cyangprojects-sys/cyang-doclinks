@@ -60,7 +60,17 @@ async function isUnlocked(token: string): Promise<boolean> {
 
 const R2_BUCKET = (process.env.R2_BUCKET || "").trim();
 
-\1
+type ShareLookupRow = {
+  token: string;
+  doc_id: string;
+  expires_at: string | null;
+  max_views: number | null;
+  views_count: number;
+  revoked_at: string | null;
+  password_hash: string | null;
+  r2_key: string;
+
+  // Moderation/scan
   moderation_status: string;
   scan_status: string;
   risk_level: string;
