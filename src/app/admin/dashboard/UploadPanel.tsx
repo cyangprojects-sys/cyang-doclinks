@@ -169,7 +169,7 @@ export default function UploadPanel({
       const putRes = await fetch(presignJson.upload_url, {
         method: "PUT",
         headers: {
-          "content-type": "application/pdf",
+          "content-type": "application/octet-stream",
           // These two headers are part of the presigned request.
           // They allow the server to verify object provenance during /complete.
           "x-amz-meta-doc-id": presignJson.doc_id,
