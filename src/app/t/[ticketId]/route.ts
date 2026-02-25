@@ -1,17 +1,47 @@
 import { NextRequest, NextResponse } from "next/server";
 import { GetObjectCommand } from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { r2Client } from "@/lib/r2";
-import { consumeAccessTicket, signedUrlTtlSeconds } from "@/lib/accessTicket";
+import { consumeAccessTicket } from "@/lib/accessTicket";
 import { sql } from "@/lib/db";
 import { clientIpKey, enforceGlobalApiRateLimit, logSecurityEvent } from "@/lib/securityTelemetry";
 import { decryptAes256Gcm, unwrapDataKey } from "@/lib/encryption";
 import { getMasterKeyByIdOrThrow } from "@/lib/masterKeys";
 import { hashUserAgent, hashIpForTicket } from "@/lib/accessTicket";
+import { Readable } from "node:stream";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
+
+function toWebStream(body: any): ReadableStream<Uint8Array> {
+  // AWS SDK v3 in Node returns a Node.js Readable stream.
+  // NextResponse expects a web stream (or a Blob/Buffer).
+  if (!body) {
+    return new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.close();
+      },
+    });
+  }
+  // If it already looks like a web stream, return as-is.
+  if (typeof body?.getReader === "function") return body as ReadableStream<Uint8Array>;
+  // Convert Node Readable -> Web ReadableStream
+  try {
+    return Readable.toWeb(body) as unknown as ReadableStream<Uint8Array>;
+  } catch {
+    // Fallback: buffer the whole response (last resort)
+    const rs = new ReadableStream<Uint8Array>({
+      async start(controller) {
+        const ab = body?.transformToByteArray
+          ? await body.transformToByteArray()
+          : Buffer.from(await new Response(body).arrayBuffer());
+        controller.enqueue(new Uint8Array(ab));
+        controller.close();
+      },
+    });
+    return rs;
+  }
+}
 
 export async function GET(
   req: NextRequest,
@@ -175,22 +205,37 @@ export async function GET(
       return new NextResponse("Server error", { status: 500, headers: { "Cache-Control": "private, no-store" } });
     }
   }
-  const signed = await getSignedUrl(
-    r2Client,
+
+  // Same-origin proxy for non-encrypted docs.
+  // This avoids CSP "frame-src" issues caused by redirecting the browser to the R2 bucket hostname.
+  // Also prevents leaking presigned URLs into client-side logs/telemetry.
+  const range = req.headers.get("range") || undefined;
+
+  const obj = await r2Client.send(
     new GetObjectCommand({
       Bucket: t.r2_bucket,
       Key: t.r2_key,
-      ResponseContentType: t.response_content_type,
-      ResponseContentDisposition: t.response_content_disposition,
-    }),
-    { expiresIn: signedUrlTtlSeconds() }
+      Range: range,
+      ResponseContentType: t.response_content_type || undefined,
+      ResponseContentDisposition: t.response_content_disposition || undefined,
+    })
   );
 
-  return new NextResponse(null, {
-    status: 302,
-    headers: {
-      Location: signed,
-      "Cache-Control": "private, no-store",
-    },
+  const headers: Record<string, string> = {
+    "Content-Type": t.response_content_type || "application/pdf",
+    "Content-Disposition": t.response_content_disposition || "inline",
+    "Cache-Control": "private, no-store",
+    // PDF viewers like Range support; we forward range responses when present.
+    "Accept-Ranges": "bytes",
+  };
+
+  const contentRange = (obj as any)?.ContentRange as string | undefined;
+  const contentLength = (obj as any)?.ContentLength as number | undefined;
+  if (contentRange) headers["Content-Range"] = contentRange;
+  if (typeof contentLength === "number") headers["Content-Length"] = String(contentLength);
+
+  return new NextResponse(toWebStream((obj as any).Body), {
+    status: contentRange ? 206 : 200,
+    headers,
   });
 }
