@@ -259,14 +259,10 @@ export default async function SharePage({
   );
 }
 
-function DocumentViewer({ docId, alias }: { docId: string; alias?: string }) {
-  const viewerUrl = alias
-    ? `/serve/${docId}?alias=${encodeURIComponent(alias)}`
-    : `/serve/${docId}`;
+function DocumentViewer({ docId, alias }: { docId: string; alias: string }) {
+  const viewerUrl = `/serve/${docId}?alias=${encodeURIComponent(alias)}`;
 
-  const downloadUrl = alias
-    ? `/serve/${docId}?alias=${encodeURIComponent(alias)}&disposition=attachment`
-    : `/serve/${docId}?disposition=attachment`;
+  const downloadUrl = `/serve/${docId}?alias=${encodeURIComponent(alias)}&disposition=attachment`;
 
   return (
     <div className="mt-4">
