@@ -67,7 +67,11 @@ export async function consumeAccessTicket(args: { req: Request; ticketId: string
   const uaHash = hashUserAgent(ua);
 
   // Atomic single-use consume with binding + expiry checks.
-  const rows = (await sql`
+  // NOTE: Browsers can legitimately hit the same ticket more than once (preload, retry, iframe reload).
+  // To avoid "Not found" flakiness, allow a short replay window for the *same* IP/UA binding.
+  const replayGraceSeconds = Number(process.env.ACCESS_TICKET_REPLAY_GRACE_SECONDS || 60);
+
+  const consumeRows = (await sql`
     update public.access_tickets
     set used_at = now()
     where id = ${args.ticketId}::uuid
@@ -97,7 +101,42 @@ export async function consumeAccessTicket(args: { req: Request; ticketId: string
     response_content_disposition: string;
   }>;
 
-  const t = rows[0];
-  if (!t) return { ok: false as const };
-  return { ok: true as const, ticket: t };
+  const consumed = consumeRows[0];
+  if (consumed) return { ok: true as const, ticket: consumed };
+
+  // Replay path: ticket was already used; allow a short re-read if still within TTL and within grace.
+  const replayRows = (await sql`
+    select
+      id::text as id,
+      doc_id::text as doc_id,
+      share_token::text as share_token,
+      alias::text as alias,
+      purpose::text as purpose,
+      r2_bucket::text as r2_bucket,
+      r2_key::text as r2_key,
+      response_content_type::text as response_content_type,
+      response_content_disposition::text as response_content_disposition
+    from public.access_tickets
+    where id = ${args.ticketId}::uuid
+      and expires_at > now()
+      and used_at is not null
+      and used_at > now() - (${replayGraceSeconds}::text || ' seconds')::interval
+      and (ip_hash is null or ip_hash = ${ipHash})
+      and (ua_hash is null or ua_hash = ${uaHash})
+    limit 1
+  `) as unknown as Array<{
+    id: string;
+    doc_id: string | null;
+    share_token: string | null;
+    alias: string | null;
+    purpose: AccessTicketPurpose;
+    r2_bucket: string;
+    r2_key: string;
+    response_content_type: string;
+    response_content_disposition: string;
+  }>;
+
+  const replay = replayRows[0];
+  if (!replay) return { ok: false as const };
+  return { ok: true as const, ticket: replay };
 }

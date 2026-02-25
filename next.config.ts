@@ -4,14 +4,12 @@ const isProd = process.env.NODE_ENV === "production";
 
 // NOTE: This project serves untrusted viewer traffic.
 // We set conservative, production-safe security headers globally.
-// Viewer/embed routes (/d/*, /serve/*) are allowed to be framed ONLY by this site (frame-ancestors 'self').
+// If you later embed docs in iframes, you'll need to relax frame-ancestors / X-Frame-Options.
 
-function cspValue(opts?: { frameAncestors?: string }) {
+function cspValue(frameAncestors: string) {
   // Keep this CSP compatible with Next.js + PDF rendering.
   // We allow https: for images/connect (e.g., fonts/analytics) and blob: for PDF rendering.
   // "unsafe-eval" is included to avoid accidental breakage (some builds/tooling may rely on it).
-  const frameAncestors = opts?.frameAncestors ?? "'none'";
-
   const parts = [
     "default-src 'self'",
     "base-uri 'self'",
@@ -34,53 +32,64 @@ function cspValue(opts?: { frameAncestors?: string }) {
 
 const nextConfig: NextConfig = {
   async headers() {
-    const common: Array<{ key: string; value: string }> = [
+    const strictHeaders: Array<{ key: string; value: string }> = [
       { key: "X-Content-Type-Options", value: "nosniff" },
+      { key: "X-Frame-Options", value: "DENY" },
       { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
       {
         key: "Permissions-Policy",
         value: "camera=(), microphone=(), geolocation=(), interest-cohort=()",
       },
+      { key: "Content-Security-Policy", value: cspValue("'none'") },
     ];
 
-    const strictHeaders: Array<{ key: string; value: string }> = [
-      ...common,
-      { key: "X-Frame-Options", value: "DENY" },
-      { key: "Content-Security-Policy", value: cspValue({ frameAncestors: "'none'" }) },
-    ];
-
-    // Allow our own pages to embed the doc viewer in an iframe.
-    // IMPORTANT: This is still locked to SAME-ORIGIN (XFO) and 'self' (CSP).
-    const viewerEmbedHeaders: Array<{ key: string; value: string }> = [
-      ...common,
+    // The doc viewer embeds /serve/* in an iframe on first-party pages.
+    // Also, some first-party/admin UX may iframe /d/* (preview panes, etc.).
+    // Allow SAMEORIGIN framing for viewer surfaces only.
+    const serveHeaders: Array<{ key: string; value: string }> = [
+      { key: "X-Content-Type-Options", value: "nosniff" },
       { key: "X-Frame-Options", value: "SAMEORIGIN" },
-      { key: "Content-Security-Policy", value: cspValue({ frameAncestors: "'self'" }) },
+      { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+      {
+        key: "Permissions-Policy",
+        value: "camera=(), microphone=(), geolocation=(), interest-cohort=()",
+      },
+      { key: "Content-Security-Policy", value: cspValue("'self'") },
     ];
 
     if (isProd) {
-      const hsts = {
+      // 2 years, preload-ready.
+      strictHeaders.push({
         key: "Strict-Transport-Security",
         value: "max-age=63072000; includeSubDomains; preload",
-      };
-      strictHeaders.push(hsts);
-      viewerEmbedHeaders.push(hsts);
-    }
+      });
+      serveHeaders.push({
+        key: "Strict-Transport-Security",
+        value: "max-age=63072000; includeSubDomains; preload",
+      });
+}
 
     return [
-      // Strict by default, but EXCLUDE viewer/embed routes so we can override them below.
-      {
-        source: "/((?!serve|d).*)",
-        headers: strictHeaders,
-      },
-
-      // Viewer routes: allow framing by 'self' only (so /d/* can iframe /serve/*).
       {
         source: "/serve/:path*",
-        headers: viewerEmbedHeaders,
+        headers: serveHeaders,
       },
       {
+        // Share viewer page (contains iframe -> /serve/*). Must be allowed to be framed by first-party.
+        // This prevents Firefox from blocking when /d/* is shown inside an iframe (admin previews, etc.).
         source: "/d/:path*",
-        headers: viewerEmbedHeaders,
+        headers: serveHeaders,
+      },
+      {
+        // Access ticket exchange/stream endpoints may be opened in embedded contexts (e.g., in-app previews).
+        // Keep them SAMEORIGIN-framable.
+        source: "/t/:path*",
+        headers: serveHeaders,
+      },
+      {
+        // Everything else is locked down against framing.
+        source: "/((?!serve|d|t).*)",
+        headers: strictHeaders,
       },
     ];
   },
