@@ -4,12 +4,14 @@ const isProd = process.env.NODE_ENV === "production";
 
 // NOTE: This project serves untrusted viewer traffic.
 // We set conservative, production-safe security headers globally.
-// If you later embed docs in iframes, you'll need to relax frame-ancestors / X-Frame-Options.
+// Viewer/embed routes (/d/*, /serve/*) are allowed to be framed ONLY by this site (frame-ancestors 'self').
 
-function cspValue(frameAncestors: string) {
+function cspValue(opts?: { frameAncestors?: string }) {
   // Keep this CSP compatible with Next.js + PDF rendering.
   // We allow https: for images/connect (e.g., fonts/analytics) and blob: for PDF rendering.
   // "unsafe-eval" is included to avoid accidental breakage (some builds/tooling may rely on it).
+  const frameAncestors = opts?.frameAncestors ?? "'none'";
+
   const parts = [
     "default-src 'self'",
     "base-uri 'self'",
@@ -32,51 +34,53 @@ function cspValue(frameAncestors: string) {
 
 const nextConfig: NextConfig = {
   async headers() {
-    const strictHeaders: Array<{ key: string; value: string }> = [
+    const common: Array<{ key: string; value: string }> = [
       { key: "X-Content-Type-Options", value: "nosniff" },
-      { key: "X-Frame-Options", value: "DENY" },
       { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
       {
         key: "Permissions-Policy",
         value: "camera=(), microphone=(), geolocation=(), interest-cohort=()",
       },
-      { key: "Content-Security-Policy", value: cspValue("'none'") },
     ];
 
-    // The doc viewer embeds /serve/* in an iframe on first-party pages.
-    // Allow SAMEORIGIN framing for /serve/* only.
-    const serveHeaders: Array<{ key: string; value: string }> = [
-      { key: "X-Content-Type-Options", value: "nosniff" },
+    const strictHeaders: Array<{ key: string; value: string }> = [
+      ...common,
+      { key: "X-Frame-Options", value: "DENY" },
+      { key: "Content-Security-Policy", value: cspValue({ frameAncestors: "'none'" }) },
+    ];
+
+    // Allow our own pages to embed the doc viewer in an iframe.
+    // IMPORTANT: This is still locked to SAME-ORIGIN (XFO) and 'self' (CSP).
+    const viewerEmbedHeaders: Array<{ key: string; value: string }> = [
+      ...common,
       { key: "X-Frame-Options", value: "SAMEORIGIN" },
-      { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-      {
-        key: "Permissions-Policy",
-        value: "camera=(), microphone=(), geolocation=(), interest-cohort=()",
-      },
-      { key: "Content-Security-Policy", value: cspValue("'self'") },
+      { key: "Content-Security-Policy", value: cspValue({ frameAncestors: "'self'" }) },
     ];
 
     if (isProd) {
-      // 2 years, preload-ready.
-      strictHeaders.push({
+      const hsts = {
         key: "Strict-Transport-Security",
         value: "max-age=63072000; includeSubDomains; preload",
-      });
-      serveHeaders.push({
-        key: "Strict-Transport-Security",
-        value: "max-age=63072000; includeSubDomains; preload",
-      });
-}
+      };
+      strictHeaders.push(hsts);
+      viewerEmbedHeaders.push(hsts);
+    }
 
     return [
+      // Strict by default, but EXCLUDE viewer/embed routes so we can override them below.
+      {
+        source: "/((?!serve|d).*)",
+        headers: strictHeaders,
+      },
+
+      // Viewer routes: allow framing by 'self' only (so /d/* can iframe /serve/*).
       {
         source: "/serve/:path*",
-        headers: serveHeaders,
+        headers: viewerEmbedHeaders,
       },
       {
-        // Everything else is locked down against framing.
-        source: "/((?!serve).*)",
-        headers: strictHeaders,
+        source: "/d/:path*",
+        headers: viewerEmbedHeaders,
       },
     ];
   },
