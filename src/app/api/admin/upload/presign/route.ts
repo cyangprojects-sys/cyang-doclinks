@@ -203,7 +203,16 @@ export async function POST(req: Request) {
       },
     };
 
-    const uploadUrl = await getSignedUrl(r2Client, new PutObjectCommand(putParams), { expiresIn });
+    const unhoistableHeaders = new Set([
+      "content-type",
+      "x-amz-meta-doc-id",
+      "x-amz-meta-orig-content-type",
+    ]);
+
+    const uploadUrl = await getSignedUrl(r2Client, new PutObjectCommand(putParams), {
+      expiresIn,
+      unhoistableHeaders,
+    });
 
     return NextResponse.json({
       ok: true,
