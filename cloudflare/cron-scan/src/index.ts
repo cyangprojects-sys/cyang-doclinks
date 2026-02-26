@@ -3,6 +3,8 @@ export interface Env {
   TARGET_NIGHTLY_URL: string;
   TARGET_KEY_ROTATION_URL: string;
   TARGET_WEBHOOKS_URL: string;
+  TARGET_AGGREGATE_URL: string;
+  TARGET_RETENTION_URL: string;
   CRON_SECRET: string; // stored as a Cloudflare secret
 }
 
@@ -24,9 +26,17 @@ async function runScheduled(event: ScheduledEvent, env: Env) {
   if (cron === "*/10 * * * *") {
     jobs.push({ name: "scan", url: env.TARGET_SCAN_URL, method: "GET" });
   }
+  // every 30 minutes
+  if (cron === "*/30 * * * *") {
+    jobs.push({ name: "aggregate", url: env.TARGET_AGGREGATE_URL, method: "GET" });
+  }
   // hourly at minute 5
   if (cron === "5 * * * *") {
     jobs.push({ name: "nightly", url: env.TARGET_NIGHTLY_URL, method: "GET" });
+  }
+  // daily at 02:17 UTC
+  if (cron === "17 2 * * *") {
+    jobs.push({ name: "retention", url: env.TARGET_RETENTION_URL, method: "GET" });
   }
   // every 15 minutes
   if (cron === "*/15 * * * *") {

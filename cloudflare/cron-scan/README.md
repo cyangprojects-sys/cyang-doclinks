@@ -6,7 +6,9 @@ Current schedules:
 - `*/5 * * * *` -> `/api/cron/webhooks`
 - `*/10 * * * *` -> `/api/cron/scan`
 - `*/15 * * * *` -> `/api/cron/key-rotation`
+- `*/30 * * * *` -> `/api/cron/aggregate`
 - `5 * * * *` -> `/api/cron/nightly`
+- `17 2 * * *` -> `/api/cron/retention`
 
 ## What you need to do in the app (cyang-doclinks)
 
@@ -36,7 +38,7 @@ npx wrangler deploy
 ```
 
 ### Optional settings
-- Update `TARGET_WEBHOOKS_URL`, `TARGET_SCAN_URL`, `TARGET_KEY_ROTATION_URL`, and `TARGET_NIGHTLY_URL` in `wrangler.toml` if route paths differ.
+- Update `TARGET_WEBHOOKS_URL`, `TARGET_SCAN_URL`, `TARGET_KEY_ROTATION_URL`, `TARGET_AGGREGATE_URL`, `TARGET_NIGHTLY_URL`, and `TARGET_RETENTION_URL` in `wrangler.toml` if route paths differ.
 
 ## Logs
 View logs in Cloudflare dashboard, or run:
