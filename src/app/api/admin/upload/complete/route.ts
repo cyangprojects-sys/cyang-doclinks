@@ -10,6 +10,7 @@ import { requireDocWrite } from "@/lib/authz";
 import { incrementUploads } from "@/lib/monetization";
 import { enforceGlobalApiRateLimit, clientIpKey, logSecurityEvent, detectStorageSpike } from "@/lib/securityTelemetry";
 import { r2Client, r2Bucket } from "@/lib/r2";
+import { enqueueDocScan } from "@/lib/scanQueue";
 
 type CompleteRequest = {
   // Newer flow: doc_id from /presign response
@@ -294,10 +295,27 @@ export async function POST(req: NextRequest) {
         scan_status = ${scanStatus}::text,
         risk_level = ${riskLevel}::text,
         risk_flags = ${riskFlags}::jsonb,
-        moderation_status = coalesce(moderation_status, 'active')
+        moderation_status = case when ${riskLevel}::text = 'high' then 'quarantined' else coalesce(moderation_status, 'active') end
       where id = ${docId}::uuid
     `;
 
+
+
+// 4b) Enqueue async malware scan (best-effort; runs via /api/cron/scan)
+try {
+  await enqueueDocScan({ docId, bucket: docBucket, key: docKey });
+} catch (e: any) {
+  // Non-fatal; upload is still usable unless other rules quarantine it.
+  await logSecurityEvent({
+    type: "malware_scan_enqueue_failed",
+    severity: "medium",
+    ip: ipInfo.ip,
+    docId,
+    scope: "upload_complete",
+    message: "Failed to enqueue malware scan job",
+    meta: { error: String(e?.message || e) },
+  });
+}
 // --- Monetization counters (hidden) ---
 // Count this as an upload for the doc owner (usually the signed-in user).
 try {

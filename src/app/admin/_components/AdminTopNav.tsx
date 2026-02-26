@@ -47,6 +47,7 @@ export default function AdminTopNav({
                 <NavLink href="/admin/billing" label="Billing" />
                 <NavLink href="/admin/security" label="Security" />
                 <NavLink href="/admin/abuse" label="Abuse" />
+                <NavLink href="/admin/dmca" label="DMCA" />
               </>
             )}
           </nav>
