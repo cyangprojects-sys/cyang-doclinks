@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
-import AdminTopNav from "./_components/AdminTopNav";
+import AdminShell from "./_components/AdminShell";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,9 +20,8 @@ export default async function AdminLayout({
   const isOwner = role === "owner";
 
   return (
-    <div className="min-h-screen">
-      <AdminTopNav email={session.user.email} isOwner={isOwner} />
-      <main className="mx-auto max-w-6xl px-4 py-6">{children}</main>
-    </div>
+    <AdminShell email={session.user.email} isOwner={isOwner}>
+      {children}
+    </AdminShell>
   );
 }

@@ -1,39 +1,57 @@
-// src/app/s/[token]/page.tsx
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import PasswordGate from "./passwordGate";
 import { isShareUnlockedAction, verifySharePasswordAction } from "./actions";
 import { resolveShareMeta } from "@/lib/resolveDoc";
+import { ShareBadge, ShareShell } from "./ShareShell";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 function fmtDate(s: string | null) {
-  if (!s) return "—";
+  if (!s) return null;
   const d = new Date(s);
   if (Number.isNaN(d.getTime())) return s;
   return d.toLocaleString();
 }
 
-function isExpired(expires_at: string | null) {
-  if (!expires_at) return false;
-  return new Date(expires_at).getTime() <= Date.now();
+function isExpired(expiresAt: string | null) {
+  if (!expiresAt) return false;
+  return new Date(expiresAt).getTime() <= Date.now();
 }
 
-function isMaxed(view_count: number, max_views: number | null) {
-  if (max_views === null) return false;
-  if (max_views === 0) return false;
-  return view_count >= max_views;
+function isMaxed(viewCount: number, maxViews: number | null) {
+  if (maxViews === null || maxViews === 0) return false;
+  return viewCount >= maxViews;
 }
 
 function maskEmail(e: string) {
   const s = (e || "").trim();
   const at = s.indexOf("@");
-  if (at <= 1) return "•••";
+  if (at <= 1) return "***";
   const name = s.slice(0, at);
   const domain = s.slice(at + 1);
-  const head = name.slice(0, 2);
-  return `${head}•••@${domain}`;
+  return `${name.slice(0, 2)}***@${domain}`;
+}
+
+function FailState({
+  token,
+  title,
+  body,
+}: {
+  token: string;
+  title: string;
+  body: string;
+}) {
+  return (
+    <ShareShell token={token} title={title} subtitle={body}>
+      <div className="text-sm text-white/70">
+        <Link href="/" className="text-white underline decoration-white/45 underline-offset-4 hover:text-cyan-100">
+          Go home
+        </Link>
+      </div>
+    </ShareShell>
+  );
 }
 
 export default async function ShareTokenPage(props: {
@@ -49,106 +67,57 @@ export default async function ShareTokenPage(props: {
   if (!t) redirect("/");
 
   const meta = await resolveShareMeta(t);
-  if (!meta.ok) {
-    return (
-      <main className="mx-auto max-w-lg px-4 py-12">
-        <h1 className="text-xl font-semibold">Not found</h1>
-        <p className="mt-2 text-sm text-neutral-400">
-          This share link doesn’t exist.
-        </p>
-        <div className="mt-6">
-          <Link href="/" className="text-blue-400 hover:underline">
-            Go home
-          </Link>
-        </div>
-      </main>
-    );
-  }
-
-  if (meta.revokedAt) {
-    return (
-      <main className="mx-auto max-w-lg px-4 py-12">
-        <h1 className="text-xl font-semibold">Link revoked</h1>
-        <p className="mt-2 text-sm text-neutral-400">
-          This share link has been revoked.
-        </p>
-      </main>
-    );
-  }
-
-  if (isExpired(meta.expiresAt)) {
-    return (
-      <main className="mx-auto max-w-lg px-4 py-12">
-        <h1 className="text-xl font-semibold">Link expired</h1>
-        <p className="mt-2 text-sm text-neutral-400">
-          This share link has expired.
-        </p>
-      </main>
-    );
-  }
-
-  if (isMaxed(meta.viewCount ?? 0, meta.maxViews)) {
-    return (
-      <main className="mx-auto max-w-lg px-4 py-12">
-        <h1 className="text-xl font-semibold">View limit reached</h1>
-        <p className="mt-2 text-sm text-neutral-400">
-          This share link has reached its max views.
-        </p>
-      </main>
-    );
-  }
+  if (!meta.ok) return <FailState token={t} title="Not found" body="This share link does not exist." />;
+  if (meta.revokedAt) return <FailState token={t} title="Link revoked" body="This share link has been revoked." />;
+  if (isExpired(meta.expiresAt))
+    return <FailState token={t} title="Link expired" body="This share link has expired." />;
+  if (isMaxed(meta.viewCount ?? 0, meta.maxViews))
+    return <FailState token={t} title="View limit reached" body="This share link has reached its max views." />;
 
   const unlocked = await isShareUnlockedAction(t);
   if (unlocked) redirect(`/s/${encodeURIComponent(t)}/view`);
 
   const requireEmail = !!meta.toEmail;
+  const expiresLabel = fmtDate(meta.expiresAt);
 
   return (
-    <main className="mx-auto max-w-lg px-4 py-12">
-      <h1 className="text-xl font-semibold">Cyang Docs</h1>
+    <ShareShell token={t} title="Secure Share Link" subtitle="Review access requirements, then open the document.">
+      <div className="space-y-5">
+        <div className="flex flex-wrap items-center gap-2">
+          <ShareBadge>PDF</ShareBadge>
+          <ShareBadge tone="good">Encrypted</ShareBadge>
+          {expiresLabel ? <ShareBadge>Expires {expiresLabel}</ShareBadge> : <ShareBadge>No expiration</ShareBadge>}
+          {meta.maxViews !== null ? (
+            <ShareBadge>{meta.maxViews === 0 ? "Unlimited views" : `Max views ${meta.maxViews}`}</ShareBadge>
+          ) : null}
+          {requireEmail ? <ShareBadge tone="warn">Recipient restricted</ShareBadge> : null}
+          {meta.hasPassword ? <ShareBadge tone="warn">Password protected</ShareBadge> : null}
+        </div>
 
-      <div className="mt-2 text-sm text-neutral-400">
-        {meta.expiresAt ? (
-          <div>Expires: {fmtDate(meta.expiresAt)}</div>
-        ) : null}
-        {meta.maxViews !== null ? (
-          <div>
-            Max views: {meta.maxViews === 0 ? "Unlimited" : meta.maxViews}
+        {errorText ? (
+          <div className="rounded-xl border border-red-400/35 bg-red-500/10 px-3 py-2 text-sm text-red-100">
+            {errorText}
           </div>
         ) : null}
-        {requireEmail ? <div>Recipient restricted</div> : null}
-      </div>
 
-      {errorText ? (
-        <div className="mt-4 rounded-md border border-red-900/40 bg-red-950/30 px-3 py-2 text-sm text-red-200">
-          {errorText}
-        </div>
-      ) : null}
-
-      {!meta.hasPassword && !requireEmail ? (
-        <form className="mt-6" action={verifySharePasswordAction}>
-          <input type="hidden" name="token" value={t} />
-          <input type="hidden" name="password" value="" />
-          <button
-            type="submit"
-            className="rounded-md bg-neutral-800 px-4 py-2 text-sm text-neutral-100 hover:bg-neutral-700"
-          >
-            Continue
-          </button>
-        </form>
-      ) : (
-        <PasswordGate
-          token={t}
-          hasPassword={meta.hasPassword}
-          requireEmail={requireEmail}
-          emailHint={meta.toEmail ? maskEmail(meta.toEmail) : null}
-        />
-      )}
-          <div className="mt-8 text-xs text-white/50">
-        <Link href={`/report?token=${encodeURIComponent(t)}`} className="underline hover:text-white">
-          Report abuse
-        </Link>
+        {!meta.hasPassword && !requireEmail ? (
+          <form action={verifySharePasswordAction} className="space-y-4">
+            <input type="hidden" name="token" value={t} />
+            <input type="hidden" name="password" value="" />
+            <button type="submit" className="btn-base btn-primary rounded-xl px-4 py-2 text-sm font-medium">
+              View document
+            </button>
+          </form>
+        ) : (
+          <PasswordGate
+            token={t}
+            hasPassword={meta.hasPassword}
+            requireEmail={requireEmail}
+            emailHint={meta.toEmail ? maskEmail(meta.toEmail) : null}
+          />
+        )}
       </div>
-    </main>
+    </ShareShell>
   );
 }
+

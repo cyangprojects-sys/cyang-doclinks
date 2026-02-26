@@ -1,4 +1,3 @@
-// src/app/s/[token]/passwordGate.tsx
 "use client";
 
 import { useMemo, useState } from "react";
@@ -6,11 +5,8 @@ import { verifySharePasswordResultAction } from "./actions";
 
 export type PasswordGateProps = {
   token: string;
-  /** If false, we still show a Continue-style button (no password field). */
   hasPassword?: boolean;
-  /** If true, require email input (used for to_email restriction). */
   requireEmail?: boolean;
-  /** Optional masked hint for the required email (e.g., c***@domain.com). */
   emailHint?: string | null;
 };
 
@@ -26,35 +22,38 @@ export default function PasswordGate({
   const [busy, setBusy] = useState(false);
 
   const title = useMemo(() => {
-    if (hasPassword && requireEmail) return "This share requires email + password.";
-    if (hasPassword) return "This share link is password protected.";
-    if (requireEmail) return "This share requires the recipient email.";
-    return "Continue to view.";
+    if (hasPassword && requireEmail) return "Password and recipient email required";
+    if (hasPassword) return "Password required";
+    if (requireEmail) return "Recipient email required";
+    return "Continue";
   }, [hasPassword, requireEmail]);
 
   const buttonText = useMemo(() => {
-    if (busy) return hasPassword ? "Unlocking…" : "Continuing…";
+    if (busy) return hasPassword ? "Unlocking..." : "Continuing...";
     return hasPassword ? "Unlock" : "Continue";
   }, [busy, hasPassword]);
 
   return (
-    <div className="mt-6 rounded-lg border border-neutral-800 bg-neutral-950 p-4">
-      <div className="text-sm text-neutral-400">{title}</div>
+    <div className="glass-card rounded-2xl p-4 sm:p-5">
+      <h2 className="text-base font-semibold tracking-tight text-white">{title}</h2>
+      <p className="mt-1 text-sm text-white/65">
+        This link is protected. Enter the required credentials to continue.
+      </p>
 
       {requireEmail ? (
-        <div className="mt-3 text-xs text-neutral-500">
+        <div className="mt-3 text-xs text-white/55">
           {emailHint ? (
             <>
-              Enter the email this share was sent to (<span className="text-neutral-300">{emailHint}</span>).
+              Use the recipient email this link was sent to (<span className="text-white/75">{emailHint}</span>).
             </>
           ) : (
-            <>Enter the email this share was sent to.</>
+            <>Use the recipient email this link was sent to.</>
           )}
         </div>
       ) : null}
 
       {err ? (
-        <div className="mt-3 rounded-md border border-red-900/40 bg-red-950/30 px-3 py-2 text-sm text-red-200">
+        <div className="mt-3 rounded-xl border border-red-400/35 bg-red-500/10 px-3 py-2 text-sm text-red-100">
           {err}
         </div>
       ) : null}
@@ -65,8 +64,8 @@ export default function PasswordGate({
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder={emailHint ? `Email (${emailHint})` : "Email"}
-            className="w-full rounded-md border border-neutral-800 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 placeholder:text-neutral-500"
+            placeholder={emailHint ? `Email (${emailHint})` : "Recipient email"}
+            className="w-full rounded-xl border border-white/20 bg-black/20 px-3 py-2 text-sm text-white placeholder:text-white/45 focus:border-cyan-300/55 focus:outline-none"
             autoComplete="email"
           />
         ) : null}
@@ -77,7 +76,7 @@ export default function PasswordGate({
             value={pw}
             onChange={(e) => setPw(e.target.value)}
             placeholder="Password"
-            className="w-full rounded-md border border-neutral-800 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 placeholder:text-neutral-500"
+            className="w-full rounded-xl border border-white/20 bg-black/20 px-3 py-2 text-sm text-white placeholder:text-white/45 focus:border-cyan-300/55 focus:outline-none"
             autoComplete="current-password"
           />
         ) : null}
@@ -90,7 +89,6 @@ export default function PasswordGate({
             try {
               const fd = new FormData();
               fd.set("token", token);
-              // Some servers expect "password" even if empty.
               fd.set("password", hasPassword ? pw : "");
               if (requireEmail) fd.set("email", email);
 
@@ -100,13 +98,12 @@ export default function PasswordGate({
                 return;
               }
 
-              // Success: client redirect to raw view
-              window.location.href = `/s/${encodeURIComponent(token)}/raw`;
+              window.location.href = `/s/${encodeURIComponent(token)}/view`;
             } finally {
               setBusy(false);
             }
           }}
-          className="w-full rounded-md bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-500 disabled:opacity-60"
+          className="btn-base btn-primary w-full rounded-xl px-4 py-2 text-sm font-medium disabled:opacity-60"
         >
           {buttonText}
         </button>
@@ -114,3 +111,4 @@ export default function PasswordGate({
     </div>
   );
 }
+
