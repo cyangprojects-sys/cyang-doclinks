@@ -3,6 +3,7 @@
 This Worker runs on Cloudflare Cron Triggers and calls your Next.js cron endpoints on `cyang.io`.
 
 Current schedules:
+- `*/5 * * * *` -> `/api/cron/webhooks`
 - `*/10 * * * *` -> `/api/cron/scan`
 - `*/15 * * * *` -> `/api/cron/key-rotation`
 - `5 * * * *` -> `/api/cron/nightly`
@@ -35,7 +36,7 @@ npx wrangler deploy
 ```
 
 ### Optional settings
-- Update `TARGET_SCAN_URL`, `TARGET_KEY_ROTATION_URL`, and `TARGET_NIGHTLY_URL` in `wrangler.toml` if route paths differ.
+- Update `TARGET_WEBHOOKS_URL`, `TARGET_SCAN_URL`, `TARGET_KEY_ROTATION_URL`, and `TARGET_NIGHTLY_URL` in `wrangler.toml` if route paths differ.
 
 ## Logs
 View logs in Cloudflare dashboard, or run:

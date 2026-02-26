@@ -2,6 +2,7 @@ export interface Env {
   TARGET_SCAN_URL: string;
   TARGET_NIGHTLY_URL: string;
   TARGET_KEY_ROTATION_URL: string;
+  TARGET_WEBHOOKS_URL: string;
   CRON_SECRET: string; // stored as a Cloudflare secret
 }
 
@@ -15,6 +16,10 @@ async function runScheduled(event: ScheduledEvent, env: Env) {
   const cron = String(event.cron || "").trim();
   const jobs: Array<{ name: string; url: string; method: "GET" | "POST" }> = [];
 
+  // every 5 minutes
+  if (cron === "*/5 * * * *") {
+    jobs.push({ name: "webhooks", url: env.TARGET_WEBHOOKS_URL, method: "GET" });
+  }
   // every 10 minutes
   if (cron === "*/10 * * * *") {
     jobs.push({ name: "scan", url: env.TARGET_SCAN_URL, method: "GET" });

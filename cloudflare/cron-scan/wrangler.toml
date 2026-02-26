@@ -3,10 +3,11 @@ main = "src/index.ts"
 compatibility_date = "2025-01-01"
 
 [triggers]
-crons = ["*/10 * * * *", "*/15 * * * *", "5 * * * *"]
+crons = ["*/5 * * * *", "*/10 * * * *", "*/15 * * * *", "5 * * * *"]
 
 [vars]
 # Update if your route paths differ.
 TARGET_SCAN_URL = "https://www.cyang.io/api/cron/scan"
 TARGET_KEY_ROTATION_URL = "https://www.cyang.io/api/cron/key-rotation"
 TARGET_NIGHTLY_URL = "https://www.cyang.io/api/cron/nightly"
+TARGET_WEBHOOKS_URL = "https://www.cyang.io/api/cron/webhooks"
