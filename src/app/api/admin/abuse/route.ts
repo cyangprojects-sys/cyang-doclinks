@@ -5,10 +5,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { requireOwner } from "@/lib/owner";
 import { clientIpKey, logSecurityEvent, enforceGlobalApiRateLimit } from "@/lib/securityTelemetry";
+import { createQuarantineOverride, revokeActiveQuarantineOverride } from "@/lib/quarantineOverride";
+import { appendImmutableAudit } from "@/lib/immutableAudit";
 
 type Action =
   | { action: "disable_doc"; docId: string; reason?: string | null; reportId?: string | null }
   | { action: "quarantine_doc"; docId: string; reason?: string | null; reportId?: string | null }
+  | { action: "override_quarantine"; docId: string; reason?: string | null; ttlMinutes?: number; confirm: string }
+  | { action: "revoke_override"; docId: string; reason?: string | null; confirm: string }
   | { action: "revoke_share"; token: string; reason?: string | null; reportId?: string | null }
   | { action: "close_report"; reportId: string; notes?: string | null };
 
@@ -81,8 +85,100 @@ export async function POST(req: NextRequest) {
       scope: "admin_abuse",
       message: reason || "Admin moderation action",
     });
+    await appendImmutableAudit({
+      streamKey: `admin:${owner.user.id}`,
+      action: "admin.abuse_doc_action",
+      actorUserId: owner.user.id,
+      orgId: owner.user.orgId ?? null,
+      docId,
+      ipHash: ipInfo.ipHash,
+      payload: { action: act, reason, reportId: (body as any).reportId ?? null },
+    });
 
     return NextResponse.json({ ok: true });
+  }
+
+  if (act === "override_quarantine") {
+    const docId = norm((body as any).docId);
+    const confirm = norm((body as any).confirm);
+    const ttlMinutes = Number((body as any).ttlMinutes ?? 30);
+    if (!docId) return NextResponse.json({ ok: false, error: "MISSING_DOC" }, { status: 400 });
+    if (confirm !== `OVERRIDE ${docId}`) {
+      return NextResponse.json(
+        { ok: false, error: "CONFIRMATION_REQUIRED", message: `confirm must equal "OVERRIDE ${docId}"` },
+        { status: 400 }
+      );
+    }
+
+    const created = await createQuarantineOverride({
+      docId,
+      actorUserId: owner.user.id,
+      reason,
+      ttlMinutes,
+    });
+    if (!created) return NextResponse.json({ ok: false, error: "OVERRIDE_CREATE_FAILED" }, { status: 500 });
+
+    await logSecurityEvent({
+      type: "quarantine_override_granted",
+      severity: "high",
+      ip: ipInfo.ip,
+      docId,
+      actorUserId: owner.user.id,
+      orgId: owner.user.orgId ?? null,
+      scope: "admin_abuse",
+      message: reason || "Temporary quarantine override granted",
+      meta: { overrideId: created.id, expiresAt: created.expires_at, ttlMinutes },
+    });
+    await appendImmutableAudit({
+      streamKey: `doc:${docId}`,
+      action: "doc.quarantine_override_granted",
+      actorUserId: owner.user.id,
+      orgId: owner.user.orgId ?? null,
+      docId,
+      ipHash: ipInfo.ipHash,
+      payload: { reason, ttlMinutes, overrideId: created.id, expiresAt: created.expires_at },
+    });
+
+    return NextResponse.json({ ok: true, override_id: created.id, expires_at: created.expires_at });
+  }
+
+  if (act === "revoke_override") {
+    const docId = norm((body as any).docId);
+    const confirm = norm((body as any).confirm);
+    if (!docId) return NextResponse.json({ ok: false, error: "MISSING_DOC" }, { status: 400 });
+    if (confirm !== `REVOKE_OVERRIDE ${docId}`) {
+      return NextResponse.json(
+        { ok: false, error: "CONFIRMATION_REQUIRED", message: `confirm must equal "REVOKE_OVERRIDE ${docId}"` },
+        { status: 400 }
+      );
+    }
+
+    const revoked = await revokeActiveQuarantineOverride({
+      docId,
+      actorUserId: owner.user.id,
+      reason,
+    });
+    await logSecurityEvent({
+      type: "quarantine_override_revoked",
+      severity: "high",
+      ip: ipInfo.ip,
+      docId,
+      actorUserId: owner.user.id,
+      orgId: owner.user.orgId ?? null,
+      scope: "admin_abuse",
+      message: reason || "Quarantine override revoked",
+      meta: { revoked },
+    });
+    await appendImmutableAudit({
+      streamKey: `doc:${docId}`,
+      action: "doc.quarantine_override_revoked",
+      actorUserId: owner.user.id,
+      orgId: owner.user.orgId ?? null,
+      docId,
+      ipHash: ipInfo.ipHash,
+      payload: { reason, revoked },
+    });
+    return NextResponse.json({ ok: true, revoked });
   }
 
   if (act === "revoke_share") {
@@ -114,6 +210,14 @@ export async function POST(req: NextRequest) {
       message: reason || "Share revoked via abuse workflow",
       meta: { token: token.slice(0, 12) },
     });
+    await appendImmutableAudit({
+      streamKey: `admin:${owner.user.id}`,
+      action: "admin.abuse_revoke_share",
+      actorUserId: owner.user.id,
+      orgId: owner.user.orgId ?? null,
+      ipHash: ipInfo.ipHash,
+      payload: { tokenPrefix: token.slice(0, 12), reason, reportId: (body as any).reportId ?? null },
+    });
 
     return NextResponse.json({ ok: true });
   }
@@ -140,6 +244,14 @@ export async function POST(req: NextRequest) {
       scope: "admin_abuse",
       message: "Abuse report closed",
       meta: { reportId },
+    });
+    await appendImmutableAudit({
+      streamKey: `admin:${owner.user.id}`,
+      action: "admin.abuse_close_report",
+      actorUserId: owner.user.id,
+      orgId: owner.user.orgId ?? null,
+      ipHash: ipInfo.ipHash,
+      payload: { reportId, notes },
     });
 
     return NextResponse.json({ ok: true });

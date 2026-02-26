@@ -68,7 +68,12 @@ export default function DmcaActionsClient({ noticeId, docId, status }: Props) {
       <button
         className="rounded-md bg-red-500/20 px-3 py-1.5 text-sm text-red-200 hover:bg-red-500/25 disabled:opacity-50"
         disabled={!!busy || !docId}
-        onClick={() => act({ action: "takedown_doc", noticeId, docId, reason: "dmca:takedown" }, "takedown")}
+        onClick={() => {
+          if (!docId) return;
+          const confirm = window.prompt(`Type exactly: TAKEDOWN ${docId}`);
+          if (!confirm) return;
+          act({ action: "takedown_doc", noticeId, docId, reason: "dmca:takedown", confirm }, "takedown");
+        }}
       >
         Disable (takedown)
       </button>
@@ -76,7 +81,12 @@ export default function DmcaActionsClient({ noticeId, docId, status }: Props) {
       <button
         className="rounded-md bg-emerald-500/15 px-3 py-1.5 text-sm text-emerald-200 hover:bg-emerald-500/20 disabled:opacity-50"
         disabled={!!busy || !docId}
-        onClick={() => act({ action: "restore_doc", noticeId, docId, reason: "dmca:restored" }, "restore")}
+        onClick={() => {
+          if (!docId) return;
+          const confirm = window.prompt(`Type exactly: RESTORE ${docId}`);
+          if (!confirm) return;
+          act({ action: "restore_doc", noticeId, docId, reason: "dmca:restored", confirm }, "restore");
+        }}
       >
         Restore
       </button>

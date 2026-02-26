@@ -73,6 +73,28 @@ export default function AbuseActionsClient({ reportId, token, docId }: Props) {
             >
               Quarantine
             </button>
+            <button
+              disabled={busy}
+              onClick={() => {
+                const confirm = window.prompt(`Type exactly: OVERRIDE ${docId}`);
+                if (!confirm) return;
+                run({ action: "override_quarantine", docId, ttlMinutes: 30, confirm });
+              }}
+              className="rounded-xl bg-amber-500/20 px-3 py-1.5 text-xs text-amber-100 hover:bg-amber-500/25 disabled:opacity-50"
+            >
+              Override 30m
+            </button>
+            <button
+              disabled={busy}
+              onClick={() => {
+                const confirm = window.prompt(`Type exactly: REVOKE_OVERRIDE ${docId}`);
+                if (!confirm) return;
+                run({ action: "revoke_override", docId, confirm });
+              }}
+              className="rounded-xl bg-amber-500/10 px-3 py-1.5 text-xs text-amber-100 hover:bg-amber-500/20 disabled:opacity-50"
+            >
+              Revoke override
+            </button>
           </>
         ) : null}
 

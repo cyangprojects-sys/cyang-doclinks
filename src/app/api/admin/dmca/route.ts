@@ -6,11 +6,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { requireOwner } from "@/lib/owner";
 import { clientIpKey, enforceGlobalApiRateLimit, logSecurityEvent } from "@/lib/securityTelemetry";
+import { appendImmutableAudit } from "@/lib/immutableAudit";
 
 type Action =
   | { action: "set_status"; noticeId: string; status: "new" | "reviewing" | "accepted" | "rejected" | "actioned"; adminNotes?: string | null }
-  | { action: "takedown_doc"; noticeId: string; docId: string; reason?: string | null }
-  | { action: "restore_doc"; noticeId: string; docId: string; reason?: string | null };
+  | { action: "takedown_doc"; noticeId: string; docId: string; reason?: string | null; confirm?: string | null }
+  | { action: "restore_doc"; noticeId: string; docId: string; reason?: string | null; confirm?: string | null };
 
 export async function POST(req: NextRequest) {
   try {
@@ -37,10 +38,23 @@ export async function POST(req: NextRequest) {
           admin_notes = coalesce(${body.adminNotes ?? null}, admin_notes)
         where id = ${body.noticeId}::uuid
       `;
+      await appendImmutableAudit({
+        streamKey: `dmca:${body.noticeId}`,
+        action: "admin.dmca_set_status",
+        ipHash: ipInfo.ipHash,
+        payload: { status: body.status, adminNotes: body.adminNotes ?? null },
+      });
       return NextResponse.json({ ok: true });
     }
 
     if (body.action === "takedown_doc") {
+      const expected = `TAKEDOWN ${body.docId}`;
+      if ((body.confirm || "").trim() !== expected) {
+        return NextResponse.json(
+          { ok: false, error: "CONFIRMATION_REQUIRED", message: `confirm must equal "${expected}"` },
+          { status: 400 }
+        );
+      }
       const reason = String(body.reason || "dmca:takedown").slice(0, 4000);
 
       await sql`
@@ -73,11 +87,25 @@ export async function POST(req: NextRequest) {
         message: "Owner actioned DMCA takedown: disabled doc",
         meta: { noticeId: body.noticeId, reason },
       });
+      await appendImmutableAudit({
+        streamKey: `doc:${body.docId}`,
+        action: "admin.dmca_takedown",
+        docId: body.docId,
+        ipHash: ipInfo.ipHash,
+        payload: { noticeId: body.noticeId, reason },
+      });
 
       return NextResponse.json({ ok: true });
     }
 
     if (body.action === "restore_doc") {
+      const expected = `RESTORE ${body.docId}`;
+      if ((body.confirm || "").trim() !== expected) {
+        return NextResponse.json(
+          { ok: false, error: "CONFIRMATION_REQUIRED", message: `confirm must equal "${expected}"` },
+          { status: 400 }
+        );
+      }
       const reason = String(body.reason || "dmca:restored").slice(0, 4000);
 
       // Only restore if doc isn't high-risk; trigger will quarantine if risk_level=high.
@@ -113,6 +141,13 @@ export async function POST(req: NextRequest) {
         scope: "dmca",
         message: "Owner restored doc after DMCA review",
         meta: { noticeId: body.noticeId, reason },
+      });
+      await appendImmutableAudit({
+        streamKey: `doc:${body.docId}`,
+        action: "admin.dmca_restore",
+        docId: body.docId,
+        ipHash: ipInfo.ipHash,
+        payload: { noticeId: body.noticeId, reason },
       });
 
       return NextResponse.json({ ok: true });

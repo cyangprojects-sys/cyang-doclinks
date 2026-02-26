@@ -11,6 +11,7 @@ import { rateLimit, rateLimitHeaders, stableHash } from "@/lib/rateLimit";
 import { mintAccessTicket } from "@/lib/accessTicket";
 import { r2Client, r2Prefix, R2_BUCKET } from "@/lib/r2";
 import { stampPdfWithWatermark } from "@/lib/pdfWatermark";
+import { hasActiveQuarantineOverride } from "@/lib/quarantineOverride";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -212,7 +213,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ toke
   const share = rows[0];
   if (!share) return new NextResponse("Not found", { status: 404 });
   const moderation = (share.moderation_status || "active").toLowerCase();
-  if (moderation !== "active") return new NextResponse("Unavailable", { status: 404 });
+  if (moderation !== "active") {
+    if (moderation !== "quarantined") return new NextResponse("Unavailable", { status: 404 });
+    const override = await hasActiveQuarantineOverride(share.doc_id);
+    if (!override) return new NextResponse("Unavailable", { status: 404 });
+  }
   const blockedScanStates = new Set(["failed", "error", "infected", "quarantined"]);
   if (blockedScanStates.has((share.scan_status || "unscanned").toLowerCase())) {
     return new NextResponse("Unavailable", { status: 404 });
