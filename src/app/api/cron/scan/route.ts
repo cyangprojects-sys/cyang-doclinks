@@ -32,6 +32,26 @@ export async function GET(req: NextRequest) {
   const retryMax = Math.max(retryBase, Number(process.env.SCAN_RETRY_MAX_MINUTES || 720));
   const queueHealth = await healScanQueue();
 
+  if (queueHealth.staleDeadLettered > 0) {
+    await logSecurityEvent({
+      type: "malware_scan_dead_letter",
+      severity: "high",
+      scope: "scanner",
+      message: "Stale running scan jobs moved to dead-letter",
+      meta: { count: queueHealth.staleDeadLettered, reason: "stale_running_timeout" },
+    });
+  }
+
+  if (queueHealth.maxAttemptJobs > 0) {
+    await logSecurityEvent({
+      type: "malware_scan_dead_letter_backlog",
+      severity: "high",
+      scope: "scanner",
+      message: "Scan jobs reached max attempts and require manual review",
+      meta: { count: queueHealth.maxAttemptJobs, maxAttempts },
+    });
+  }
+
   // Claim jobs using SKIP LOCKED to avoid concurrent cron overlap.
   const jobs = (await sql`
     with picked as (
@@ -147,6 +167,21 @@ export async function GET(req: NextRequest) {
           deadLettered: shouldDeadLetter,
         },
       });
+      if (shouldDeadLetter) {
+        await logSecurityEvent({
+          type: "malware_scan_dead_letter",
+          severity: "high",
+          docId: job.doc_id,
+          scope: "scanner",
+          message: "Malware scan job dead-lettered after max retries",
+          meta: {
+            jobId: job.id,
+            attempts: attempt,
+            maxAttempts,
+            error: msg,
+          },
+        });
+      }
       await detectScanFailureSpike();
       await reportException({
         error: e,
