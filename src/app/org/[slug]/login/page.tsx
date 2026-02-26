@@ -8,9 +8,11 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export default async function OrgLoginPage(
-  { params }: { params: Promise<{ slug: string }> }
+  { params, searchParams }: { params: Promise<{ slug: string }>; searchParams?: Promise<Record<string, string | string[] | undefined>> }
 ) {
   const { slug: rawSlug } = await params;
+  const sp = (await searchParams) || {};
+  const invite = String((Array.isArray(sp.invite) ? sp.invite[0] : sp.invite) || "").trim();
   const slug = String(rawSlug || "").trim().toLowerCase();
 
   const org = await getOrgBySlug(slug);
@@ -55,14 +57,14 @@ export default async function OrgLoginPage(
           </p>
 
           <a
-            href={`/org/${org.slug}/auth/google`}
+            href={`/org/${org.slug}/auth/google${invite ? `?invite=${encodeURIComponent(invite)}` : ""}`}
             className="mt-6 block w-full rounded-2xl bg-white px-5 py-3 text-center text-sm font-medium text-black hover:bg-white/90"
           >
             Sign in with Google
           </a>
 
           <a
-            href={`/org/${org.slug}/auth/enterprise-oidc`}
+            href={`/org/${org.slug}/auth/enterprise-oidc${invite ? `?invite=${encodeURIComponent(invite)}` : ""}`}
             className={`mt-3 block w-full rounded-2xl px-5 py-3 text-center text-sm font-medium ${
               showEnterprise
                 ? "bg-white/10 text-white hover:bg-white/15"

@@ -2,6 +2,7 @@
 import { cookies } from "next/headers";
 
 export const ORG_COOKIE_NAME = "cyang_org";
+export const ORG_INVITE_COOKIE_NAME = "cyang_org_invite";
 
 /**
  * Returns org slug from cookie, or null.

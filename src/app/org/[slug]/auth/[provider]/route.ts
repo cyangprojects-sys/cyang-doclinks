@@ -1,6 +1,6 @@
 // src/app/org/[slug]/auth/[provider]/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { ORG_COOKIE_NAME } from "@/lib/tenant";
+import { ORG_COOKIE_NAME, ORG_INVITE_COOKIE_NAME } from "@/lib/tenant";
 import { getOrgBySlug } from "@/lib/orgs";
 
 export const runtime = "nodejs";
@@ -31,6 +31,8 @@ export async function GET(req: NextRequest, ctx: RouteCtx) {
     return NextResponse.redirect(new URL(`/org/${encodeURIComponent(slug)}/login`, req.url));
   }
 
+  const inviteToken = String(new URL(req.url).searchParams.get("invite") || "").trim();
+
   // Bind org to this browser (httpOnly so JS can't tamper with it).
   const res = NextResponse.redirect(
     new URL(
@@ -46,6 +48,16 @@ export async function GET(req: NextRequest, ctx: RouteCtx) {
     path: "/",
     maxAge: 60 * 60 * 24 * 14, // 14 days
   });
+
+  if (inviteToken) {
+    res.cookies.set(ORG_INVITE_COOKIE_NAME, inviteToken, {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      path: "/",
+      maxAge: 60 * 30, // 30 minutes
+    });
+  }
 
   return res;
 }

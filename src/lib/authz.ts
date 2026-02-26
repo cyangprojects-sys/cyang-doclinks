@@ -4,8 +4,9 @@ import { cookies } from "next/headers";
 
 import { authOptions } from "@/auth";
 import { sql } from "@/lib/db";
-import { ORG_COOKIE_NAME } from "@/lib/tenant";
+import { ORG_COOKIE_NAME, ORG_INVITE_COOKIE_NAME } from "@/lib/tenant";
 import { getOrgBySlug, orgAllowsEmail } from "@/lib/orgs";
+import { acceptInviteForUser, getActiveMembership, orgMembershipTablesReady, upsertMembership } from "@/lib/orgMembership";
 
 export type Role = "viewer" | "admin" | "owner";
 
@@ -95,6 +96,24 @@ async function getDefaultOrgId(): Promise<string | null> {
 
 export type EnsureUserCtx = { orgId: string | null; orgSlug: string | null };
 
+async function consumeInviteCookieToken(): Promise<string | null> {
+  try {
+    const c = await cookies();
+    const token = String(c.get(ORG_INVITE_COOKIE_NAME)?.value || "").trim();
+    if (!token) return null;
+    c.set(ORG_INVITE_COOKIE_NAME, "", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      maxAge: 0,
+    });
+    return token;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Ensure a row exists in public.users for this email and return {id,email,role,orgId,orgSlug}.
  *
@@ -161,6 +180,52 @@ export async function ensureUserByEmail(emailRaw: string, ctx: EnsureUserCtx): P
         throw new Error("ORG_MISMATCH");
       }
 
+      if (orgId && (await orgMembershipTablesReady())) {
+        const isOwnerByEnv = desiredRole === "owner";
+        const defaultOrgId = await getDefaultOrgId();
+        const isDefaultOrg = defaultOrgId && orgId === defaultOrgId;
+
+        if (isOwnerByEnv || isDefaultOrg) {
+          await upsertMembership({
+            orgId,
+            userId: u.id,
+            role: isOwnerByEnv ? "owner" : u.role === "admin" ? "admin" : "viewer",
+            invitedByUserId: null,
+          });
+        }
+
+        let membership = await getActiveMembership({ orgId, userId: u.id });
+        if (!membership) {
+          const inviteToken = await consumeInviteCookieToken();
+          if (inviteToken) {
+            await acceptInviteForUser({
+              orgId,
+              userId: u.id,
+              email,
+              token: inviteToken,
+            });
+            membership = await getActiveMembership({ orgId, userId: u.id });
+          }
+        }
+
+        if (!membership && !isOwnerByEnv && !isDefaultOrg) {
+          throw new Error("ORG_MEMBERSHIP_REQUIRED");
+        }
+
+        if (membership?.role === "admin" && u.role === "viewer") {
+          const rows3 = (await sql`
+            update public.users
+            set role = 'admin'
+            where id = ${u.id}::uuid
+            returning id::text as id, email, role, org_id::text as org_id
+          `) as unknown as Array<{ id: string; email: string; role: Role; org_id: string | null }>;
+          const u3 = rows3?.[0];
+          if (u3?.id) {
+            return { id: u3.id, email: u3.email, role: u3.role, orgId: u3.org_id ?? orgId, orgSlug };
+          }
+        }
+      }
+
       // Defensive: if OWNER_EMAIL matches, guarantee role owner.
       if (desiredRole === "owner" && u.role !== "owner") {
         const rows2 = (await sql`
@@ -211,6 +276,9 @@ export async function ensureUserByEmail(emailRaw: string, ctx: EnsureUserCtx): P
     if (msg.includes("org_domain_blocked")) {
       throw new Error("Email domain is not allowed for this organization.");
     }
+    if (msg.includes("org_membership_required")) {
+      throw new Error("Organization membership is required. Ask an owner for an invite.");
+    }
 
     if (msg.includes("relation") && msg.includes("users") && msg.includes("does not exist")) {
       throw new Error(
@@ -243,7 +311,19 @@ export async function getAuthedUser(): Promise<AuthedUser | null> {
   const orgId = (session?.user as any)?.orgId ?? null;
   const orgSlug = (session?.user as any)?.orgSlug ?? null;
 
-  return ensureUserByEmail(email, { orgId, orgSlug });
+  try {
+    return await ensureUserByEmail(email, { orgId, orgSlug });
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : "";
+    if (
+      msg.includes("Organization membership is required") ||
+      msg.includes("Email domain is not allowed") ||
+      msg.includes("Organization not found")
+    ) {
+      return null;
+    }
+    throw e;
+  }
 }
 
 /**

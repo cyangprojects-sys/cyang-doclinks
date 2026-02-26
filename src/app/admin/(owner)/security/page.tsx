@@ -2,6 +2,8 @@ import { sql } from "@/lib/db";
 import KeyManagementPanel from "./KeyManagementPanel";
 import { RBAC_PERMISSIONS, listRolePermissionOverrides, permissionsTableExists } from "@/lib/rbac";
 import type { Role } from "@/lib/authz";
+import { requireRole } from "@/lib/authz";
+import { listOrgMemberships, listPendingOrgInvites, orgMembershipTablesReady } from "@/lib/orgMembership";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,6 +22,8 @@ export default async function SecurityTelemetryPage(props: {
   const sp = (await props.searchParams) || {};
   const saved = (Array.isArray(sp.saved) ? sp.saved[0] : sp.saved) || "";
   const error = (Array.isArray(sp.error) ? sp.error[0] : sp.error) || "";
+  const inviteUrl = (Array.isArray(sp.invite_url) ? sp.invite_url[0] : sp.invite_url) || "";
+  const currentUser = await requireRole("owner");
 
   // Recent security events
   const events = (await sql`
@@ -92,6 +96,9 @@ export default async function SecurityTelemetryPage(props: {
   }> = [];
 
   const roles: Role[] = ["viewer", "admin", "owner"];
+  const membershipTableReady = await orgMembershipTablesReady();
+  const orgMembers = membershipTableReady && currentUser.orgId ? await listOrgMemberships(currentUser.orgId) : [];
+  const orgInvites = membershipTableReady && currentUser.orgId ? await listPendingOrgInvites(currentUser.orgId) : [];
   const rbacTableReady = await permissionsTableExists();
   const rbacOverrides = rbacTableReady ? await listRolePermissionOverrides() : [];
   const rbacMap = new Map<string, boolean>();
@@ -180,6 +187,11 @@ export default async function SecurityTelemetryPage(props: {
       {error ? (
         <div className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-200">
           RBAC update failed: {error}
+        </div>
+      ) : null}
+      {saved === "org_invite" && inviteUrl ? (
+        <div className="mt-4 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-200">
+          Invite created: <span className="font-mono break-all">{inviteUrl}</span>
         </div>
       ) : null}
 
@@ -293,6 +305,121 @@ export default async function SecurityTelemetryPage(props: {
             </tbody>
           </table>
         </div>
+      </div>
+
+      <div className="mt-4 rounded-xl border border-white/10 bg-white/5 p-4">
+        <h2 className="text-sm font-semibold">Organization Membership</h2>
+        <p className="mt-1 text-xs text-white/50">
+          Invite-only access model for your tenant. Domain allowlists are supplemental, not primary access control.
+        </p>
+
+        {!membershipTableReady ? (
+          <div className="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+            Membership tables not found. Run <span className="font-mono">scripts/sql/org_membership_invites.sql</span>.
+          </div>
+        ) : (
+          <>
+            <form action="/api/admin/security/org-access" method="post" className="mt-3 flex flex-wrap items-end gap-2 rounded-lg border border-white/10 bg-black/20 p-3">
+              <input type="hidden" name="action" value="invite" />
+              <label className="text-xs text-white/70">
+                Email
+                <input name="email" type="email" required className="mt-1 block rounded border border-white/15 bg-black/40 px-2 py-1 text-xs text-white" />
+              </label>
+              <label className="text-xs text-white/70">
+                Role
+                <select name="role" defaultValue="viewer" className="mt-1 block rounded border border-white/15 bg-black/40 px-2 py-1 text-xs text-white">
+                  <option value="viewer">viewer</option>
+                  <option value="admin">admin</option>
+                  <option value="owner">owner</option>
+                </select>
+              </label>
+              <label className="text-xs text-white/70">
+                Expires (days)
+                <input name="expires_days" type="number" min={1} max={90} defaultValue={7} className="mt-1 block w-24 rounded border border-white/15 bg-black/40 px-2 py-1 text-xs text-white" />
+              </label>
+              <button type="submit" className="rounded border border-white/15 bg-white/10 px-3 py-1.5 text-xs hover:bg-white/15">
+                Create Invite
+              </button>
+            </form>
+
+            <div className="mt-3 overflow-x-auto">
+              <table className="w-full min-w-[760px] text-left text-sm">
+                <thead className="bg-black/30 text-xs text-white/60">
+                  <tr>
+                    <th className="px-3 py-2">Member</th>
+                    <th className="px-3 py-2">Role</th>
+                    <th className="px-3 py-2">Joined</th>
+                    <th className="px-3 py-2">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/10">
+                  {orgMembers.map((m) => (
+                    <tr key={m.user_id} className="bg-black/10">
+                      <td className="px-3 py-2 font-mono text-xs text-white/80">{m.email}</td>
+                      <td className="px-3 py-2">
+                        <form action="/api/admin/security/org-access" method="post" className="flex items-center gap-2">
+                          <input type="hidden" name="action" value="set_member_role" />
+                          <input type="hidden" name="user_id" value={m.user_id} />
+                          <select name="role" defaultValue={m.role} className="rounded border border-white/15 bg-black/40 px-2 py-1 text-xs text-white">
+                            <option value="viewer">viewer</option>
+                            <option value="admin">admin</option>
+                            <option value="owner">owner</option>
+                          </select>
+                          <button type="submit" className="rounded border border-white/15 bg-white/5 px-2 py-1 text-xs hover:bg-white/10">Save</button>
+                        </form>
+                      </td>
+                      <td className="px-3 py-2 text-xs text-white/60">{m.joined_at}</td>
+                      <td className="px-3 py-2">
+                        <form action="/api/admin/security/org-access" method="post">
+                          <input type="hidden" name="action" value="remove_member" />
+                          <input type="hidden" name="user_id" value={m.user_id} />
+                          <button type="submit" className="rounded border border-red-500/30 bg-red-500/10 px-2 py-1 text-xs text-red-200 hover:bg-red-500/20">
+                            Remove
+                          </button>
+                        </form>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="mt-3 overflow-x-auto">
+              <table className="w-full min-w-[760px] text-left text-sm">
+                <thead className="bg-black/30 text-xs text-white/60">
+                  <tr>
+                    <th className="px-3 py-2">Pending invite</th>
+                    <th className="px-3 py-2">Role</th>
+                    <th className="px-3 py-2">Expires</th>
+                    <th className="px-3 py-2">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/10">
+                  {orgInvites.length ? orgInvites.map((i) => (
+                    <tr key={i.id} className="bg-black/10">
+                      <td className="px-3 py-2 font-mono text-xs text-white/80">{i.email}</td>
+                      <td className="px-3 py-2 text-xs text-white/70">{i.role}</td>
+                      <td className="px-3 py-2 text-xs text-white/60">{i.expires_at}</td>
+                      <td className="px-3 py-2">
+                        <form action="/api/admin/security/org-access" method="post">
+                          <input type="hidden" name="action" value="revoke_invite" />
+                          <input type="hidden" name="invite_id" value={i.id} />
+                          <button type="submit" className="rounded border border-red-500/30 bg-red-500/10 px-2 py-1 text-xs text-red-200 hover:bg-red-500/20">
+                            Revoke
+                          </button>
+                        </form>
+                      </td>
+                    </tr>
+                  )) : (
+                    <tr className="bg-black/10">
+                      <td colSpan={4} className="px-3 py-2 text-xs text-white/60">No pending invites.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
       </div>
 
       <div className="mt-4 rounded-xl border border-white/10 bg-white/5 p-4">
