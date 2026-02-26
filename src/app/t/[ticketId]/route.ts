@@ -9,6 +9,7 @@ import { getMasterKeyByIdOrThrow } from "@/lib/masterKeys";
 import { hashUserAgent, hashIpForTicket } from "@/lib/accessTicket";
 import { Readable } from "node:stream";
 import { appendImmutableAudit } from "@/lib/immutableAudit";
+import { allowUnencryptedServing } from "@/lib/securityPolicy";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -217,6 +218,19 @@ export async function GET(
       });
       return new NextResponse("Server error", { status: 500, headers: { "Cache-Control": "private, no-store" } });
     }
+  }
+
+  // Platform policy: legacy unencrypted files are blocked unless explicitly allowed.
+  if (!allowUnencryptedServing()) {
+    void logSecurityEvent({
+      type: "unencrypted_serve_blocked",
+      severity: "high",
+      ip: clientIpKey(req).ip,
+      docId: t.doc_id,
+      scope: "ticket_serve",
+      message: "Serving blocked for unencrypted document by policy",
+    });
+    return new NextResponse("Unavailable", { status: 403, headers: { "Cache-Control": "private, no-store" } });
   }
 
   // Same-origin proxy for non-encrypted docs.

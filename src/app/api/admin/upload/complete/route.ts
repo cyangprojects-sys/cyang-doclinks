@@ -301,6 +301,8 @@ export async function POST(req: NextRequest) {
         key: docKey,
         sampleBytes: Number(process.env.PDF_SAFETY_SAMPLE_BYTES || 262144),
         absMaxBytes: absMax,
+        maxPdfPages: Number(process.env.PDF_MAX_PAGES || 2000),
+        pageCountCheckMaxBytes: Number(process.env.PDF_PAGECOUNT_MAX_BYTES || 25 * 1024 * 1024),
       });
 
       if (!safety.ok) {

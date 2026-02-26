@@ -166,6 +166,10 @@ export async function GET(
   if (!share) return new NextResponse("Not found", { status: 404 });
   const moderation = (share.moderation_status || "active").toLowerCase();
   if (moderation !== "active") return new NextResponse("Unavailable", { status: 404 });
+  const blockedScanStates = new Set(["failed", "error", "infected", "quarantined"]);
+  if (blockedScanStates.has((share.scan_status || "unscanned").toLowerCase())) {
+    return new NextResponse("Unavailable", { status: 404 });
+  }
 
   const risk = (share.risk_level || "low").toLowerCase();
   const riskyInline = risk === "high" || (share.scan_status || "").toLowerCase() === "risky";

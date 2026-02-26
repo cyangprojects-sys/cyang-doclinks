@@ -145,7 +145,8 @@ async function getDocPointer(
       d.content_type::text as content_type,
       d.size_bytes::bigint as size_bytes,
       coalesce(d.status::text, '') as status,
-      coalesce(d.moderation_status::text, 'active') as moderation_status
+      coalesce(d.moderation_status::text, 'active') as moderation_status,
+      coalesce(d.scan_status::text, 'unscanned') as scan_status
     from public.docs d
     where d.id = ${id}::uuid
     limit 1
@@ -159,6 +160,7 @@ async function getDocPointer(
         size_bytes: string | number | null;
         status: string;
         moderation_status: string;
+        scan_status: string;
     }>;
 
     const r = rows?.[0];
@@ -166,9 +168,12 @@ async function getDocPointer(
 
     const lifecycle = (r.status || "").toLowerCase();
     const moderation = (r.moderation_status || "active").toLowerCase();
+    const scanStatus = (r.scan_status || "unscanned").toLowerCase();
+    const blockedScanStates = new Set(["failed", "error", "infected", "quarantined"]);
 
     if (lifecycle === "deleted") return { ok: false };
     if (moderation === "disabled" || moderation === "quarantined" || moderation === "deleted") return { ok: false };
+    if (blockedScanStates.has(scanStatus)) return { ok: false };
     if (!r.bucket || !r.r2_key) return { ok: false };
 
     return {

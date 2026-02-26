@@ -26,13 +26,13 @@ export type PdfSafetyResult =
       isPdf: true;
       riskLevel: PdfRiskLevel;
       flags: string[];
-      details: Record<string, any>;
+      details: Record<string, unknown>;
     }
   | {
       ok: false;
       error: "NOT_PDF" | "UNREADABLE" | "TOO_LARGE" | "INTERNAL";
       message: string;
-      details?: Record<string, any>;
+      details?: Record<string, unknown>;
     };
 
 function bufToAscii(b: Buffer): string {
@@ -98,6 +98,12 @@ async function readRange(args: { bucket: string; key: string; range: string }): 
   return Buffer.concat(chunks);
 }
 
+function countPdfPages(text: string): number {
+  // Heuristic page marker count used as a hard guardrail.
+  const matches = text.match(/\/Type\s*\/Page\b/g);
+  return matches ? matches.length : 0;
+}
+
 export async function validatePdfInR2(args: {
   bucket: string;
   key: string;
@@ -105,9 +111,15 @@ export async function validatePdfInR2(args: {
   sampleBytes?: number;
   // Absolute max allowed size (safety)
   absMaxBytes?: number;
+  // Hard page count cap. 0/undefined disables.
+  maxPdfPages?: number;
+  // Max object size eligible for full page-count pass.
+  pageCountCheckMaxBytes?: number;
 }): Promise<PdfSafetyResult> {
   const sampleBytes = Math.max(4 * 1024, Math.min(Number(args.sampleBytes ?? 256 * 1024), 1024 * 1024));
   const absMaxBytes = Number(args.absMaxBytes ?? 1_000_000_000);
+  const maxPdfPages = Math.max(0, Number(args.maxPdfPages ?? 0));
+  const pageCountCheckMaxBytes = Math.max(1024 * 1024, Number(args.pageCountCheckMaxBytes ?? 25 * 1024 * 1024));
 
   try {
     const head = await r2Client.send(new HeadObjectCommand({ Bucket: args.bucket, Key: args.key }));
@@ -130,20 +142,39 @@ export async function validatePdfInR2(args: {
     const sample = bufToAscii(first);
     const flags = findFlags(sample);
     const riskLevel = riskFromFlags(flags);
+    let pageCount = countPdfPages(sample);
+
+    if (maxPdfPages > 0 && size <= pageCountCheckMaxBytes && size > first.length) {
+      const full = await readRange({ bucket: args.bucket, key: args.key, range: `bytes=0-${size - 1}` });
+      if (full.length) {
+        pageCount = countPdfPages(bufToAscii(full));
+      }
+    }
+
+    if (maxPdfPages > 0 && pageCount > maxPdfPages) {
+      return {
+        ok: false,
+        error: "INTERNAL",
+        message: "PDF exceeds max page count policy.",
+        details: { pageCount, maxPdfPages },
+      };
+    }
 
     return {
       ok: true,
       isPdf: true,
       riskLevel,
       flags,
-      details: { sampledBytes: first.length, size },
+      details: { sampledBytes: first.length, size, pageCount, maxPdfPages: maxPdfPages || null },
     };
-  } catch (e: any) {
+  } catch (e: unknown) {
+    const errName = e instanceof Error ? e.name : "Error";
+    const errMsg = e instanceof Error ? e.message : String(e);
     return {
       ok: false,
       error: "INTERNAL",
       message: "PDF validation failed.",
-      details: { err: e?.name ?? e?.message ?? String(e) },
+      details: { err: errName, message: errMsg },
     };
   }
 }

@@ -12,6 +12,7 @@ import { enforcePlanLimitsEnabled } from "@/lib/billingFlags";
 import { enforceGlobalApiRateLimit, clientIpKey, logSecurityEvent } from "@/lib/securityTelemetry";
 import { generateDataKey, generateIv, wrapDataKey } from "@/lib/encryption";
 import { getActiveMasterKeyOrThrow } from "@/lib/masterKeys";
+import { appendImmutableAudit } from "@/lib/immutableAudit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -107,6 +108,12 @@ export async function POST(req: Request) {
 
     // Enterprise mode: ignore false; require encryption
     const encryptRequested = parsed.data.encrypt;
+    if (encryptRequested !== undefined && user.role !== "owner") {
+      return NextResponse.json(
+        { ok: false, error: "FORBIDDEN", message: "Encryption settings are owner-only." },
+        { status: 403 }
+      );
+    }
     if (encryptRequested === false) {
       return NextResponse.json(
         { ok: false, error: "ENCRYPTION_REQUIRED", message: "Encryption is mandatory." },
@@ -200,6 +207,23 @@ export async function POST(req: Request) {
         ${wrap.tag}
       )
     `;
+
+    await appendImmutableAudit({
+      streamKey: `doc:${docId}`,
+      action: "doc.upload_initiated",
+      actorUserId: user.id,
+      orgId: user.orgId ?? null,
+      docId,
+      ipHash: ipInfo.ipHash,
+      payload: {
+        encryptionEnabled: true,
+        encAlg,
+        encKeyVersion,
+        contentType,
+        sizeBytes,
+        filename,
+      },
+    });
 
     const expiresIn = 10 * 60;
 

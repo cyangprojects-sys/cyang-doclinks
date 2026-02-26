@@ -213,6 +213,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ toke
   if (!share) return new NextResponse("Not found", { status: 404 });
   const moderation = (share.moderation_status || "active").toLowerCase();
   if (moderation !== "active") return new NextResponse("Unavailable", { status: 404 });
+  const blockedScanStates = new Set(["failed", "error", "infected", "quarantined"]);
+  if (blockedScanStates.has((share.scan_status || "unscanned").toLowerCase())) {
+    return new NextResponse("Unavailable", { status: 404 });
+  }
 
   if (share.revoked_at) return new NextResponse("Revoked", { status: 410 });
   if (isExpired(share.expires_at)) return new NextResponse("Link expired", { status: 410 });
