@@ -115,6 +115,13 @@ function pickFilename(title: string | null, original: string | null, fallback: s
   return base.replace(/[^\w.\- ]+/g, "_");
 }
 
+function parseDisposition(req: NextRequest): "inline" | "attachment" {
+  const url = new URL(req.url);
+  const d = (url.searchParams.get("disposition") || url.searchParams.get("dl") || "").toLowerCase();
+  if (d === "1" || d === "true" || d === "download" || d === "attachment") return "attachment";
+  return "inline";
+}
+
 export async function GET(
   req: NextRequest,
   ctx: { params: Promise<{ alias: string }> }
@@ -151,6 +158,7 @@ export async function GET(
       id: ipKey,
       limit: Number(process.env.RATE_LIMIT_ALIAS_IP_PER_MIN || 90),
       windowSeconds: 60,
+      failClosed: true,
     });
     if (!ipRl.ok) {
       return new Response("Too Many Requests", {
@@ -162,7 +170,7 @@ export async function GET(
       });
     }
 
-    const resolved = await resolveDoc({ docId: row.docId });
+    const resolved = await resolveDoc({ alias });
     if (!resolved.ok) return new Response("Not found", { status: 404 });
 
     if (!resolved.bucket || !resolved.r2Key) {
@@ -171,6 +179,7 @@ export async function GET(
 
     const filename = pickFilename(resolved.title, resolved.originalFilename, alias) + ".pdf";
     const contentType = resolved.contentType || "application/pdf";
+    const disposition = parseDisposition(req);
 // --- Monetization / plan limits (hidden) ---
 // Enforce the document owner's monthly view quota.
 if (shouldCountView(req)) {
@@ -217,7 +226,7 @@ if (shouldCountView(req)) {
         insert into public.doc_views
           (doc_id, alias, path, kind, user_agent, referer, ip_hash, share_token, event_type)
         values
-          (${row.docId}::uuid, ${alias}, ${new URL(req.url).pathname}, 'alias', ${ua}, ${ref}, ${ipHash}, null, 'preview_view')
+          (${row.docId}::uuid, ${alias}, ${new URL(req.url).pathname}, 'alias', ${ua}, ${ref}, ${ipHash}, null, ${disposition === "attachment" ? "file_download" : "preview_view"})
       `;
     } catch {
       await sql`
@@ -239,11 +248,11 @@ if (shouldCountView(req)) {
       docId: row.docId,
       shareToken: null,
       alias,
-      purpose: "preview_view",
+      purpose: disposition === "attachment" ? "file_download" : "preview_view",
       r2Bucket: resolved.bucket,
       r2Key: resolved.r2Key,
       responseContentType: contentType,
-      responseContentDisposition: `inline; filename="${filename}"`,
+      responseContentDisposition: `${disposition}; filename="${filename}"`,
     });
 
     if (!ticketId) {

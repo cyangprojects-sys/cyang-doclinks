@@ -29,7 +29,14 @@ async function tableExists(regclass: string) {
 
 export async function GET(req: NextRequest) {
   try {
-    await requireRole("admin");
+    const enabled =
+      process.env.NODE_ENV !== "production" ||
+      ["1", "true", "yes", "on"].includes(String(process.env.ADMIN_DEBUG_ENABLED || "").trim().toLowerCase());
+    if (!enabled) {
+      return NextResponse.json({ ok: false, error: "NOT_FOUND" }, { status: 404 });
+    }
+
+    await requireRole("owner");
 
     const url = new URL(req.url);
     const alias = (url.searchParams.get("alias") || "").trim();

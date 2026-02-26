@@ -80,6 +80,7 @@ async function throttlePasswordAttempts(args: { token: string; ip: string }): Pr
     id,
     limit: Number(process.env.RATE_LIMIT_PW_PER_MIN || RATE_LIMIT_PER_MIN),
     windowSeconds: 60,
+    failClosed: true,
   });
   if (!rl1.ok) {
     return { ok: false, retryAfterSeconds: rl1.resetSeconds, message: "Too many attempts. Try again soon." };
@@ -91,6 +92,7 @@ async function throttlePasswordAttempts(args: { token: string; ip: string }): Pr
     id,
     limit: Number(process.env.RATE_LIMIT_PW_PER_10MIN || RATE_LIMIT_PER_10MIN),
     windowSeconds: 600,
+    failClosed: true,
   });
   if (!rl2.ok) {
     return { ok: false, retryAfterSeconds: rl2.resetSeconds, message: "Too many attempts. Please wait a bit and try again." };
@@ -201,7 +203,7 @@ export async function verifySharePasswordCore(
           values (${token}, ${ipHash})
         `;
     } catch {
-        // If attempts table missing, don’t block unlock.
+        return { ok: false, error: "rate_limited", message: "Password verification is temporarily unavailable." };
     }
 
     const match = await bcrypt.compare(password, passwordHash);

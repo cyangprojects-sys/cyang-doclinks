@@ -31,11 +31,15 @@ function bucketFor(windowSeconds: number, epochSeconds: number): number {
 }
 
 export function stableHash(input: string, saltEnv: string = "VIEW_SALT"): string {
-  const salt = (process.env[saltEnv] || process.env.VIEW_SALT || "").trim();
+  const salt = (process.env[saltEnv] || process.env.VIEW_SALT || process.env.NEXTAUTH_SECRET || "").trim();
   if (!salt) {
-    // Fall back to an unhashed-but-shortened value if salt is missing.
-    // This is still safe-ish (not PII expansion) but less ideal.
-    return (input || "unknown").slice(0, 64);
+    const allowInsecureFallback =
+      String(process.env.DEV_ALLOW_INSECURE_FALLBACK || "").trim() === "1" &&
+      process.env.NODE_ENV !== "production";
+    if (allowInsecureFallback) {
+      return crypto.createHash("sha256").update(input || "").digest("hex").slice(0, 32);
+    }
+    throw new Error("Missing hashing secret (set VIEW_SALT or NEXTAUTH_SECRET).");
   }
   return crypto.createHmac("sha256", salt).update(input || "").digest("hex").slice(0, 32);
 }
@@ -45,6 +49,7 @@ export async function rateLimit(args: {
   id: string;
   limit: number;
   windowSeconds: number;
+  failClosed?: boolean;
 }): Promise<RateLimitResult> {
   const limit = Math.max(1, Math.floor(args.limit));
   const windowSeconds = Math.max(1, Math.floor(args.windowSeconds));
@@ -76,7 +81,17 @@ export async function rateLimit(args: {
       count,
     };
   } catch {
-    // If the table is missing or DB is unavailable, fail open.
+    // If the table is missing or DB is unavailable, optionally fail closed.
+    if (args.failClosed) {
+      return {
+        ok: false,
+        limit,
+        remaining: 0,
+        resetSeconds: windowSeconds,
+        bucket,
+        count: limit + 1,
+      };
+    }
     return {
       ok: true,
       limit,

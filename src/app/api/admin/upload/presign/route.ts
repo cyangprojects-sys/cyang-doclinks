@@ -60,6 +60,7 @@ export async function POST(req: Request) {
       windowSeconds: 60,
       actorUserId: user.id,
       orgId: user.orgId ?? null,
+      strict: true,
     });
     if (!globalRl.ok) {
       return NextResponse.json(
@@ -76,6 +77,7 @@ export async function POST(req: Request) {
       windowSeconds: 60,
       actorUserId: user.id,
       orgId: user.orgId ?? null,
+      strict: true,
     });
     if (!presignRl.ok) {
       await logSecurityEvent({

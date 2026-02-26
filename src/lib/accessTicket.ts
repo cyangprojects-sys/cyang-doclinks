@@ -11,8 +11,15 @@ function bindingSecret() {
   const authSecret = (process.env.NEXTAUTH_SECRET || "").trim();
   if (authSecret) return authSecret;
 
-  // Last-resort fallback keeps binding enabled even if env is incomplete.
-  return "ticket-bind-fallback-v1";
+  const allowInsecureFallback =
+    process.env.NODE_ENV !== "production" &&
+    String(process.env.DEV_ALLOW_INSECURE_FALLBACK || "").trim() === "1";
+
+  if (allowInsecureFallback) {
+    return "dev-only-ticket-bind-fallback";
+  }
+
+  throw new Error("Missing VIEW_SALT or NEXTAUTH_SECRET for access ticket binding.");
 }
 
 function hmacHex(value: string) {

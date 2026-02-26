@@ -1,6 +1,7 @@
 // src/app/org/[slug]/auth/[provider]/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { ORG_COOKIE_NAME } from "@/lib/tenant";
+import { getOrgBySlug } from "@/lib/orgs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,6 +19,11 @@ export async function GET(req: NextRequest, ctx: RouteCtx) {
   const provider = String(params?.provider || "").trim();
 
   if (!slug) {
+    return NextResponse.redirect(new URL("/login", req.url));
+  }
+
+  const org = await getOrgBySlug(slug);
+  if (!org) {
     return NextResponse.redirect(new URL("/login", req.url));
   }
 

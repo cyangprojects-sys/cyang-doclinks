@@ -4,6 +4,7 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { HeadObjectCommand } from "@aws-sdk/client-s3";
 import { GetObjectCommand } from "@aws-sdk/client-s3";
+import { DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { validatePdfBuffer, validatePdfInR2 } from "@/lib/pdfSafety";
 import { sql } from "@/lib/db";
 import { slugify } from "@/lib/slug";
@@ -43,6 +44,7 @@ export async function POST(req: NextRequest) {
       scope: "ip:api",
       limit: Number(process.env.RATE_LIMIT_API_IP_PER_MIN || 240),
       windowSeconds: 60,
+      strict: true,
     });
     if (!globalRl.ok) {
       return NextResponse.json(
@@ -58,6 +60,7 @@ export async function POST(req: NextRequest) {
       scope: "ip:upload_complete",
       limit: Number(process.env.RATE_LIMIT_UPLOAD_COMPLETE_IP_PER_MIN || 30),
       windowSeconds: 60,
+      strict: true,
     });
     if (!completeRl.ok) {
       await logSecurityEvent({
@@ -151,6 +154,27 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: "bucket_mismatch" }, { status: 409 });
     }
 
+    const cleanupRejectedObject = async (reason: string, meta?: Record<string, unknown>) => {
+      try {
+        await r2Client.send(
+          new DeleteObjectCommand({
+            Bucket: docBucket,
+            Key: docKey,
+          })
+        );
+      } catch (e: any) {
+        await logSecurityEvent({
+          type: "upload_complete_cleanup_failed",
+          severity: "high",
+          ip: ipInfo.ip,
+          docId,
+          scope: "upload_complete",
+          message: "Failed to delete rejected object from R2",
+          meta: { reason, error: String(e?.message || e), ...(meta || {}) },
+        });
+      }
+    };
+
     // 3) Verify the object exists in R2 and matches expected constraints.
     // This closes the bypass where a client can lie about size/type during presign.
     const absMax = Number(process.env.UPLOAD_ABSOLUTE_MAX_BYTES || 1_000_000_000); // ~1GB default
@@ -209,6 +233,7 @@ export async function POST(req: NextRequest) {
     const meta = ((head as any)?.Metadata ?? {}) as Record<string, string>;
 
     if (!Number.isFinite(contentLength) || contentLength <= 0) {
+      await cleanupRejectedObject("invalid_object", { contentLength });
       return NextResponse.json({ ok: false, error: "invalid_object" }, { status: 409 });
     }
     if (Number.isFinite(absMax) && absMax > 0 && contentLength > absMax) {
@@ -221,6 +246,7 @@ export async function POST(req: NextRequest) {
         message: "Uploaded object exceeds absolute max",
         meta: { contentLength, absMax },
       });
+      await cleanupRejectedObject("object_too_large", { contentLength, absMax });
       return NextResponse.json({ ok: false, error: "object_too_large" }, { status: 413 });
     }
 
@@ -240,6 +266,7 @@ export async function POST(req: NextRequest) {
           message: "Uploaded object size mismatch",
           meta: { expectedPlain, contentLength, encryptionEnabled },
         });
+        await cleanupRejectedObject("size_mismatch", { expectedPlain, contentLength, encryptionEnabled });
         return NextResponse.json({ ok: false, error: "size_mismatch" }, { status: 409 });
       }
     }
@@ -257,6 +284,7 @@ export async function POST(req: NextRequest) {
         scope: "upload_complete",
         message: "R2 object metadata doc-id missing",
       });
+      await cleanupRejectedObject("metadata_missing");
       return NextResponse.json({ ok: false, error: "metadata_missing" }, { status: 409 });
     }
 
@@ -270,6 +298,7 @@ export async function POST(req: NextRequest) {
         message: "R2 object metadata doc-id mismatch",
         meta: { metaDocId, docId },
       });
+      await cleanupRejectedObject("metadata_mismatch", { metaDocId, docId });
       return NextResponse.json({ ok: false, error: "metadata_mismatch" }, { status: 409 });
     }
 
@@ -284,6 +313,7 @@ export async function POST(req: NextRequest) {
         message: "R2 metadata orig-content-type is not application/pdf",
         meta: { metaOrigCt, ct },
       });
+      await cleanupRejectedObject("not_pdf", { metaOrigCt, contentType: ct });
       return NextResponse.json({ ok: false, error: "not_pdf" }, { status: 409 });
     }
 
@@ -298,6 +328,7 @@ export async function POST(req: NextRequest) {
           message: "Encrypted object content-type must be application/octet-stream",
           meta: { contentType: ct },
         });
+        await cleanupRejectedObject("invalid_content_type", { encryptionEnabled: true, contentType: ct });
         return NextResponse.json({ ok: false, error: "invalid_content_type" }, { status: 409 });
       }
     } else if (ct && ct !== "application/pdf") {
@@ -310,6 +341,7 @@ export async function POST(req: NextRequest) {
         message: "Unencrypted object content-type must be application/pdf",
         meta: { contentType: ct },
       });
+      await cleanupRejectedObject("invalid_content_type", { encryptionEnabled: false, contentType: ct });
       return NextResponse.json({ ok: false, error: "invalid_content_type" }, { status: 409 });
     }
 
@@ -341,6 +373,7 @@ export async function POST(req: NextRequest) {
           message: "PDF validation failed",
           meta: { error: safety.error, message: safety.message, details: safety.details ?? null },
         });
+        await cleanupRejectedObject("pdf_validation_failed", { error: safety.error });
         return NextResponse.json({ ok: false, error: safety.error, message: safety.message }, { status: 409 });
       }
 
@@ -365,6 +398,7 @@ export async function POST(req: NextRequest) {
           scope: "upload_complete",
           message: "Encrypted upload missing key metadata",
         });
+        await cleanupRejectedObject("encryption_metadata_missing");
         return NextResponse.json({ ok: false, error: "encryption_metadata_missing" }, { status: 409 });
       }
 
@@ -400,6 +434,7 @@ export async function POST(req: NextRequest) {
           message: "Encrypted upload could not be decrypted for validation",
           meta: { error: String(e?.message || e) },
         });
+        await cleanupRejectedObject("decrypt_failed", { error: String(e?.message || e) });
         return NextResponse.json({ ok: false, error: "decrypt_failed" }, { status: 409 });
       }
 
@@ -418,6 +453,7 @@ export async function POST(req: NextRequest) {
           message: "PDF validation failed after decrypt",
           meta: { error: safety.error, message: safety.message, details: safety.details ?? null },
         });
+        await cleanupRejectedObject("pdf_validation_failed_after_decrypt", { error: safety.error });
         return NextResponse.json({ ok: false, error: safety.error, message: safety.message }, { status: 409 });
       }
 

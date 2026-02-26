@@ -261,7 +261,7 @@ export default async function SharePage({
     return (
       <main className="mx-auto max-w-5xl px-4 py-10">
         <ShareForm docId={bypass.docId} />
-        <DocumentViewer docId={bypass.docId} alias={alias} availabilityHint={availabilityHint} />
+        <DocumentViewer alias={alias} availabilityHint={availabilityHint} />
       </main>
     );
   }
@@ -288,20 +288,19 @@ export default async function SharePage({
     }
   }
 
-  const resolved = await resolveDoc({ docId: row.docId });
+  const resolved = await resolveDoc({ alias });
   if (!resolved.ok) notFound();
 
   return (
-        <main className="mx-auto max-w-5xl px-4 py-10">
-      <DocumentViewer docId={resolved.docId} alias={alias} />
+    <main className="mx-auto max-w-5xl px-4 py-10">
+      <DocumentViewer alias={alias} />
     </main>
   );
 }
 
-function DocumentViewer({ docId, alias, availabilityHint }: { docId: string; alias: string; availabilityHint?: string | null }) {
-  const viewerUrl = `/serve/${docId}?alias=${encodeURIComponent(alias)}`;
-
-  const downloadUrl = `/serve/${docId}?alias=${encodeURIComponent(alias)}&disposition=attachment`;
+function DocumentViewer({ alias, availabilityHint }: { alias: string; availabilityHint?: string | null }) {
+  const viewerUrl = `/d/${encodeURIComponent(alias)}/raw`;
+  const downloadUrl = `/d/${encodeURIComponent(alias)}/raw?disposition=attachment`;
 
   return (
     <div className="mt-4">

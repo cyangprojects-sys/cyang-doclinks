@@ -5,7 +5,7 @@ import { cookies } from "next/headers";
 import { authOptions } from "@/auth";
 import { sql } from "@/lib/db";
 import { ORG_COOKIE_NAME } from "@/lib/tenant";
-import { getOrgBySlug } from "@/lib/orgs";
+import { getOrgBySlug, orgAllowsEmail } from "@/lib/orgs";
 
 export type Role = "viewer" | "admin" | "owner";
 
@@ -32,9 +32,18 @@ function roleRank(role: Role): number {
   }
 }
 
-function ownerEmailFromEnv(): string | null {
-  const owner = normEmail(process.env.OWNER_EMAIL || "");
-  return owner ? owner : null;
+function ownerEmailSetFromEnv(): Set<string> {
+  const single = normEmail(process.env.OWNER_EMAIL || "");
+  const list = String(process.env.OWNER_EMAILS || "").trim();
+  const set = new Set<string>();
+  if (single) set.add(single);
+  if (list) {
+    for (const part of list.split(",")) {
+      const email = normEmail(part);
+      if (email) set.add(email);
+    }
+  }
+  return set;
 }
 
 /**
@@ -42,7 +51,8 @@ function ownerEmailFromEnv(): string | null {
  * Some older code wraps this in an async function, so this is intentionally sync.
  */
 export function getOwnerEmail(): string {
-  return ownerEmailFromEnv() ?? "";
+  const set = ownerEmailSetFromEnv();
+  return set.values().next().value ?? "";
 }
 
 /**
@@ -102,8 +112,8 @@ export async function ensureUserByEmail(emailRaw: string, ctx: EnsureUserCtx): P
   const email = normEmail(emailRaw);
   if (!email) throw new Error("UNAUTHENTICATED");
 
-  const ownerEmail = ownerEmailFromEnv();
-  const desiredRole: Role = ownerEmail && email === ownerEmail ? "owner" : "viewer";
+  const ownerEmails = ownerEmailSetFromEnv();
+  const desiredRole: Role = ownerEmails.has(email) ? "owner" : "viewer";
 
   // Resolve org if possible
   let orgId = ctx.orgId ?? null;
@@ -111,8 +121,14 @@ export async function ensureUserByEmail(emailRaw: string, ctx: EnsureUserCtx): P
 
   if (!orgId && orgSlug && (await organizationsTableExists())) {
     const org = await getOrgBySlug(orgSlug);
-    orgId = org?.id ?? null;
-    orgSlug = org?.slug ?? orgSlug;
+    if (!org) {
+      throw new Error("ORG_NOT_FOUND");
+    }
+    if (!orgAllowsEmail(org, email)) {
+      throw new Error("ORG_DOMAIN_BLOCKED");
+    }
+    orgId = org.id;
+    orgSlug = org.slug;
   }
 
   if (!orgId) {
@@ -188,6 +204,12 @@ export async function ensureUserByEmail(emailRaw: string, ctx: EnsureUserCtx): P
 
     if (msg.includes("org_mismatch")) {
       throw new Error("This email is already bound to a different organization.");
+    }
+    if (msg.includes("org_not_found")) {
+      throw new Error("Organization not found.");
+    }
+    if (msg.includes("org_domain_blocked")) {
+      throw new Error("Email domain is not allowed for this organization.");
     }
 
     if (msg.includes("relation") && msg.includes("users") && msg.includes("does not exist")) {

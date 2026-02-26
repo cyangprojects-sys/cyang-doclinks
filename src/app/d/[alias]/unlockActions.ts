@@ -152,6 +152,7 @@ export async function verifyAliasPasswordResultAction(formData: FormData): Promi
             id,
             limit: Number(process.env.RATE_LIMIT_ALIAS_PW_PER_MIN || 10),
             windowSeconds: 60,
+            failClosed: true,
         });
         if (!rl1.ok) return { ok: false, error: "bad_password", message: "Too many attempts. Try again soon." };
 
@@ -160,10 +161,11 @@ export async function verifyAliasPasswordResultAction(formData: FormData): Promi
             id,
             limit: Number(process.env.RATE_LIMIT_ALIAS_PW_PER_10MIN || 25),
             windowSeconds: 600,
+            failClosed: true,
         });
         if (!rl2.ok) return { ok: false, error: "bad_password", message: "Too many attempts. Please wait and try again." };
     } catch {
-        // fail open
+        return { ok: false, error: "bad_password", message: "Password verification is temporarily unavailable." };
     }
 
     const match = await bcrypt.compare(password, row.passwordHash);

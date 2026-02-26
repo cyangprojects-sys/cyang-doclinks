@@ -69,6 +69,7 @@ export async function GET(
     scope: "ip:ticket",
     limit: Number(process.env.RATE_LIMIT_TICKET_IP_PER_MIN || 240),
     windowSeconds: 60,
+    strict: true,
   });
   if (!ticketRl.ok) {
     return new NextResponse("Too Many Requests", {

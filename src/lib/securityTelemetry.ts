@@ -134,8 +134,9 @@ export async function enforceGlobalApiRateLimit(args: {
   windowSeconds: number;
   actorUserId?: string | null;
   orgId?: string | null;
+  strict?: boolean;
 }) {
-  const { req, scope, limit, windowSeconds, actorUserId, orgId } = args;
+  const { req, scope, limit, windowSeconds, actorUserId, orgId, strict } = args;
   const { ip, ipHash } = clientIpKey(req);
 
   const rl = await rateLimit({
@@ -143,6 +144,7 @@ export async function enforceGlobalApiRateLimit(args: {
     id: ipHash,
     limit,
     windowSeconds,
+    failClosed: Boolean(strict),
   });
 
   const retryAfterSeconds = Math.max(1, rl.resetSeconds);

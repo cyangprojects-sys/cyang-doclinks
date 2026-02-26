@@ -13,6 +13,7 @@ import { emitWebhook } from "@/lib/webhooks";
 import { geoDecisionForRequest, getCountryFromHeaders } from "@/lib/geo";
 import { assertCanServeView, incrementMonthlyViews } from "@/lib/monetization";
 import { enforcePlanLimitsEnabled } from "@/lib/billingFlags";
+import { getAuthedUser, roleAtLeast } from "@/lib/authz";
 
 function getClientIp(req: NextRequest) {
   const xff = req.headers.get("x-forwarded-for") || "";
@@ -38,21 +39,40 @@ function parseDisposition(req: NextRequest): "inline" | "attachment" {
 
 export async function GET(req: NextRequest, ctx: { params: Promise<{ docId: string }> }) {
   const { docId } = await ctx.params;
-  const resolved = await resolveDoc({ docId });
+  const url = new URL(req.url);
+  const aliasParam = (url.searchParams.get("alias") || "").trim() || null;
+  const tokenParam = (url.searchParams.get("token") || "").trim() || null;
+
+  let resolved;
+  if (tokenParam) {
+    resolved = await resolveDoc({ token: tokenParam });
+  } else if (aliasParam) {
+    resolved = await resolveDoc({ alias: aliasParam });
+  } else {
+    // Direct /serve/{docId} access is reserved for privileged first-party users.
+    const u = await getAuthedUser();
+    if (!u || !roleAtLeast(u.role, "admin")) {
+      return new Response("Forbidden", { status: 403 });
+    }
+    resolved = await resolveDoc({ docId });
+  }
 
   if (!resolved.ok) {
+    if (resolved.error === "PASSWORD_REQUIRED") {
+      return new Response("Forbidden", { status: 403 });
+    }
+    return new Response("Not found", { status: 404 });
+  }
+
+  // Prevent docId path from becoming a standalone capability.
+  if (resolved.docId !== docId) {
     return new Response("Not found", { status: 404 });
   }
 
   // --- Rate limiting (best-effort) ---
   // 1) Global IP throttling for the serve endpoint
   // 2) Optional token abuse protection if a share token is provided
-  const url = new URL(req.url);
-  const alias = url.searchParams.get("alias");
-  const token = url.searchParams.get("token");
   const ip = getClientIpFromHeaders(req.headers) || "";
-  const aliasParam = (alias || "").trim() || null;
-  const tokenParam = (token || "").trim() || null;
   const ipHash = hashIp(ip);
   const dispositionForLog = parseDisposition(req);
   const ipKey = stableHash(ip, "VIEW_SALT");
@@ -69,6 +89,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ docId: stri
     id: ipKey,
     limit: Number(process.env.RATE_LIMIT_SERVE_IP_PER_MIN || 120),
     windowSeconds: 60,
+    failClosed: true,
   });
 
   if (!ipRl.ok) {
@@ -81,12 +102,13 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ docId: stri
     });
   }
 
-  if (token) {
+  if (tokenParam) {
     const tokenRl = await rateLimit({
       scope: "token:serve",
-      id: stableHash(String(token), "VIEW_SALT"),
+      id: stableHash(String(tokenParam), "VIEW_SALT"),
       limit: Number(process.env.RATE_LIMIT_SERVE_TOKEN_PER_MIN || 240),
       windowSeconds: 60,
+      failClosed: true,
     });
     if (!tokenRl.ok) {
       return new Response("Too Many Requests", {
@@ -129,7 +151,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ docId: stri
     // 1) High-level audit trail (writes to doc_audit if present)
     await logDocAccess({
       docId: resolved.docId,
-      alias: alias || null,
+      alias: aliasParam,
       shareId: null,
       emailUsed: null,
       ip,
@@ -141,7 +163,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ docId: stri
     try {
       await sql`
         insert into public.doc_access_log (doc_id, alias, token, ip, user_agent)
-        values (${resolved.docId}::uuid, ${alias || null}, ${token || null}, ${ip || null}, ${userAgent || null})
+        values (${resolved.docId}::uuid, ${aliasParam}, ${tokenParam}, ${ip || null}, ${userAgent || null})
       `;
 
       emitWebhook("doc.viewed", {
@@ -167,8 +189,6 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ docId: stri
     const ipHash = hashIp(ip);
     const ua = req.headers.get("user-agent") || null;
     const ref = req.headers.get("referer") || null;
-    const aliasParam = url.searchParams.get("alias") || null;
-    const tokenParam = url.searchParams.get("token") || null;
 
     // Try newer schema first (share_token + event_type). Fall back to legacy schema.
     try {
@@ -208,8 +228,8 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ docId: stri
   const ticketId = await mintAccessTicket({
     req,
     docId: resolved.docId,
-    shareToken: url.searchParams.get("token") || null,
-    alias: url.searchParams.get("alias") || null,
+    shareToken: tokenParam,
+    alias: aliasParam,
     purpose: disposition === "attachment" ? "file_download" : "preview_view",
     r2Bucket: resolved.bucket,
     r2Key: resolved.r2Key,
