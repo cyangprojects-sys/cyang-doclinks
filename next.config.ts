@@ -10,7 +10,10 @@ const isProd = process.env.NODE_ENV === "production";
 function cspValue(frameAncestors: string) {
   // Keep this CSP compatible with Next.js + PDF rendering.
   // We allow https: for images/connect (e.g., fonts/analytics) and blob: for PDF rendering.
-  // "unsafe-eval" is included to avoid accidental breakage (some builds/tooling may rely on it).
+  // Keep dev permissive enough for local tooling; production drops unsafe-eval.
+  const scriptSrc = isProd
+    ? "script-src 'self' 'unsafe-inline' https:"
+    : "script-src 'self' 'unsafe-inline' 'unsafe-eval' https:";
   const parts = [
     "default-src 'self'",
     "base-uri 'self'",
@@ -21,7 +24,7 @@ function cspValue(frameAncestors: string) {
     "media-src 'self' blob:",
     "font-src 'self' data: https:",
     "connect-src 'self' https:",
-    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https:",
+    scriptSrc,
     "style-src 'self' 'unsafe-inline' https:",
   ];
 
