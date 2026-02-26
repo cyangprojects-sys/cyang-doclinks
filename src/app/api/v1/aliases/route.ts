@@ -5,9 +5,11 @@ import { NextResponse, type NextRequest } from "next/server";
 import { sql } from "@/lib/db";
 import { verifyApiKeyFromRequest } from "@/lib/apiAuth";
 import { emitWebhook } from "@/lib/webhooks";
-import { enforceGlobalApiRateLimit } from "@/lib/securityTelemetry";
+import { clientIpKey, enforceGlobalApiRateLimit } from "@/lib/securityTelemetry";
+import { appendImmutableAudit } from "@/lib/immutableAudit";
 
 export async function POST(req: NextRequest) {
+  const ipInfo = clientIpKey(req);
   const rl = await enforceGlobalApiRateLimit({
     req,
     scope: "ip:api",
@@ -58,6 +60,18 @@ export async function POST(req: NextRequest) {
   `;
 
   emitWebhook("alias.created", { alias, doc_id: docId, created_via: "api" });
+  await appendImmutableAudit({
+    streamKey: `doc:${docId}`,
+    action: "doc.alias_created",
+    actorUserId: auth.ownerId,
+    docId,
+    subjectId: alias,
+    ipHash: ipInfo.ipHash,
+    payload: {
+      alias,
+      via: "api",
+    },
+  });
 
   return NextResponse.json({ ok: true, alias, doc_id: docId });
 }
