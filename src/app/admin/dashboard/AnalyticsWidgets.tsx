@@ -32,6 +32,7 @@ export default async function AnalyticsWidgets({ ownerId }: { ownerId?: string; 
   const hasDocAliases = await tableExists("public.doc_aliases");
   const hasSecurityEvents = await tableExists("public.security_events");
   const hasScanJobs = await tableExists("public.malware_scan_jobs");
+  const hasBackupRuns = await tableExists("public.backup_runs");
 
   const ownerFilterDocs = ownerId ? sql`and d.owner_id = ${ownerId}::uuid` : sql``;
   const ownerFilterShares = ownerId ? sql`and st.owner_id = ${ownerId}::uuid` : sql``;
@@ -222,6 +223,14 @@ export default async function AnalyticsWidgets({ ownerId }: { ownerId?: string; 
   let presignErrors24h = 0;
   let abuseSpikes24h = 0;
   let deadLetterBacklog = 0;
+  let cronRuns24h = 0;
+  let cronFailures24h = 0;
+  let cronFreshHealthy = 0;
+  let cronFreshTotal = 0;
+  let backupLastStatus: string | null = null;
+  let backupHoursSinceLastSuccess: number | null = null;
+  let backupFreshOk = false;
+  let topSecurityTypes: Array<{ type: string; c: number }> = [];
 
   if (hasSecurityEvents) {
     try {
@@ -254,6 +263,89 @@ export default async function AnalyticsWidgets({ ownerId }: { ownerId?: string; 
       deadLetterAlerts24h = Number(rows?.[0]?.dead_letter_alerts ?? 0);
       presignErrors24h = Number(rows?.[0]?.presign_errors ?? 0);
       abuseSpikes24h = Number(rows?.[0]?.abuse_spikes ?? 0);
+    } catch {
+      // ignore
+    }
+
+    try {
+      const rows = (await sql`
+        select
+          coalesce(sum(case when se.type in ('cron_run_ok','cron_run_failed') then 1 else 0 end), 0)::int as runs,
+          coalesce(sum(case when se.type = 'cron_run_failed' then 1 else 0 end), 0)::int as failures
+        from public.security_events se
+        where se.created_at > now() - interval '24 hours'
+          ${ownerId
+            ? sql`and (se.actor_user_id = ${ownerId}::uuid or se.actor_user_id is null)`
+            : sql``}
+      `) as unknown as Array<{ runs: number; failures: number }>;
+      cronRuns24h = Number(rows?.[0]?.runs ?? 0);
+      cronFailures24h = Number(rows?.[0]?.failures ?? 0);
+    } catch {
+      // ignore
+    }
+
+    try {
+      topSecurityTypes = (await sql`
+        select
+          se.type::text as type,
+          count(*)::int as c
+        from public.security_events se
+        where se.created_at > now() - interval '24 hours'
+        group by se.type
+        order by c desc, se.type asc
+        limit 5
+      `) as unknown as Array<{ type: string; c: number }>;
+    } catch {
+      topSecurityTypes = [];
+    }
+  }
+
+  if (hasSecurityEvents) {
+    try {
+      const expectedJobs = ["webhooks", "scan", "key-rotation", "aggregate", "nightly", "retention"];
+      const rows = (await sql`
+        select
+          coalesce(se.meta->>'job', '')::text as job,
+          max(se.created_at)::text as last_run
+        from public.security_events se
+        where se.type = 'cron_run_ok'
+          and se.created_at > now() - interval '6 hours'
+          and coalesce(se.meta->>'job', '') <> ''
+        group by coalesce(se.meta->>'job', '')
+      `) as unknown as Array<{ job: string; last_run: string }>;
+      const seen = new Set(rows.map((r) => r.job));
+      cronFreshTotal = expectedJobs.length;
+      cronFreshHealthy = expectedJobs.filter((j) => seen.has(j)).length;
+    } catch {
+      // ignore
+    }
+  }
+
+  if (hasBackupRuns) {
+    try {
+      const rows = (await sql`
+        select status::text as status
+        from public.backup_runs
+        order by created_at desc
+        limit 1
+      `) as unknown as Array<{ status: string }>;
+      backupLastStatus = rows?.[0]?.status ?? null;
+    } catch {
+      // ignore
+    }
+    try {
+      const rows = (await sql`
+        select
+          extract(epoch from (now() - max(created_at))) / 3600.0 as hours_since
+        from public.backup_runs
+        where status in ('ok', 'success')
+      `) as unknown as Array<{ hours_since: number | string | null }>;
+      const h = rows?.[0]?.hours_since;
+      backupHoursSinceLastSuccess = h == null ? null : Number(h);
+      backupFreshOk =
+        backupHoursSinceLastSuccess != null &&
+        Number.isFinite(backupHoursSinceLastSuccess) &&
+        backupHoursSinceLastSuccess <= Number(process.env.BACKUP_MAX_AGE_HOURS || 30);
     } catch {
       // ignore
     }
@@ -373,6 +465,54 @@ export default async function AnalyticsWidgets({ ownerId }: { ownerId?: string; 
             </div>
           </div>
           <div className="mt-3 text-xs text-neutral-400">Dead-letter backlog: {fmtInt(deadLetterBacklog)}</div>
+        </div>
+
+        <div className="rounded-2xl border border-neutral-800 bg-neutral-950 p-4 shadow-sm">
+          <div className="text-xs text-neutral-400">Ops readiness (24h)</div>
+          <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
+            <div>
+              <div className="text-xl font-semibold text-neutral-100">{fmtInt(cronRuns24h)}</div>
+              <div className="text-xs text-neutral-400">Cron runs</div>
+            </div>
+            <div>
+              <div className="text-xl font-semibold text-neutral-100">{fmtInt(cronFailures24h)}</div>
+              <div className="text-xs text-neutral-400">Cron failures</div>
+            </div>
+            <div>
+              <div className="text-xl font-semibold text-neutral-100">
+                {cronFreshHealthy}/{cronFreshTotal || 6}
+              </div>
+              <div className="text-xs text-neutral-400">Fresh cron jobs (6h)</div>
+            </div>
+            <div>
+              <div className="text-xl font-semibold text-neutral-100">
+                {backupLastStatus || "n/a"}
+              </div>
+              <div className="text-xs text-neutral-400">Last backup status</div>
+            </div>
+          </div>
+          <div className="mt-3 text-xs text-neutral-400">
+            Backup freshness:{" "}
+            <span className={backupFreshOk ? "text-emerald-300" : "text-amber-300"}>
+              {backupHoursSinceLastSuccess == null ? "unknown" : `${backupHoursSinceLastSuccess.toFixed(1)}h`}
+            </span>
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-neutral-800 bg-neutral-950 p-4 shadow-sm">
+          <div className="text-xs text-neutral-400">Top security events (24h)</div>
+          <ol className="mt-2 space-y-1 text-sm">
+            {topSecurityTypes.length ? (
+              topSecurityTypes.map((r) => (
+                <li key={r.type} className="flex items-center justify-between gap-2">
+                  <span className="truncate font-mono text-xs text-neutral-200">{r.type}</span>
+                  <span className="shrink-0 text-xs text-neutral-400">{fmtInt(r.c)}</span>
+                </li>
+              ))
+            ) : (
+              <li className="text-xs text-neutral-400">No security events in the last 24 hours.</li>
+            )}
+          </ol>
         </div>
       </div>
     </section>

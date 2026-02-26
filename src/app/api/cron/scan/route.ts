@@ -9,6 +9,7 @@ import { scanR2Object } from "@/lib/malwareScan";
 import { logSecurityEvent, detectScanFailureSpike } from "@/lib/securityTelemetry";
 import { healScanQueue } from "@/lib/scanQueue";
 import { reportException } from "@/lib/observability";
+import { logCronRun } from "@/lib/cronTelemetry";
 
 type Job = {
   id: string;
@@ -25,6 +26,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "UNAUTHORIZED" }, { status: 401 });
   }
 
+  const startedAt = Date.now();
+  try {
   const maxJobs = Math.max(1, Math.min(25, Number(process.env.SCAN_CRON_BATCH || 10)));
   const absMaxBytes = Math.max(1024 * 1024, Number(process.env.SCAN_ABS_MAX_BYTES || 25_000_000)); // default 25MB
   const maxAttempts = Math.max(1, Number(process.env.SCAN_MAX_ATTEMPTS || 5));
@@ -193,5 +196,27 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ ok: true, claimed: jobs.length, queue_health: queueHealth, results });
+  const duration = Date.now() - startedAt;
+  await logCronRun({
+    job: "scan",
+    ok: true,
+    durationMs: duration,
+    meta: {
+      claimed: jobs.length,
+      failed: results.filter((r) => r.ok === false).length,
+      deadLetterBacklog: queueHealth.maxAttemptJobs,
+    },
+  });
+  return NextResponse.json({ ok: true, duration_ms: duration, claimed: jobs.length, queue_health: queueHealth, results });
+  } catch (e: unknown) {
+    const duration = Date.now() - startedAt;
+    const msg = e instanceof Error ? e.message : String(e);
+    await logCronRun({
+      job: "scan",
+      ok: false,
+      durationMs: duration,
+      meta: { error: msg },
+    });
+    return NextResponse.json({ ok: false, error: msg }, { status: 500 });
+  }
 }

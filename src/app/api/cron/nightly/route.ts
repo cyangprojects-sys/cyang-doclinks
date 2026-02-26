@@ -12,6 +12,7 @@ import { processKeyRotationJobs } from "@/lib/keyRotationJobs";
 import { revokeExpiredSharesBatch } from "@/lib/shareLifecycle";
 import { runUsageMaintenance } from "@/lib/usageMaintenance";
 import { logSecurityEvent } from "@/lib/securityTelemetry";
+import { logCronRun } from "@/lib/cronTelemetry";
 
 import { isCronAuthorized } from "@/lib/cronAuth";
 
@@ -29,6 +30,7 @@ export async function GET(req: NextRequest) {
   }
 
   const startedAt = Date.now();
+  try {
 
   // 1) Aggregate daily view counts
   const aggregate = await aggregateDocViewDaily();
@@ -77,10 +79,23 @@ export async function GET(req: NextRequest) {
     });
   }
 
+  const duration = Date.now() - startedAt;
+  await logCronRun({
+    job: "nightly",
+    ok: true,
+    durationMs: duration,
+    meta: {
+      aggregateOk: Boolean((aggregate as any)?.ok),
+      retentionOk: Boolean((retention as any)?.ok),
+      keyRotationProcessed: (key_rotation_jobs as any)?.processed ?? null,
+      revokedExpiredShares: expiredSharesRevoked.revoked,
+      backupStatus: (backup_recovery as any)?.backupStatus ?? null,
+    },
+  });
   return NextResponse.json({
     ok: true,
     now: new Date().toISOString(),
-    duration_ms: Date.now() - startedAt,
+    duration_ms: duration,
     aggregate,
     retention,
     expiration_alerts,
@@ -91,4 +106,15 @@ export async function GET(req: NextRequest) {
     usage_maintenance,
     backup_recovery,
   });
+  } catch (e: unknown) {
+    const duration = Date.now() - startedAt;
+    const msg = e instanceof Error ? e.message : String(e);
+    await logCronRun({
+      job: "nightly",
+      ok: false,
+      durationMs: duration,
+      meta: { error: msg },
+    });
+    return NextResponse.json({ ok: false, error: msg }, { status: 500 });
+  }
 }

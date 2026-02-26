@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse, type NextRequest } from "next/server";
 import { processWebhookDeliveries } from "@/lib/webhooks";
+import { logCronRun } from "@/lib/cronTelemetry";
 
 function isAuthorized(req: NextRequest): boolean {
   const secret = (process.env.CRON_SECRET || "").trim();
@@ -30,11 +31,33 @@ export async function GET(req: NextRequest) {
   }
 
   const startedAt = Date.now();
-  const res = await processWebhookDeliveries({ maxBatch: 25, maxAttempts: 8 });
-
-  return NextResponse.json({
-    ...res,
-    now: new Date().toISOString(),
-    duration_ms: Date.now() - startedAt,
-  });
+  try {
+    const res = await processWebhookDeliveries({ maxBatch: 25, maxAttempts: 8 });
+    const duration = Date.now() - startedAt;
+    await logCronRun({
+      job: "webhooks",
+      ok: true,
+      durationMs: duration,
+      meta: {
+        attempted: (res as any)?.attempted ?? null,
+        delivered: (res as any)?.delivered ?? null,
+        failed: (res as any)?.failed ?? null,
+      },
+    });
+    return NextResponse.json({
+      ...res,
+      now: new Date().toISOString(),
+      duration_ms: duration,
+    });
+  } catch (e: unknown) {
+    const duration = Date.now() - startedAt;
+    const msg = e instanceof Error ? e.message : String(e);
+    await logCronRun({
+      job: "webhooks",
+      ok: false,
+      durationMs: duration,
+      meta: { error: msg },
+    });
+    return NextResponse.json({ ok: false, error: msg }, { status: 500 });
+  }
 }

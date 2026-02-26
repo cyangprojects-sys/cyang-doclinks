@@ -4,6 +4,7 @@ export const dynamic = "force-dynamic";
 import { NextResponse, type NextRequest } from "next/server";
 import { runRetention } from "@/lib/retention";
 import { isCronAuthorized } from "@/lib/cronAuth";
+import { logCronRun } from "@/lib/cronTelemetry";
 
 export async function GET(req: NextRequest) {
   if (!isCronAuthorized(req)) {
@@ -19,12 +20,30 @@ export async function GET(req: NextRequest) {
   }
 
   const startedAt = Date.now();
-  const retention = await runRetention();
-
-  return NextResponse.json({
-    ok: true,
-    now: new Date().toISOString(),
-    duration_ms: Date.now() - startedAt,
-    retention,
-  });
+  try {
+    const retention = await runRetention();
+    const duration = Date.now() - startedAt;
+    await logCronRun({
+      job: "retention",
+      ok: true,
+      durationMs: duration,
+      meta: { retention },
+    });
+    return NextResponse.json({
+      ok: true,
+      now: new Date().toISOString(),
+      duration_ms: duration,
+      retention,
+    });
+  } catch (e: unknown) {
+    const duration = Date.now() - startedAt;
+    const msg = e instanceof Error ? e.message : String(e);
+    await logCronRun({
+      job: "retention",
+      ok: false,
+      durationMs: duration,
+      meta: { error: msg },
+    });
+    return NextResponse.json({ ok: false, error: msg }, { status: 500 });
+  }
 }
