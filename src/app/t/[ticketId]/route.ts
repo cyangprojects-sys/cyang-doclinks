@@ -16,6 +16,17 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
+function secureDocHeaders(extra?: Record<string, string>): Record<string, string> {
+  return {
+    "Cache-Control": "private, no-store, max-age=0",
+    Pragma: "no-cache",
+    Expires: "0",
+    "X-Content-Type-Options": "nosniff",
+    "Referrer-Policy": "no-referrer",
+    ...(extra || {}),
+  };
+}
+
 function toWebStream(body: any): ReadableStream<Uint8Array> {
   // AWS SDK v3 in Node returns a Node.js Readable stream.
   // NextResponse expects a web stream (or a Blob/Buffer).
@@ -62,7 +73,7 @@ export async function GET(
   if (!ticketRl.ok) {
     return new NextResponse("Too Many Requests", {
       status: ticketRl.status,
-      headers: { "Retry-After": String(ticketRl.retryAfterSeconds), "Cache-Control": "private, no-store" },
+      headers: secureDocHeaders({ "Retry-After": String(ticketRl.retryAfterSeconds) }),
     });
   }
 
@@ -78,7 +89,7 @@ export async function GET(
     });
     return new NextResponse("Not found", {
       status: 404,
-      headers: { "Cache-Control": "private, no-store" },
+      headers: secureDocHeaders(),
     });
   }
 
@@ -101,19 +112,19 @@ export async function GET(
       const scanStatus = (row?.scan_status || "unscanned").toLowerCase();
 
       if (moderation === "deleted" || moderation === "disabled") {
-        return new NextResponse("Unavailable", { status: 404, headers: { "Cache-Control": "private, no-store" } });
+        return new NextResponse("Unavailable", { status: 404, headers: secureDocHeaders() });
       }
       if (moderation === "quarantined") {
         const override = await hasActiveQuarantineOverride(t.doc_id);
         if (!override) {
-          return new NextResponse("Unavailable", { status: 404, headers: { "Cache-Control": "private, no-store" } });
+          return new NextResponse("Unavailable", { status: 404, headers: secureDocHeaders() });
         }
       }
       if (blockedScanStates.has(scanStatus)) {
-        return new NextResponse("Unavailable", { status: 404, headers: { "Cache-Control": "private, no-store" } });
+        return new NextResponse("Unavailable", { status: 404, headers: secureDocHeaders() });
       }
     } catch {
-      return new NextResponse("Unavailable", { status: 404, headers: { "Cache-Control": "private, no-store" } });
+      return new NextResponse("Unavailable", { status: 404, headers: secureDocHeaders() });
     }
   }
 
@@ -243,11 +254,10 @@ export async function GET(
 
       return new NextResponse(responseBlob, {
         status: 200,
-        headers: {
+        headers: secureDocHeaders({
           "Content-Type": t.response_content_type || "application/pdf",
           "Content-Disposition": t.response_content_disposition || "inline",
-          "Cache-Control": "private, no-store",
-        },
+        }),
       });
     } catch (e: any) {
       void logSecurityEvent({
@@ -258,7 +268,7 @@ export async function GET(
         scope: "doc_decrypt_error",
         message: e?.message || "Decrypt failed",
       });
-      return new NextResponse("Server error", { status: 500, headers: { "Cache-Control": "private, no-store" } });
+      return new NextResponse("Server error", { status: 500, headers: secureDocHeaders() });
     }
   }
 
@@ -272,7 +282,7 @@ export async function GET(
       scope: "ticket_serve",
       message: "Serving blocked for unencrypted document by policy",
     });
-    return new NextResponse("Unavailable", { status: 403, headers: { "Cache-Control": "private, no-store" } });
+    return new NextResponse("Unavailable", { status: 403, headers: secureDocHeaders() });
   }
 
   // Same-origin proxy for non-encrypted docs.
@@ -290,13 +300,12 @@ export async function GET(
     })
   );
 
-  const headers: Record<string, string> = {
+  const headers = secureDocHeaders({
     "Content-Type": t.response_content_type || "application/pdf",
     "Content-Disposition": t.response_content_disposition || "inline",
-    "Cache-Control": "private, no-store",
     // PDF viewers like Range support; we forward range responses when present.
     "Accept-Ranges": "bytes",
-  };
+  });
 
   const contentRange = (obj as any)?.ContentRange as string | undefined;
   const contentLength = (obj as any)?.ContentLength as number | undefined;
