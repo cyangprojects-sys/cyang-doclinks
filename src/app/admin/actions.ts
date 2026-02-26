@@ -12,6 +12,7 @@ import { requireDocWrite, requireRole, requireUser } from "@/lib/authz";
 import { setRetentionSettings, setExpirationAlertSettings, getExpirationAlertSettings } from "@/lib/settings";
 import { generateApiKey, hashApiKey } from "@/lib/apiKeys";
 import { emitWebhook } from "@/lib/webhooks";
+import { appendImmutableAudit } from "@/lib/immutableAudit";
 
 function getBaseUrl() {
   const explicit = process.env.BASE_URL || process.env.NEXTAUTH_URL;
@@ -21,6 +22,28 @@ function getBaseUrl() {
   if (vercel) return `https://${vercel}`.replace(/\/+$/, "");
 
   return "http://localhost:3000";
+}
+
+async function appendAdminAudit(args: {
+  action: string;
+  docId?: string | null;
+  subjectId?: string | null;
+  payload?: Record<string, unknown> | null;
+}) {
+  try {
+    const u = await requireUser();
+    await appendImmutableAudit({
+      streamKey: args.docId ? `doc:${args.docId}` : `admin:${u.id}`,
+      action: args.action,
+      actorUserId: u.id,
+      orgId: u.orgId ?? null,
+      docId: args.docId ?? undefined,
+      subjectId: args.subjectId ?? null,
+      payload: args.payload ?? null,
+    });
+  } catch {
+    // best-effort audit logging; do not block admin flow
+  }
 }
 
 async function requireShareWrite(token: string) {
@@ -103,6 +126,12 @@ export async function createOrAssignAliasAction(formData: FormData): Promise<voi
   `;
 
   emitWebhook("alias.created", { alias, doc_id: docId });
+  await appendAdminAudit({
+    action: "doc.alias_upserted",
+    docId,
+    subjectId: alias,
+    payload: { alias },
+  });
 
   revalidatePath("/admin");
   revalidatePath("/admin/dashboard");
@@ -281,6 +310,18 @@ export async function revokeDocShareAction(formData: FormData): Promise<void> {
     max_views: before?.[0]?.max_views ?? null,
     views_count: before?.[0]?.views_count ?? null,
   });
+  await appendAdminAudit({
+    action: "share.revoked",
+    docId: before?.[0]?.doc_id ?? null,
+    subjectId: token,
+    payload: {
+      toEmail: before?.[0]?.to_email ?? null,
+      expiresAt: before?.[0]?.expires_at ?? null,
+      maxViews: before?.[0]?.max_views ?? null,
+      viewsCount: before?.[0]?.views_count ?? null,
+      via: "admin_action",
+    },
+  });
 
   revalidatePath("/admin/dashboard");
   revalidatePath("/admin");
@@ -339,6 +380,11 @@ export async function revokeAllSharesForDocAction(formData: FormData): Promise<v
     where doc_id = ${docId}::uuid
       and revoked_at is null
   `;
+  await appendAdminAudit({
+    action: "share.bulk_revoked_for_doc",
+    docId,
+    payload: { via: "admin_action" },
+  });
 
   revalidatePath("/admin/dashboard");
   revalidatePath("/admin");
@@ -383,6 +429,12 @@ export async function disableAliasForDocAction(formData: FormData): Promise<void
   }
 
   emitWebhook("alias.disabled", { doc_id: docId, alias });
+  await appendAdminAudit({
+    action: "doc.alias_disabled",
+    docId,
+    subjectId: alias,
+    payload: { alias, via: "admin_action" },
+  });
 
   revalidatePath("/admin/dashboard");
   revalidatePath("/admin");
@@ -537,6 +589,13 @@ export async function bulkRevokeAllSharesForDocsAction(formData: FormData): Prom
     where doc_id = any(${docIds}::uuid[])
       and revoked_at is null
   `;
+  for (const docId of docIds) {
+    await appendAdminAudit({
+      action: "share.bulk_revoked_for_doc",
+      docId,
+      payload: { via: "admin_action", bulk: true },
+    });
+  }
 
   revalidatePath("/admin/dashboard");
   revalidatePath("/admin");
@@ -570,6 +629,13 @@ export async function bulkDisableAliasesForDocsAction(formData: FormData): Promi
         where doc_id = any(${docIds}::uuid[])
       `;
     }
+  }
+  for (const docId of docIds) {
+    await appendAdminAudit({
+      action: "doc.alias_disabled",
+      docId,
+      payload: { via: "admin_action", bulk: true },
+    });
   }
 
   revalidatePath("/admin/dashboard");
