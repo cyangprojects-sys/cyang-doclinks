@@ -370,31 +370,31 @@ export default async function AnalyticsWidgets({ ownerId }: { ownerId?: string; 
   return (
     <section className="mb-6">
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <div className="rounded-2xl border border-neutral-800 bg-neutral-950 p-4 shadow-sm">
-          <div className="text-xs text-neutral-400">Total views (all time)</div>
-          <div className="mt-1 text-2xl font-semibold text-neutral-100">{fmtInt(totalViews)}</div>
-          <div className="mt-2 text-xs text-neutral-400">Last 30 days</div>
+        <div className="glass-card-strong rounded-2xl p-4">
+          <div className="text-xs text-white/60">Total views (all time)</div>
+          <div className="mt-1 text-2xl font-semibold text-white">{fmtInt(totalViews)}</div>
+          <div className="mt-2 text-xs text-white/60">Last 30 days</div>
           <div className="mt-1 flex items-center justify-between gap-3">
-            <div className="text-sm font-medium text-neutral-200">{fmtInt(views30)}</div>
-            <div className="text-neutral-400">
+            <div className="text-sm font-medium text-white/90">{fmtInt(views30)}</div>
+            <div className="text-white/65">
               <Sparkline values={series30} ariaLabel="30 day views sparkline" />
             </div>
           </div>
         </div>
 
-        <div className="rounded-2xl border border-neutral-800 bg-neutral-950 p-4 shadow-sm">
-          <div className="text-xs text-neutral-400">Rolling views</div>
+        <div className="glass-card-strong rounded-2xl p-4">
+          <div className="text-xs text-white/60">Rolling views</div>
           <div className="mt-2 flex items-baseline justify-between">
             <div>
-              <div className="text-2xl font-semibold text-neutral-100">{fmtInt(views7)}</div>
-              <div className="text-xs text-neutral-400">Last 7 days</div>
+              <div className="text-2xl font-semibold text-white">{fmtInt(views7)}</div>
+              <div className="text-xs text-white/60">Last 7 days</div>
             </div>
             <div>
-              <div className="text-2xl font-semibold text-neutral-100">{fmtInt(views30)}</div>
-              <div className="text-xs text-neutral-400">Last 30 days</div>
+              <div className="text-2xl font-semibold text-white">{fmtInt(views30)}</div>
+              <div className="text-xs text-white/60">Last 30 days</div>
             </div>
           </div>
-          <div className="mt-3 text-xs text-neutral-400">
+          <div className="mt-3 text-xs text-white/60">
             {hasDocViewDaily ? (
               <span>Using daily aggregates (fast).</span>
             ) : (
@@ -403,98 +403,98 @@ export default async function AnalyticsWidgets({ ownerId }: { ownerId?: string; 
           </div>
         </div>
 
-        <div className="rounded-2xl border border-neutral-800 bg-neutral-950 p-4 shadow-sm">
-          <div className="text-xs text-neutral-400">Shares</div>
+        <div className="glass-card-strong rounded-2xl p-4">
+          <div className="text-xs text-white/60">Shares</div>
           <div className="mt-2 grid grid-cols-3 gap-2">
             <div>
-              <div className="text-xl font-semibold text-neutral-100">{fmtInt(activeShares)}</div>
-              <div className="text-xs text-neutral-400">Active</div>
+              <div className="text-xl font-semibold text-white">{fmtInt(activeShares)}</div>
+              <div className="text-xs text-white/60">Active</div>
             </div>
             <div>
-              <div className="text-xl font-semibold text-neutral-100">{fmtInt(revokedShares)}</div>
-              <div className="text-xs text-neutral-400">Revoked</div>
+              <div className="text-xl font-semibold text-white">{fmtInt(revokedShares)}</div>
+              <div className="text-xs text-white/60">Revoked</div>
             </div>
             <div>
-              <div className="text-xl font-semibold text-neutral-100">{fmtInt(expiringShares)}</div>
-              <div className="text-xs text-neutral-400">Expiring (3d)</div>
+              <div className="text-xl font-semibold text-white">{fmtInt(expiringShares)}</div>
+              <div className="text-xs text-white/60">Expiring (3d)</div>
             </div>
           </div>
-          <div className="mt-3 text-xs text-neutral-400">Alias expiring (3d): {fmtInt(expiringAliases)}</div>
+          <div className="mt-3 text-xs text-white/60">Alias expiring (3d): {fmtInt(expiringAliases)}</div>
         </div>
 
-        <div className="rounded-2xl border border-neutral-800 bg-neutral-950 p-4 shadow-sm">
-          <div className="text-xs text-neutral-400">Top docs (30d)</div>
+        <div className="glass-card-strong rounded-2xl p-4">
+          <div className="text-xs text-white/60">Top docs (30d)</div>
           <ol className="mt-2 space-y-1 text-sm">
             {topDocs.length ? (
               topDocs.map((d) => (
                 <li key={d.doc_id} className="flex items-center justify-between gap-2">
-                  <Link className="truncate text-neutral-200 underline-offset-2 hover:underline" href={`/admin/docs/${d.doc_id}`}>
+                  <Link className="truncate text-white/90 underline-offset-2 hover:underline" href={`/admin/docs/${d.doc_id}`}>
                     {d.doc_title || d.doc_id.slice(0, 8)}
                   </Link>
-                  <span className="shrink-0 text-xs text-neutral-400">{fmtInt(d.views_30)}</span>
+                  <span className="shrink-0 text-xs text-white/60">{fmtInt(d.views_30)}</span>
                 </li>
               ))
             ) : (
-              <li className="text-xs text-neutral-400">No data yet.</li>
+              <li className="text-xs text-white/60">No data yet.</li>
             )}
           </ol>
         </div>
 
         {!isViewerScoped ? (
           <>
-            <div className="rounded-2xl border border-neutral-800 bg-neutral-950 p-4 shadow-sm">
+            <div className="glass-card-strong rounded-2xl p-4">
               <div className="flex items-center justify-between gap-2">
-                <div className="text-xs text-neutral-400">Security ops (24h)</div>
-                <Link className="text-[11px] text-neutral-400 underline-offset-2 hover:underline" href="/admin/security">
+                <div className="text-xs text-white/60">Security ops (24h)</div>
+                <Link className="text-[11px] text-white/70 underline-offset-2 hover:underline" href="/admin/security">
                   Open security
                 </Link>
               </div>
               <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
                 <div>
-                  <div className="text-xl font-semibold text-neutral-100">{fmtInt(scanFailures24h)}</div>
-                  <div className="text-xs text-neutral-400">Scan failures</div>
+                  <div className="text-xl font-semibold text-white">{fmtInt(scanFailures24h)}</div>
+                  <div className="text-xs text-white/60">Scan failures</div>
                 </div>
                 <div>
-                  <div className="text-xl font-semibold text-neutral-100">{fmtInt(deadLetterAlerts24h)}</div>
-                  <div className="text-xs text-neutral-400">Dead-letter alerts</div>
+                  <div className="text-xl font-semibold text-white">{fmtInt(deadLetterAlerts24h)}</div>
+                  <div className="text-xs text-white/60">Dead-letter alerts</div>
                 </div>
                 <div>
-                  <div className="text-xl font-semibold text-neutral-100">{fmtInt(presignErrors24h)}</div>
-                  <div className="text-xs text-neutral-400">Presign errors</div>
+                  <div className="text-xl font-semibold text-white">{fmtInt(presignErrors24h)}</div>
+                  <div className="text-xs text-white/60">Presign errors</div>
                 </div>
                 <div>
-                  <div className="text-xl font-semibold text-neutral-100">{fmtInt(abuseSpikes24h)}</div>
-                  <div className="text-xs text-neutral-400">Abuse spikes</div>
+                  <div className="text-xl font-semibold text-white">{fmtInt(abuseSpikes24h)}</div>
+                  <div className="text-xs text-white/60">Abuse spikes</div>
                 </div>
               </div>
-              <div className="mt-3 text-xs text-neutral-400">Dead-letter backlog: {fmtInt(deadLetterBacklog)}</div>
+              <div className="mt-3 text-xs text-white/60">Dead-letter backlog: {fmtInt(deadLetterBacklog)}</div>
             </div>
 
-            <div className="rounded-2xl border border-neutral-800 bg-neutral-950 p-4 shadow-sm">
-              <div className="text-xs text-neutral-400">Ops readiness (24h)</div>
+            <div className="glass-card-strong rounded-2xl p-4">
+              <div className="text-xs text-white/60">Ops readiness (24h)</div>
               <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
                 <div>
-                  <div className="text-xl font-semibold text-neutral-100">{fmtInt(cronRuns24h)}</div>
-                  <div className="text-xs text-neutral-400">Cron runs</div>
+                  <div className="text-xl font-semibold text-white">{fmtInt(cronRuns24h)}</div>
+                  <div className="text-xs text-white/60">Cron runs</div>
                 </div>
                 <div>
-                  <div className="text-xl font-semibold text-neutral-100">{fmtInt(cronFailures24h)}</div>
-                  <div className="text-xs text-neutral-400">Cron failures</div>
+                  <div className="text-xl font-semibold text-white">{fmtInt(cronFailures24h)}</div>
+                  <div className="text-xs text-white/60">Cron failures</div>
                 </div>
                 <div>
-                  <div className="text-xl font-semibold text-neutral-100">
+                  <div className="text-xl font-semibold text-white">
                     {cronFreshHealthy}/{cronFreshTotal || 6}
                   </div>
-                  <div className="text-xs text-neutral-400">Fresh cron jobs (6h)</div>
+                  <div className="text-xs text-white/60">Fresh cron jobs (6h)</div>
                 </div>
                 <div>
-                  <div className="text-xl font-semibold text-neutral-100">
+                  <div className="text-xl font-semibold text-white">
                     {backupLastStatus || "n/a"}
                   </div>
-                  <div className="text-xs text-neutral-400">Last backup status</div>
+                  <div className="text-xs text-white/60">Last backup status</div>
                 </div>
               </div>
-              <div className="mt-3 text-xs text-neutral-400">
+              <div className="mt-3 text-xs text-white/60">
                 Backup freshness:{" "}
                 <span className={backupFreshOk ? "text-emerald-300" : "text-amber-300"}>
                   {backupHoursSinceLastSuccess == null ? "unknown" : `${backupHoursSinceLastSuccess.toFixed(1)}h`}
@@ -502,18 +502,18 @@ export default async function AnalyticsWidgets({ ownerId }: { ownerId?: string; 
               </div>
             </div>
 
-            <div className="rounded-2xl border border-neutral-800 bg-neutral-950 p-4 shadow-sm">
-              <div className="text-xs text-neutral-400">Top security events (24h)</div>
+            <div className="glass-card-strong rounded-2xl p-4">
+              <div className="text-xs text-white/60">Top security events (24h)</div>
               <ol className="mt-2 space-y-1 text-sm">
                 {topSecurityTypes.length ? (
                   topSecurityTypes.map((r) => (
                     <li key={r.type} className="flex items-center justify-between gap-2">
-                      <span className="truncate font-mono text-xs text-neutral-200">{r.type}</span>
-                      <span className="shrink-0 text-xs text-neutral-400">{fmtInt(r.c)}</span>
+                      <span className="truncate font-mono text-xs text-white/85">{r.type}</span>
+                      <span className="shrink-0 text-xs text-white/60">{fmtInt(r.c)}</span>
                     </li>
                   ))
                 ) : (
-                  <li className="text-xs text-neutral-400">No security events in the last 24 hours.</li>
+                  <li className="text-xs text-white/60">No security events in the last 24 hours.</li>
                 )}
               </ol>
             </div>

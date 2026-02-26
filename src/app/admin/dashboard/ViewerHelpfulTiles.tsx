@@ -19,7 +19,6 @@ type RecentShare = {
   doc_id: string;
   title: string | null;
   created_at: string | null;
-  expires_at: string | null;
 };
 
 type ExpiringItem = {
@@ -31,16 +30,14 @@ type ExpiringItem = {
 };
 
 function fmtDate(s: string | null | undefined): string {
-  if (!s) return "—";
+  if (!s) return "-";
   const d = new Date(s);
-  if (Number.isNaN(d.getTime())) return "—";
+  if (Number.isNaN(d.getTime())) return "-";
   return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "2-digit" });
 }
 
 function chip(label: string) {
-  return (
-    <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-xs text-white/80">{label}</span>
-  );
+  return <span className="ui-badge rounded-full px-2 py-0.5 text-xs">{label}</span>;
 }
 
 async function hasColumn(table: string, column: string): Promise<boolean> {
@@ -52,7 +49,7 @@ async function hasColumn(table: string, column: string): Promise<boolean> {
         and table_name = ${table}
         and column_name = ${column}
       limit 1
-    `) as unknown as Array<{ "?column?": number }>; // shape doesn't matter
+    `) as unknown as Array<{ "?column?": number }>;
     return rows.length > 0;
   } catch {
     return false;
@@ -75,7 +72,6 @@ async function hasTable(table: string): Promise<boolean> {
 }
 
 export default async function ViewerHelpfulTiles({ userId, orgId, hasOrgId }: Props) {
-  // Schema capability checks (best-effort; keeps this component drop-in safe across branches)
   const [hasDocs, hasDocViews, hasShareTokens, hasDocAliases, hasOwnerId] = await Promise.all([
     hasTable("docs"),
     hasTable("doc_views"),
@@ -84,15 +80,10 @@ export default async function ViewerHelpfulTiles({ userId, orgId, hasOrgId }: Pr
     hasColumn("docs", "owner_id"),
   ]);
 
-  // Tenant scope: if docs.org_id exists, always restrict to the user's org.
   const orgFilter = hasOrgId && orgId ? sql`and d.org_id = ${orgId}::uuid` : sql``;
-
-  // Viewer scope: only their docs if docs.owner_id exists.
   const ownerFilter = hasOwnerId ? sql`and d.owner_id = ${userId}::uuid` : sql``;
-
   const docFilter = sql`${orgFilter} ${ownerFilter}`;
 
-  // --- Most viewed this month
   let mostViewed: MostViewed | null = null;
   try {
     if (hasDocs && hasDocViews) {
@@ -115,7 +106,6 @@ export default async function ViewerHelpfulTiles({ userId, orgId, hasOrgId }: Pr
     mostViewed = null;
   }
 
-  // --- Recent shares
   let recentShares: RecentShare[] = [];
   try {
     if (hasDocs && hasShareTokens) {
@@ -124,8 +114,7 @@ export default async function ViewerHelpfulTiles({ userId, orgId, hasOrgId }: Pr
           st.token::text as token,
           d.id::text as doc_id,
           d.title::text as title,
-          st.created_at::text as created_at,
-          st.expires_at::text as expires_at
+          st.created_at::text as created_at
         from public.share_tokens st
         join public.docs d on d.id = st.doc_id
         where 1=1
@@ -138,7 +127,6 @@ export default async function ViewerHelpfulTiles({ userId, orgId, hasOrgId }: Pr
     recentShares = [];
   }
 
-  // --- Expiring soon (next 7 days)
   const expiring: ExpiringItem[] = [];
   try {
     if (hasDocs && hasShareTokens) {
@@ -203,7 +191,6 @@ export default async function ViewerHelpfulTiles({ userId, orgId, hasOrgId }: Pr
     // ignore
   }
 
-  // sort and cap
   expiring.sort((a, b) => {
     const ta = a.expires_at ? new Date(a.expires_at).getTime() : Number.POSITIVE_INFINITY;
     const tb = b.expires_at ? new Date(b.expires_at).getTime() : Number.POSITIVE_INFINITY;
@@ -214,42 +201,38 @@ export default async function ViewerHelpfulTiles({ userId, orgId, hasOrgId }: Pr
   const publicHref = (item: ExpiringItem) => (item.kind === "share" ? `/s/${item.token_or_alias}` : `/d/${item.token_or_alias}`);
 
   return (
-    <section className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+    <section className="glass-card-strong rounded-2xl p-4">
       <div className="flex items-center justify-between">
         <div>
           <div className="text-sm font-medium text-white">Helpful</div>
           <div className="mt-1 text-xs text-white/60">Quick shortcuts for your own content</div>
         </div>
         <div className="flex gap-2">
-          {!hasDocs ? chip("Tracking not enabled") : null}
+          {!hasDocs ? chip("Tracking off") : null}
           {hasOwnerId ? chip("My docs") : chip("No ownership")}
         </div>
       </div>
 
       <div className="mt-4 grid gap-3">
-        {/* Most viewed */}
-        <div className="rounded-lg border border-white/10 bg-white/5 p-3">
-          <div className="text-xs font-medium text-white/80">Most viewed (this month)</div>
+        <Tile title="Most viewed (this month)">
           {mostViewed ? (
-            <div className="mt-2 flex items-center justify-between gap-3">
+            <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
                 <div className="truncate text-sm text-white">{mostViewed.title ?? "Untitled"}</div>
                 <div className="mt-1 text-xs text-white/60">{mostViewed.views} views</div>
               </div>
-              <Link className="shrink-0 text-xs text-white/70 hover:text-white" href={`/admin/docs/${mostViewed.doc_id}`}>
-                Manage →
+              <Link className="shrink-0 text-xs text-white/75 hover:text-white" href={`/admin/docs/${mostViewed.doc_id}`}>
+                Manage
               </Link>
             </div>
           ) : (
-            <div className="mt-2 text-sm text-white/60">—</div>
+            <div className="text-sm text-white/60">-</div>
           )}
-        </div>
+        </Tile>
 
-        {/* Recent shares */}
-        <div className="rounded-lg border border-white/10 bg-white/5 p-3">
-          <div className="text-xs font-medium text-white/80">Recent shares</div>
+        <Tile title="Recent shares">
           {recentShares.length ? (
-            <div className="mt-2 space-y-2">
+            <div className="space-y-2">
               {recentShares.map((s) => (
                 <div key={s.token} className="flex items-center justify-between gap-3">
                   <Link className="min-w-0 truncate text-sm text-white hover:underline" href={`/s/${s.token}`}>
@@ -257,42 +240,56 @@ export default async function ViewerHelpfulTiles({ userId, orgId, hasOrgId }: Pr
                   </Link>
                   <div className="flex items-center gap-3">
                     <div className="shrink-0 text-xs text-white/60">{fmtDate(s.created_at)}</div>
-                    <Link className="shrink-0 text-xs text-white/70 hover:text-white" href={`/admin/docs/${s.doc_id}`}>
-                      Manage →
+                    <Link className="shrink-0 text-xs text-white/75 hover:text-white" href={`/admin/docs/${s.doc_id}`}>
+                      Manage
                     </Link>
                   </div>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="mt-2 text-sm text-white/60">—</div>
+            <div className="text-sm text-white/60">-</div>
           )}
-        </div>
+        </Tile>
 
-        {/* Expiring soon */}
-        <div className="rounded-lg border border-white/10 bg-white/5 p-3">
-          <div className="text-xs font-medium text-white/80">Expiring soon (7 days)</div>
+        <Tile title="Expiring soon (7 days)">
           {expiringSoon.length ? (
-            <div className="mt-2 space-y-2">
+            <div className="space-y-2">
               {expiringSoon.map((it) => (
                 <div key={`${it.kind}:${it.token_or_alias}`} className="flex items-center justify-between gap-3">
                   <Link className="min-w-0 truncate text-sm text-white hover:underline" href={publicHref(it)}>
-                    {it.doc_title ?? "Untitled"} <span className="text-xs text-white/50">({it.kind})</span>
+                    {it.doc_title ?? "Untitled"} <span className="text-xs text-white/55">({it.kind})</span>
                   </Link>
                   <div className="flex items-center gap-3">
                     <div className="shrink-0 text-xs text-white/60">{fmtDate(it.expires_at)}</div>
-                    <Link className="shrink-0 text-xs text-white/70 hover:text-white" href={`/admin/docs/${it.doc_id}`}>
-                      Manage →
+                    <Link className="shrink-0 text-xs text-white/75 hover:text-white" href={`/admin/docs/${it.doc_id}`}>
+                      Manage
                     </Link>
                   </div>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="mt-2 text-sm text-white/60">—</div>
+            <div className="text-sm text-white/60">-</div>
           )}
-        </div>
+        </Tile>
       </div>
     </section>
   );
 }
+
+function Tile({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="glass-card rounded-xl p-3">
+      <div className="mb-2 text-xs font-medium text-white/70">{title}</div>
+      {children}
+    </div>
+  );
+}
+

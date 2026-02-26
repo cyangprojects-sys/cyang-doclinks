@@ -1,12 +1,18 @@
 // src/app/admin/dashboard/ViewerUsageWidget.tsx
 import { sql } from "@/lib/db";
-import { getPlanForUser, getActiveShareCountForOwner, getStorageBytesForOwner, getMonthlyViewCount, getDailyUploadCount } from "@/lib/monetization";
+import {
+  getPlanForUser,
+  getActiveShareCountForOwner,
+  getStorageBytesForOwner,
+  getMonthlyViewCount,
+  getDailyUploadCount,
+} from "@/lib/monetization";
 
 export const runtime = "nodejs";
 
 function fmtBytes(n: number | null): string {
-  if (n == null) return "—";
-  if (!Number.isFinite(n) || n < 0) return "—";
+  if (n == null) return "-";
+  if (!Number.isFinite(n) || n < 0) return "-";
   const units = ["B", "KB", "MB", "GB", "TB"];
   let v = n;
   let i = 0;
@@ -36,10 +42,9 @@ export default async function ViewerUsageWidget(props: { userId: string }) {
   const hasMonthly = await tableExists("public.user_usage_monthly");
   const hasDaily = await tableExists("public.user_usage_daily");
 
-  // Plan + usage are best-effort (widget must not break if tables aren't deployed yet)
   let planName = "Free";
   let maxActiveShares: number | null = 3;
-  let maxStorageBytes: number | null = 524288000; // 500MB
+  let maxStorageBytes: number | null = 524288000;
   let maxViewsPerMonth: number | null = 100;
   let maxUploadsPerDay: number | null = 10;
 
@@ -99,88 +104,69 @@ export default async function ViewerUsageWidget(props: { userId: string }) {
     maxUploadsPerDay == null || dailyUploads == null ? null : Math.max(0, maxUploadsPerDay - dailyUploads);
 
   return (
-    <section className="rounded-xl border border-neutral-800 bg-neutral-950 p-4">
+    <section className="glass-card-strong rounded-2xl p-4">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <div className="text-sm font-medium text-neutral-100">Your usage</div>
-          <div className="mt-0.5 text-xs text-neutral-500">Plan: {planName}</div>
+          <div className="text-sm font-medium text-white">Your usage</div>
+          <div className="mt-0.5 text-xs text-white/60">Plan: {planName}</div>
         </div>
-        <a
-          href="#shares"
-          className="rounded-md border border-neutral-800 bg-neutral-950 px-3 py-1.5 text-xs text-neutral-200 hover:bg-neutral-900"
-        >
+        <a href="#shares" className="btn-base btn-secondary rounded-lg px-3 py-1.5 text-xs">
           Manage shares
         </a>
       </div>
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
-        <div className="rounded-lg border border-neutral-800 bg-neutral-950 p-3">
-          <div className="text-xs text-neutral-500">Active shares</div>
-          <div className="mt-1 text-lg font-semibold text-neutral-100">
-            {activeShares}
-            {maxActiveShares == null ? (
-              <span className="text-sm font-normal text-neutral-500"> / ∞</span>
-            ) : (
-              <span className="text-sm font-normal text-neutral-500"> / {maxActiveShares}</span>
-            )}
-          </div>
-          <div className="mt-1 text-xs text-neutral-500">
-            {sharesLeft == null ? "Unlimited shares" : `${sharesLeft} share${sharesLeft === 1 ? "" : "s"} left`}
-          </div>
-        </div>
-
-        <div className="rounded-lg border border-neutral-800 bg-neutral-950 p-3">
-          <div className="text-xs text-neutral-500">Storage</div>
-          <div className="mt-1 text-lg font-semibold text-neutral-100">
-            {fmtBytes(usedStorage)}
-            {maxStorageBytes == null ? (
-              <span className="text-sm font-normal text-neutral-500"> / ∞</span>
-            ) : (
-              <span className="text-sm font-normal text-neutral-500"> / {fmtBytes(maxStorageBytes)}</span>
-            )}
-          </div>
-          <div className="mt-1 text-xs text-neutral-500">
-            {storageLeft == null ? "Unlimited storage" : `${fmtBytes(storageLeft)} free`}
-          </div>
-          {storageWarn ? (
-            <div className="mt-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-1 text-xs text-amber-200">
-              Storage usage is {storagePct}% of plan limit.
-            </div>
-          ) : null}
-        </div>
-
-        <div className="rounded-lg border border-neutral-800 bg-neutral-950 p-3">
-          <div className="text-xs text-neutral-500">Monthly views</div>
-          <div className="mt-1 text-lg font-semibold text-neutral-100">
-            {monthlyViews == null ? "—" : monthlyViews}
-            {maxViewsPerMonth == null ? (
-              <span className="text-sm font-normal text-neutral-500"> / ∞</span>
-            ) : monthlyViews == null ? (
-              <span className="text-sm font-normal text-neutral-500"> (tracking not enabled)</span>
-            ) : (
-              <span className="text-sm font-normal text-neutral-500"> / {maxViewsPerMonth}</span>
-            )}
-          </div>
-          <div className="mt-1 text-xs text-neutral-500">
-            {viewsLeft == null ? "" : `${viewsLeft} left this month`}
-          </div>
-        </div>
-
-        <div className="rounded-lg border border-neutral-800 bg-neutral-950 p-3">
-          <div className="text-xs text-neutral-500">Uploads today</div>
-          <div className="mt-1 text-lg font-semibold text-neutral-100">
-            {dailyUploads == null ? "—" : dailyUploads}
-            {maxUploadsPerDay == null ? (
-              <span className="text-sm font-normal text-neutral-500"> / ∞</span>
-            ) : dailyUploads == null ? (
-              <span className="text-sm font-normal text-neutral-500"> (tracking not enabled)</span>
-            ) : (
-              <span className="text-sm font-normal text-neutral-500"> / {maxUploadsPerDay}</span>
-            )}
-          </div>
-          <div className="mt-1 text-xs text-neutral-500">{uploadsLeft == null ? "" : `${uploadsLeft} left today`}</div>
-        </div>
+        <MetricCard
+          title="Active shares"
+          value={`${activeShares}${maxActiveShares == null ? " / inf" : ` / ${maxActiveShares}`}`}
+          note={sharesLeft == null ? "Unlimited shares" : `${sharesLeft} share${sharesLeft === 1 ? "" : "s"} left`}
+        />
+        <MetricCard
+          title="Storage"
+          value={`${fmtBytes(usedStorage)}${maxStorageBytes == null ? " / inf" : ` / ${fmtBytes(maxStorageBytes)}`}`}
+          note={storageLeft == null ? "Unlimited storage" : `${fmtBytes(storageLeft)} free`}
+          warning={storageWarn ? `Storage usage is ${storagePct}% of plan limit.` : null}
+        />
+        <MetricCard
+          title="Monthly views"
+          value={
+            monthlyViews == null
+              ? `-${maxViewsPerMonth == null ? " / inf" : " (tracking not enabled)"}`
+              : `${monthlyViews}${maxViewsPerMonth == null ? " / inf" : ` / ${maxViewsPerMonth}`}`
+          }
+          note={viewsLeft == null ? "" : `${viewsLeft} left this month`}
+        />
+        <MetricCard
+          title="Uploads today"
+          value={
+            dailyUploads == null
+              ? `-${maxUploadsPerDay == null ? " / inf" : " (tracking not enabled)"}`
+              : `${dailyUploads}${maxUploadsPerDay == null ? " / inf" : ` / ${maxUploadsPerDay}`}`
+          }
+          note={uploadsLeft == null ? "" : `${uploadsLeft} left today`}
+        />
       </div>
     </section>
   );
 }
+
+function MetricCard(props: {
+  title: string;
+  value: string;
+  note?: string;
+  warning?: string | null;
+}) {
+  return (
+    <div className="glass-card rounded-xl p-3">
+      <div className="text-xs text-white/55">{props.title}</div>
+      <div className="mt-1 text-lg font-semibold text-white">{props.value}</div>
+      {props.note ? <div className="mt-1 text-xs text-white/60">{props.note}</div> : null}
+      {props.warning ? (
+        <div className="mt-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-1 text-xs text-amber-100">
+          {props.warning}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
