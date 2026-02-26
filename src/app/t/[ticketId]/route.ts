@@ -10,6 +10,7 @@ import { hashUserAgent, hashIpForTicket } from "@/lib/accessTicket";
 import { Readable } from "node:stream";
 import { appendImmutableAudit } from "@/lib/immutableAudit";
 import { allowUnencryptedServing } from "@/lib/securityPolicy";
+import { hasActiveQuarantineOverride } from "@/lib/quarantineOverride";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -74,6 +75,39 @@ export async function GET(
   }
 
   const t = consumed.ticket;
+  const blockedScanStates = new Set(["failed", "error", "infected", "quarantined"]);
+
+  if (t.doc_id) {
+    try {
+      const rows = (await sql`
+        select
+          coalesce(moderation_status::text, 'active') as moderation_status,
+          coalesce(scan_status::text, 'unscanned') as scan_status
+        from public.docs
+        where id = ${t.doc_id}::uuid
+        limit 1
+      `) as unknown as Array<{ moderation_status: string; scan_status: string }>;
+
+      const row = rows?.[0];
+      const moderation = (row?.moderation_status || "active").toLowerCase();
+      const scanStatus = (row?.scan_status || "unscanned").toLowerCase();
+
+      if (moderation === "deleted" || moderation === "disabled") {
+        return new NextResponse("Unavailable", { status: 404, headers: { "Cache-Control": "private, no-store" } });
+      }
+      if (moderation === "quarantined") {
+        const override = await hasActiveQuarantineOverride(t.doc_id);
+        if (!override) {
+          return new NextResponse("Unavailable", { status: 404, headers: { "Cache-Control": "private, no-store" } });
+        }
+      }
+      if (blockedScanStates.has(scanStatus)) {
+        return new NextResponse("Unavailable", { status: 404, headers: { "Cache-Control": "private, no-store" } });
+      }
+    } catch {
+      return new NextResponse("Unavailable", { status: 404, headers: { "Cache-Control": "private, no-store" } });
+    }
+  }
 
   // If the doc is encrypted, we must proxy + decrypt server-side.
   let enc:

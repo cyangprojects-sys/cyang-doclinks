@@ -104,6 +104,68 @@ function countPdfPages(text: string): number {
   return matches ? matches.length : 0;
 }
 
+function validatePdfBufferInternal(args: {
+  bytes: Buffer;
+  absMaxBytes?: number;
+  maxPdfPages?: number;
+}): PdfSafetyResult {
+  const bytes = args.bytes;
+  const size = bytes.length;
+  const absMaxBytes = Number(args.absMaxBytes ?? 1_000_000_000);
+  const maxPdfPages = Math.max(0, Number(args.maxPdfPages ?? 0));
+
+  if (!Number.isFinite(size) || size <= 0) {
+    return { ok: false, error: "UNREADABLE", message: "Object size is invalid." };
+  }
+  if (Number.isFinite(absMaxBytes) && absMaxBytes > 0 && size > absMaxBytes) {
+    return { ok: false, error: "TOO_LARGE", message: "Object exceeds absolute max.", details: { size, absMaxBytes } };
+  }
+  if (!hasPdfHeader(bytes.subarray(0, Math.min(bytes.length, 8)))) {
+    return { ok: false, error: "NOT_PDF", message: "Missing %PDF- header (not a valid PDF)." };
+  }
+
+  const sample = bufToAscii(bytes);
+  const flags = findFlags(sample);
+  const riskLevel = riskFromFlags(flags);
+  const pageCount = countPdfPages(sample);
+
+  if (maxPdfPages > 0 && pageCount > maxPdfPages) {
+    return {
+      ok: false,
+      error: "INTERNAL",
+      message: "PDF exceeds max page count policy.",
+      details: { pageCount, maxPdfPages },
+    };
+  }
+
+  return {
+    ok: true,
+    isPdf: true,
+    riskLevel,
+    flags,
+    details: { sampledBytes: bytes.length, size, pageCount, maxPdfPages: maxPdfPages || null },
+  };
+}
+
+export function validatePdfBuffer(args: {
+  bytes: Buffer;
+  absMaxBytes?: number;
+  maxPdfPages?: number;
+}): PdfSafetyResult {
+  try {
+    return validatePdfBufferInternal(args);
+  } catch (e: unknown) {
+    const errName = e instanceof Error ? e.name : "Error";
+    const errMsg = e instanceof Error ? e.message : String(e);
+    return {
+      ok: false,
+      error: "INTERNAL",
+      message: "PDF validation failed.",
+      details: { err: errName, message: errMsg },
+    };
+  }
+}
+
 export async function validatePdfInR2(args: {
   bucket: string;
   key: string;

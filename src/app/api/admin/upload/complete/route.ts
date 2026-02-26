@@ -3,7 +3,8 @@ export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
 import { HeadObjectCommand } from "@aws-sdk/client-s3";
-import { validatePdfInR2 } from "@/lib/pdfSafety";
+import { GetObjectCommand } from "@aws-sdk/client-s3";
+import { validatePdfBuffer, validatePdfInR2 } from "@/lib/pdfSafety";
 import { sql } from "@/lib/db";
 import { slugify } from "@/lib/slug";
 import { requireDocWrite } from "@/lib/authz";
@@ -11,6 +12,8 @@ import { incrementUploads } from "@/lib/monetization";
 import { enforceGlobalApiRateLimit, clientIpKey, logSecurityEvent, detectStorageSpike } from "@/lib/securityTelemetry";
 import { r2Client, r2Bucket } from "@/lib/r2";
 import { enqueueDocScan } from "@/lib/scanQueue";
+import { decryptAes256Gcm, unwrapDataKey } from "@/lib/encryption";
+import { getMasterKeyByIdOrThrow } from "@/lib/masterKeys";
 
 type CompleteRequest = {
   // Newer flow: doc_id from /presign response
@@ -23,6 +26,14 @@ type CompleteRequest = {
   title?: string | null;
   original_filename?: string | null;
 };
+
+async function streamToBuffer(body: any): Promise<Buffer> {
+  const chunks: Buffer[] = [];
+  for await (const chunk of body as any) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  }
+  return Buffer.concat(chunks);
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -148,11 +159,26 @@ export async function POST(req: NextRequest) {
     const verifyRows = (await sql`
       select
         size_bytes::bigint as size_bytes,
-        encryption_enabled::boolean as encryption_enabled
+        encryption_enabled::boolean as encryption_enabled,
+        coalesce(enc_alg, '')::text as enc_alg,
+        enc_iv as enc_iv,
+        coalesce(enc_key_version, '')::text as enc_key_version,
+        enc_wrapped_key as enc_wrapped_key,
+        enc_wrap_iv as enc_wrap_iv,
+        enc_wrap_tag as enc_wrap_tag
       from public.docs
       where id = ${docId}::uuid
       limit 1
-    `) as unknown as Array<{ size_bytes: number | string | null; encryption_enabled: boolean | null }>;
+    `) as unknown as Array<{
+      size_bytes: number | string | null;
+      encryption_enabled: boolean | null;
+      enc_alg: string;
+      enc_iv: Buffer | null;
+      enc_key_version: string;
+      enc_wrapped_key: Buffer | null;
+      enc_wrap_iv: Buffer | null;
+      enc_wrap_tag: Buffer | null;
+    }>;
 
     const expectedPlain = Number(verifyRows?.[0]?.size_bytes ?? 0);
     const encryptionEnabled = Boolean(verifyRows?.[0]?.encryption_enabled);
@@ -322,9 +348,82 @@ export async function POST(req: NextRequest) {
       riskLevel = safety.riskLevel;
       riskFlags = { flags: safety.flags, details: safety.details };
     } else {
-      scanStatus = "skipped_encrypted";
-      riskLevel = "low";
-      riskFlags = { flags: ["encrypted:skipped_validation"] };
+      const encMeta = verifyRows?.[0];
+      if (
+        !encMeta?.enc_alg ||
+        !encMeta?.enc_iv ||
+        !encMeta?.enc_key_version ||
+        !encMeta?.enc_wrapped_key ||
+        !encMeta?.enc_wrap_iv ||
+        !encMeta?.enc_wrap_tag
+      ) {
+        await logSecurityEvent({
+          type: "upload_complete_encryption_meta_missing",
+          severity: "high",
+          ip: ipInfo.ip,
+          docId,
+          scope: "upload_complete",
+          message: "Encrypted upload missing key metadata",
+        });
+        return NextResponse.json({ ok: false, error: "encryption_metadata_missing" }, { status: 409 });
+      }
+
+      let decrypted: Buffer;
+      try {
+        const mk = await getMasterKeyByIdOrThrow(encMeta.enc_key_version);
+        const dataKey = unwrapDataKey({
+          wrapped: encMeta.enc_wrapped_key,
+          wrapIv: encMeta.enc_wrap_iv,
+          wrapTag: encMeta.enc_wrap_tag,
+          masterKey: mk.key,
+        });
+
+        const encryptedObj = await r2Client.send(
+          new GetObjectCommand({
+            Bucket: docBucket,
+            Key: docKey,
+          })
+        );
+        const ciphertext = await streamToBuffer((encryptedObj as any).Body);
+        decrypted = decryptAes256Gcm({
+          ciphertext,
+          iv: encMeta.enc_iv,
+          key: dataKey,
+        });
+      } catch (e: any) {
+        await logSecurityEvent({
+          type: "upload_complete_decrypt_failed",
+          severity: "high",
+          ip: ipInfo.ip,
+          docId,
+          scope: "upload_complete",
+          message: "Encrypted upload could not be decrypted for validation",
+          meta: { error: String(e?.message || e) },
+        });
+        return NextResponse.json({ ok: false, error: "decrypt_failed" }, { status: 409 });
+      }
+
+      const safety = validatePdfBuffer({
+        bytes: decrypted,
+        absMaxBytes: absMax,
+        maxPdfPages: Number(process.env.PDF_MAX_PAGES || 2000),
+      });
+      if (!safety.ok) {
+        await logSecurityEvent({
+          type: "upload_complete_pdf_validation_failed",
+          severity: "high",
+          ip: ipInfo.ip,
+          docId,
+          scope: "upload_complete",
+          message: "PDF validation failed after decrypt",
+          meta: { error: safety.error, message: safety.message, details: safety.details ?? null },
+        });
+        return NextResponse.json({ ok: false, error: safety.error, message: safety.message }, { status: 409 });
+      }
+
+      scanStatus = safety.riskLevel === "low" ? "clean" : "risky";
+      riskLevel = safety.riskLevel;
+      riskFlags = { flags: safety.flags, details: safety.details, mode: "decrypted_validation" };
     }
 
 // 4) Mark doc ready + update metadata (best-effort)
