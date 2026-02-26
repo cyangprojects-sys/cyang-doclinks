@@ -20,7 +20,7 @@ export const dynamic = "force-dynamic";
 // We keep "encrypt" in the schema for backward compatibility, but it must be true (or omitted).
 const BodySchema = z.object({
   title: z.string().optional(),
-  filename: z.string().min(1),
+  filename: z.string().min(1).max(240),
   contentType: z.string().optional(),
   sizeBytes: z.number().int().positive().optional(),
   encrypt: z.boolean().optional(),
@@ -28,6 +28,15 @@ const BodySchema = z.object({
 
 function safeKeyPart(name: string) {
   return name.replace(/[^a-zA-Z0-9._-]+/g, "_").replace(/_+/g, "_").slice(0, 120);
+}
+
+function isSafeUploadFilename(name: string): boolean {
+  const n = String(name || "").trim();
+  if (!n) return false;
+  if (n.length > 240) return false;
+  if (/[\\/:*?"<>|]/.test(n)) return false;
+  if (n.includes("..")) return false;
+  return /\.pdf$/i.test(n);
 }
 
 function getKeyPrefix() {
@@ -89,6 +98,12 @@ export async function POST(req: Request) {
     }
 
     const { title, filename } = parsed.data;
+    if (!isSafeUploadFilename(filename)) {
+      return NextResponse.json(
+        { ok: false, error: "BAD_FILENAME", message: "filename must be a safe .pdf filename." },
+        { status: 400 }
+      );
+    }
 
     // Enterprise mode: ignore false; require encryption
     const encryptRequested = parsed.data.encrypt;
@@ -98,9 +113,7 @@ export async function POST(req: Request) {
         { status: 400 }
       );
     }
-    const encrypt = true;
-
-    const contentType = parsed.data.contentType ?? "application/pdf";
+    const contentType = (parsed.data.contentType ?? "application/pdf").toLowerCase();
     const sizeBytes = parsed.data.sizeBytes ?? null;
 
     // Hard enforcement needs an explicit sizeBytes to prevent bypassing storage/file-size caps.
@@ -108,7 +121,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: "MISSING_SIZE", message: "sizeBytes is required." }, { status: 400 });
     }
 
-    if (contentType !== "application/pdf") {
+    if (contentType !== "application/pdf" && contentType !== "application/x-pdf") {
       return NextResponse.json({ ok: false, error: "NOT_PDF" }, { status: 400 });
     }
 

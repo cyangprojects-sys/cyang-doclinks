@@ -201,7 +201,9 @@ export async function POST(req: NextRequest) {
     // If encryption is enabled, the uploaded ciphertext includes a 16-byte GCM tag appended.
     // Some clients may also send unencrypted bytes in the future; accept exact match as well.
     if (Number.isFinite(expectedPlain) && expectedPlain > 0) {
-      const allowedSizes = new Set<number>([expectedPlain, expectedPlain + 16]);
+      const allowedSizes = encryptionEnabled
+        ? new Set<number>([expectedPlain + 16])
+        : new Set<number>([expectedPlain]);
       if (!allowedSizes.has(contentLength)) {
         await logSecurityEvent({
           type: "upload_complete_size_mismatch",
@@ -220,7 +222,19 @@ export async function POST(req: NextRequest) {
     const metaDocId = (meta["doc-id"] || meta["doc_id"] || "").toString();
     const metaOrigCt = (meta["orig-content-type"] || meta["orig_content_type"] || "").toString();
 
-    if (metaDocId && metaDocId !== docId) {
+    if (!metaDocId) {
+      await logSecurityEvent({
+        type: "upload_complete_meta_missing_doc_id",
+        severity: "high",
+        ip: ipInfo.ip,
+        docId,
+        scope: "upload_complete",
+        message: "R2 object metadata doc-id missing",
+      });
+      return NextResponse.json({ ok: false, error: "metadata_missing" }, { status: 409 });
+    }
+
+    if (metaDocId !== docId) {
       await logSecurityEvent({
         type: "upload_complete_meta_mismatch",
         severity: "high",
@@ -234,7 +248,7 @@ export async function POST(req: NextRequest) {
     }
 
     // If present, require original to be PDF.
-    if (metaOrigCt && metaOrigCt !== "application/pdf") {
+    if (!metaOrigCt || metaOrigCt !== "application/pdf") {
       await logSecurityEvent({
         type: "upload_complete_not_pdf",
         severity: "high",
@@ -245,6 +259,32 @@ export async function POST(req: NextRequest) {
         meta: { metaOrigCt, ct },
       });
       return NextResponse.json({ ok: false, error: "not_pdf" }, { status: 409 });
+    }
+
+    if (encryptionEnabled) {
+      if (ct && ct !== "application/octet-stream") {
+        await logSecurityEvent({
+          type: "upload_complete_ciphertext_ct_mismatch",
+          severity: "high",
+          ip: ipInfo.ip,
+          docId,
+          scope: "upload_complete",
+          message: "Encrypted object content-type must be application/octet-stream",
+          meta: { contentType: ct },
+        });
+        return NextResponse.json({ ok: false, error: "invalid_content_type" }, { status: 409 });
+      }
+    } else if (ct && ct !== "application/pdf") {
+      await logSecurityEvent({
+        type: "upload_complete_plaintext_ct_mismatch",
+        severity: "high",
+        ip: ipInfo.ip,
+        docId,
+        scope: "upload_complete",
+        message: "Unencrypted object content-type must be application/pdf",
+        meta: { contentType: ct },
+      });
+      return NextResponse.json({ ok: false, error: "invalid_content_type" }, { status: 409 });
     }
 
     

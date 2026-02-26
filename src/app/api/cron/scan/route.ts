@@ -7,6 +7,7 @@ import { isCronAuthorized } from "@/lib/cronAuth";
 import { sql } from "@/lib/db";
 import { scanR2Object } from "@/lib/malwareScan";
 import { logSecurityEvent } from "@/lib/securityTelemetry";
+import { healScanQueue } from "@/lib/scanQueue";
 
 type Job = {
   id: string;
@@ -25,6 +26,7 @@ export async function GET(req: NextRequest) {
 
   const maxJobs = Math.max(1, Math.min(25, Number(process.env.SCAN_CRON_BATCH || 10)));
   const absMaxBytes = Math.max(1024 * 1024, Number(process.env.SCAN_ABS_MAX_BYTES || 25_000_000)); // default 25MB
+  const queueHealth = await healScanQueue();
 
   // Claim jobs using SKIP LOCKED to avoid concurrent cron overlap.
   const jobs = (await sql`
@@ -113,5 +115,5 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ ok: true, claimed: jobs.length, results });
+  return NextResponse.json({ ok: true, claimed: jobs.length, queue_health: queueHealth, results });
 }

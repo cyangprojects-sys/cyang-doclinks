@@ -126,3 +126,14 @@ export function decryptAes256Gcm(args: {
   decipher.setAuthTag(tag);
   return Buffer.concat([decipher.update(data), decipher.final()]);
 }
+
+export function encryptAes256Gcm(args: {
+  plaintext: Buffer;
+  iv: Buffer;
+  key: Buffer;
+}): Buffer {
+  const cipher = crypto.createCipheriv("aes-256-gcm", args.key, args.iv);
+  const out = Buffer.concat([cipher.update(args.plaintext), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return Buffer.concat([out, tag]);
+}

@@ -8,6 +8,7 @@ import { decryptAes256Gcm, unwrapDataKey } from "@/lib/encryption";
 import { getMasterKeyByIdOrThrow } from "@/lib/masterKeys";
 import { hashUserAgent, hashIpForTicket } from "@/lib/accessTicket";
 import { Readable } from "node:stream";
+import { appendImmutableAudit } from "@/lib/immutableAudit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -172,6 +173,18 @@ export async function GET(
       } catch {
         // ignore
       }
+
+      await appendImmutableAudit({
+        streamKey: `doc:${t.doc_id}`,
+        action: "doc.decrypt",
+        docId: t.doc_id,
+        subjectId: t.id,
+        ipHash: hashIpForTicket(ip),
+        payload: {
+          keyVersion: enc.keyVersion,
+          purpose: t.purpose ?? null,
+        },
+      });
 
       void logSecurityEvent({
         type: "decrypt",

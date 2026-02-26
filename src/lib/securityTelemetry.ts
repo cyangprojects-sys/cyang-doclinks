@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import { sql } from "@/lib/db";
 import { rateLimit } from "@/lib/rateLimit";
+import { appendImmutableAudit } from "@/lib/immutableAudit";
 
 /**
  * Hash IP address (privacy safe logging)
@@ -102,6 +103,21 @@ export async function logSecurityEvent(
         ${ev.meta ? JSON.stringify(ev.meta) : null}::jsonb
       )
     `;
+
+    await appendImmutableAudit({
+      streamKey: `security:${ev.type}`,
+      action: "security.event",
+      actorUserId: ev.actorUserId ?? null,
+      orgId: ev.orgId ?? null,
+      docId: ev.docId ?? null,
+      ipHash: ev.ip ? hashIp(ev.ip) : null,
+      payload: {
+        severity: ev.severity,
+        scope: ev.scope ?? null,
+        message: ev.message ?? null,
+        meta: ev.meta ?? null,
+      },
+    });
   } catch (err) {
     // best-effort; do not crash request paths
     console.error("Failed to log security event:", err);

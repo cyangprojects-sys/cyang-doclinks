@@ -12,6 +12,7 @@ import { rateLimit, rateLimitHeaders, stableHash } from "@/lib/rateLimit";
 import { emitWebhook } from "@/lib/webhooks";
 import { geoDecisionForRequest, getCountryFromHeaders } from "@/lib/geo";
 import { assertCanServeView, incrementMonthlyViews } from "@/lib/monetization";
+import { enforcePlanLimitsEnabled } from "@/lib/billingFlags";
 
 function getClientIp(req: NextRequest) {
   const xff = req.headers.get("x-forwarded-for") || "";
@@ -116,7 +117,9 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ docId: stri
       await incrementMonthlyViews(ownerId, 1);
     }
   } catch {
-    // Fail closed behavior is handled inside assertCanServeView when enforcement is enabled.
+    if (enforcePlanLimitsEnabled()) {
+      return new Response("Temporarily unavailable", { status: 503 });
+    }
   }
 
   // Audit log (best-effort)

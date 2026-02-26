@@ -7,6 +7,7 @@
 
 import crypto from "crypto";
 import { sql } from "@/lib/db";
+import { appendImmutableAudit } from "@/lib/immutableAudit";
 
 export function getClientIpFromHeaders(h: Headers): string {
   // Keep this consistent with src/lib/securityTelemetry.ts (single source of truth for IP extraction)
@@ -137,4 +138,21 @@ export async function logDocAccess(args: {
   } catch {
     // best-effort
   }
+
+  const uaHash = userAgent
+    ? crypto.createHash("sha256").update(userAgent).digest("hex").slice(0, 32)
+    : null;
+  await appendImmutableAudit({
+    streamKey: `doc:${docId}`,
+    action: "doc.access",
+    docId,
+    subjectId: tokenToStore,
+    ipHash: ipHash ?? null,
+    payload: {
+      alias: alias ?? null,
+      tokenPresent: Boolean(tokenToStore),
+      emailPresent: Boolean(emailUsed),
+      uaHash,
+    },
+  });
 }

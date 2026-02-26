@@ -1,0 +1,12 @@
+*** Begin Patch
+*** Update File: vercel.json
+@@
+-  "crons": [
+-    {
+-      "path": "/api/cron/scan",
+-      "schedule": "*/10 * * * *"
+-    }
+-  ]
++  // NOTE: removed Vercel cron due to Hobby plan limitation (daily-only).
++  // Scheduling moved to Cloudflare Workers Cron Triggers.
+*** End Patch
