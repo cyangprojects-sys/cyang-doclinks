@@ -1,7 +1,6 @@
-// src/app/admin/dashboard/UploadPanel.tsx
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 type PresignResponse =
@@ -24,6 +23,15 @@ type KeyStatusResponse =
   | { ok: true; configured: boolean; active_key_id: string | null; revoked_active: boolean }
   | { ok: false; error: string; message?: string };
 
+type UploadItem = {
+  id: string;
+  file: File;
+  status: "queued" | "uploading" | "done" | "error";
+  message?: string;
+  viewUrl?: string;
+  docId?: string;
+};
+
 function fmtBytes(n: number) {
   if (!Number.isFinite(n)) return "";
   if (n < 1024) return `${n} B`;
@@ -41,26 +49,22 @@ export default function UploadPanel({
   canCheckEncryptionStatus: boolean;
 }) {
   const router = useRouter();
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const [title, setTitle] = useState("");
-  const [file, setFile] = useState<File | null>(null);
+  const [items, setItems] = useState<UploadItem[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const [docId, setDocId] = useState<string | null>(null);
-  const [viewUrl, setViewUrl] = useState<string | null>(null);
+  const [dragOver, setDragOver] = useState(false);
 
   const [encryptionReady, setEncryptionReady] = useState<boolean | null>(null);
   const [encryptionMsg, setEncryptionMsg] = useState<string | null>(null);
 
-  const fileLabel = useMemo(() => {
-    if (!file) return "Choose a PDF…";
-    return `${file.name} (${fmtBytes(file.size)})`;
-  }, [file]);
+  const queuedCount = useMemo(() => items.filter((i) => i.status === "queued").length, [items]);
+  const doneCount = useMemo(() => items.filter((i) => i.status === "done").length, [items]);
+  const errorCount = useMemo(() => items.filter((i) => i.status === "error").length, [items]);
 
   useEffect(() => {
     if (!canCheckEncryptionStatus) {
-      // Don't render encryption status for non-owner accounts.
       setEncryptionReady(null);
       setEncryptionMsg(null);
       return;
@@ -82,11 +86,7 @@ export default function UploadPanel({
 
         if (!j.configured || j.revoked_active) {
           setEncryptionReady(false);
-          setEncryptionMsg(
-            !j.configured
-              ? "Missing DOC_MASTER_KEYS"
-              : "Active master key is revoked (rotate to a new key)."
-          );
+          setEncryptionMsg(!j.configured ? "Missing DOC_MASTER_KEYS" : "Active master key is revoked (rotate to a new key).");
           return;
         }
 
@@ -105,112 +105,123 @@ export default function UploadPanel({
     };
   }, [canCheckEncryptionStatus]);
 
-  async function onUpload() {
+  function addFiles(files: FileList | File[]) {
+    const arr = Array.from(files || []);
+    const onlyPdf = arr.filter((f) => f.type === "application/pdf" || f.name.toLowerCase().endsWith(".pdf"));
+    if (arr.length && !onlyPdf.length) {
+      setError("Only PDF files are allowed.");
+      return;
+    }
+    if (!onlyPdf.length) return;
     setError(null);
-    setDocId(null);
-    setViewUrl(null);
+    setItems((prev) => [
+      ...prev,
+      ...onlyPdf.map((file) => ({
+        id: `${file.name}-${file.size}-${file.lastModified}-${crypto.randomUUID()}`,
+        file,
+        status: "queued" as const,
+      })),
+    ]);
+  }
 
+  function updateItem(id: string, patch: Partial<UploadItem>) {
+    setItems((prev) => prev.map((i) => (i.id === id ? { ...i, ...patch } : i)));
+  }
+
+  async function uploadOne(item: UploadItem) {
+    const file = item.file;
+    updateItem(item.id, { status: "uploading", message: undefined });
+
+    const presignRes = await fetch("/api/admin/upload/presign", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        title: file.name,
+        filename: file.name,
+        contentType: "application/pdf",
+        sizeBytes: file.size,
+        encrypt: true,
+      }),
+    });
+
+    const presignJson = (await presignRes.json().catch(() => null)) as PresignResponse | null;
+    if (!presignRes.ok || !presignJson || presignJson.ok !== true) {
+      const msg = (presignJson as any)?.message || (presignJson as any)?.error || `Init failed (${presignRes.status})`;
+      throw new Error(msg);
+    }
+
+    const enc = presignJson.encryption as any;
+    if (!enc?.enabled || !enc?.data_key_b64 || !enc?.iv_b64) {
+      throw new Error("Server did not provide encryption parameters.");
+    }
+
+    const keyBytes = b64ToU8(enc.data_key_b64);
+    const ivBytes = b64ToU8(enc.iv_b64);
+    const cryptoKey = await crypto.subtle.importKey("raw", keyBytes, { name: "AES-GCM" }, false, ["encrypt"]);
+    const plain = await file.arrayBuffer();
+    const cipher = await crypto.subtle.encrypt({ name: "AES-GCM", iv: ivBytes }, cryptoKey, plain);
+    const putBody = new Blob([new Uint8Array(cipher)], { type: "application/octet-stream" });
+
+    const putRes = await fetch(presignJson.upload_url, {
+      method: "PUT",
+      headers: {
+        "content-type": "application/octet-stream",
+        "x-amz-meta-doc-id": presignJson.doc_id,
+        "x-amz-meta-orig-content-type": "application/pdf",
+      },
+      body: putBody,
+    });
+    if (!putRes.ok) {
+      const txt = await putRes.text().catch(() => "");
+      throw new Error(`R2 upload failed (${putRes.status})${txt ? `: ${txt}` : ""}`);
+    }
+
+    const completeRes = await fetch("/api/admin/upload/complete", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        doc_id: presignJson.doc_id,
+        title: file.name,
+        original_filename: file.name,
+        r2_bucket: presignJson.bucket,
+        r2_key: presignJson.r2_key,
+      }),
+    });
+
+    const completeJson = (await completeRes.json().catch(() => null)) as CompleteResponse | null;
+    if (!completeRes.ok || !completeJson || completeJson.ok !== true) {
+      const msg = (completeJson as any)?.message || (completeJson as any)?.error || `Finalize failed (${completeRes.status})`;
+      throw new Error(msg);
+    }
+
+    updateItem(item.id, {
+      status: "done",
+      docId: completeJson.doc_id,
+      viewUrl: completeJson.view_url,
+    });
+  }
+
+  async function onUploadAll() {
+    setError(null);
     if (encryptionReady === false) {
       setError(encryptionMsg || "Encryption is not configured.");
       return;
     }
-
-    if (!file) {
-      setError("Choose a PDF first.");
-      return;
-    }
-
-    const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
-    if (!isPdf) {
-      setError("Only PDFs are allowed.");
+    if (!items.some((i) => i.status === "queued")) {
+      setError("Add at least one PDF first.");
       return;
     }
 
     setBusy(true);
     try {
-      // 1) Presign (encryption is mandatory)
-      const presignRes = await fetch("/api/admin/upload/presign", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          title: title || file.name,
-          filename: file.name,
-          contentType: "application/pdf",
-          sizeBytes: file.size,
-          encrypt: true,
-        }),
-      });
-
-      const presignJson = (await presignRes.json().catch(() => null)) as PresignResponse | null;
-      if (!presignRes.ok || !presignJson || presignJson.ok !== true) {
-        const msg =
-          (presignJson as any)?.message ||
-          (presignJson as any)?.error ||
-          `Init failed (${presignRes.status})`;
-        throw new Error(msg);
+      const queue = items.filter((i) => i.status === "queued");
+      for (const item of queue) {
+        try {
+          await uploadOne(item);
+        } catch (e: any) {
+          updateItem(item.id, { status: "error", message: e?.message || "Upload failed." });
+        }
       }
-
-      const enc = presignJson.encryption as any;
-      if (!enc?.enabled || !enc?.data_key_b64 || !enc?.iv_b64) {
-        throw new Error("Server did not provide encryption parameters.");
-      }
-
-      // 2) Client-side encryption (AES-256-GCM)
-      const keyBytes = b64ToU8(enc.data_key_b64);
-      const ivBytes = b64ToU8(enc.iv_b64);
-
-      const cryptoKey = await crypto.subtle.importKey("raw", keyBytes, { name: "AES-GCM" }, false, ["encrypt"]);
-      const plain = await file.arrayBuffer();
-      const cipher = await crypto.subtle.encrypt({ name: "AES-GCM", iv: ivBytes }, cryptoKey, plain);
-
-      const putBody = new Blob([new Uint8Array(cipher)], { type: "application/octet-stream" });
-
-      // 3) PUT to R2
-      const putRes = await fetch(presignJson.upload_url, {
-        method: "PUT",
-        headers: {
-          "content-type": "application/octet-stream",
-          // These two headers are part of the presigned request.
-          // They allow the server to verify object provenance during /complete.
-          "x-amz-meta-doc-id": presignJson.doc_id,
-          "x-amz-meta-orig-content-type": "application/pdf",
-        },
-        body: putBody,
-      });
-
-      if (!putRes.ok) {
-        const txt = await putRes.text().catch(() => "");
-        throw new Error(`R2 upload failed (${putRes.status})${txt ? `: ${txt}` : ""}`);
-      }
-
-      // 4) Complete
-      const completeRes = await fetch("/api/admin/upload/complete", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          doc_id: presignJson.doc_id,
-          title: title || file.name,
-          original_filename: file.name,
-          r2_bucket: presignJson.bucket,
-          r2_key: presignJson.r2_key,
-        }),
-      });
-
-      const completeJson = (await completeRes.json().catch(() => null)) as CompleteResponse | null;
-      if (!completeRes.ok || !completeJson || completeJson.ok !== true) {
-        const msg =
-          (completeJson as any)?.message ||
-          (completeJson as any)?.error ||
-          `Finalize failed (${completeRes.status})`;
-        throw new Error(msg);
-      }
-
-      setDocId(completeJson.doc_id);
-      setViewUrl(completeJson.view_url);
-
-      setTitle("");
-      setFile(null);
-
       router.refresh();
     } catch (e: any) {
       setError(e?.message || "Upload failed.");
@@ -223,68 +234,113 @@ export default function UploadPanel({
     <div className="rounded-xl border border-white/10 bg-white/5 p-5">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold">Upload document</h2>
+          <h2 className="text-lg font-semibold">Upload documents</h2>
           <p className="mt-1 text-sm text-white/60">
-            Direct-to-R2 signed PUT. Creates doc row first, then finalizes and generates alias.
+            Drag and drop one or many PDFs. Document title is automatically set from filename.
           </p>
         </div>
 
         <button
-          onClick={onUpload}
-          disabled={busy || !file || encryptionReady === false}
+          onClick={onUploadAll}
+          disabled={busy || queuedCount === 0 || encryptionReady === false}
           className="rounded-lg border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold hover:bg-white/10 disabled:opacity-50"
         >
-          {busy ? "Uploading…" : "Upload"}
+          {busy ? "Uploading..." : `Upload${queuedCount > 0 ? ` (${queuedCount})` : ""}`}
         </button>
       </div>
 
-      <div className="mt-4 grid gap-3 md:grid-cols-2">
-        <div>
-          <div className="text-xs font-medium text-white/70">Title (optional)</div>
+      <div className="mt-4">
+        <div
+          onDragOver={(e) => {
+            e.preventDefault();
+            setDragOver(true);
+          }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={(e) => {
+            e.preventDefault();
+            setDragOver(false);
+            if (e.dataTransfer?.files?.length) addFiles(e.dataTransfer.files);
+          }}
+          onClick={() => fileInputRef.current?.click()}
+          className={`cursor-pointer rounded-xl border-2 border-dashed px-4 py-8 text-center transition ${
+            dragOver ? "border-sky-300 bg-sky-500/10" : "border-white/20 bg-black/30 hover:border-white/40"
+          }`}
+        >
+          <div className="text-sm font-medium text-white">Drop PDF files here</div>
+          <div className="mt-1 text-xs text-white/60">or click to browse multiple files</div>
           <input
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="Shown in admin list / emails"
-            className="mt-1 w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm outline-none focus:border-white/20"
+            ref={fileInputRef}
+            type="file"
+            multiple
+            accept="application/pdf"
+            className="hidden"
+            onChange={(e) => {
+              if (e.target.files?.length) addFiles(e.target.files);
+              e.currentTarget.value = "";
+            }}
           />
-        </div>
-
-        <div>
-          <div className="text-xs font-medium text-white/70">PDF file</div>
-          <label className="mt-1 flex cursor-pointer items-center justify-between gap-3 rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm hover:border-white/20">
-            <span className="truncate text-white/80">{fileLabel}</span>
-            <span className="rounded-md border border-white/10 bg-white/5 px-2 py-1 text-xs font-semibold">Browse…</span>
-            <input
-              type="file"
-              accept="application/pdf"
-              className="hidden"
-              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-            />
-          </label>
         </div>
       </div>
 
       <div className="mt-3 rounded-lg border border-emerald-400/10 bg-emerald-400/5 px-3 py-2 text-xs text-emerald-200/90">
-        🔐 Documents are encrypted end-to-end (AES-256-GCM). The server only decrypts when serving.
+        Documents are encrypted end-to-end (AES-256-GCM). The server only decrypts when serving.
       </div>
 
       {canCheckEncryptionStatus && encryptionReady === false && (
-        <div className="mt-2 text-sm text-red-300">
-          {encryptionMsg ?? "Encryption not configured."}
-        </div>
+        <div className="mt-2 text-sm text-red-300">{encryptionMsg ?? "Encryption not configured."}</div>
       )}
 
       {error && <div className="mt-3 text-sm text-red-300">{error}</div>}
 
-      {docId && viewUrl && (
-        <div className="mt-4 rounded-lg border border-white/10 bg-black/30 px-3 py-3 text-sm">
-          <div className="text-xs text-white/50">Uploaded</div>
-          <div className="mt-1 font-mono text-xs text-white/70">{docId}</div>
-          <a className="mt-2 inline-block text-sm text-sky-300 hover:underline" href={viewUrl}>
-            {viewUrl}
-          </a>
+      {items.length > 0 ? (
+        <div className="mt-4 rounded-lg border border-white/10 bg-black/30 p-3 text-sm">
+          <div className="mb-2 flex flex-wrap items-center gap-3 text-xs text-white/60">
+            <span>Total: {items.length}</span>
+            <span>Done: {doneCount}</span>
+            <span>Errors: {errorCount}</span>
+          </div>
+          <div className="max-h-72 overflow-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="text-white/50">
+                <tr>
+                  <th className="py-1 pr-2">File</th>
+                  <th className="py-1 pr-2">Size</th>
+                  <th className="py-1 pr-2">Status</th>
+                  <th className="py-1 pr-2">Result</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((item) => (
+                  <tr key={item.id} className="border-t border-white/10">
+                    <td className="py-2 pr-2 text-white/85">{item.file.name}</td>
+                    <td className="py-2 pr-2 text-white/60">{fmtBytes(item.file.size)}</td>
+                    <td className="py-2 pr-2">
+                      {item.status === "done"
+                        ? "Done"
+                        : item.status === "error"
+                          ? "Error"
+                          : item.status === "uploading"
+                            ? "Uploading..."
+                            : "Queued"}
+                    </td>
+                    <td className="py-2 pr-2 text-white/70">
+                      {item.status === "error" ? (
+                        <span className="text-red-300">{item.message || "Upload failed"}</span>
+                      ) : item.viewUrl ? (
+                        <a href={item.viewUrl} className="text-sky-300 hover:underline">
+                          Open
+                        </a>
+                      ) : (
+                        "-"
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
-      )}
+      ) : null}
     </div>
   );
 }
