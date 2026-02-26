@@ -6,8 +6,9 @@ import { NextResponse, type NextRequest } from "next/server";
 import { isCronAuthorized } from "@/lib/cronAuth";
 import { sql } from "@/lib/db";
 import { scanR2Object } from "@/lib/malwareScan";
-import { logSecurityEvent } from "@/lib/securityTelemetry";
+import { logSecurityEvent, detectScanFailureSpike } from "@/lib/securityTelemetry";
 import { healScanQueue } from "@/lib/scanQueue";
+import { reportException } from "@/lib/observability";
 
 type Job = {
   id: string;
@@ -48,7 +49,7 @@ export async function GET(req: NextRequest) {
     returning j.id::text as id, j.doc_id::text as doc_id, j.r2_bucket::text as r2_bucket, j.r2_key::text as r2_key, j.attempts::int as attempts
   `) as unknown as Job[];
 
-  const results: any[] = [];
+  const results: Array<Record<string, unknown>> = [];
   for (const job of jobs) {
     try {
       const verdict = await scanR2Object({
@@ -99,8 +100,8 @@ export async function GET(req: NextRequest) {
       }
 
       results.push({ id: job.id, ok: true, verdict: verdict.verdict, riskLevel: verdict.riskLevel });
-    } catch (e: any) {
-      const msg = String(e?.message || e);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
 
       await sql`
         update public.malware_scan_jobs
@@ -110,6 +111,21 @@ export async function GET(req: NextRequest) {
           last_error = ${msg}
         where id = ${job.id}::uuid
       `;
+
+      await logSecurityEvent({
+        type: "malware_scan_job_failed",
+        severity: "high",
+        docId: job.doc_id,
+        scope: "scanner",
+        message: "Malware scan job failed",
+        meta: { jobId: job.id, attempts: job.attempts, error: msg },
+      });
+      await detectScanFailureSpike();
+      await reportException({
+        error: e,
+        event: "malware_scan_job_error",
+        context: { jobId: job.id, docId: job.doc_id },
+      });
 
       results.push({ id: job.id, ok: false, error: msg });
     }

@@ -9,10 +9,11 @@ import { r2Client, r2Bucket } from "@/lib/r2";
 import { requireUser } from "@/lib/authz";
 import { assertCanUpload } from "@/lib/monetization";
 import { enforcePlanLimitsEnabled } from "@/lib/billingFlags";
-import { enforceGlobalApiRateLimit, clientIpKey, logSecurityEvent } from "@/lib/securityTelemetry";
+import { enforceGlobalApiRateLimit, clientIpKey, logSecurityEvent, detectPresignFailureSpike } from "@/lib/securityTelemetry";
 import { generateDataKey, generateIv, wrapDataKey } from "@/lib/encryption";
 import { getActiveMasterKeyOrThrow } from "@/lib/masterKeys";
 import { appendImmutableAudit } from "@/lib/immutableAudit";
+import { reportException } from "@/lib/observability";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -47,6 +48,7 @@ function getKeyPrefix() {
 }
 
 export async function POST(req: Request) {
+  const ipInfo = clientIpKey(req);
   try {
     const user = await requireUser();
 
@@ -67,7 +69,6 @@ export async function POST(req: Request) {
     }
 
     // Upload presign throttle per-IP (stronger)
-    const ipInfo = clientIpKey(req);
     const presignRl = await enforceGlobalApiRateLimit({
       req,
       scope: "ip:upload_presign",
@@ -142,8 +143,19 @@ export async function POST(req: Request) {
     let mk;
     try {
       mk = await getActiveMasterKeyOrThrow();
-    } catch (e: any) {
-      const msg = e?.message === "MASTER_KEY_REVOKED" ? "Active master key is revoked." : "Missing DOC_MASTER_KEYS.";
+    } catch (e: unknown) {
+      const msg = e instanceof Error && e.message === "MASTER_KEY_REVOKED" ? "Active master key is revoked." : "Missing DOC_MASTER_KEYS.";
+      await logSecurityEvent({
+        type: "upload_presign_error",
+        severity: "high",
+        ip: ipInfo.ip,
+        actorUserId: user.id,
+        orgId: user.orgId ?? null,
+        scope: "upload_presign",
+        message: "Encryption configuration unavailable during presign",
+        meta: { reason: msg },
+      });
+      await detectPresignFailureSpike({ ip: ipInfo.ip });
       return NextResponse.json(
         { ok: false, error: "ENCRYPTION_NOT_CONFIGURED", message: msg },
         { status: 500 }
@@ -260,10 +272,23 @@ export async function POST(req: Request) {
       expires_in: expiresIn,
       encryption: { enabled: true, alg: encAlg, iv_b64: encIv.toString("base64"), data_key_b64: dataKey.toString("base64") },
     });
-  } catch (err: any) {
-    console.error("PRESIGN ERROR:", err);
+  } catch (err: unknown) {
+    await logSecurityEvent({
+      type: "upload_presign_error",
+      severity: "high",
+      ip: ipInfo.ip,
+      scope: "upload_presign",
+      message: "Unhandled presign error",
+      meta: { error: err instanceof Error ? err.message : String(err) },
+    });
+    await detectPresignFailureSpike({ ip: ipInfo.ip });
+    await reportException({
+      error: err,
+      event: "upload_presign_route_error",
+      context: { route: "/api/admin/upload/presign" },
+    });
     return NextResponse.json(
-      { ok: false, error: "SERVER_ERROR", message: err?.message ?? String(err) },
+      { ok: false, error: "SERVER_ERROR", message: err instanceof Error ? err.message : String(err) },
       { status: 500 }
     );
   }

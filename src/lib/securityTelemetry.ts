@@ -246,3 +246,90 @@ export async function detectStorageSpike(args: {
     // ignore
   }
 }
+
+async function detectEventSpike(args: {
+  eventType: string;
+  windowMinutes: number;
+  threshold: number;
+  alertType: string;
+  severity: "low" | "medium" | "high";
+  ip?: string | null;
+  scope: string;
+  message: string;
+  meta?: Record<string, unknown>;
+}) {
+  const { eventType, windowMinutes, threshold } = args;
+  if (!eventType || threshold <= 0 || windowMinutes <= 0) return;
+
+  try {
+    const rows = (await sql`
+      select count(*)::int as c
+      from public.security_events
+      where type = ${eventType}
+        and created_at > now() - (${windowMinutes}::text || ' minutes')::interval
+    `) as unknown as Array<{ c: number }>;
+    const count = Number(rows?.[0]?.c ?? 0);
+    if (count < threshold) return;
+
+    await logSecurityEvent({
+      type: args.alertType,
+      severity: args.severity,
+      ip: args.ip ?? null,
+      scope: args.scope,
+      message: args.message,
+      meta: {
+        sourceEvent: eventType,
+        count,
+        threshold,
+        windowMinutes,
+        ...(args.meta ?? {}),
+      },
+    });
+  } catch {
+    // ignore
+  }
+}
+
+export async function detectAbuseReportSpike(args: { ip?: string | null }) {
+  const threshold = Math.max(1, Number(process.env.ABUSE_REPORT_SPIKE_THRESHOLD || 20));
+  const windowMinutes = Math.max(1, Number(process.env.ABUSE_REPORT_SPIKE_WINDOW_MINUTES || 10));
+  await detectEventSpike({
+    eventType: "abuse_report_submitted",
+    threshold,
+    windowMinutes,
+    alertType: "abuse_report_spike",
+    severity: "high",
+    ip: args.ip ?? null,
+    scope: "abuse_report",
+    message: "Abuse report submission spike detected",
+  });
+}
+
+export async function detectPresignFailureSpike(args: { ip?: string | null }) {
+  const threshold = Math.max(1, Number(process.env.PRESIGN_FAILURE_SPIKE_THRESHOLD || 15));
+  const windowMinutes = Math.max(1, Number(process.env.PRESIGN_FAILURE_SPIKE_WINDOW_MINUTES || 10));
+  await detectEventSpike({
+    eventType: "upload_presign_error",
+    threshold,
+    windowMinutes,
+    alertType: "upload_presign_failure_spike",
+    severity: "high",
+    ip: args.ip ?? null,
+    scope: "upload_presign",
+    message: "Upload presign failures spiked",
+  });
+}
+
+export async function detectScanFailureSpike() {
+  const threshold = Math.max(1, Number(process.env.SCAN_FAILURE_SPIKE_THRESHOLD || 10));
+  const windowMinutes = Math.max(1, Number(process.env.SCAN_FAILURE_SPIKE_WINDOW_MINUTES || 10));
+  await detectEventSpike({
+    eventType: "malware_scan_job_failed",
+    threshold,
+    windowMinutes,
+    alertType: "malware_scan_failure_spike",
+    severity: "high",
+    scope: "scanner",
+    message: "Malware scan failures spiked",
+  });
+}
