@@ -104,6 +104,8 @@ export async function createAndEmailShareToken(
   try {
     const docId = String(form.get("docId") || "").trim();
     const alias = String(form.get("alias") || "").trim();
+    const shareTitleRaw = String(form.get("shareTitle") || "").trim();
+    const shareTitle = shareTitleRaw ? shareTitleRaw.slice(0, 240) : null;
     const toEmailRaw = String(form.get("toEmail") || "").trim();
     const expiresAtRaw = String(form.get("expiresAt") || "").trim();
     const maxViewsRaw = String(form.get("maxViews") || "").trim();
@@ -113,6 +115,14 @@ export async function createAndEmailShareToken(
       return { ok: false, error: "bad_request", message: "Missing docId" };
 
     await requireDocWrite(docId);
+
+    if (shareTitle) {
+      await sql`
+        update public.docs
+        set title = ${shareTitle}
+        where id = ${docId}::uuid
+      `;
+    }
 
     const toEmail = toEmailRaw ? toEmailRaw.toLowerCase() : null;
 
@@ -178,7 +188,7 @@ if (ownerId) {
     // no recipient email → just return
     if (!toEmail) return { ok: true, token, url };
 
-    const title = docRows[0]?.title || "Document";
+    const title = shareTitle || docRows[0]?.title || "Document";
     const pretty = alias ? `/d/${alias}` : title;
 
     const subject = `Cyang Docs: ${title}`;

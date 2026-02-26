@@ -24,6 +24,7 @@ function toIsoFromDatetimeLocal(v: string): string | "" {
 }
 
 export default function ShareForm({ docId, alias }: { docId: string; alias?: string }) {
+  const [shareTitle, setShareTitle] = useState("");
   const [toEmail, setToEmail] = useState("");
   const [password, setPassword] = useState("");
   const [maxViews, setMaxViews] = useState<string>("");
@@ -49,6 +50,7 @@ export default function ShareForm({ docId, alias }: { docId: string; alias?: str
       const fd = new FormData();
       fd.set("docId", docId);
       fd.set("alias", alias || "");
+      fd.set("shareTitle", shareTitle.trim() ? shareTitle.trim() : "");
       fd.set("toEmail", toEmail.trim() ? toEmail.trim() : "");
       fd.set("password", password); // may be blank
       fd.set("expiresAt", toIsoFromDatetimeLocal(expiresLocal));
@@ -97,6 +99,21 @@ export default function ShareForm({ docId, alias }: { docId: string; alias?: str
   return (
     <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-4 shadow-sm">
       <div className="flex flex-col gap-3">
+        <div>
+          <label className="text-sm font-medium text-neutral-300">
+            Title before sharing (optional)
+          </label>
+          <div className="mt-1 text-xs text-neutral-500">
+            If set, updates this document title before creating the share link.
+          </div>
+          <input
+            value={shareTitle}
+            onChange={(e) => setShareTitle(e.target.value)}
+            placeholder="Leave blank to keep current title"
+            className="mt-2 w-full rounded-lg border border-neutral-800 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 placeholder:text-neutral-500 focus:border-neutral-600 focus:outline-none focus:ring-2 focus:ring-neutral-700 transition"
+          />
+        </div>
+
         <div>
           <label className="text-sm font-medium text-neutral-300">
             Recipient Email (optional)

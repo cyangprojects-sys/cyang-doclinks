@@ -10,6 +10,7 @@ import { authOptions } from "@/auth";
 import { sql } from "@/lib/db";
 import { isAliasUnlockedAction } from "./unlockActions";
 import { getAuthedUser, roleAtLeast } from "@/lib/authz";
+import { allowUnencryptedServing } from "@/lib/securityPolicy";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -112,6 +113,43 @@ async function userOwnsDoc(userId: string, docId: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+async function getDocAvailabilityHint(docId: string): Promise<string | null> {
+  try {
+    const rows = (await sql`
+      select
+        coalesce(encryption_enabled, false) as encryption_enabled,
+        coalesce(moderation_status::text, 'active') as moderation_status,
+        coalesce(scan_status::text, 'unscanned') as scan_status
+      from public.docs
+      where id = ${docId}::uuid
+      limit 1
+    `) as unknown as Array<{
+      encryption_enabled: boolean;
+      moderation_status: string;
+      scan_status: string;
+    }>;
+
+    const r = rows?.[0];
+    if (!r) return null;
+
+    if (!r.encryption_enabled && !allowUnencryptedServing()) {
+      return "This is a legacy unencrypted upload. Serving is blocked by policy (ALLOW_UNENCRYPTED_SERVE=false). Re-upload or migrate this document to encrypted storage.";
+    }
+
+    const moderation = String(r.moderation_status || "active").toLowerCase();
+    if (moderation === "quarantined") return "This document is quarantined and cannot be served without an active override.";
+    if (moderation === "disabled" || moderation === "deleted") return `This document is ${moderation} and unavailable.`;
+
+    const blockedScanStates = new Set(["failed", "error", "infected", "quarantined"]);
+    if (blockedScanStates.has(String(r.scan_status || "unscanned").toLowerCase())) {
+      return `Serving is blocked due to scan status: ${r.scan_status}.`;
+    }
+  } catch {
+    // ignore
+  }
+  return null;
 }
 
 /**
@@ -219,10 +257,11 @@ export default async function SharePage({
     (u ? roleAtLeast(u.role, "admin") || (await userOwnsDoc(u.id, bypass.docId)) : false);
 
   if (isPrivileged) {
+    const availabilityHint = await getDocAvailabilityHint(bypass.docId);
     return (
       <main className="mx-auto max-w-5xl px-4 py-10">
         <ShareForm docId={bypass.docId} />
-        <DocumentViewer docId={bypass.docId} alias={alias} />
+        <DocumentViewer docId={bypass.docId} alias={alias} availabilityHint={availabilityHint} />
       </main>
     );
   }
@@ -259,13 +298,18 @@ export default async function SharePage({
   );
 }
 
-function DocumentViewer({ docId, alias }: { docId: string; alias: string }) {
+function DocumentViewer({ docId, alias, availabilityHint }: { docId: string; alias: string; availabilityHint?: string | null }) {
   const viewerUrl = `/serve/${docId}?alias=${encodeURIComponent(alias)}`;
 
   const downloadUrl = `/serve/${docId}?alias=${encodeURIComponent(alias)}&disposition=attachment`;
 
   return (
     <div className="mt-4">
+      {availabilityHint ? (
+        <div className="mb-3 rounded-lg border border-amber-700/40 bg-amber-950/30 px-3 py-2 text-sm text-amber-100">
+          {availabilityHint}
+        </div>
+      ) : null}
       <div className="overflow-hidden rounded-xl border border-white/10 bg-white/5">
         <iframe
           title="Document viewer"
