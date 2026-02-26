@@ -1,4 +1,4 @@
-// src/app/admin/api-keys/page.tsx
+// src/app/admin/(owner)/api-keys/page.tsx
 import { redirect } from "next/navigation";
 import { unstable_noStore as noStore } from "next/cache";
 import { sql } from "@/lib/db";
@@ -18,6 +18,13 @@ type Row = {
   revoked_at: string | null;
   last_used_at: string | null;
 };
+
+function fmtDate(s: string | null) {
+  if (!s) return "-";
+  const d = new Date(s);
+  if (Number.isNaN(d.getTime())) return s;
+  return d.toLocaleString();
+}
 
 export default async function ApiKeysPage() {
   noStore();
@@ -42,27 +49,25 @@ export default async function ApiKeysPage() {
   `) as unknown as Row[];
 
   return (
-    <div className="mx-auto max-w-5xl p-6 text-white">
-      <div className="mb-6 flex items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold">API Keys</h1>
+    <div className="mx-auto max-w-6xl p-4 text-white md:p-6">
+      <div className="mb-5 flex items-center justify-between gap-3">
+        <h1 className="text-2xl font-semibold tracking-tight">API Keys</h1>
       </div>
 
-      <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-4">
-        <p className="text-sm text-neutral-300">
-          Create keys for programmatic access. Keys are shown <span className="font-medium">once</span> at creation.
-          Store them somewhere safe.
+      <section className="glass-card-strong rounded-2xl p-4">
+        <p className="text-sm text-white/70">
+          Create keys for programmatic access. New keys are shown once at creation.
         </p>
         <div className="mt-4">
           <CreateApiKeyForm />
         </div>
-      </div>
+      </section>
 
-      <div className="mt-8">
+      <section className="mt-8">
         <h2 className="text-lg font-medium">Your keys</h2>
-
-        <div className="mt-3 overflow-x-auto rounded-xl border border-neutral-800">
+        <div className="glass-card-strong mt-3 overflow-x-auto rounded-2xl border border-white/10">
           <table className="min-w-[900px] text-sm">
-            <thead className="bg-neutral-900 text-neutral-400">
+            <thead className="bg-[#10192b]/95 text-white/75 backdrop-blur">
               <tr>
                 <th className="px-4 py-3 text-left">Name</th>
                 <th className="px-4 py-3 text-left">Prefix</th>
@@ -76,31 +81,27 @@ export default async function ApiKeysPage() {
               {rows.map((r) => {
                 const revoked = !!r.revoked_at;
                 return (
-                  <tr key={r.id} className="border-t border-neutral-800 hover:bg-neutral-900">
-                    <td className="px-4 py-3 whitespace-nowrap">{r.name}</td>
-                    <td className="px-4 py-3 whitespace-nowrap font-mono text-xs">{r.prefix}</td>
-                    <td className="px-4 py-3 whitespace-nowrap">{r.created_at}</td>
-                    <td className="px-4 py-3 whitespace-nowrap">{r.last_used_at ?? "—"}</td>
-                    <td className="px-4 py-3 whitespace-nowrap">
+                  <tr key={r.id} className="border-t border-white/10 hover:bg-white/[0.03]">
+                    <td className="whitespace-nowrap px-4 py-3 text-white">{r.name}</td>
+                    <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-white/85">{r.prefix}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-white/70">{fmtDate(r.created_at)}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-white/70">{fmtDate(r.last_used_at)}</td>
+                    <td className="whitespace-nowrap px-4 py-3">
                       {revoked ? (
-                        <span className="text-neutral-400">Revoked</span>
+                        <span className="inline-flex items-center rounded-full border border-amber-500/25 bg-amber-500/10 px-2 py-0.5 text-xs text-amber-100">Revoked</span>
                       ) : (
-                        <span className="text-emerald-300">Active</span>
+                        <span className="inline-flex items-center rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2 py-0.5 text-xs text-emerald-100">Active</span>
                       )}
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-right">
-                      {revoked ? (
-                        <span className="text-neutral-500">—</span>
-                      ) : (
-                        <RevokeApiKeyButton id={r.id} />
-                      )}
+                    <td className="whitespace-nowrap px-4 py-3 text-right">
+                      {revoked ? <span className="text-white/50">-</span> : <RevokeApiKeyButton id={r.id} />}
                     </td>
                   </tr>
                 );
               })}
               {!rows.length && (
                 <tr>
-                  <td className="px-4 py-6 text-neutral-400" colSpan={6}>
+                  <td className="px-4 py-6 text-white/60" colSpan={6}>
                     No API keys yet.
                   </td>
                 </tr>
@@ -109,10 +110,11 @@ export default async function ApiKeysPage() {
           </table>
         </div>
 
-        <div className="mt-3 text-xs text-neutral-400">
-          Tip: set <span className="font-mono">API_KEY_SALT</span> in your environment to enable hashing.
+        <div className="mt-3 text-xs text-white/60">
+          Tip: set <span className="font-mono">API_KEY_SALT</span> in env to enable hashing.
         </div>
-      </div>
+      </section>
     </div>
   );
 }
+
