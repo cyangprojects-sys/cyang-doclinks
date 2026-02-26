@@ -2,14 +2,14 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
-import { requireRole } from "@/lib/authz";
+import { requirePermission } from "@/lib/rbac";
 import { clearViewLimitOverride, setViewLimitOverride } from "@/lib/viewLimitOverride";
 import { appendImmutableAudit } from "@/lib/immutableAudit";
 import { logSecurityEvent } from "@/lib/securityTelemetry";
 
 export async function POST(req: Request) {
   try {
-    const u = await requireRole("owner");
+    const u = await requirePermission("billing.override");
     const form = await req.formData();
     const action = String(form.get("action") || "").trim();
     const ownerId = String(form.get("ownerId") || u.id).trim();

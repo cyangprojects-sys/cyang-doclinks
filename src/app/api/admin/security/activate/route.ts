@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireRole } from "@/lib/authz";
+import { requirePermission } from "@/lib/rbac";
 import { setActiveMasterKey } from "@/lib/masterKeys";
 import { logSecurityEvent } from "@/lib/securityTelemetry";
 
@@ -14,7 +14,7 @@ const Body = z.object({
 
 export async function POST(req: Request) {
   try {
-    const u = await requireRole("owner");
+    const u = await requirePermission("security.keys.manage");
     const json = await req.json().catch(() => null);
     const parsed = Body.safeParse(json);
     if (!parsed.success) return NextResponse.json({ ok: false, error: "BAD_REQUEST" }, { status: 400 });

@@ -2,7 +2,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
-import { requireRole } from "@/lib/authz";
+import { requirePermission } from "@/lib/rbac";
 import { setBillingFlags, getBillingFlags } from "@/lib/settings";
 
 function asCheckboxBool(v: FormDataEntryValue | null): boolean {
@@ -13,13 +13,13 @@ function asCheckboxBool(v: FormDataEntryValue | null): boolean {
 }
 
 export async function GET() {
-  await requireRole("owner");
+  await requirePermission("billing.manage");
   const res = await getBillingFlags();
   return NextResponse.json(res, { status: res.ok ? 200 : 500 });
 }
 
 export async function POST(req: Request) {
-  await requireRole("owner");
+  await requirePermission("billing.manage");
 
   const url = new URL(req.url);
 

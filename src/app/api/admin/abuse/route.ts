@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
-import { requireOwner } from "@/lib/owner";
+import { requirePermission } from "@/lib/rbac";
 import { clientIpKey, logSecurityEvent, enforceGlobalApiRateLimit } from "@/lib/securityTelemetry";
 import { createQuarantineOverride, revokeActiveQuarantineOverride } from "@/lib/quarantineOverride";
 import { appendImmutableAudit } from "@/lib/immutableAudit";
@@ -21,9 +21,14 @@ function norm(s: any): string {
 }
 
 export async function POST(req: NextRequest) {
-  // Owner auth
-  const owner = await requireOwner();
-  if (!owner.ok) return NextResponse.json({ ok: false, error: owner.reason }, { status: owner.reason === "FORBIDDEN" ? 403 : 401 });
+  let user;
+  try {
+    user = await requirePermission("abuse.manage");
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : "FORBIDDEN";
+    const status = msg === "UNAUTHENTICATED" ? 401 : 403;
+    return NextResponse.json({ ok: false, error: msg }, { status });
+  }
 
   const ipInfo = clientIpKey(req);
 
@@ -61,7 +66,7 @@ export async function POST(req: NextRequest) {
         moderation_status = ${act === "disable_doc" ? "disabled" : "quarantined"},
         scan_status = ${act === "quarantine_doc" ? "quarantined" : sql`scan_status`},
         disabled_at = now(),
-        disabled_by = ${owner.user.id}::uuid,
+        disabled_by = ${user.id}::uuid,
         disabled_reason = ${reason}
       where id = ${docId}::uuid
     `;
@@ -86,10 +91,10 @@ export async function POST(req: NextRequest) {
       message: reason || "Admin moderation action",
     });
     await appendImmutableAudit({
-      streamKey: `admin:${owner.user.id}`,
+      streamKey: `admin:${user.id}`,
       action: "admin.abuse_doc_action",
-      actorUserId: owner.user.id,
-      orgId: owner.user.orgId ?? null,
+      actorUserId: user.id,
+      orgId: user.orgId ?? null,
       docId,
       ipHash: ipInfo.ipHash,
       payload: { action: act, reason, reportId: (body as any).reportId ?? null },
@@ -112,7 +117,7 @@ export async function POST(req: NextRequest) {
 
     const created = await createQuarantineOverride({
       docId,
-      actorUserId: owner.user.id,
+      actorUserId: user.id,
       reason,
       ttlMinutes,
     });
@@ -123,8 +128,8 @@ export async function POST(req: NextRequest) {
       severity: "high",
       ip: ipInfo.ip,
       docId,
-      actorUserId: owner.user.id,
-      orgId: owner.user.orgId ?? null,
+      actorUserId: user.id,
+      orgId: user.orgId ?? null,
       scope: "admin_abuse",
       message: reason || "Temporary quarantine override granted",
       meta: { overrideId: created.id, expiresAt: created.expires_at, ttlMinutes },
@@ -132,8 +137,8 @@ export async function POST(req: NextRequest) {
     await appendImmutableAudit({
       streamKey: `doc:${docId}`,
       action: "doc.quarantine_override_granted",
-      actorUserId: owner.user.id,
-      orgId: owner.user.orgId ?? null,
+      actorUserId: user.id,
+      orgId: user.orgId ?? null,
       docId,
       ipHash: ipInfo.ipHash,
       payload: { reason, ttlMinutes, overrideId: created.id, expiresAt: created.expires_at },
@@ -155,7 +160,7 @@ export async function POST(req: NextRequest) {
 
     const revoked = await revokeActiveQuarantineOverride({
       docId,
-      actorUserId: owner.user.id,
+      actorUserId: user.id,
       reason,
     });
     await logSecurityEvent({
@@ -163,8 +168,8 @@ export async function POST(req: NextRequest) {
       severity: "high",
       ip: ipInfo.ip,
       docId,
-      actorUserId: owner.user.id,
-      orgId: owner.user.orgId ?? null,
+      actorUserId: user.id,
+      orgId: user.orgId ?? null,
       scope: "admin_abuse",
       message: reason || "Quarantine override revoked",
       meta: { revoked },
@@ -172,8 +177,8 @@ export async function POST(req: NextRequest) {
     await appendImmutableAudit({
       streamKey: `doc:${docId}`,
       action: "doc.quarantine_override_revoked",
-      actorUserId: owner.user.id,
-      orgId: owner.user.orgId ?? null,
+      actorUserId: user.id,
+      orgId: user.orgId ?? null,
       docId,
       ipHash: ipInfo.ipHash,
       payload: { reason, revoked },
@@ -211,10 +216,10 @@ export async function POST(req: NextRequest) {
       meta: { token: token.slice(0, 12) },
     });
     await appendImmutableAudit({
-      streamKey: `admin:${owner.user.id}`,
+      streamKey: `admin:${user.id}`,
       action: "admin.abuse_revoke_share",
-      actorUserId: owner.user.id,
-      orgId: owner.user.orgId ?? null,
+      actorUserId: user.id,
+      orgId: user.orgId ?? null,
       ipHash: ipInfo.ipHash,
       payload: { tokenPrefix: token.slice(0, 12), reason, reportId: (body as any).reportId ?? null },
     });
@@ -233,7 +238,7 @@ export async function POST(req: NextRequest) {
         status = 'closed',
         admin_notes = ${notes},
         closed_at = now(),
-        closed_by = ${owner.user.id}::uuid
+        closed_by = ${user.id}::uuid
       where id = ${reportId}::uuid
     `;
 
@@ -246,10 +251,10 @@ export async function POST(req: NextRequest) {
       meta: { reportId },
     });
     await appendImmutableAudit({
-      streamKey: `admin:${owner.user.id}`,
+      streamKey: `admin:${user.id}`,
       action: "admin.abuse_close_report",
-      actorUserId: owner.user.id,
-      orgId: owner.user.orgId ?? null,
+      actorUserId: user.id,
+      orgId: user.orgId ?? null,
       ipHash: ipInfo.ipHash,
       payload: { reportId, notes },
     });

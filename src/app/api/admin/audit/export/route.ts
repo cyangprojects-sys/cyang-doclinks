@@ -4,7 +4,7 @@ export const dynamic = "force-dynamic";
 
 import { NextRequest } from "next/server";
 import { sql } from "@/lib/db";
-import { requireRole } from "@/lib/authz";
+import { requirePermission } from "@/lib/rbac";
 
 type ExportType = "audit" | "access" | "views";
 
@@ -31,7 +31,7 @@ function parseIntParam(raw: string | null, fallback: number, min: number, max: n
 
 export async function GET(req: NextRequest) {
   try {
-    await requireRole("admin");
+    await requirePermission("audit.export");
   } catch {
     return new Response("Forbidden", { status: 403 });
   }

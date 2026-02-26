@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireRole } from "@/lib/authz";
+import { requirePermission } from "@/lib/rbac";
 import { listMasterKeysWithStatus, isMasterKeyRevoked, getDbActiveMasterKeyId, listRecentMasterKeyChanges } from "@/lib/masterKeys";
 import { getActiveMasterKey } from "@/lib/encryption";
 import { listKeyRotationJobs, getKeyRotationStatusSummary } from "@/lib/keyRotationJobs";
@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    await requireRole("owner");
+    await requirePermission("security.keys.read");
 
     let activeId: string | null = null;
     try {

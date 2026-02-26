@@ -4,7 +4,7 @@ export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
-import { requireOwner } from "@/lib/owner";
+import { requirePermission } from "@/lib/rbac";
 import { clientIpKey, enforceGlobalApiRateLimit, logSecurityEvent } from "@/lib/securityTelemetry";
 import { appendImmutableAudit } from "@/lib/immutableAudit";
 
@@ -15,7 +15,7 @@ type Action =
 
 export async function POST(req: NextRequest) {
   try {
-    await requireOwner();
+    const user = await requirePermission("dmca.manage");
 
     const globalRl = await enforceGlobalApiRateLimit({
       req,
@@ -41,6 +41,8 @@ export async function POST(req: NextRequest) {
       await appendImmutableAudit({
         streamKey: `dmca:${body.noticeId}`,
         action: "admin.dmca_set_status",
+        actorUserId: user.id,
+        orgId: user.orgId ?? null,
         ipHash: ipInfo.ipHash,
         payload: { status: body.status, adminNotes: body.adminNotes ?? null },
       });
@@ -90,6 +92,8 @@ export async function POST(req: NextRequest) {
       await appendImmutableAudit({
         streamKey: `doc:${body.docId}`,
         action: "admin.dmca_takedown",
+        actorUserId: user.id,
+        orgId: user.orgId ?? null,
         docId: body.docId,
         ipHash: ipInfo.ipHash,
         payload: { noticeId: body.noticeId, reason },
@@ -145,6 +149,8 @@ export async function POST(req: NextRequest) {
       await appendImmutableAudit({
         streamKey: `doc:${body.docId}`,
         action: "admin.dmca_restore",
+        actorUserId: user.id,
+        orgId: user.orgId ?? null,
         docId: body.docId,
         ipHash: ipInfo.ipHash,
         payload: { noticeId: body.noticeId, reason },
