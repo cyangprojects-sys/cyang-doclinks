@@ -1,9 +1,13 @@
 import Link from "next/link";
+import { getDmcaEmail, getPrivacyEmail } from "@/lib/legal";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export default function PrivacyPage() {
+  const privacyEmail = getPrivacyEmail();
+  const dmcaEmail = getDmcaEmail();
+
   return (
     <main className="mx-auto max-w-3xl px-4 py-10">
       <div className="flex items-center justify-between">
@@ -59,7 +63,15 @@ export default function PrivacyPage() {
         <section>
           <h2 className="text-base font-semibold text-white">Contact</h2>
           <p className="mt-2">
-            For privacy requests, DMCA notices, or abuse reports use{" "}
+            Privacy requests:{" "}
+            <a className="underline text-white/90 hover:text-white" href={`mailto:${privacyEmail}`}>
+              {privacyEmail}
+            </a>
+            . DMCA notices:{" "}
+            <a className="underline text-white/90 hover:text-white" href={`mailto:${dmcaEmail}`}>
+              {dmcaEmail}
+            </a>
+            . Abuse reports can also be submitted through{" "}
             <Link href="/report" className="underline text-white/90 hover:text-white">
               /report
             </Link>
@@ -70,3 +82,4 @@ export default function PrivacyPage() {
     </main>
   );
 }
+
