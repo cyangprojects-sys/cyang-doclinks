@@ -68,6 +68,14 @@ export async function GET(
 
   const consumed = await consumeAccessTicket({ req, ticketId });
   if (!consumed.ok) {
+    void logSecurityEvent({
+      type: "ticket_consume_denied",
+      severity: "medium",
+      ip: clientIpKey(req).ip,
+      scope: "ticket_serve",
+      message: "Access ticket consume denied",
+      meta: { ticketId },
+    });
     return new NextResponse("Not found", {
       status: 404,
       headers: { "Cache-Control": "private, no-store" },

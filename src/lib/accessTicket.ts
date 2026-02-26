@@ -4,20 +4,29 @@ import { getClientIp } from "@/lib/view";
 
 export type AccessTicketPurpose = "preview_view" | "file_download" | "watermarked_file_download";
 
-function hmacHex(value: string, salt: string) {
-  return crypto.createHmac("sha256", salt).update(value).digest("hex");
+function bindingSecret() {
+  const viewSalt = (process.env.VIEW_SALT || "").trim();
+  if (viewSalt) return viewSalt;
+
+  const authSecret = (process.env.NEXTAUTH_SECRET || "").trim();
+  if (authSecret) return authSecret;
+
+  // Last-resort fallback keeps binding enabled even if env is incomplete.
+  return "ticket-bind-fallback-v1";
+}
+
+function hmacHex(value: string) {
+  return crypto.createHmac("sha256", bindingSecret()).update(value).digest("hex");
 }
 
 export function hashUserAgent(ua: string | null | undefined) {
-  const salt = (process.env.VIEW_SALT || "").trim();
-  if (!salt || !ua) return null;
-  return hmacHex(ua, salt).slice(0, 32);
+  if (!ua) return null;
+  return hmacHex(ua).slice(0, 32);
 }
 
 export function hashIpForTicket(ip: string | null | undefined) {
-  const salt = (process.env.VIEW_SALT || "").trim();
-  if (!salt || !ip) return null;
-  return hmacHex(ip, salt).slice(0, 32);
+  if (!ip) return null;
+  return hmacHex(ip).slice(0, 32);
 }
 
 export function ticketTtlSeconds() {
@@ -65,11 +74,22 @@ export async function consumeAccessTicket(args: { req: Request; ticketId: string
 
   const ipHash = hashIpForTicket(ip);
   const uaHash = hashUserAgent(ua);
+  const requireIp = !["0", "false", "no", "off"].includes(String(process.env.ACCESS_TICKET_REQUIRE_IP_MATCH || "true").trim().toLowerCase());
+  const requireUa = ["1", "true", "yes", "on"].includes(String(process.env.ACCESS_TICKET_REQUIRE_UA_MATCH || "false").trim().toLowerCase());
+
+  if (requireIp && !ipHash) return { ok: false as const };
+  if (requireUa && !uaHash) return { ok: false as const };
 
   // Atomic single-use consume with binding + expiry checks.
   // NOTE: Browsers can legitimately hit the same ticket more than once (preload, retry, iframe reload).
-  // To avoid "Not found" flakiness, allow a short replay window for the *same* IP/UA binding.
-  const replayGraceSeconds = Number(process.env.ACCESS_TICKET_REPLAY_GRACE_SECONDS || 60);
+  // Replays are purpose-sensitive: previews can tolerate a short retry window;
+  // downloads should be effectively one-time by default.
+  const replayGracePreview = Math.max(0, Number(process.env.ACCESS_TICKET_REPLAY_GRACE_SECONDS_PREVIEW || 45));
+  const replayGraceDownload = Math.max(0, Number(process.env.ACCESS_TICKET_REPLAY_GRACE_SECONDS_DOWNLOAD || 0));
+  const replayGraceWatermarked = Math.max(
+    0,
+    Number(process.env.ACCESS_TICKET_REPLAY_GRACE_SECONDS_WATERMARKED_DOWNLOAD || replayGraceDownload)
+  );
 
   const consumeRows = (await sql`
     update public.access_tickets
@@ -77,8 +97,8 @@ export async function consumeAccessTicket(args: { req: Request; ticketId: string
     where id = ${args.ticketId}::uuid
       and used_at is null
       and expires_at > now()
-      and (ip_hash is null or ip_hash = ${ipHash})
-      and (ua_hash is null or ua_hash = ${uaHash})
+      ${requireIp ? sql`and ip_hash = ${ipHash}` : sql`and (ip_hash is null or ip_hash = ${ipHash})`}
+      ${requireUa ? sql`and ua_hash = ${uaHash}` : sql`and (ua_hash is null or ua_hash = ${uaHash})`}
     returning
       id::text as id,
       doc_id::text as doc_id,
@@ -120,9 +140,15 @@ export async function consumeAccessTicket(args: { req: Request; ticketId: string
     where id = ${args.ticketId}::uuid
       and expires_at > now()
       and used_at is not null
-      and used_at > now() - (${replayGraceSeconds}::text || ' seconds')::interval
-      and (ip_hash is null or ip_hash = ${ipHash})
-      and (ua_hash is null or ua_hash = ${uaHash})
+      and used_at > now() - (
+        case
+          when purpose = 'preview_view' then ${replayGracePreview}::text
+          when purpose = 'watermarked_file_download' then ${replayGraceWatermarked}::text
+          else ${replayGraceDownload}::text
+        end || ' seconds'
+      )::interval
+      ${requireIp ? sql`and ip_hash = ${ipHash}` : sql`and (ip_hash is null or ip_hash = ${ipHash})`}
+      ${requireUa ? sql`and ua_hash = ${uaHash}` : sql`and (ua_hash is null or ua_hash = ${uaHash})`}
     limit 1
   `) as unknown as Array<{
     id: string;
