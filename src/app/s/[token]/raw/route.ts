@@ -10,6 +10,7 @@ import { rateLimit, rateLimitHeaders, stableHash } from "@/lib/rateLimit";
 import { mintAccessTicket } from "@/lib/accessTicket";
 import { geoDecisionForRequest, getCountryFromHeaders } from "@/lib/geo";
 import { hasActiveQuarantineOverride } from "@/lib/quarantineOverride";
+import { appendImmutableAudit } from "@/lib/immutableAudit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -278,8 +279,24 @@ export async function GET(
     } catch {
       // ignore
     }
-
-    // Analytics (best-effort) — only on the first counted request
+    try {
+      await appendImmutableAudit({
+        streamKey: `doc:${share.doc_id}`,
+        action: "share.view",
+        docId: share.doc_id,
+        subjectId: token,
+        ipHash: hashIp(getClientIpFromHeaders(req.headers)),
+        payload: {
+          route: "s_token_raw",
+          eventType: "preview_view",
+          riskLevel: share.risk_level || "low",
+          scanStatus: share.scan_status || "unscanned",
+        },
+      });
+    } catch {
+      // ignore
+    }
+    // Analytics (best-effort) only on first counted request
     try {
       const ip = getClientIpFromHeaders(req.headers);
       const ua = getUserAgentFromHeaders(req.headers);
@@ -338,3 +355,5 @@ export async function GET(
     },
   });
 }
+
+

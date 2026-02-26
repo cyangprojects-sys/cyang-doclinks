@@ -8,13 +8,15 @@ import { verifyApiKeyFromRequest } from "@/lib/apiAuth";
 import { emitWebhook } from "@/lib/webhooks";
 import { assertCanCreateShare, getPlanForUser, normalizeExpiresAtForPlan } from "@/lib/monetization";
 import crypto from "crypto";
-import { enforceGlobalApiRateLimit } from "@/lib/securityTelemetry";
+import { clientIpKey, enforceGlobalApiRateLimit } from "@/lib/securityTelemetry";
+import { appendImmutableAudit } from "@/lib/immutableAudit";
 
 function newToken(): string {
   return crypto.randomBytes(16).toString("hex");
 }
 
 export async function POST(req: NextRequest) {
+  const ipInfo = clientIpKey(req);
   const rl = await enforceGlobalApiRateLimit({
     req,
     scope: "ip:api",
@@ -128,6 +130,26 @@ const base = (process.env.BASE_URL || process.env.NEXTAUTH_URL || (process.env.V
     max_views: maxViews,
     has_password: !!passwordHash,
     created_via: "api",
+  });
+
+  await appendImmutableAudit({
+    streamKey: `doc:${docId}`,
+    action: "share.create",
+    actorUserId: auth.ownerId,
+    docId,
+    subjectId: token,
+    ipHash: ipInfo.ipHash,
+    payload: {
+      toEmail,
+      expiresAt: normalizedExpiresAt,
+      maxViews,
+      hasPassword: Boolean(passwordHash),
+      allowedCountries,
+      blockedCountries,
+      watermarkEnabled: watermarkEnabled ?? false,
+      watermarkText: watermarkText ?? null,
+      via: "api",
+    },
   });
 
   return NextResponse.json({ ok: true, token, url });

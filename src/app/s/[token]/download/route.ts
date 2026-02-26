@@ -12,6 +12,7 @@ import { mintAccessTicket } from "@/lib/accessTicket";
 import { r2Client, r2Prefix, R2_BUCKET } from "@/lib/r2";
 import { stampPdfWithWatermark } from "@/lib/pdfWatermark";
 import { hasActiveQuarantineOverride } from "@/lib/quarantineOverride";
+import { appendImmutableAudit } from "@/lib/immutableAudit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -309,6 +310,23 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ toke
       emailUsed,
       ip: getClientIpFromHeaders(req.headers),
       userAgent: getUserAgentFromHeaders(req.headers),
+    });
+  } catch {
+    // ignore
+  }
+
+  try {
+    await appendImmutableAudit({
+      streamKey: `doc:${share.doc_id}`,
+      action: "share.download",
+      docId: share.doc_id,
+      subjectId: token,
+      ipHash: hashIp(getClientIpFromHeaders(req.headers)),
+      payload: {
+        route: "s_token_download",
+        eventType: watermarkEnabled ? "watermarked_file_download" : "file_download",
+        watermarkEnabled,
+      },
     });
   } catch {
     // ignore
