@@ -4,6 +4,7 @@ import { requirePermission } from "@/lib/rbac";
 import { rotateDocKeys } from "@/lib/masterKeys";
 import { logSecurityEvent } from "@/lib/securityTelemetry";
 import { enqueueKeyRotationJob } from "@/lib/keyRotationJobs";
+import { appendImmutableAudit } from "@/lib/immutableAudit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -39,6 +40,23 @@ export async function POST(req: Request) {
         requestedByUserId: u.id,
       });
 
+      try {
+        await appendImmutableAudit({
+          streamKey: "security:key-management",
+          action: "encryption.key.rotate.enqueued",
+          actorUserId: u.id,
+          subjectId: job.id,
+          payload: {
+            fromKeyId: parsed.data.from_key_id,
+            toKeyId,
+            limit: parsed.data.limit ?? 250,
+            mode: "async",
+          },
+        });
+      } catch {
+        // ignore immutable audit failures to avoid blocking control-plane operation
+      }
+
       void logSecurityEvent({
         type: "master_key_rotate_job_enqueued",
         severity: "medium",
@@ -57,6 +75,27 @@ export async function POST(req: Request) {
       toKeyId: parsed.data.to_key_id,
       limit: parsed.data.limit ?? 250,
     });
+
+    try {
+      await appendImmutableAudit({
+        streamKey: "security:key-management",
+        action: "encryption.key.rotate.executed",
+        actorUserId: u.id,
+        subjectId: parsed.data.from_key_id,
+        payload: {
+          fromKeyId: parsed.data.from_key_id,
+          toKeyId: parsed.data.to_key_id ?? "active",
+          limit: parsed.data.limit ?? 250,
+          mode: "sync",
+          scanned: res.scanned,
+          rotated: res.rotated,
+          failed: res.failed,
+          remaining: res.remaining,
+        },
+      });
+    } catch {
+      // ignore immutable audit failures to avoid blocking control-plane operation
+    }
 
     void logSecurityEvent({
       type: "master_key_rotate",

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requirePermission } from "@/lib/rbac";
 import { revokeMasterKey } from "@/lib/masterKeys";
 import { logSecurityEvent } from "@/lib/securityTelemetry";
+import { appendImmutableAudit } from "@/lib/immutableAudit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -19,6 +20,20 @@ export async function POST(req: Request) {
     if (!parsed.success) return NextResponse.json({ ok: false, error: "BAD_REQUEST" }, { status: 400 });
 
     await revokeMasterKey({ id: parsed.data.key_id, actorUserId: u.id });
+
+    try {
+      await appendImmutableAudit({
+        streamKey: "security:key-management",
+        action: "encryption.key.revoke",
+        actorUserId: u.id,
+        subjectId: parsed.data.key_id,
+        payload: {
+          keyId: parsed.data.key_id,
+        },
+      });
+    } catch {
+      // ignore immutable audit failures to avoid blocking control-plane operation
+    }
 
     void logSecurityEvent({
       type: "master_key_revoke",

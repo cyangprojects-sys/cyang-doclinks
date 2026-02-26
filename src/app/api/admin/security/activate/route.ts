@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requirePermission } from "@/lib/rbac";
 import { setActiveMasterKey } from "@/lib/masterKeys";
 import { logSecurityEvent } from "@/lib/securityTelemetry";
+import { appendImmutableAudit } from "@/lib/immutableAudit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -24,6 +25,21 @@ export async function POST(req: Request) {
       actorUserId: u.id,
       reason: parsed.data.reason ?? null,
     });
+
+    try {
+      await appendImmutableAudit({
+        streamKey: "security:key-management",
+        action: "encryption.key.activate",
+        actorUserId: u.id,
+        subjectId: parsed.data.key_id,
+        payload: {
+          keyId: parsed.data.key_id,
+          reason: parsed.data.reason ?? null,
+        },
+      });
+    } catch {
+      // ignore immutable audit failures to avoid blocking control-plane operation
+    }
 
     void logSecurityEvent({
       type: "master_key_activate",

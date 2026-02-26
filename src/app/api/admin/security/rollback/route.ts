@@ -4,6 +4,7 @@ import { requirePermission } from "@/lib/rbac";
 import { sql } from "@/lib/db";
 import { setActiveMasterKey } from "@/lib/masterKeys";
 import { logSecurityEvent } from "@/lib/securityTelemetry";
+import { appendImmutableAudit } from "@/lib/immutableAudit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -42,6 +43,23 @@ export async function POST(req: Request) {
       reason: parsed.data.reason ?? `Rollback of change ${row.id}`,
       rollbackOfChangeId: row.id,
     });
+
+    try {
+      await appendImmutableAudit({
+        streamKey: "security:key-management",
+        action: "encryption.key.rollback",
+        actorUserId: u.id,
+        subjectId: row.id,
+        payload: {
+          changeId: row.id,
+          fromKeyId: row.new_key_id,
+          toKeyId: row.previous_key_id,
+          reason: parsed.data.reason ?? null,
+        },
+      });
+    } catch {
+      // ignore immutable audit failures to avoid blocking control-plane operation
+    }
 
     void logSecurityEvent({
       type: "master_key_rollback",
