@@ -8,10 +8,6 @@
     {
       "path": "/api/cron/webhooks",
       "schedule": "0 3 * * *"
-    },
-    {
-      "path": "/api/cron/scan",
-      "schedule": "*/10 * * * *"
     }
   ]
 }

@@ -1,0 +1,11 @@
+name = "cyang-doclinks-cron-scan"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+
+[triggers]
+crons = ["*/10 * * * *"]
+
+[vars]
+# Update if your route path differs.
+TARGET_URL = "https://www.cyang.io/api/cron/scan"
+HTTP_METHOD = "POST"
