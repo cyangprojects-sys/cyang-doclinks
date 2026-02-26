@@ -1,5 +1,6 @@
 import { sql } from "@/lib/db";
 import { getBillingFlags } from "@/lib/settings";
+import { hasActiveViewLimitOverride } from "@/lib/viewLimitOverride";
 
 export type Plan = {
   id: "free" | "pro" | (string & {});
@@ -215,6 +216,9 @@ export async function assertCanCreateShare(ownerId: string): Promise<LimitResult
 export async function assertCanServeView(ownerId: string): Promise<LimitResult> {
   const billingRes = await getBillingFlags();
   if (!billingRes.flags.enforcePlanLimits) return { ok: true };
+
+  const overridden = await hasActiveViewLimitOverride(ownerId);
+  if (overridden) return { ok: true };
 
   const plan = await getPlanForUser(ownerId);
   if (plan.maxViewsPerMonth == null) return { ok: true };

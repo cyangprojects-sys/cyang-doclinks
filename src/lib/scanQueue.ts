@@ -37,36 +37,63 @@ export async function enqueueDocScan(opts: { docId: string; bucket: string; key:
 export async function healScanQueue(args?: {
   runningTimeoutMinutes?: number;
   maxAttempts?: number;
-  retryDelayMinutes?: number;
+  retryBaseMinutes?: number;
+  retryMaxMinutes?: number;
 }) {
   const runningTimeout = Math.max(1, Number(args?.runningTimeoutMinutes ?? process.env.SCAN_RUNNING_TIMEOUT_MINUTES ?? 20));
   const maxAttempts = Math.max(1, Number(args?.maxAttempts ?? process.env.SCAN_MAX_ATTEMPTS ?? 5));
-  const retryDelay = Math.max(1, Number(args?.retryDelayMinutes ?? process.env.SCAN_ERROR_RETRY_MINUTES ?? 10));
+  const retryBase = Math.max(1, Number(args?.retryBaseMinutes ?? process.env.SCAN_RETRY_BASE_MINUTES ?? 5));
+  const retryMax = Math.max(retryBase, Number(args?.retryMaxMinutes ?? process.env.SCAN_RETRY_MAX_MINUTES ?? 720));
 
   const staleRunning = (await sql`
-    with u as (
+    with requeue as (
       update public.malware_scan_jobs
       set
         status = 'queued',
         last_error = 'Auto-requeued stale running job',
-        started_at = null
+        started_at = null,
+        next_retry_at = null
       where status = 'running'
         and started_at < now() - (${runningTimeout}::text || ' minutes')::interval
         and attempts < ${maxAttempts}::int
       returning 1
+    ),
+    dead as (
+      update public.malware_scan_jobs
+      set
+        status = 'dead_letter',
+        last_error = coalesce(last_error, 'Max attempts reached from running state'),
+        finished_at = coalesce(finished_at, now()),
+        next_retry_at = null
+      where status = 'running'
+        and started_at < now() - (${runningTimeout}::text || ' minutes')::interval
+        and attempts >= ${maxAttempts}::int
+      returning 1
     )
-    select count(*)::int as c from u
-  `) as unknown as Array<{ c: number }>;
+    select
+      (select count(*)::int from requeue) as requeued,
+      (select count(*)::int from dead) as dead
+  `) as unknown as Array<{ requeued: number; dead: number }>;
 
   const retriedErrors = (await sql`
     with u as (
       update public.malware_scan_jobs
       set
         status = 'queued',
-        started_at = null
+        started_at = null,
+        next_retry_at = null
       where status = 'error'
         and attempts < ${maxAttempts}::int
-        and coalesce(finished_at, created_at) < now() - (${retryDelay}::text || ' minutes')::interval
+        and (
+          next_retry_at is null
+          or next_retry_at <= now()
+          or coalesce(finished_at, created_at) <= now() - (
+            least(
+              ${retryMax}::int,
+              ${retryBase}::int * (2 ^ greatest(attempts - 1, 0))
+            )::text || ' minutes'
+          )::interval
+        )
       returning 1
     )
     select count(*)::int as c from u
@@ -87,8 +114,10 @@ export async function healScanQueue(args?: {
   return {
     runningTimeout,
     maxAttempts,
-    retryDelay,
-    staleRequeued: Number(staleRunning?.[0]?.c ?? 0),
+    retryBase,
+    retryMax,
+    staleRequeued: Number(staleRunning?.[0]?.requeued ?? 0),
+    staleDeadLettered: Number(staleRunning?.[0]?.dead ?? 0),
     errorRequeued: Number(retriedErrors?.[0]?.c ?? 0),
     maxAttemptJobs: Number(saturated?.[0]?.c ?? 0),
   };

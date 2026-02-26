@@ -27,6 +27,9 @@ export async function GET(req: NextRequest) {
 
   const maxJobs = Math.max(1, Math.min(25, Number(process.env.SCAN_CRON_BATCH || 10)));
   const absMaxBytes = Math.max(1024 * 1024, Number(process.env.SCAN_ABS_MAX_BYTES || 25_000_000)); // default 25MB
+  const maxAttempts = Math.max(1, Number(process.env.SCAN_MAX_ATTEMPTS || 5));
+  const retryBase = Math.max(1, Number(process.env.SCAN_RETRY_BASE_MINUTES || 5));
+  const retryMax = Math.max(retryBase, Number(process.env.SCAN_RETRY_MAX_MINUTES || 720));
   const queueHealth = await healScanQueue();
 
   // Claim jobs using SKIP LOCKED to avoid concurrent cron overlap.
@@ -102,15 +105,33 @@ export async function GET(req: NextRequest) {
       results.push({ id: job.id, ok: true, verdict: verdict.verdict, riskLevel: verdict.riskLevel });
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
+      const attempt = Math.max(1, Number(job.attempts || 1));
+      const delayMinutes = Math.min(retryMax, retryBase * Math.pow(2, Math.max(0, attempt - 1)));
+      const shouldDeadLetter = attempt >= maxAttempts;
 
       await sql`
         update public.malware_scan_jobs
         set
-          status = 'error',
+          status = ${shouldDeadLetter ? "dead_letter" : "error"}::text,
           finished_at = now(),
-          last_error = ${msg}
+          last_error = ${msg},
+          next_retry_at = case
+            when ${shouldDeadLetter} then null
+            else now() + (${Math.floor(delayMinutes)}::text || ' minutes')::interval
+          end
         where id = ${job.id}::uuid
       `;
+
+      if (shouldDeadLetter) {
+        await sql`
+          update public.docs
+          set scan_status = case
+            when lower(coalesce(moderation_status,'active')) in ('disabled','quarantined','deleted') then scan_status
+            else 'error'
+          end
+          where id = ${job.doc_id}::uuid
+        `;
+      }
 
       await logSecurityEvent({
         type: "malware_scan_job_failed",
@@ -118,7 +139,13 @@ export async function GET(req: NextRequest) {
         docId: job.doc_id,
         scope: "scanner",
         message: "Malware scan job failed",
-        meta: { jobId: job.id, attempts: job.attempts, error: msg },
+        meta: {
+          jobId: job.id,
+          attempts: attempt,
+          error: msg,
+          retryDelayMinutes: shouldDeadLetter ? null : Math.floor(delayMinutes),
+          deadLettered: shouldDeadLetter,
+        },
       });
       await detectScanFailureSpike();
       await reportException({

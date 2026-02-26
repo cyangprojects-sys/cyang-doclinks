@@ -4,6 +4,7 @@ import { unstable_noStore as noStore } from "next/cache";
 import { getAuthedUser } from "@/lib/authz";
 import { getBillingFlags } from "@/lib/settings";
 import { getPlanForUser, getStorageBytesForOwner } from "@/lib/monetization";
+import { getActiveViewLimitOverride } from "@/lib/viewLimitOverride";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -55,6 +56,7 @@ export default async function BillingSettingsPage({
   const flags = res.flags;
   const plan = await getPlanForUser(u.id);
   const usedStorage = await getStorageBytesForOwner(u.id);
+  const activeViewOverride = await getActiveViewLimitOverride(u.id);
   const storagePct =
     plan.maxStorageBytes && plan.maxStorageBytes > 0
       ? Math.min(100, Math.max(0, Math.round((usedStorage / plan.maxStorageBytes) * 100)))
@@ -99,6 +101,70 @@ export default async function BillingSettingsPage({
             Warning: storage usage is at {storagePct}% of your plan limit.
           </div>
         ) : null}
+      </Card>
+
+      <Card>
+        <div className="text-sm font-medium text-white">View limit override</div>
+        <div className="mt-1 text-xs text-neutral-400">
+          Temporarily bypass monthly view cap for this owner account.
+        </div>
+        <div className="mt-2 text-sm text-neutral-200">
+          Status:{" "}
+          {activeViewOverride ? (
+            <span className="text-amber-200">
+              Active until {new Date(activeViewOverride.expiresAt).toLocaleString()}
+            </span>
+          ) : (
+            <span className="text-neutral-400">Inactive</span>
+          )}
+        </div>
+
+        <div className="mt-3 grid gap-3 md:grid-cols-2">
+          <form action="/api/admin/billing/view-override" method="post" className="space-y-2 rounded-lg border border-neutral-800 bg-black/30 p-3">
+            <input type="hidden" name="action" value="set" />
+            <input type="hidden" name="ownerId" value={u.id} />
+            <label className="block text-xs text-neutral-400">Hours</label>
+            <input
+              type="number"
+              name="hours"
+              min={1}
+              max={720}
+              defaultValue={24}
+              className="w-full rounded-md border border-neutral-700 bg-neutral-950 px-2 py-2 text-sm text-white"
+            />
+            <label className="block text-xs text-neutral-400">Reason (required in ops)</label>
+            <input
+              type="text"
+              name="reason"
+              placeholder="Incident response / temporary support"
+              className="w-full rounded-md border border-neutral-700 bg-neutral-950 px-2 py-2 text-sm text-white"
+            />
+            <button
+              type="submit"
+              className="inline-flex items-center rounded-md border border-white/15 bg-white/5 px-3 py-2 text-sm text-white/90 hover:bg-white/10"
+            >
+              Enable override
+            </button>
+          </form>
+
+          <form action="/api/admin/billing/view-override" method="post" className="space-y-2 rounded-lg border border-neutral-800 bg-black/30 p-3">
+            <input type="hidden" name="action" value="clear" />
+            <input type="hidden" name="ownerId" value={u.id} />
+            <label className="block text-xs text-neutral-400">Reason</label>
+            <input
+              type="text"
+              name="reason"
+              placeholder="Override no longer needed"
+              className="w-full rounded-md border border-neutral-700 bg-neutral-950 px-2 py-2 text-sm text-white"
+            />
+            <button
+              type="submit"
+              className="inline-flex items-center rounded-md border border-red-700/40 bg-red-950/30 px-3 py-2 text-sm text-red-200 hover:bg-red-950/40"
+            >
+              Disable override
+            </button>
+          </form>
+        </div>
       </Card>
 
       <Card>
