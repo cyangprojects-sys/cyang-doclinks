@@ -234,6 +234,7 @@ export async function updateExpirationAlertSettingsAction(formData: FormData): P
 // Used as <form action={deleteDocAction}> — must return void
 export async function deleteDocAction(formData: FormData): Promise<void> {
   const docId = String(formData.get("docId") || formData.get("doc_id") || "").trim();
+  const reason = String(formData.get("reason") || "").trim() || null;
   if (!docId) throw new Error("Missing docId.");
 
   await requireDocWrite(docId);
@@ -267,6 +268,11 @@ export async function deleteDocAction(formData: FormData): Promise<void> {
   revalidatePath("/admin/dashboard");
 
   emitWebhook("doc.deleted", { doc_id: docId, title });
+  await appendAdminAudit({
+    action: "doc.deleted",
+    docId,
+    payload: { title, reason, via: "admin_action" },
+  });
 }
 
 /**
@@ -641,6 +647,57 @@ export async function bulkDisableAliasesForDocsAction(formData: FormData): Promi
   revalidatePath("/admin/dashboard");
   revalidatePath("/admin");
   for (const id of docIds) revalidatePath(`/admin/docs/${id}`);
+}
+
+export async function bulkDeleteDocsAction(formData: FormData): Promise<void> {
+  await requireRole("owner");
+  const raw = String(formData.get("docIds") || "").trim();
+  const reason = String(formData.get("reason") || "").trim() || null;
+  if (!raw) throw new Error("Missing docIds.");
+  const docIds = JSON.parse(raw) as string[];
+  if (!Array.isArray(docIds) || docIds.length === 0) return;
+
+  for (const docId of docIds) {
+    const id = String(docId || "").trim();
+    if (!id) continue;
+
+    try {
+      const drows = (await sql`
+        select title::text as title
+        from public.docs
+        where id = ${id}::uuid
+        limit 1
+      `) as unknown as Array<{ title: string | null }>;
+      const title = drows?.[0]?.title ?? null;
+
+      const { bucket, key } = await resolveR2LocationForDoc(id);
+      await r2Client.send(
+        new DeleteObjectCommand({
+          Bucket: bucket,
+          Key: key,
+        })
+      );
+      await sql`delete from docs where id = ${id}::uuid`;
+      try {
+        await sql`delete from doc_aliases where doc_id = ${id}::uuid`;
+      } catch {
+        // ignore
+      }
+
+      emitWebhook("doc.deleted", { doc_id: id, title, bulk: true, reason });
+      await appendAdminAudit({
+        action: "doc.deleted",
+        docId: id,
+        payload: { title, reason, via: "owner_bulk_delete" },
+      });
+    } catch {
+      // continue processing other selected docs
+    }
+  }
+
+  revalidatePath("/admin/viewer-uploads");
+  revalidatePath("/admin/dashboard");
+  revalidatePath("/admin");
 }
 
 // Expiration warning email (best-effort; uses doc_aliases.expires_at + share_tokens.expires_at)
