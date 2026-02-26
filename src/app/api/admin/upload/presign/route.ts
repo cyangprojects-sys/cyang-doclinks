@@ -107,14 +107,9 @@ export async function POST(req: Request) {
       );
     }
 
-    // Enterprise mode: ignore false; require encryption
+    // Enterprise mode: encryption is mandatory for everyone.
+    // Non-owner accounts are allowed to upload; they just cannot disable encryption.
     const encryptRequested = parsed.data.encrypt;
-    if (encryptRequested !== undefined && user.role !== "owner") {
-      return NextResponse.json(
-        { ok: false, error: "FORBIDDEN", message: "Encryption settings are owner-only." },
-        { status: 403 }
-      );
-    }
     if (encryptRequested === false) {
       return NextResponse.json(
         { ok: false, error: "ENCRYPTION_REQUIRED", message: "Encryption is mandatory." },
