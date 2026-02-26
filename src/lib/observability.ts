@@ -1,3 +1,5 @@
+import * as Sentry from "@sentry/nextjs";
+
 type Severity = "debug" | "info" | "warn" | "error";
 
 export function logStructured(args: {
@@ -32,12 +34,23 @@ export async function reportException(args: {
   context?: Record<string, unknown>;
 }) {
   const message = args.error instanceof Error ? args.error.message : String(args.error);
+  const err = args.error instanceof Error ? args.error : new Error(message);
   logStructured({
     severity: "error",
     event: args.event,
     message,
     context: args.context ?? {},
   });
+
+  try {
+    Sentry.withScope((scope) => {
+      scope.setTag("event", args.event);
+      if (args.context) scope.setContext("app_context", args.context);
+      Sentry.captureException(err);
+    });
+  } catch {
+    // ignore secondary failures
+  }
 
   // Optional external sink (Sentry-compatible via your own bridge endpoint).
   const hook = String(process.env.OBSERVABILITY_ERROR_WEBHOOK || "").trim();
