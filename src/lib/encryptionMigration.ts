@@ -19,7 +19,23 @@ async function streamToBuffer(body: unknown): Promise<Buffer> {
   }
   const chunks: Buffer[] = [];
   for await (const chunk of body as AsyncIterable<unknown>) {
-    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    if (Buffer.isBuffer(chunk)) {
+      chunks.push(chunk);
+      continue;
+    }
+    if (chunk instanceof Uint8Array) {
+      chunks.push(Buffer.from(chunk));
+      continue;
+    }
+    if (typeof chunk === "string") {
+      chunks.push(Buffer.from(chunk));
+      continue;
+    }
+    if (chunk instanceof ArrayBuffer) {
+      chunks.push(Buffer.from(new Uint8Array(chunk)));
+      continue;
+    }
+    throw new Error("UNSUPPORTED_STREAM_CHUNK");
   }
   return Buffer.concat(chunks);
 }
