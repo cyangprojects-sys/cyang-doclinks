@@ -9,6 +9,9 @@ import { runAutomatedKeyRotation } from "@/lib/keyRotation";
 import { migrateLegacyEncryptionBatch } from "@/lib/encryptionMigration";
 import { runBackupRecoveryCheck } from "@/lib/backupRecovery";
 import { processKeyRotationJobs } from "@/lib/keyRotationJobs";
+import { revokeExpiredSharesBatch } from "@/lib/shareLifecycle";
+import { runUsageMaintenance } from "@/lib/usageMaintenance";
+import { logSecurityEvent } from "@/lib/securityTelemetry";
 
 import { isCronAuthorized } from "@/lib/cronAuth";
 
@@ -53,8 +56,26 @@ export async function GET(req: NextRequest) {
       })
     : { enabled: false };
 
-  // 6) Optional backup + recovery checks
+  // 6) Auto-disable expired shares so plan limits count strictly by active records
+  const expiredSharesRevoked = await revokeExpiredSharesBatch(
+    Math.max(1, Math.min(5000, Number(process.env.EXPIRED_SHARES_REVOKE_BATCH || 1000)))
+  );
+
+  // 7) Monthly usage maintenance/reset hygiene
+  const usage_maintenance = await runUsageMaintenance();
+
+  // 8) Optional backup + recovery checks
   const backup_recovery = await runBackupRecoveryCheck();
+
+  if (expiredSharesRevoked.revoked > 0) {
+    await logSecurityEvent({
+      type: "expired_shares_auto_revoked",
+      severity: "low",
+      scope: "cron_nightly",
+      message: "Auto-revoked expired share tokens",
+      meta: { revoked: expiredSharesRevoked.revoked },
+    });
+  }
 
   return NextResponse.json({
     ok: true,
@@ -66,6 +87,8 @@ export async function GET(req: NextRequest) {
     key_rotation,
     key_rotation_jobs,
     legacy_encryption_migration,
+    expired_shares_revoked: expiredSharesRevoked,
+    usage_maintenance,
     backup_recovery,
   });
 }
