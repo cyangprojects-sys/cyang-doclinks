@@ -1,5 +1,7 @@
 import { sql } from "@/lib/db";
 import KeyManagementPanel from "./KeyManagementPanel";
+import { RBAC_PERMISSIONS, listRolePermissionOverrides, permissionsTableExists } from "@/lib/rbac";
+import type { Role } from "@/lib/authz";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -12,7 +14,13 @@ function fmt(n: number) {
   }
 }
 
-export default async function SecurityTelemetryPage() {
+export default async function SecurityTelemetryPage(props: {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const sp = (await props.searchParams) || {};
+  const saved = (Array.isArray(sp.saved) ? sp.saved[0] : sp.saved) || "";
+  const error = (Array.isArray(sp.error) ? sp.error[0] : sp.error) || "";
+
   // Recent security events
   const events = (await sql`
     select
@@ -82,6 +90,14 @@ export default async function SecurityTelemetryPage() {
     last_error: string | null;
     r2_key: string | null;
   }> = [];
+
+  const roles: Role[] = ["viewer", "admin", "owner"];
+  const rbacTableReady = await permissionsTableExists();
+  const rbacOverrides = rbacTableReady ? await listRolePermissionOverrides() : [];
+  const rbacMap = new Map<string, boolean>();
+  for (const row of rbacOverrides) {
+    rbacMap.set(`${row.permission}:${row.role}`, Boolean(row.allowed));
+  }
 
   try {
     const queueRows = (await sql`
@@ -155,6 +171,17 @@ export default async function SecurityTelemetryPage() {
       <div className="mt-6">
         <KeyManagementPanel />
       </div>
+
+      {saved === "rbac" ? (
+        <div className="mt-4 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-200">
+          RBAC override updated.
+        </div>
+      ) : null}
+      {error ? (
+        <div className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-200">
+          RBAC update failed: {error}
+        </div>
+      ) : null}
 
       <div className="mt-6 grid gap-4 lg:grid-cols-3">
         <section className="rounded-xl border border-white/10 bg-white/5 p-4 lg:col-span-1">
@@ -266,6 +293,63 @@ export default async function SecurityTelemetryPage() {
             </tbody>
           </table>
         </div>
+      </div>
+
+      <div className="mt-4 rounded-xl border border-white/10 bg-white/5 p-4">
+        <h2 className="text-sm font-semibold">RBAC permission overrides</h2>
+        <p className="mt-1 text-xs text-white/50">
+          Owner-level policy controls for role permissions. These overrides take precedence over defaults in code.
+        </p>
+
+        {!rbacTableReady ? (
+          <div className="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+            RBAC override table not found. Run <span className="font-mono">scripts/sql/enterprise_rbac.sql</span>.
+          </div>
+        ) : (
+          <div className="mt-3 overflow-x-auto">
+            <table className="w-full min-w-[740px] text-left text-sm">
+              <thead className="bg-black/30 text-xs text-white/60">
+                <tr>
+                  <th className="px-3 py-2">Permission</th>
+                  {roles.map((r) => (
+                    <th key={r} className="px-3 py-2 capitalize">{r}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/10">
+                {RBAC_PERMISSIONS.map((perm) => (
+                  <tr key={perm} className="bg-black/10">
+                    <td className="px-3 py-2 font-mono text-xs text-white/80">{perm}</td>
+                    {roles.map((role) => {
+                      const key = `${perm}:${role}`;
+                      const allowed = rbacMap.get(key);
+                      const current = allowed == null ? "default" : allowed ? "allow" : "deny";
+                      return (
+                        <td key={key} className="px-3 py-2">
+                          <form action="/api/admin/security/rbac" method="post" className="flex items-center gap-2">
+                            <input type="hidden" name="permission" value={perm} />
+                            <input type="hidden" name="role" value={role} />
+                            <select
+                              name="allowed"
+                              defaultValue={current === "deny" ? "0" : "1"}
+                              className="rounded border border-white/15 bg-black/40 px-2 py-1 text-xs text-white"
+                            >
+                              <option value="1">{current === "default" ? "Default/Allow" : "Allow"}</option>
+                              <option value="0">Deny</option>
+                            </select>
+                            <button className="rounded border border-white/15 bg-white/5 px-2 py-1 text-xs hover:bg-white/10" type="submit">
+                              Save
+                            </button>
+                          </form>
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );

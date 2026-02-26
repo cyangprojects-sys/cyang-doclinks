@@ -12,6 +12,18 @@ export type Permission =
   | "security.keys.manage"
   | "security.migrate_legacy";
 
+export const RBAC_PERMISSIONS: Permission[] = [
+  "audit.export",
+  "abuse.manage",
+  "dmca.manage",
+  "billing.manage",
+  "billing.override",
+  "retention.run",
+  "security.keys.read",
+  "security.keys.manage",
+  "security.migrate_legacy",
+];
+
 const DEFAULT_MIN_ROLE: Record<Permission, Role> = {
   "audit.export": "admin",
   "abuse.manage": "admin",
@@ -26,7 +38,7 @@ const DEFAULT_MIN_ROLE: Record<Permission, Role> = {
 
 let permissionsTableExistsCache: boolean | null = null;
 
-async function permissionsTableExists(): Promise<boolean> {
+export async function permissionsTableExists(): Promise<boolean> {
   if (permissionsTableExistsCache != null) return permissionsTableExistsCache;
   try {
     const rows = (await sql`select to_regclass('public.role_permissions')::text as reg`) as unknown as Array<{ reg: string | null }>;
@@ -65,5 +77,35 @@ export async function requirePermission(permission: Permission): Promise<AuthedU
   const ok = await userHasPermission(user, permission);
   if (!ok) throw new Error("FORBIDDEN");
   return user;
+}
+
+export async function listRolePermissionOverrides(): Promise<Array<{ permission: Permission; role: Role; allowed: boolean; updated_at: string }>> {
+  if (!(await permissionsTableExists())) return [];
+  const rows = (await sql`
+    select
+      permission::text as permission,
+      role::text as role,
+      allowed::boolean as allowed,
+      updated_at::text as updated_at
+    from public.role_permissions
+    order by permission asc, role asc
+  `) as unknown as Array<{ permission: Permission; role: Role; allowed: boolean; updated_at: string }>;
+  return rows;
+}
+
+export async function upsertRolePermissionOverride(args: {
+  permission: Permission;
+  role: Role;
+  allowed: boolean;
+}): Promise<void> {
+  if (!(await permissionsTableExists())) throw new Error("RBAC_TABLE_MISSING");
+  await sql`
+    insert into public.role_permissions (permission, role, allowed, updated_at)
+    values (${args.permission}::text, ${args.role}::text, ${args.allowed}, now())
+    on conflict (permission, role)
+    do update set
+      allowed = excluded.allowed,
+      updated_at = now()
+  `;
 }
 
