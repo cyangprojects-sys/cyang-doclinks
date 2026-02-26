@@ -19,6 +19,18 @@ export function SiteFooter() {
                     <Link href="/about" className="hover:text-white">
                         About
                     </Link>
+                    <Link href="/terms" className="hover:text-white">
+                        Terms
+                    </Link>
+                    <Link href="/acceptable-use" className="hover:text-white">
+                        Acceptable Use
+                    </Link>
+                    <Link href="/privacy" className="hover:text-white">
+                        Privacy
+                    </Link>
+                    <Link href="/report" className="hover:text-white">
+                        Report
+                    </Link>
                 </div>
             </div>
         </footer>

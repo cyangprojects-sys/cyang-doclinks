@@ -3,6 +3,7 @@ import { unstable_noStore as noStore } from "next/cache";
 
 import { getAuthedUser } from "@/lib/authz";
 import { getBillingFlags } from "@/lib/settings";
+import { getPlanForUser, getStorageBytesForOwner } from "@/lib/monetization";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -52,6 +53,13 @@ export default async function BillingSettingsPage({
 
   const res = await getBillingFlags();
   const flags = res.flags;
+  const plan = await getPlanForUser(u.id);
+  const usedStorage = await getStorageBytesForOwner(u.id);
+  const storagePct =
+    plan.maxStorageBytes && plan.maxStorageBytes > 0
+      ? Math.min(100, Math.max(0, Math.round((usedStorage / plan.maxStorageBytes) * 100)))
+      : null;
+  const storageWarn = storagePct != null && storagePct >= 80;
 
   const saved = searchParams?.saved === "1";
   const error = searchParams?.error ? decodeURIComponent(searchParams.error) : null;
@@ -76,6 +84,22 @@ export default async function BillingSettingsPage({
           {error ? `Failed to save: ${error}` : "Saved."}
         </div>
       )}
+
+      <Card>
+        <div className="text-sm font-medium text-white">Storage usage</div>
+        <div className="mt-1 text-xs text-neutral-400">
+          Plan cap: {plan.maxStorageBytes == null ? "Unlimited" : `${(plan.maxStorageBytes / (1024 * 1024)).toFixed(0)} MB`}
+        </div>
+        <div className="mt-2 text-sm text-neutral-200">
+          Used: {(usedStorage / (1024 * 1024)).toFixed(1)} MB
+          {storagePct != null ? ` (${storagePct}%)` : ""}
+        </div>
+        {storageWarn ? (
+          <div className="mt-3 rounded-lg border border-amber-900/50 bg-amber-950/30 px-3 py-2 text-sm text-amber-200">
+            Warning: storage usage is at {storagePct}% of your plan limit.
+          </div>
+        ) : null}
+      </Card>
 
       <Card>
         <form action="/api/admin/billing" method="post" className="space-y-3">

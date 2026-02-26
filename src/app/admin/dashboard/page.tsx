@@ -203,13 +203,11 @@ const docFilter = sql`${orgFilter} ${ownerFilter}`;
 
       <AnalyticsWidgets ownerId={canSeeAll ? undefined : u.id} />
 
-      {/* Viewer-facing usage + quick actions */}
-      {!canSeeAll ? (
-        <div className="grid gap-4 lg:grid-cols-2">
-          <ViewerUsageWidget userId={u.id} />
-          <ViewerHelpfulTiles userId={u.id} orgId={u.orgId} hasOrgId={hasOrgId} />
-        </div>
-      ) : null}
+      {/* Usage + quick actions */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        <ViewerUsageWidget userId={u.id} />
+        {!canSeeAll ? <ViewerHelpfulTiles userId={u.id} orgId={u.orgId} hasOrgId={hasOrgId} /> : null}
+      </div>
 
       {missingCoreTables ? (
         <div className="rounded-lg border border-neutral-800 bg-neutral-950 p-4 text-sm text-neutral-300">

@@ -87,6 +87,11 @@ export default async function ViewerUsageWidget(props: { userId: string }) {
 
   const sharesLeft = maxActiveShares == null ? null : Math.max(0, maxActiveShares - activeShares);
   const storageLeft = maxStorageBytes == null ? null : Math.max(0, maxStorageBytes - usedStorage);
+  const storagePct =
+    maxStorageBytes && maxStorageBytes > 0
+      ? Math.min(100, Math.max(0, Math.round((usedStorage / maxStorageBytes) * 100)))
+      : null;
+  const storageWarn = storagePct != null && storagePct >= 80;
 
   const viewsLeft =
     maxViewsPerMonth == null || monthlyViews == null ? null : Math.max(0, maxViewsPerMonth - monthlyViews);
@@ -137,6 +142,11 @@ export default async function ViewerUsageWidget(props: { userId: string }) {
           <div className="mt-1 text-xs text-neutral-500">
             {storageLeft == null ? "Unlimited storage" : `${fmtBytes(storageLeft)} free`}
           </div>
+          {storageWarn ? (
+            <div className="mt-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-1 text-xs text-amber-200">
+              Storage usage is {storagePct}% of plan limit.
+            </div>
+          ) : null}
         </div>
 
         <div className="rounded-lg border border-neutral-800 bg-neutral-950 p-3">
