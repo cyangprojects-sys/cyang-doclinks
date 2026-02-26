@@ -25,6 +25,7 @@ function fmtInt(n: number) {
 }
 
 export default async function AnalyticsWidgets({ ownerId }: { ownerId?: string; }) {
+  const isViewerScoped = Boolean(ownerId);
   const hasDocViews = await tableExists("public.doc_views");
   const hasDocViewDaily = await tableExists("public.doc_view_daily");
   const hasDocs = await tableExists("public.docs");
@@ -439,81 +440,85 @@ export default async function AnalyticsWidgets({ ownerId }: { ownerId?: string; 
           </ol>
         </div>
 
-        <div className="rounded-2xl border border-neutral-800 bg-neutral-950 p-4 shadow-sm">
-          <div className="flex items-center justify-between gap-2">
-            <div className="text-xs text-neutral-400">Security ops (24h)</div>
-            <Link className="text-[11px] text-neutral-400 underline-offset-2 hover:underline" href="/admin/security">
-              Open security
-            </Link>
-          </div>
-          <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
-            <div>
-              <div className="text-xl font-semibold text-neutral-100">{fmtInt(scanFailures24h)}</div>
-              <div className="text-xs text-neutral-400">Scan failures</div>
-            </div>
-            <div>
-              <div className="text-xl font-semibold text-neutral-100">{fmtInt(deadLetterAlerts24h)}</div>
-              <div className="text-xs text-neutral-400">Dead-letter alerts</div>
-            </div>
-            <div>
-              <div className="text-xl font-semibold text-neutral-100">{fmtInt(presignErrors24h)}</div>
-              <div className="text-xs text-neutral-400">Presign errors</div>
-            </div>
-            <div>
-              <div className="text-xl font-semibold text-neutral-100">{fmtInt(abuseSpikes24h)}</div>
-              <div className="text-xs text-neutral-400">Abuse spikes</div>
-            </div>
-          </div>
-          <div className="mt-3 text-xs text-neutral-400">Dead-letter backlog: {fmtInt(deadLetterBacklog)}</div>
-        </div>
-
-        <div className="rounded-2xl border border-neutral-800 bg-neutral-950 p-4 shadow-sm">
-          <div className="text-xs text-neutral-400">Ops readiness (24h)</div>
-          <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
-            <div>
-              <div className="text-xl font-semibold text-neutral-100">{fmtInt(cronRuns24h)}</div>
-              <div className="text-xs text-neutral-400">Cron runs</div>
-            </div>
-            <div>
-              <div className="text-xl font-semibold text-neutral-100">{fmtInt(cronFailures24h)}</div>
-              <div className="text-xs text-neutral-400">Cron failures</div>
-            </div>
-            <div>
-              <div className="text-xl font-semibold text-neutral-100">
-                {cronFreshHealthy}/{cronFreshTotal || 6}
+        {!isViewerScoped ? (
+          <>
+            <div className="rounded-2xl border border-neutral-800 bg-neutral-950 p-4 shadow-sm">
+              <div className="flex items-center justify-between gap-2">
+                <div className="text-xs text-neutral-400">Security ops (24h)</div>
+                <Link className="text-[11px] text-neutral-400 underline-offset-2 hover:underline" href="/admin/security">
+                  Open security
+                </Link>
               </div>
-              <div className="text-xs text-neutral-400">Fresh cron jobs (6h)</div>
-            </div>
-            <div>
-              <div className="text-xl font-semibold text-neutral-100">
-                {backupLastStatus || "n/a"}
+              <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
+                <div>
+                  <div className="text-xl font-semibold text-neutral-100">{fmtInt(scanFailures24h)}</div>
+                  <div className="text-xs text-neutral-400">Scan failures</div>
+                </div>
+                <div>
+                  <div className="text-xl font-semibold text-neutral-100">{fmtInt(deadLetterAlerts24h)}</div>
+                  <div className="text-xs text-neutral-400">Dead-letter alerts</div>
+                </div>
+                <div>
+                  <div className="text-xl font-semibold text-neutral-100">{fmtInt(presignErrors24h)}</div>
+                  <div className="text-xs text-neutral-400">Presign errors</div>
+                </div>
+                <div>
+                  <div className="text-xl font-semibold text-neutral-100">{fmtInt(abuseSpikes24h)}</div>
+                  <div className="text-xs text-neutral-400">Abuse spikes</div>
+                </div>
               </div>
-              <div className="text-xs text-neutral-400">Last backup status</div>
+              <div className="mt-3 text-xs text-neutral-400">Dead-letter backlog: {fmtInt(deadLetterBacklog)}</div>
             </div>
-          </div>
-          <div className="mt-3 text-xs text-neutral-400">
-            Backup freshness:{" "}
-            <span className={backupFreshOk ? "text-emerald-300" : "text-amber-300"}>
-              {backupHoursSinceLastSuccess == null ? "unknown" : `${backupHoursSinceLastSuccess.toFixed(1)}h`}
-            </span>
-          </div>
-        </div>
 
-        <div className="rounded-2xl border border-neutral-800 bg-neutral-950 p-4 shadow-sm">
-          <div className="text-xs text-neutral-400">Top security events (24h)</div>
-          <ol className="mt-2 space-y-1 text-sm">
-            {topSecurityTypes.length ? (
-              topSecurityTypes.map((r) => (
-                <li key={r.type} className="flex items-center justify-between gap-2">
-                  <span className="truncate font-mono text-xs text-neutral-200">{r.type}</span>
-                  <span className="shrink-0 text-xs text-neutral-400">{fmtInt(r.c)}</span>
-                </li>
-              ))
-            ) : (
-              <li className="text-xs text-neutral-400">No security events in the last 24 hours.</li>
-            )}
-          </ol>
-        </div>
+            <div className="rounded-2xl border border-neutral-800 bg-neutral-950 p-4 shadow-sm">
+              <div className="text-xs text-neutral-400">Ops readiness (24h)</div>
+              <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
+                <div>
+                  <div className="text-xl font-semibold text-neutral-100">{fmtInt(cronRuns24h)}</div>
+                  <div className="text-xs text-neutral-400">Cron runs</div>
+                </div>
+                <div>
+                  <div className="text-xl font-semibold text-neutral-100">{fmtInt(cronFailures24h)}</div>
+                  <div className="text-xs text-neutral-400">Cron failures</div>
+                </div>
+                <div>
+                  <div className="text-xl font-semibold text-neutral-100">
+                    {cronFreshHealthy}/{cronFreshTotal || 6}
+                  </div>
+                  <div className="text-xs text-neutral-400">Fresh cron jobs (6h)</div>
+                </div>
+                <div>
+                  <div className="text-xl font-semibold text-neutral-100">
+                    {backupLastStatus || "n/a"}
+                  </div>
+                  <div className="text-xs text-neutral-400">Last backup status</div>
+                </div>
+              </div>
+              <div className="mt-3 text-xs text-neutral-400">
+                Backup freshness:{" "}
+                <span className={backupFreshOk ? "text-emerald-300" : "text-amber-300"}>
+                  {backupHoursSinceLastSuccess == null ? "unknown" : `${backupHoursSinceLastSuccess.toFixed(1)}h`}
+                </span>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-neutral-800 bg-neutral-950 p-4 shadow-sm">
+              <div className="text-xs text-neutral-400">Top security events (24h)</div>
+              <ol className="mt-2 space-y-1 text-sm">
+                {topSecurityTypes.length ? (
+                  topSecurityTypes.map((r) => (
+                    <li key={r.type} className="flex items-center justify-between gap-2">
+                      <span className="truncate font-mono text-xs text-neutral-200">{r.type}</span>
+                      <span className="shrink-0 text-xs text-neutral-400">{fmtInt(r.c)}</span>
+                    </li>
+                  ))
+                ) : (
+                  <li className="text-xs text-neutral-400">No security events in the last 24 hours.</li>
+                )}
+              </ol>
+            </div>
+          </>
+        ) : null}
       </div>
     </section>
   );
