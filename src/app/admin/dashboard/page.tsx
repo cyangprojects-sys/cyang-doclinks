@@ -57,13 +57,23 @@ export default async function AdminDashboardPage() {
   const hasDocAliases = await tableExists("public.doc_aliases");
   const hasOwnerId = await columnExists("docs", "owner_id");
   const hasOrgId = await columnExists("docs", "org_id");
+  const hasCreatedByEmail = await columnExists("docs", "created_by_email");
 
   // Tenant scope: if docs.org_id exists, always restrict to the user's org.
 // This prevents cross-tenant data leaks in multi-tenant mode.
 const orgFilter = hasOrgId && u.orgId ? sql`and d.org_id = ${u.orgId}::uuid` : sql``;
 
-// For viewers, show only their docs if docs.owner_id exists.
-const ownerFilter = !canSeeAll && hasOwnerId ? sql`and d.owner_id = ${u.id}::uuid` : sql``;
+// For viewers, show only their docs.
+// Legacy fallback: owner_id may be null on older rows; use created_by_email in that case.
+const ownerFilter = !canSeeAll
+  ? hasOwnerId
+    ? hasCreatedByEmail
+      ? sql`and (d.owner_id = ${u.id}::uuid or (d.owner_id is null and lower(coalesce(d.created_by_email,'')) = lower(${u.email})))`
+      : sql`and d.owner_id = ${u.id}::uuid`
+    : hasCreatedByEmail
+      ? sql`and lower(coalesce(d.created_by_email,'')) = lower(${u.email})`
+      : sql``
+  : sql``;
 
 const docFilter = sql`${orgFilter} ${ownerFilter}`;
 
@@ -238,8 +248,8 @@ const docFilter = sql`${orgFilter} ${ownerFilter}`;
             jump to views →
           </a>
         </div>
-        {/* Viewers can delete their own documents only when ownership is enabled (docs.owner_id) */}
-        <UnifiedDocsTableClient rows={unifiedRows} defaultPageSize={10} showDelete={canSeeAll || hasOwnerId} />
+        {/* Viewers can delete own docs using owner_id, with created_by_email fallback for legacy rows. */}
+        <UnifiedDocsTableClient rows={unifiedRows} defaultPageSize={10} showDelete={canSeeAll || hasOwnerId || hasCreatedByEmail} />
       </section>
 
       {/* Views by doc */}

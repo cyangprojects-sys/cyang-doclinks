@@ -75,8 +75,17 @@ export default async function AdminDocDetailPage({
 
   const hasOwnerId = await columnExists("docs", "owner_id");
   const hasOrgId = await columnExists("docs", "org_id");
+  const hasCreatedByEmail = await columnExists("docs", "created_by_email");
   const orgGate = hasOrgId && u.orgId ? sql`and d.org_id = ${u.orgId}::uuid` : sql``;
-  const ownerGate = !canSeeAll && hasOwnerId ? sql`and d.owner_id = ${u.id}::uuid` : sql``;
+  const ownerGate = !canSeeAll
+    ? hasOwnerId
+      ? hasCreatedByEmail
+        ? sql`and (d.owner_id = ${u.id}::uuid or (d.owner_id is null and lower(coalesce(d.created_by_email,'')) = lower(${u.email})))`
+        : sql`and d.owner_id = ${u.id}::uuid`
+      : hasCreatedByEmail
+        ? sql`and lower(coalesce(d.created_by_email,'')) = lower(${u.email})`
+        : sql``
+    : sql``;
   const scopeGate = sql`${orgGate} ${ownerGate}`;
 
   const docRows = (await sql`

@@ -273,7 +273,11 @@ export async function requireDocWrite(docIdRaw: string): Promise<void> {
   if (!docId) throw new Error("Missing docId.");
 
   const u = await requireUser();
-  if (u.role === "owner" || u.role === "admin") {
+  if (u.role === "owner") {
+    // Owner has full control across all documents.
+    return;
+  }
+  if (u.role === "admin") {
     // still enforce org scope if docs.org_id exists
     try {
       const rows = (await sql`
@@ -293,17 +297,21 @@ export async function requireDocWrite(docIdRaw: string): Promise<void> {
   try {
     const rows = (await sql`
       select owner_id::text as owner_id,
-             org_id::text as org_id
+             org_id::text as org_id,
+             lower(coalesce(created_by_email, ''))::text as created_by_email
       from public.docs
       where id = ${docId}::uuid
       limit 1
-    `) as unknown as Array<{ owner_id: string | null; org_id: string | null }>;
+    `) as unknown as Array<{ owner_id: string | null; org_id: string | null; created_by_email: string }>;
 
     const ownerId = rows?.[0]?.owner_id ?? null;
     const docOrgId = rows?.[0]?.org_id ?? null;
+    const createdByEmail = rows?.[0]?.created_by_email ?? "";
 
-    if (!ownerId) throw new Error("Doc not found.");
-    if (ownerId !== u.id) throw new Error("FORBIDDEN");
+    // Legacy fallback: before owner_id was enforced, treat created_by_email as ownership signal.
+    const ownsById = ownerId === u.id;
+    const ownsByEmail = !ownerId && createdByEmail && createdByEmail === String(u.email || "").toLowerCase();
+    if (!ownsById && !ownsByEmail) throw new Error("FORBIDDEN");
     if (docOrgId && u.orgId && docOrgId !== u.orgId) throw new Error("FORBIDDEN");
     return;
   } catch (e: any) {
