@@ -8,6 +8,7 @@ import { sendExpirationAlerts } from "@/lib/expirationAlerts";
 import { runAutomatedKeyRotation } from "@/lib/keyRotation";
 import { migrateLegacyEncryptionBatch } from "@/lib/encryptionMigration";
 import { runBackupRecoveryCheck } from "@/lib/backupRecovery";
+import { processKeyRotationJobs } from "@/lib/keyRotationJobs";
 
 import { isCronAuthorized } from "@/lib/cronAuth";
 
@@ -37,6 +38,9 @@ export async function GET(req: NextRequest) {
 
   // 4) Optional automated key rotation
   const key_rotation = await runAutomatedKeyRotation();
+  const key_rotation_jobs = await processKeyRotationJobs({
+    maxJobs: Math.max(1, Math.min(25, Number(process.env.KEY_ROTATION_CRON_MAX_JOBS || 5))),
+  });
 
   // 5) Optional legacy encryption migration batch
   const legacy_migration_enabled = ["1", "true", "yes", "on"].includes(
@@ -60,6 +64,7 @@ export async function GET(req: NextRequest) {
     retention,
     expiration_alerts,
     key_rotation,
+    key_rotation_jobs,
     legacy_encryption_migration,
     backup_recovery,
   });

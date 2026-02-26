@@ -2,20 +2,55 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-type KeysResponse =
-  | {
-      ok: true;
-      configured: boolean;
-      active_key_id: string | null;
-      revoked_active: boolean;
-      keys: Array<{ id: string; active: boolean; revoked: boolean }>;
-    }
-  | { ok: false; error: string; message?: string };
+type MasterKeyRow = { id: string; active: boolean; revoked: boolean };
+type MasterKeyChange = {
+  id: string;
+  created_at: string;
+  changed_by_user_id: string | null;
+  previous_key_id: string | null;
+  new_key_id: string;
+  reason: string | null;
+  rollback_of_change_id: string | null;
+};
+type RotationJob = {
+  id: string;
+  created_at: string;
+  started_at: string | null;
+  finished_at: string | null;
+  from_key_id: string;
+  to_key_id: string;
+  status: "queued" | "running" | "completed" | "failed" | "canceled";
+  scanned_count: number;
+  rotated_count: number;
+  failed_count: number;
+  max_batch: number;
+  last_error: string | null;
+};
+type KeysOk = {
+  ok: true;
+  configured: boolean;
+  active_key_id: string | null;
+  db_active_key_id: string | null;
+  revoked_active: boolean;
+  keys: MasterKeyRow[];
+  changes: MasterKeyChange[];
+  jobs: RotationJob[];
+  job_summary: { queued: number; running: number; failed: number };
+};
+type KeysErr = { ok: false; error: string; message?: string };
+type KeysResponse = KeysOk | KeysErr;
 
-function pillClass(active: boolean, revoked: boolean) {
+function pillClass(active: boolean, revoked: boolean): string {
   if (revoked) return "border-red-400/20 bg-red-400/10 text-red-200";
   if (active) return "border-emerald-400/20 bg-emerald-400/10 text-emerald-200";
   return "border-white/10 bg-white/5 text-white/70";
+}
+
+function statusClass(status: RotationJob["status"]): string {
+  if (status === "completed") return "border-emerald-500/30 bg-emerald-500/10 text-emerald-200";
+  if (status === "running") return "border-blue-500/30 bg-blue-500/10 text-blue-200";
+  if (status === "failed") return "border-red-500/30 bg-red-500/10 text-red-200";
+  return "border-white/15 bg-white/5 text-white/70";
 }
 
 export default function KeyManagementPanel() {
@@ -23,30 +58,60 @@ export default function KeyManagementPanel() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const keys = useMemo(() => ((data && (data as any).ok) ? (data as any).keys as any[] : []), [data]);
-  const activeId = (data && (data as any).ok) ? (data as any).active_key_id as (string | null) : null;
+  const keys = useMemo(() => (data && data.ok ? data.keys : []), [data]);
+  const activeId = data && data.ok ? data.active_key_id : null;
+  const changes = data && data.ok ? data.changes : [];
+  const jobs = data && data.ok ? data.jobs : [];
+  const jobSummary = data && data.ok ? data.job_summary : { queued: 0, running: 0, failed: 0 };
 
+  const [activateKey, setActivateKey] = useState<string>("");
+  const [activateReason, setActivateReason] = useState<string>("");
   const [fromKey, setFromKey] = useState<string>("");
-  const [toKey, setToKey] = useState<string>(""); // optional, blank = active
+  const [toKey, setToKey] = useState<string>("");
   const [limit, setLimit] = useState<number>(250);
 
   async function refresh() {
     setError(null);
     const r = await fetch("/api/admin/security/keys", { method: "GET" });
     const j = (await r.json().catch(() => null)) as KeysResponse | null;
-    setData(j);
-    if (!r.ok || !j || (j as any).ok === false) {
-      setError((j as any)?.error || "Failed to load keys.");
+    if (!j) {
+      setError("Failed to load keys.");
+      return;
     }
+    setData(j);
+    if (!r.ok || !j.ok) setError(j.ok ? "Failed to load keys." : (j.error || "Failed to load keys."));
   }
 
   useEffect(() => {
-    refresh();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    void refresh();
   }, []);
 
+  async function onActivate() {
+    if (!activateKey) {
+      setError("Select a key to activate.");
+      return;
+    }
+    if (!confirm(`Switch active key to "${activateKey}"?`)) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const r = await fetch("/api/admin/security/activate", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ key_id: activateKey, reason: activateReason || undefined }),
+      });
+      const j = (await r.json().catch(() => null)) as { ok?: boolean; error?: string } | null;
+      if (!r.ok || !j?.ok) throw new Error(j?.error || "Activate failed.");
+      await refresh();
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Activate failed.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function onRevoke(id: string) {
-    if (!confirm(`Revoke master key "${id}"?\n\nThis will immediately block decrypt for any documents still using it.`)) return;
+    if (!confirm(`Revoke key "${id}"? This blocks decrypts for docs still on this key.`)) return;
     setBusy(true);
     setError(null);
     try {
@@ -55,19 +120,23 @@ export default function KeyManagementPanel() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ key_id: id }),
       });
-      const j = await r.json().catch(() => null);
-      if (!r.ok || !j || (j as any).ok === false) throw new Error((j as any)?.error || "Revoke failed.");
+      const j = (await r.json().catch(() => null)) as { ok?: boolean; error?: string } | null;
+      if (!r.ok || !j?.ok) throw new Error(j?.error || "Revoke failed.");
       await refresh();
-    } catch (e: any) {
-      setError(e?.message || "Revoke failed.");
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Revoke failed.");
     } finally {
       setBusy(false);
     }
   }
 
-  async function onRotate() {
-    if (!fromKey) {
-      setError("Select a FROM key.");
+  async function onEnqueueRotation() {
+    if (!fromKey || !toKey) {
+      setError("Select FROM and TO keys.");
+      return;
+    }
+    if (fromKey === toKey) {
+      setError("FROM and TO keys must differ.");
       return;
     }
     setBusy(true);
@@ -78,16 +147,37 @@ export default function KeyManagementPanel() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           from_key_id: fromKey,
-          to_key_id: toKey || undefined,
+          to_key_id: toKey,
           limit,
+          async_job: true,
         }),
       });
-      const j = await r.json().catch(() => null);
-      if (!r.ok || !j || (j as any).ok === false) throw new Error((j as any)?.error || "Rotate failed.");
+      const j = (await r.json().catch(() => null)) as { ok?: boolean; error?: string } | null;
+      if (!r.ok || !j?.ok) throw new Error(j?.error || "Failed to enqueue rotation job.");
       await refresh();
-      alert(`Rotated ${Number((j as any).rotated || 0)} documents.`);
-    } catch (e: any) {
-      setError(e?.message || "Rotate failed.");
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Failed to enqueue rotation job.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onRollback(changeId: string, previousKeyId: string | null) {
+    if (!previousKeyId) return;
+    if (!confirm(`Rollback key change to restore "${previousKeyId}"?`)) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const r = await fetch("/api/admin/security/rollback", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ change_id: changeId }),
+      });
+      const j = (await r.json().catch(() => null)) as { ok?: boolean; error?: string } | null;
+      if (!r.ok || !j?.ok) throw new Error(j?.error || "Rollback failed.");
+      await refresh();
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Rollback failed.");
     } finally {
       setBusy(false);
     }
@@ -97,13 +187,13 @@ export default function KeyManagementPanel() {
     <section className="rounded-xl border border-white/10 bg-white/5 p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-sm font-semibold">Master key management</h2>
+          <h2 className="text-sm font-semibold">Master key operations</h2>
           <p className="mt-1 text-xs text-white/50">
-            Keys are sourced from <span className="font-mono text-white/70">DOC_MASTER_KEYS</span>. Revocations are stored in DB to allow instant shutdown.
+            Active key switching, async rewrap jobs, and rollback history.
           </p>
         </div>
         <button
-          onClick={refresh}
+          onClick={() => void refresh()}
           disabled={busy}
           className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-xs font-semibold hover:bg-white/10 disabled:opacity-50"
         >
@@ -112,16 +202,16 @@ export default function KeyManagementPanel() {
       </div>
 
       <div className="mt-3 flex flex-wrap gap-2">
-        {keys?.length ? (
+        {keys.length ? (
           keys.map((k) => (
-            <div key={k.id} className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs ${pillClass(!!k.active, !!k.revoked)}`}>
+            <div key={k.id} className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs ${pillClass(k.active, k.revoked)}`}>
               <span className="font-mono">{k.id}</span>
-              {k.active ? <span className="text-[10px] opacity-90">ACTIVE</span> : null}
-              {k.revoked ? <span className="text-[10px] opacity-90">REVOKED</span> : null}
+              {k.active ? <span className="text-[10px]">ACTIVE</span> : null}
+              {k.revoked ? <span className="text-[10px]">REVOKED</span> : null}
               <button
                 disabled={busy || k.revoked}
-                onClick={() => onRevoke(k.id)}
-                className="ml-1 rounded-full border border-white/10 bg-black/20 px-2 py-0.5 text-[10px] font-semibold hover:bg-black/30 disabled:opacity-50"
+                onClick={() => void onRevoke(k.id)}
+                className="rounded-full border border-white/10 bg-black/20 px-2 py-0.5 text-[10px] font-semibold hover:bg-black/30 disabled:opacity-50"
                 title="Revoke key"
               >
                 Revoke
@@ -129,89 +219,146 @@ export default function KeyManagementPanel() {
             </div>
           ))
         ) : (
-          <div className="text-sm text-white/60">No keys detected. Set DOC_MASTER_KEYS.</div>
+          <div className="text-sm text-white/60">No keys detected. Configure DOC_MASTER_KEYS.</div>
         )}
       </div>
 
       <div className="mt-4 grid gap-3 lg:grid-cols-3">
+        <div className="rounded-lg border border-white/10 bg-black/30 p-3">
+          <div className="text-xs font-semibold text-white/80">Active key switch</div>
+          <div className="mt-1 text-[11px] text-white/60">Current: {activeId || "none"}</div>
+          <select
+            value={activateKey}
+            onChange={(e) => setActivateKey(e.target.value)}
+            className="mt-2 w-full rounded-lg border border-white/10 bg-black/40 px-2 py-2 text-xs outline-none focus:border-white/20"
+          >
+            <option value="">Select key...</option>
+            {keys.filter((k) => !k.revoked).map((k) => (
+              <option key={k.id} value={k.id}>
+                {k.id}
+              </option>
+            ))}
+          </select>
+          <input
+            type="text"
+            value={activateReason}
+            onChange={(e) => setActivateReason(e.target.value)}
+            placeholder="Reason (optional)"
+            className="mt-2 w-full rounded-lg border border-white/10 bg-black/40 px-2 py-2 text-xs outline-none focus:border-white/20"
+          />
+          <button
+            onClick={() => void onActivate()}
+            disabled={busy || !activateKey}
+            className="mt-2 w-full rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-xs font-semibold hover:bg-white/10 disabled:opacity-50"
+          >
+            Set Active Key
+          </button>
+        </div>
+
         <div className="rounded-lg border border-white/10 bg-black/30 p-3 lg:col-span-2">
-          <div className="text-xs font-semibold text-white/80">Rewrap document keys (rotation)</div>
-          <p className="mt-1 text-xs text-white/50">
-            Unwraps each document data key with the FROM key and re-wraps it with the TO key (default: active). Content in R2 is unchanged.
+          <div className="text-xs font-semibold text-white/80">Re-encryption job queue</div>
+          <p className="mt-1 text-[11px] text-white/55">
+            Jobs are processed by Cloudflare-triggered cron calling `/api/cron/key-rotation`.
           </p>
-
-          <div className="mt-3 grid gap-2 md:grid-cols-3">
-            <div>
-              <div className="text-[11px] text-white/60">FROM key</div>
-              <select
-                value={fromKey}
-                onChange={(e) => setFromKey(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-white/10 bg-black/40 px-2 py-2 text-xs outline-none focus:border-white/20"
-              >
-                <option value="">Select…</option>
-                {keys.map((k) => (
-                  <option key={k.id} value={k.id}>
-                    {k.id}{k.revoked ? " (revoked)" : ""}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <div className="text-[11px] text-white/60">TO key (optional)</div>
-              <select
-                value={toKey}
-                onChange={(e) => setToKey(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-white/10 bg-black/40 px-2 py-2 text-xs outline-none focus:border-white/20"
-              >
-                <option value="">Active ({activeId || "unknown"})</option>
-                {keys.map((k) => (
-                  <option key={k.id} value={k.id}>
-                    {k.id}{k.active ? " (active)" : ""}{k.revoked ? " (revoked)" : ""}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <div className="text-[11px] text-white/60">Batch limit</div>
-              <input
-                type="number"
-                min={1}
-                max={2000}
-                value={limit}
-                onChange={(e) => setLimit(Number(e.target.value || 250))}
-                className="mt-1 w-full rounded-lg border border-white/10 bg-black/40 px-2 py-2 text-xs outline-none focus:border-white/20"
-              />
-            </div>
-          </div>
-
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <button
-              onClick={onRotate}
-              disabled={busy || !fromKey}
-              className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-xs font-semibold hover:bg-white/10 disabled:opacity-50"
+          <div className="mt-2 grid gap-2 md:grid-cols-3">
+            <select
+              value={fromKey}
+              onChange={(e) => setFromKey(e.target.value)}
+              className="rounded-lg border border-white/10 bg-black/40 px-2 py-2 text-xs outline-none focus:border-white/20"
             >
-              {busy ? "Working…" : "Rotate (rewrap) batch"}
-            </button>
-            <div className="text-xs text-white/50">
-              Tip: rotate docs off a key before revoking it.
-            </div>
+              <option value="">FROM key...</option>
+              {keys.map((k) => (
+                <option key={k.id} value={k.id}>
+                  {k.id}
+                </option>
+              ))}
+            </select>
+            <select
+              value={toKey}
+              onChange={(e) => setToKey(e.target.value)}
+              className="rounded-lg border border-white/10 bg-black/40 px-2 py-2 text-xs outline-none focus:border-white/20"
+            >
+              <option value="">TO key...</option>
+              {keys.filter((k) => !k.revoked).map((k) => (
+                <option key={k.id} value={k.id}>
+                  {k.id}
+                </option>
+              ))}
+            </select>
+            <input
+              type="number"
+              min={1}
+              max={2000}
+              value={limit}
+              onChange={(e) => setLimit(Number(e.target.value || 250))}
+              className="rounded-lg border border-white/10 bg-black/40 px-2 py-2 text-xs outline-none focus:border-white/20"
+            />
+          </div>
+          <div className="mt-2 flex items-center gap-2 text-xs text-white/60">
+            <span>Queued: {jobSummary.queued}</span>
+            <span>Running: {jobSummary.running}</span>
+            <span>Failed: {jobSummary.failed}</span>
+          </div>
+          <button
+            onClick={() => void onEnqueueRotation()}
+            disabled={busy || !fromKey || !toKey}
+            className="mt-2 rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-xs font-semibold hover:bg-white/10 disabled:opacity-50"
+          >
+            Enqueue Rotation Job
+          </button>
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-3 lg:grid-cols-2">
+        <div className="rounded-lg border border-white/10 bg-black/30 p-3">
+          <div className="text-xs font-semibold text-white/80">Recent key changes</div>
+          <div className="mt-2 space-y-2">
+            {changes.length ? (
+              changes.map((c) => (
+                <div key={c.id} className="rounded-lg border border-white/10 bg-black/20 p-2 text-xs">
+                  <div className="font-mono text-white/70">{c.created_at}</div>
+                  <div className="mt-1 text-white/80">{c.previous_key_id || "none"} → {c.new_key_id}</div>
+                  <div className="text-white/50">{c.reason || "no reason"}</div>
+                  <button
+                    onClick={() => void onRollback(c.id, c.previous_key_id)}
+                    disabled={busy || !c.previous_key_id}
+                    className="mt-1 rounded border border-white/15 bg-white/5 px-2 py-1 text-[11px] font-semibold hover:bg-white/10 disabled:opacity-40"
+                  >
+                    Rollback
+                  </button>
+                </div>
+              ))
+            ) : (
+              <div className="text-xs text-white/60">No key change history available.</div>
+            )}
           </div>
         </div>
 
         <div className="rounded-lg border border-white/10 bg-black/30 p-3">
-          <div className="text-xs font-semibold text-white/80">Operational notes</div>
-          <ul className="mt-2 space-y-2 text-xs text-white/55">
-            <li>• Revocation is instant (DB-backed).</li>
-            <li>• Rotation is safe and does not touch R2 objects.</li>
-            <li>• Uploads always use the active key from env.</li>
-            <li>• Keep at least 2 keys in env for seamless rotation.</li>
-          </ul>
+          <div className="text-xs font-semibold text-white/80">Rotation jobs</div>
+          <div className="mt-2 space-y-2">
+            {jobs.length ? (
+              jobs.map((j) => (
+                <div key={j.id} className="rounded-lg border border-white/10 bg-black/20 p-2 text-xs">
+                  <div className="flex items-center justify-between">
+                    <div className="font-mono text-white/70">{j.id.slice(0, 8)}</div>
+                    <span className={`rounded-md border px-2 py-0.5 text-[10px] ${statusClass(j.status)}`}>{j.status}</span>
+                  </div>
+                  <div className="mt-1 text-white/80">{j.from_key_id} → {j.to_key_id}</div>
+                  <div className="text-white/55">
+                    scanned {j.scanned_count}, rotated {j.rotated_count}, failed {j.failed_count}
+                  </div>
+                  {j.last_error ? <div className="mt-1 text-red-300">{j.last_error}</div> : null}
+                </div>
+              ))
+            ) : (
+              <div className="text-xs text-white/60">No jobs yet.</div>
+            )}
+          </div>
         </div>
       </div>
 
-      {error && <div className="mt-3 text-sm text-red-300">{error}</div>}
+      {error ? <div className="mt-3 text-sm text-red-300">{error}</div> : null}
     </section>
   );
 }

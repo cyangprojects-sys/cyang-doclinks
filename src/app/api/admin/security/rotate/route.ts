@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireRole } from "@/lib/authz";
 import { rotateDocKeys } from "@/lib/masterKeys";
 import { logSecurityEvent } from "@/lib/securityTelemetry";
+import { enqueueKeyRotationJob } from "@/lib/keyRotationJobs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -11,6 +12,7 @@ const Body = z.object({
   from_key_id: z.string().min(1),
   to_key_id: z.string().optional(),
   limit: z.number().int().positive().max(2000).optional(),
+  async_job: z.boolean().optional(),
 });
 
 export async function POST(req: Request) {
@@ -19,6 +21,36 @@ export async function POST(req: Request) {
     const json = await req.json().catch(() => null);
     const parsed = Body.safeParse(json);
     if (!parsed.success) return NextResponse.json({ ok: false, error: "BAD_REQUEST" }, { status: 400 });
+
+    const asyncJob = parsed.data.async_job ?? true;
+
+    if (asyncJob) {
+      const toKeyId = parsed.data.to_key_id || "";
+      if (!toKeyId) {
+        return NextResponse.json(
+          { ok: false, error: "TO_KEY_REQUIRED", message: "to_key_id is required for async rotation job." },
+          { status: 400 }
+        );
+      }
+      const job = await enqueueKeyRotationJob({
+        fromKeyId: parsed.data.from_key_id,
+        toKeyId,
+        maxBatch: parsed.data.limit ?? 250,
+        requestedByUserId: u.id,
+      });
+
+      void logSecurityEvent({
+        type: "master_key_rotate_job_enqueued",
+        severity: "medium",
+        actorUserId: u.id,
+        orgId: u.orgId ?? null,
+        scope: "crypto",
+        message: "Master key rotation job enqueued",
+        meta: { from: parsed.data.from_key_id, to: toKeyId, jobId: job.id, limit: parsed.data.limit ?? 250 },
+      });
+
+      return NextResponse.json({ ok: true, job_id: job.id, mode: "async" });
+    }
 
     const res = await rotateDocKeys({
       fromKeyId: parsed.data.from_key_id,
@@ -33,10 +65,10 @@ export async function POST(req: Request) {
       orgId: u.orgId ?? null,
       scope: "crypto",
       message: "Rewrapped document data keys",
-      meta: { from: parsed.data.from_key_id, to: parsed.data.to_key_id ?? "active", rotated: res.rotated },
+      meta: { from: parsed.data.from_key_id, to: parsed.data.to_key_id ?? "active", rotated: res.rotated, failed: res.failed, remaining: res.remaining },
     });
 
-    return NextResponse.json({ ok: true, rotated: res.rotated });
+    return NextResponse.json({ ok: true, mode: "sync", rotated: res.rotated, failed: res.failed, scanned: res.scanned, remaining: res.remaining });
   } catch (e: any) {
     const msg = e?.message || "Server error";
     const status = msg === "FORBIDDEN" || msg === "UNAUTHENTICATED" ? 403 : 500;

@@ -1,6 +1,11 @@
-# Cloudflare Cron Trigger (every 10 minutes) for cyang-doclinks malware scanning
+# Cloudflare Cron Triggers for cyang-doclinks background jobs
 
-This Worker runs on Cloudflare's Cron Triggers and calls your existing Next.js API route on cyang.io.
+This Worker runs on Cloudflare Cron Triggers and calls your Next.js cron endpoints on `cyang.io`.
+
+Current schedules:
+- `*/10 * * * *` -> `/api/cron/scan`
+- `*/15 * * * *` -> `/api/cron/key-rotation`
+- `5 * * * *` -> `/api/cron/nightly`
 
 ## What you need to do in the app (cyang-doclinks)
 
@@ -30,7 +35,7 @@ npx wrangler deploy
 ```
 
 ### Optional settings
-- Update `TARGET_URL` and `HTTP_METHOD` in `wrangler.toml` if your route path/method differs.
+- Update `TARGET_SCAN_URL`, `TARGET_KEY_ROTATION_URL`, and `TARGET_NIGHTLY_URL` in `wrangler.toml` if route paths differ.
 
 ## Logs
 View logs in Cloudflare dashboard, or run:
