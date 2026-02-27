@@ -10,7 +10,7 @@ import { sql } from "@/lib/db";
 import { slugify } from "@/lib/slug";
 import { requireDocWrite } from "@/lib/authz";
 import { incrementUploads } from "@/lib/monetization";
-import { enforceGlobalApiRateLimit, clientIpKey, logSecurityEvent, detectStorageSpike } from "@/lib/securityTelemetry";
+import { enforceGlobalApiRateLimit, clientIpKey, logDbErrorEvent, logSecurityEvent, detectStorageSpike } from "@/lib/securityTelemetry";
 import { getR2Bucket, r2Client } from "@/lib/r2";
 import { enqueueDocScan } from "@/lib/scanQueue";
 import { decryptAes256Gcm, unwrapDataKey } from "@/lib/encryption";
@@ -523,6 +523,16 @@ try {
       process.env.NEXT_PUBLIC_SITE_URL ||
       (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000");
 
+        await logSecurityEvent({
+          type: "upload_complete_success",
+          severity: "low",
+          ip: ipInfo.ip,
+          scope: "upload_complete",
+          message: "Upload finalized successfully",
+          docId,
+          meta: { sizeBytes: expectedPlain || null },
+        });
+
         return NextResponse.json({
           ok: true,
           doc_id: docId,
@@ -547,6 +557,12 @@ try {
       });
       return NextResponse.json({ ok: false, error: "TIMEOUT" }, { status: 504 });
     }
+    await logDbErrorEvent({
+      scope: "upload_complete",
+      message: String(e?.message || e || "server_error"),
+      ip: clientIpKey(req).ip,
+      meta: { route: "/api/admin/upload/complete" },
+    });
     return NextResponse.json(
       { ok: false, error: "server_error", message: e?.message || "Unknown error" },
       { status: 500 }

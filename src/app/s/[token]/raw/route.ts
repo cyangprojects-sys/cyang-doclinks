@@ -14,7 +14,7 @@ import { appendImmutableAudit } from "@/lib/immutableAudit";
 import { getR2Bucket } from "@/lib/r2";
 import { isSecurityTestNoDbMode, isShareServingDisabled } from "@/lib/securityPolicy";
 import { getRouteTimeoutMs, isRouteTimeoutError, withRouteTimeout } from "@/lib/routeTimeout";
-import { logSecurityEvent } from "@/lib/securityTelemetry";
+import { logDbErrorEvent, logSecurityEvent } from "@/lib/securityTelemetry";
 import { assertRuntimeEnv, isRuntimeEnvError } from "@/lib/runtimeEnv";
 
 export const runtime = "nodejs";
@@ -436,6 +436,14 @@ export async function GET(
         meta: { timeoutMs },
       });
       return new NextResponse("Gateway Timeout", { status: 504 });
+    }
+    if (e instanceof Error) {
+      await logDbErrorEvent({
+        scope: "share_raw",
+        message: e.message,
+        ip: getClientIpFromHeaders(req.headers) || null,
+        meta: { route: "/s/[token]/raw" },
+      });
     }
     throw e;
   }

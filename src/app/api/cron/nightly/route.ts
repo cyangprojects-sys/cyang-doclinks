@@ -11,7 +11,7 @@ import { runBackupRecoveryCheck } from "@/lib/backupRecovery";
 import { processKeyRotationJobs } from "@/lib/keyRotationJobs";
 import { revokeExpiredSharesBatch } from "@/lib/shareLifecycle";
 import { runUsageMaintenance } from "@/lib/usageMaintenance";
-import { logSecurityEvent } from "@/lib/securityTelemetry";
+import { detectDbErrorSpike, detectScanFailureSpike, detectUploadCompletionSpike, logSecurityEvent } from "@/lib/securityTelemetry";
 import { logCronRun } from "@/lib/cronTelemetry";
 import { runBillingMaintenance } from "@/lib/billingSubscription";
 
@@ -74,6 +74,11 @@ export async function GET(req: NextRequest) {
   const billing_sync = await runBillingMaintenance({
     maxUsers: Math.max(1, Math.min(5000, Number(process.env.BILLING_MAINTENANCE_MAX_USERS || 500))),
   });
+
+  // 10) Spike alerting rollups (best-effort)
+  await detectScanFailureSpike();
+  await detectUploadCompletionSpike();
+  await detectDbErrorSpike();
 
   if (expiredSharesRevoked.revoked > 0) {
     await logSecurityEvent({

@@ -10,7 +10,7 @@ import { rateLimit, rateLimitHeaders, stableHash } from "@/lib/rateLimit";
 import { mintAccessTicket } from "@/lib/accessTicket";
 import { assertCanServeView, incrementMonthlyViews } from "@/lib/monetization";
 import { enforcePlanLimitsEnabled } from "@/lib/billingFlags";
-import { clientIpKey, logSecurityEvent } from "@/lib/securityTelemetry";
+import { clientIpKey, logDbErrorEvent, logSecurityEvent } from "@/lib/securityTelemetry";
 import crypto from "crypto";
 import { isAliasServingDisabled, isSecurityTestNoDbMode } from "@/lib/securityPolicy";
 import { getRouteTimeoutMs, isRouteTimeoutError, withRouteTimeout } from "@/lib/routeTimeout";
@@ -305,6 +305,12 @@ if (shouldCountView(req)) {
       });
       return new Response("Gateway Timeout", { status: 504 });
     }
+    await logDbErrorEvent({
+      scope: "alias_raw",
+      message: String(err?.message || err || "alias_raw_error"),
+      ip: clientIpKey(req).ip,
+      meta: { route: "/d/[alias]/raw" },
+    });
     console.error("RAW ROUTE ERROR:", err);
     return new Response("Internal server error", { status: 500 });
   }

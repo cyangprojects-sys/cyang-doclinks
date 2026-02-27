@@ -355,3 +355,66 @@ export async function detectScanFailureSpike() {
     message: "Malware scan failures spiked",
   });
 }
+
+export async function detectUploadCompletionSpike() {
+  const threshold = Math.max(1, Number(process.env.UPLOAD_SPIKE_THRESHOLD || 120));
+  const windowMinutes = Math.max(1, Number(process.env.UPLOAD_SPIKE_WINDOW_MINUTES || 10));
+  await detectEventSpike({
+    eventType: "upload_complete_success",
+    threshold,
+    windowMinutes,
+    alertType: "upload_spike_alert",
+    severity: "high",
+    scope: "upload_complete",
+    message: "Upload completion volume spiked",
+  });
+}
+
+export async function detectDbErrorSpike() {
+  const threshold = Math.max(1, Number(process.env.DB_ERROR_SPIKE_THRESHOLD || 20));
+  const windowMinutes = Math.max(1, Number(process.env.DB_ERROR_SPIKE_WINDOW_MINUTES || 10));
+  await detectEventSpike({
+    eventType: "db_error",
+    threshold,
+    windowMinutes,
+    alertType: "db_error_spike",
+    severity: "high",
+    scope: "database",
+    message: "Database error rate spiked",
+  });
+}
+
+function looksLikeDbErrorMessage(message: string): boolean {
+  const msg = String(message || "").toLowerCase();
+  if (!msg) return false;
+  return (
+    msg.includes("neondberror") ||
+    msg.includes("sqlstate") ||
+    msg.includes("database") ||
+    msg.includes("relation") ||
+    msg.includes("connection") ||
+    msg.includes("authentication failed") ||
+    msg.includes("timeout")
+  );
+}
+
+export async function logDbErrorEvent(args: {
+  scope: string;
+  message: string;
+  ip?: string | null;
+  actorUserId?: string | null;
+  orgId?: string | null;
+  meta?: Record<string, unknown>;
+}) {
+  if (!looksLikeDbErrorMessage(args.message)) return;
+  await logSecurityEvent({
+    type: "db_error",
+    severity: "high",
+    ip: args.ip ?? null,
+    actorUserId: args.actorUserId ?? null,
+    orgId: args.orgId ?? null,
+    scope: args.scope,
+    message: args.message,
+    meta: args.meta ?? null,
+  });
+}

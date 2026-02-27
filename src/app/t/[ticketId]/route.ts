@@ -3,7 +3,7 @@ import { GetObjectCommand } from "@aws-sdk/client-s3";
 import { r2Client } from "@/lib/r2";
 import { consumeAccessTicket } from "@/lib/accessTicket";
 import { sql } from "@/lib/db";
-import { clientIpKey, enforceGlobalApiRateLimit, logSecurityEvent } from "@/lib/securityTelemetry";
+import { clientIpKey, enforceGlobalApiRateLimit, logDbErrorEvent, logSecurityEvent } from "@/lib/securityTelemetry";
 import { decryptAes256Gcm, unwrapDataKey } from "@/lib/encryption";
 import { getMasterKeyByIdOrThrow } from "@/lib/masterKeys";
 import { hashUserAgent, hashIpForTicket } from "@/lib/accessTicket";
@@ -375,6 +375,14 @@ export async function GET(
         meta: { timeoutMs },
       });
       return new NextResponse("Gateway Timeout", { status: 504, headers: secureDocHeaders() });
+    }
+    if (e instanceof Error) {
+      await logDbErrorEvent({
+        scope: "ticket_serve",
+        message: e.message,
+        ip: clientIpKey(req).ip,
+        meta: { route: "/t/[ticketId]" },
+      });
     }
     throw e;
   }

@@ -16,7 +16,7 @@ import { enforcePlanLimitsEnabled } from "@/lib/billingFlags";
 import { getAuthedUser, roleAtLeast } from "@/lib/authz";
 import { isGlobalServeDisabled, isSecurityTestNoDbMode } from "@/lib/securityPolicy";
 import { getRouteTimeoutMs, isRouteTimeoutError, withRouteTimeout } from "@/lib/routeTimeout";
-import { logSecurityEvent } from "@/lib/securityTelemetry";
+import { logDbErrorEvent, logSecurityEvent } from "@/lib/securityTelemetry";
 import { assertRuntimeEnv, isRuntimeEnvError } from "@/lib/runtimeEnv";
 
 function getClientIp(req: NextRequest) {
@@ -286,6 +286,14 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ docId: stri
         meta: { timeoutMs },
       });
       return new Response("Gateway Timeout", { status: 504 });
+    }
+    if (e instanceof Error) {
+      await logDbErrorEvent({
+        scope: "serve",
+        message: e.message,
+        ip: getClientIpFromHeaders(req.headers) || null,
+        meta: { route: "/serve/[docId]" },
+      });
     }
     throw e;
   }

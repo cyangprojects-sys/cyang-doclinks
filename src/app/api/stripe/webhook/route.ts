@@ -15,7 +15,7 @@ import {
   upsertStripeSubscription,
 } from "@/lib/billingSubscription";
 import { appendImmutableAudit } from "@/lib/immutableAudit";
-import { logSecurityEvent } from "@/lib/securityTelemetry";
+import { logDbErrorEvent, logSecurityEvent } from "@/lib/securityTelemetry";
 import { getRouteTimeoutMs, isRouteTimeoutError, withRouteTimeout } from "@/lib/routeTimeout";
 import { assertRuntimeEnv, isRuntimeEnvError } from "@/lib/runtimeEnv";
 
@@ -153,6 +153,12 @@ export async function POST(req: NextRequest) {
         } catch (e: any) {
           webhookStatus = "failed";
           webhookMessage = String(e?.message || e || "webhook_failed");
+          await logDbErrorEvent({
+            scope: "billing_webhook",
+            message: webhookMessage,
+            ip: req.headers.get("x-forwarded-for") || null,
+            meta: { route: "/api/stripe/webhook", eventType, eventId: verified.eventId },
+          });
           await logSecurityEvent({
             type: "stripe_webhook_processing_failed",
             severity: "high",
@@ -174,6 +180,14 @@ export async function POST(req: NextRequest) {
       timeoutMs
     );
   } catch (e: unknown) {
+    if (e instanceof Error) {
+      await logDbErrorEvent({
+        scope: "billing_webhook",
+        message: e.message,
+        ip: req.headers.get("x-forwarded-for") || null,
+        meta: { route: "/api/stripe/webhook" },
+      });
+    }
     if (isRuntimeEnvError(e)) {
       return NextResponse.json({ ok: false, error: "ENV_MISCONFIGURED" }, { status: 503 });
     }
