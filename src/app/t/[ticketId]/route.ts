@@ -12,6 +12,7 @@ import { appendImmutableAudit } from "@/lib/immutableAudit";
 import { allowUnencryptedServing, isSecurityTestNoDbMode, isTicketServingDisabled } from "@/lib/securityPolicy";
 import { hasActiveQuarantineOverride } from "@/lib/quarantineOverride";
 import { getRouteTimeoutMs, isRouteTimeoutError, withRouteTimeout } from "@/lib/routeTimeout";
+import { assertRuntimeEnv, isRuntimeEnvError } from "@/lib/runtimeEnv";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -73,6 +74,8 @@ export async function GET(
   try {
     return await withRouteTimeout(
       (async () => {
+        assertRuntimeEnv("ticket_serve");
+
         if (isSecurityTestNoDbMode()) {
           return new NextResponse("Direct open is disabled for this protected document.", {
             status: 403,
@@ -359,6 +362,9 @@ export async function GET(
       timeoutMs
     );
   } catch (e: unknown) {
+    if (isRuntimeEnvError(e)) {
+      return new NextResponse("Unavailable", { status: 503, headers: secureDocHeaders() });
+    }
     if (isRouteTimeoutError(e)) {
       void logSecurityEvent({
         type: "ticket_serve_timeout",

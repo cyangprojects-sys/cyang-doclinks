@@ -16,6 +16,7 @@ import { enqueueDocScan } from "@/lib/scanQueue";
 import { decryptAes256Gcm, unwrapDataKey } from "@/lib/encryption";
 import { getMasterKeyByIdOrThrow } from "@/lib/masterKeys";
 import { getRouteTimeoutMs, isRouteTimeoutError, withRouteTimeout } from "@/lib/routeTimeout";
+import { assertRuntimeEnv, isRuntimeEnvError } from "@/lib/runtimeEnv";
 
 type CompleteRequest = {
   // Newer flow: doc_id from /presign response
@@ -42,6 +43,8 @@ export async function POST(req: NextRequest) {
   try {
     return await withRouteTimeout(
       (async () => {
+        assertRuntimeEnv("upload_complete");
+
         const r2Bucket = getR2Bucket();
         // Global API throttle (best-effort)
         const globalRl = await enforceGlobalApiRateLimit({
@@ -530,6 +533,9 @@ try {
       timeoutMs
     );
   } catch (e: any) {
+    if (isRuntimeEnvError(e)) {
+      return NextResponse.json({ ok: false, error: "ENV_MISCONFIGURED" }, { status: 503 });
+    }
     if (isRouteTimeoutError(e)) {
       await logSecurityEvent({
         type: "upload_complete_timeout",

@@ -17,6 +17,7 @@ import {
 import { appendImmutableAudit } from "@/lib/immutableAudit";
 import { logSecurityEvent } from "@/lib/securityTelemetry";
 import { getRouteTimeoutMs, isRouteTimeoutError, withRouteTimeout } from "@/lib/routeTimeout";
+import { assertRuntimeEnv, isRuntimeEnvError } from "@/lib/runtimeEnv";
 
 function planFromStripePriceId(priceId: string | null): "free" | "pro" {
   const proPrices = String(process.env.STRIPE_PRO_PRICE_IDS || "")
@@ -48,6 +49,8 @@ export async function POST(req: NextRequest) {
   try {
     return await withRouteTimeout(
       (async () => {
+        assertRuntimeEnv("stripe_webhook");
+
         const rawBody = await req.text();
         const signature = req.headers.get("stripe-signature");
         const verified = verifyStripeWebhookSignature({
@@ -171,6 +174,9 @@ export async function POST(req: NextRequest) {
       timeoutMs
     );
   } catch (e: unknown) {
+    if (isRuntimeEnvError(e)) {
+      return NextResponse.json({ ok: false, error: "ENV_MISCONFIGURED" }, { status: 503 });
+    }
     if (isRouteTimeoutError(e)) {
       await logSecurityEvent({
         type: "stripe_webhook_timeout",

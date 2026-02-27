@@ -17,6 +17,7 @@ import { getAuthedUser, roleAtLeast } from "@/lib/authz";
 import { isGlobalServeDisabled, isSecurityTestNoDbMode } from "@/lib/securityPolicy";
 import { getRouteTimeoutMs, isRouteTimeoutError, withRouteTimeout } from "@/lib/routeTimeout";
 import { logSecurityEvent } from "@/lib/securityTelemetry";
+import { assertRuntimeEnv, isRuntimeEnvError } from "@/lib/runtimeEnv";
 
 function getClientIp(req: NextRequest) {
   const xff = req.headers.get("x-forwarded-for") || "";
@@ -45,6 +46,8 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ docId: stri
   try {
     return await withRouteTimeout(
       (async () => {
+        assertRuntimeEnv("serve");
+
         if (isSecurityTestNoDbMode()) {
           return new Response("Not found", { status: 404 });
         }
@@ -270,6 +273,9 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ docId: stri
       timeoutMs
     );
   } catch (e: unknown) {
+    if (isRuntimeEnvError(e)) {
+      return new Response("Unavailable", { status: 503 });
+    }
     if (isRouteTimeoutError(e)) {
       void logSecurityEvent({
         type: "serve_timeout",

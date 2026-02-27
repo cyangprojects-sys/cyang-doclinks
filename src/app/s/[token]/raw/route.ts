@@ -15,6 +15,7 @@ import { getR2Bucket } from "@/lib/r2";
 import { isSecurityTestNoDbMode, isShareServingDisabled } from "@/lib/securityPolicy";
 import { getRouteTimeoutMs, isRouteTimeoutError, withRouteTimeout } from "@/lib/routeTimeout";
 import { logSecurityEvent } from "@/lib/securityTelemetry";
+import { assertRuntimeEnv, isRuntimeEnvError } from "@/lib/runtimeEnv";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -122,6 +123,8 @@ export async function GET(
   try {
     return await withRouteTimeout(
       (async () => {
+        assertRuntimeEnv("share_raw");
+
         if (isSecurityTestNoDbMode()) {
           return new NextResponse("Not found", { status: 404 });
         }
@@ -420,6 +423,9 @@ export async function GET(
       timeoutMs
     );
   } catch (e: unknown) {
+    if (isRuntimeEnvError(e)) {
+      return new NextResponse("Unavailable", { status: 503 });
+    }
     if (isRouteTimeoutError(e)) {
       await logSecurityEvent({
         type: "share_raw_timeout",

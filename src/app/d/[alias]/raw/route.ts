@@ -14,6 +14,7 @@ import { clientIpKey, logSecurityEvent } from "@/lib/securityTelemetry";
 import crypto from "crypto";
 import { isAliasServingDisabled, isSecurityTestNoDbMode } from "@/lib/securityPolicy";
 import { getRouteTimeoutMs, isRouteTimeoutError, withRouteTimeout } from "@/lib/routeTimeout";
+import { assertRuntimeEnv, isRuntimeEnvError } from "@/lib/runtimeEnv";
 
 function normAlias(alias: string): string {
   return decodeURIComponent(String(alias || "")).trim().toLowerCase();
@@ -133,6 +134,8 @@ export async function GET(
   try {
     return await withRouteTimeout(
       (async () => {
+        assertRuntimeEnv("alias_raw");
+
         if (isSecurityTestNoDbMode()) {
           return new Response("Not found", { status: 404 });
         }
@@ -288,6 +291,9 @@ if (shouldCountView(req)) {
       timeoutMs
     );
   } catch (err: any) {
+    if (isRuntimeEnvError(err)) {
+      return new Response("Unavailable", { status: 503 });
+    }
     if (isRouteTimeoutError(err)) {
       await logSecurityEvent({
         type: "alias_raw_timeout",
