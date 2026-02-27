@@ -7,6 +7,8 @@ import { sql } from "@/lib/db";
 import { ensureStripeCustomer, stripeApi } from "@/lib/stripeClient";
 import { appendImmutableAudit } from "@/lib/immutableAudit";
 import { logSecurityEvent } from "@/lib/securityTelemetry";
+import { getRouteTimeoutMs, isRouteTimeoutError, withRouteTimeout } from "@/lib/routeTimeout";
+import { assertRuntimeEnv, isRuntimeEnvError } from "@/lib/runtimeEnv";
 
 function baseUrl(req: NextRequest): string {
   const configured =
@@ -53,52 +55,72 @@ async function persistCustomerId(userId: string, customerId: string): Promise<vo
 }
 
 export async function POST(req: NextRequest) {
+  const timeoutMs = getRouteTimeoutMs("ROUTE_TIMEOUT_BILLING_CHECKOUT_MS", 15_000);
   try {
-    const u = await requirePermission("billing.manage");
-    const existingCustomerId = await readExistingCustomerId(u.id);
-    const customerId = await ensureStripeCustomer({
-      userId: u.id,
-      email: u.email,
-      existingCustomerId,
-    });
-    if (customerId !== existingCustomerId) {
-      await persistCustomerId(u.id, customerId);
-    }
+    return await withRouteTimeout(
+      (async () => {
+        assertRuntimeEnv("stripe_admin");
+        const u = await requirePermission("billing.manage");
+        const existingCustomerId = await readExistingCustomerId(u.id);
+        const customerId = await ensureStripeCustomer({
+          userId: u.id,
+          email: u.email,
+          existingCustomerId,
+        });
+        if (customerId !== existingCustomerId) {
+          await persistCustomerId(u.id, customerId);
+        }
 
-    const origin = baseUrl(req);
-    const successUrl = `${origin}/admin/billing?checkout=success`;
-    const cancelUrl = `${origin}/admin/billing?checkout=canceled`;
-    const priceId = getProPriceId();
+        const origin = baseUrl(req);
+        const successUrl = `${origin}/admin/billing?checkout=success`;
+        const cancelUrl = `${origin}/admin/billing?checkout=canceled`;
+        const priceId = getProPriceId();
 
-    const session = await stripeApi("checkout/sessions", {
-      method: "POST",
-      body: {
-        mode: "subscription",
-        customer: customerId,
-        "line_items[0][price]": priceId,
-        "line_items[0][quantity]": "1",
-        success_url: successUrl,
-        cancel_url: cancelUrl,
-        "metadata[user_id]": u.id,
-      },
-    });
+        const session = await stripeApi("checkout/sessions", {
+          method: "POST",
+          body: {
+            mode: "subscription",
+            customer: customerId,
+            "line_items[0][price]": priceId,
+            "line_items[0][quantity]": "1",
+            success_url: successUrl,
+            cancel_url: cancelUrl,
+            "metadata[user_id]": u.id,
+          },
+        });
 
-    const checkoutUrl = String(session?.url || "").trim();
-    if (!checkoutUrl) throw new Error("Stripe checkout did not return a session URL");
+        const checkoutUrl = String(session?.url || "").trim();
+        if (!checkoutUrl) throw new Error("Stripe checkout did not return a session URL");
 
-    await appendImmutableAudit({
-      streamKey: `user:${u.id}:billing`,
-      action: "billing.checkout_session.created",
-      actorUserId: u.id,
-      orgId: u.orgId ?? null,
-      payload: {
-        customerId,
-        priceId,
-      },
-    });
+        await appendImmutableAudit({
+          streamKey: `user:${u.id}:billing`,
+          action: "billing.checkout_session.created",
+          actorUserId: u.id,
+          orgId: u.orgId ?? null,
+          payload: {
+            customerId,
+            priceId,
+          },
+        });
 
-    return NextResponse.redirect(checkoutUrl, { status: 303 });
+        return NextResponse.redirect(checkoutUrl, { status: 303 });
+      })(),
+      timeoutMs
+    );
   } catch (e: any) {
+    if (isRuntimeEnvError(e)) {
+      return NextResponse.redirect(new URL("/admin/billing?error=ENV_MISCONFIGURED", req.url), { status: 303 });
+    }
+    if (isRouteTimeoutError(e)) {
+      await logSecurityEvent({
+        type: "billing_checkout_timeout",
+        severity: "high",
+        scope: "billing",
+        message: "Checkout session creation exceeded timeout",
+        meta: { timeoutMs },
+      });
+      return NextResponse.redirect(new URL("/admin/billing?error=TIMEOUT", req.url), { status: 303 });
+    }
     const msg = String(e?.message || e || "checkout_failed");
     await logSecurityEvent({
       type: "billing_checkout_failed",
@@ -109,4 +131,3 @@ export async function POST(req: NextRequest) {
     return NextResponse.redirect(new URL(`/admin/billing?error=${encodeURIComponent(msg)}`, req.url), { status: 303 });
   }
 }
-

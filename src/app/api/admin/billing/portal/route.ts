@@ -7,6 +7,8 @@ import { sql } from "@/lib/db";
 import { ensureStripeCustomer, stripeApi } from "@/lib/stripeClient";
 import { appendImmutableAudit } from "@/lib/immutableAudit";
 import { logSecurityEvent } from "@/lib/securityTelemetry";
+import { getRouteTimeoutMs, isRouteTimeoutError, withRouteTimeout } from "@/lib/routeTimeout";
+import { assertRuntimeEnv, isRuntimeEnvError } from "@/lib/runtimeEnv";
 
 function baseUrl(req: NextRequest): string {
   const configured =
@@ -44,42 +46,62 @@ async function persistCustomerId(userId: string, customerId: string): Promise<vo
 }
 
 export async function POST(req: NextRequest) {
+  const timeoutMs = getRouteTimeoutMs("ROUTE_TIMEOUT_BILLING_PORTAL_MS", 15_000);
   try {
-    const u = await requirePermission("billing.manage");
-    const existingCustomerId = await readExistingCustomerId(u.id);
-    const customerId = await ensureStripeCustomer({
-      userId: u.id,
-      email: u.email,
-      existingCustomerId,
-    });
-    if (customerId !== existingCustomerId) {
-      await persistCustomerId(u.id, customerId);
-    }
+    return await withRouteTimeout(
+      (async () => {
+        assertRuntimeEnv("stripe_admin");
+        const u = await requirePermission("billing.manage");
+        const existingCustomerId = await readExistingCustomerId(u.id);
+        const customerId = await ensureStripeCustomer({
+          userId: u.id,
+          email: u.email,
+          existingCustomerId,
+        });
+        if (customerId !== existingCustomerId) {
+          await persistCustomerId(u.id, customerId);
+        }
 
-    const returnUrl = `${baseUrl(req)}/admin/billing`;
-    const portal = await stripeApi("billing_portal/sessions", {
-      method: "POST",
-      body: {
-        customer: customerId,
-        return_url: returnUrl,
-      },
-    });
+        const returnUrl = `${baseUrl(req)}/admin/billing`;
+        const portal = await stripeApi("billing_portal/sessions", {
+          method: "POST",
+          body: {
+            customer: customerId,
+            return_url: returnUrl,
+          },
+        });
 
-    const portalUrl = String(portal?.url || "").trim();
-    if (!portalUrl) throw new Error("Stripe portal did not return a URL");
+        const portalUrl = String(portal?.url || "").trim();
+        if (!portalUrl) throw new Error("Stripe portal did not return a URL");
 
-    await appendImmutableAudit({
-      streamKey: `user:${u.id}:billing`,
-      action: "billing.portal_session.created",
-      actorUserId: u.id,
-      orgId: u.orgId ?? null,
-      payload: {
-        customerId,
-      },
-    });
+        await appendImmutableAudit({
+          streamKey: `user:${u.id}:billing`,
+          action: "billing.portal_session.created",
+          actorUserId: u.id,
+          orgId: u.orgId ?? null,
+          payload: {
+            customerId,
+          },
+        });
 
-    return NextResponse.redirect(portalUrl, { status: 303 });
+        return NextResponse.redirect(portalUrl, { status: 303 });
+      })(),
+      timeoutMs
+    );
   } catch (e: any) {
+    if (isRuntimeEnvError(e)) {
+      return NextResponse.redirect(new URL("/admin/billing?error=ENV_MISCONFIGURED", req.url), { status: 303 });
+    }
+    if (isRouteTimeoutError(e)) {
+      await logSecurityEvent({
+        type: "billing_portal_timeout",
+        severity: "high",
+        scope: "billing",
+        message: "Portal session creation exceeded timeout",
+        meta: { timeoutMs },
+      });
+      return NextResponse.redirect(new URL("/admin/billing?error=TIMEOUT", req.url), { status: 303 });
+    }
     const msg = String(e?.message || e || "portal_failed");
     await logSecurityEvent({
       type: "billing_portal_failed",
@@ -90,4 +112,3 @@ export async function POST(req: NextRequest) {
     return NextResponse.redirect(new URL(`/admin/billing?error=${encodeURIComponent(msg)}`, req.url), { status: 303 });
   }
 }
-

@@ -5,7 +5,8 @@ export type RuntimeEnvScope =
   | "ticket_serve"
   | "upload_complete"
   | "upload_presign"
-  | "stripe_webhook";
+  | "stripe_webhook"
+  | "stripe_admin";
 
 export class RuntimeEnvError extends Error {
   readonly scope: RuntimeEnvScope;
@@ -76,6 +77,9 @@ function requiredForScope(scope: RuntimeEnvScope): string[] {
       break;
     case "stripe_webhook":
       require("STRIPE_WEBHOOK_SECRET");
+      break;
+    case "stripe_admin":
+      require("STRIPE_SECRET_KEY");
       break;
   }
 
