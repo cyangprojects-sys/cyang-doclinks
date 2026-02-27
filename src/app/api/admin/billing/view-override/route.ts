@@ -67,7 +67,8 @@ export async function POST(req: Request) {
 
     return NextResponse.redirect(new URL("/admin/billing?error=bad_action", req.url), { status: 303 });
   } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : String(e);
-    return NextResponse.redirect(new URL(`/admin/billing?error=${encodeURIComponent(msg)}`, req.url), { status: 303 });
+    const msg = e instanceof Error ? e.message : "SERVER_ERROR";
+    const safeError = msg === "FORBIDDEN" || msg === "UNAUTHENTICATED" ? "FORBIDDEN" : "SERVER_ERROR";
+    return NextResponse.redirect(new URL(`/admin/billing?error=${encodeURIComponent(safeError)}`, req.url), { status: 303 });
   }
 }

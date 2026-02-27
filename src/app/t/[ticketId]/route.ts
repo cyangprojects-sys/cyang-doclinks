@@ -404,6 +404,6 @@ export async function GET(
         meta: { route: "/t/[ticketId]" },
       });
     }
-    throw e;
+    return new NextResponse("Unavailable", { status: 503, headers: secureDocHeaders() });
   }
 }

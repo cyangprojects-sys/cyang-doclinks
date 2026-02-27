@@ -70,7 +70,7 @@ async function trySendResendEmail(opts: {
     process.env.RESEND_FROM ||
     "Cyang Docs <no-reply@cyang.io>";
 
-  if (!key) return { ok: false, message: "RESEND_API_KEY not set" };
+  if (!key) return { ok: false, message: "Email service unavailable" };
 
   try {
     const r = await fetch("https://api.resend.com/emails", {
@@ -88,13 +88,12 @@ async function trySendResendEmail(opts: {
     });
 
     if (!r.ok) {
-      const txt = await r.text();
-      return { ok: false, message: `Resend error: ${r.status} ${txt}` };
+      return { ok: false, message: "Failed to send email" };
     }
 
     return { ok: true };
   } catch (e: any) {
-    return { ok: false, message: e?.message || "Failed to send email" };
+    return { ok: false, message: "Failed to send email" };
   }
 }
 
@@ -218,7 +217,7 @@ if (ownerId) {
     await trySendResendEmail({ to: toEmail, subject, html });
     return { ok: true, token, url };
   } catch (e: any) {
-    return { ok: false, error: "exception", message: e?.message || "Error" };
+    return { ok: false, error: "exception", message: "Unable to create share." };
   }
 }
 
@@ -269,7 +268,7 @@ export async function getShareStatsByToken(
 
     return { ok: true, row };
   } catch (e: any) {
-    return { ok: false, error: "exception", message: e?.message || "Error" };
+    return { ok: false, error: "exception", message: "Unable to load share stats." };
   }
 }
 
@@ -298,6 +297,6 @@ export async function revokeShareToken(
 
     return { ok: true, token };
   } catch (e: any) {
-    return { ok: false, error: "exception", message: e?.message || "Error" };
+    return { ok: false, error: "exception", message: "Unable to revoke share." };
   }
 }

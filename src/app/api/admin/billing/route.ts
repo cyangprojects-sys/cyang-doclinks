@@ -19,11 +19,10 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  await requirePermission("billing.manage");
-
   const url = new URL(req.url);
 
   try {
+    await requirePermission("billing.manage");
     const form = await req.formData();
     const next = {
       enforcePlanLimits: asCheckboxBool(form.get("enforcePlanLimits")),
@@ -41,13 +40,14 @@ export async function POST(req: Request) {
       return NextResponse.redirect(url, { status: 303 });
     }
 
-    url.searchParams.set("error", encodeURIComponent(saved.error ?? "unknown"));
+    url.searchParams.set("error", "SAVE_FAILED");
     return NextResponse.redirect(url, { status: 303 });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
+    const msg = e instanceof Error ? e.message : "SERVER_ERROR";
+    const safeError = msg === "FORBIDDEN" || msg === "UNAUTHENTICATED" ? "FORBIDDEN" : "SERVER_ERROR";
     url.pathname = "/admin/billing";
     url.search = "";
-    url.searchParams.set("error", encodeURIComponent(msg));
+    url.searchParams.set("error", safeError);
     return NextResponse.redirect(url, { status: 303 });
   }
 }

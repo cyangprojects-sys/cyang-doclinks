@@ -57,6 +57,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.redirect(new URL("/admin/billing/stripe?error=TIMEOUT", req.url), { status: 303 });
     }
     const msg = String(e?.message || e || "billing_sync_failed");
-    return NextResponse.redirect(new URL(`/admin/billing/stripe?error=${encodeURIComponent(msg)}`, req.url), { status: 303 });
+    const safeError =
+      msg === "FORBIDDEN" || msg === "UNAUTHENTICATED"
+        ? "FORBIDDEN"
+        : "BILLING_SYNC_FAILED";
+    return NextResponse.redirect(new URL(`/admin/billing/stripe?error=${encodeURIComponent(safeError)}`, req.url), { status: 303 });
   }
 }
