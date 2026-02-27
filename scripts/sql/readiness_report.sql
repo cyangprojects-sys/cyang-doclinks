@@ -61,3 +61,16 @@ select
     from public.recovery_drills
     where status = 'success'
   ) as recovery_days_since_last_success;
+
+-- 7) Index and scan health (high-level)
+select
+  count(*) filter (
+    where (seq_scan + idx_scan) > 0
+      and (seq_scan::numeric / (seq_scan + idx_scan)) >= 0.80
+      and n_live_tup > 1000
+  )::int as high_seq_scan_tables,
+  count(*) filter (
+    where idx_scan = 0
+  )::int as tables_with_no_index_usage_stats
+from pg_stat_user_tables
+where schemaname = 'public';
