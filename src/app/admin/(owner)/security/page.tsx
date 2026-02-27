@@ -27,6 +27,52 @@ export default async function SecurityTelemetryPage(props: {
   const currentUser = await requireRole("owner");
   const freezeSettingsRes = await getSecurityFreezeSettings();
   const freeze = freezeSettingsRes.settings;
+  let orgFreezeSupported = false;
+  let orgIsFrozen = false;
+  if (currentUser.orgId) {
+    try {
+      const rows = (await sql`
+        select
+          coalesce(disabled, false) as disabled,
+          coalesce(is_active, true) as is_active
+        from public.organizations
+        where id = ${currentUser.orgId}::uuid
+        limit 1
+      `) as unknown as Array<{ disabled: boolean; is_active: boolean }>;
+      if (rows?.length) {
+        orgFreezeSupported = true;
+        orgIsFrozen = Boolean(rows[0].disabled) || !Boolean(rows[0].is_active);
+      }
+    } catch {
+      try {
+        const rows = (await sql`
+          select disabled
+          from public.organizations
+          where id = ${currentUser.orgId}::uuid
+          limit 1
+        `) as unknown as Array<{ disabled: boolean }>;
+        if (rows?.length) {
+          orgFreezeSupported = true;
+          orgIsFrozen = Boolean(rows[0].disabled);
+        }
+      } catch {
+        try {
+          const rows = (await sql`
+            select is_active
+            from public.organizations
+            where id = ${currentUser.orgId}::uuid
+            limit 1
+          `) as unknown as Array<{ is_active: boolean }>;
+          if (rows?.length) {
+            orgFreezeSupported = true;
+            orgIsFrozen = !Boolean(rows[0].is_active);
+          }
+        } catch {
+          orgFreezeSupported = false;
+        }
+      }
+    }
+  }
 
   // Recent security events
   const events = (await sql`
@@ -202,6 +248,16 @@ export default async function SecurityTelemetryPage(props: {
           Emergency freeze controls updated.
         </div>
       ) : null}
+      {saved === "tenant_frozen" ? (
+        <div className="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+          Tenant emergency freeze enabled.
+        </div>
+      ) : null}
+      {saved === "tenant_unfrozen" ? (
+        <div className="mt-4 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-200">
+          Tenant emergency freeze disabled.
+        </div>
+      ) : null}
 
       <div className="mt-4 rounded-xl border border-red-500/30 bg-red-500/10 p-4">
         <h2 className="text-sm font-semibold text-red-100">Incident kill-switch controls</h2>
@@ -238,6 +294,43 @@ export default async function SecurityTelemetryPage(props: {
             </button>
           </div>
         </form>
+      </div>
+
+      <div className="mt-4 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4">
+        <h2 className="text-sm font-semibold text-amber-100">Tenant emergency freeze</h2>
+        <p className="mt-1 text-xs text-amber-200/80">
+          Freeze only your organization during an incident. This is lower blast-radius than global freeze.
+        </p>
+        {!orgFreezeSupported ? (
+          <div className="mt-2 rounded-lg border border-amber-500/30 bg-black/30 px-3 py-2 text-xs text-amber-200">
+            Organization freeze flags are not available in this schema.
+          </div>
+        ) : (
+          <form action="/api/admin/security/tenant-freeze" method="post" className="mt-3 flex items-center gap-3">
+            <span
+              className={[
+                "inline-flex items-center rounded-md border px-2 py-1 text-xs",
+                orgIsFrozen
+                  ? "border-red-500/40 bg-red-500/20 text-red-100"
+                  : "border-emerald-500/40 bg-emerald-500/20 text-emerald-100",
+              ].join(" ")}
+            >
+              {orgIsFrozen ? "Frozen" : "Active"}
+            </span>
+            <input type="hidden" name="freeze" value={orgIsFrozen ? "0" : "1"} />
+            <button
+              type="submit"
+              className={[
+                "rounded border px-3 py-1.5 text-xs",
+                orgIsFrozen
+                  ? "border-emerald-400/40 bg-emerald-500/20 text-emerald-100 hover:bg-emerald-500/30"
+                  : "border-amber-400/40 bg-amber-500/20 text-amber-100 hover:bg-amber-500/30",
+              ].join(" ")}
+            >
+              {orgIsFrozen ? "Unfreeze tenant" : "Freeze tenant"}
+            </button>
+          </form>
+        )}
       </div>
 
       <div className="mt-6 grid gap-4 lg:grid-cols-3">
