@@ -153,7 +153,7 @@ export async function GET(req: NextRequest) {
           lastModified: head.LastModified ? new Date(head.LastModified).toISOString() : null,
         };
       } catch (e: any) {
-        r2Head = { ok: false, error: e?.name ?? "HEAD_FAILED", message: e?.message ?? String(e) };
+        r2Head = { ok: false, error: e?.name ?? "HEAD_FAILED", message: "Object HEAD failed" };
         notes.push("R2 HEAD failed (bucket/key may be wrong, or credentials missing).");
       }
     } else if (docRow && hasDocs) {

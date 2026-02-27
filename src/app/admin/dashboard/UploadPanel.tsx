@@ -11,7 +11,6 @@ type PresignResponse =
       r2_key: string;
       bucket: string;
       expires_in: number;
-      encryption: { enabled: true; alg: string | null; iv_b64: string | null; data_key_b64: string | null };
     }
   | { ok: false; error: string; message?: string };
 
@@ -37,10 +36,6 @@ function fmtBytes(n: number) {
   if (n < 1024) return `${n} B`;
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
   return `${(n / (1024 * 1024)).toFixed(2)} MB`;
-}
-
-function b64ToU8(b64: string) {
-  return Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
 }
 
 export default function UploadPanel({
@@ -151,26 +146,14 @@ export default function UploadPanel({
       throw new Error(msg);
     }
 
-    const enc = presignJson.encryption as any;
-    if (!enc?.enabled || !enc?.data_key_b64 || !enc?.iv_b64) {
-      throw new Error("Server did not provide encryption parameters.");
-    }
-
-    const keyBytes = b64ToU8(enc.data_key_b64);
-    const ivBytes = b64ToU8(enc.iv_b64);
-    const cryptoKey = await crypto.subtle.importKey("raw", keyBytes, { name: "AES-GCM" }, false, ["encrypt"]);
-    const plain = await file.arrayBuffer();
-    const cipher = await crypto.subtle.encrypt({ name: "AES-GCM", iv: ivBytes }, cryptoKey, plain);
-    const putBody = new Blob([new Uint8Array(cipher)], { type: "application/octet-stream" });
-
     const putRes = await fetch(presignJson.upload_url, {
       method: "PUT",
       headers: {
-        "content-type": "application/octet-stream",
+        "content-type": "application/pdf",
         "x-amz-meta-doc-id": presignJson.doc_id,
         "x-amz-meta-orig-content-type": "application/pdf",
       },
-      body: putBody,
+      body: file,
     });
     if (!putRes.ok) {
       const txt = await putRes.text().catch(() => "");

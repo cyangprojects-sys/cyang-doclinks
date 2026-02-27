@@ -17,7 +17,6 @@ import {
   logSecurityEvent,
   maybeBlockIpOnAbuse,
 } from "@/lib/securityTelemetry";
-import { generateDataKey, generateIv, wrapDataKey } from "@/lib/encryption";
 import { getActiveMasterKeyOrThrow } from "@/lib/masterKeys";
 import { appendImmutableAudit } from "@/lib/immutableAudit";
 import { reportException } from "@/lib/observability";
@@ -171,9 +170,9 @@ export async function POST(req: Request) {
     }
 
     // --- Mandatory encryption configuration ---
-    let mk;
+    let activeKeyId: string;
     try {
-      mk = await getActiveMasterKeyOrThrow();
+      activeKeyId = (await getActiveMasterKeyOrThrow()).id;
     } catch (e: unknown) {
       const msg = e instanceof Error && e.message === "MASTER_KEY_REVOKED" ? "Active master key is revoked." : "Missing DOC_MASTER_KEYS.";
       await logSecurityEvent({
@@ -200,14 +199,6 @@ export async function POST(req: Request) {
 
     const createdByEmail = user.email;
 
-    // Per-document encryption metadata (always enabled)
-    const dataKey = generateDataKey();
-    const wrap = wrapDataKey({ dataKey, masterKey: mk.key });
-
-    const encAlg = "AES-256-GCM";
-    const encIv = generateIv();
-    const encKeyVersion = mk.id;
-
     await sql`
       insert into docs (
         id,
@@ -221,13 +212,7 @@ export async function POST(req: Request) {
         r2_key,
         created_by_email,
         status,
-        encryption_enabled,
-        enc_alg,
-        enc_iv,
-        enc_key_version,
-        enc_wrapped_key,
-        enc_wrap_iv,
-        enc_wrap_tag
+        encryption_enabled
       )
       values (
         ${docId}::uuid,
@@ -241,13 +226,7 @@ export async function POST(req: Request) {
         ${key},
         ${createdByEmail},
         'uploading',
-        true,
-        ${encAlg},
-        ${encIv},
-        ${encKeyVersion},
-        ${wrap.wrapped},
-        ${wrap.iv},
-        ${wrap.tag}
+        true
       )
     `;
 
@@ -260,8 +239,8 @@ export async function POST(req: Request) {
       ipHash: ipInfo.ipHash,
       payload: {
         encryptionEnabled: true,
-        encAlg,
-        encKeyVersion,
+        encAlg: "AES-256-GCM",
+        encKeyVersion: activeKeyId,
         contentType,
         sizeBytes,
         filename,
@@ -273,10 +252,7 @@ export async function POST(req: Request) {
     const putParams: any = {
       Bucket: r2Bucket,
       Key: key,
-      // The uploaded object is encrypted bytes (ciphertext), not a literal PDF.
-      // We still enforce that the *original* file is a PDF via request validation,
-      // and bind that fact into signed metadata.
-      ContentType: "application/octet-stream",
+      ContentType: "application/pdf",
       Metadata: {
         "doc-id": docId,
         "orig-content-type": "application/pdf",
@@ -301,7 +277,6 @@ export async function POST(req: Request) {
       r2_key: key,
       bucket: r2Bucket,
       expires_in: expiresIn,
-      encryption: { enabled: true, alg: encAlg, iv_b64: encIv.toString("base64"), data_key_b64: dataKey.toString("base64") },
     });
   } catch (err: unknown) {
     await logSecurityEvent({

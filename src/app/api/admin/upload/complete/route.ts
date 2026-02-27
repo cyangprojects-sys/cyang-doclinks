@@ -4,6 +4,7 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { HeadObjectCommand } from "@aws-sdk/client-s3";
 import { GetObjectCommand } from "@aws-sdk/client-s3";
+import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { validatePdfBuffer } from "@/lib/pdfSafety";
 import { sql } from "@/lib/db";
@@ -13,8 +14,8 @@ import { incrementUploads } from "@/lib/monetization";
 import { enforceGlobalApiRateLimit, clientIpKey, logDbErrorEvent, logSecurityEvent, detectStorageSpike } from "@/lib/securityTelemetry";
 import { getR2Bucket, r2Client } from "@/lib/r2";
 import { enqueueDocScan } from "@/lib/scanQueue";
-import { decryptAes256Gcm, unwrapDataKey } from "@/lib/encryption";
-import { getMasterKeyByIdOrThrow } from "@/lib/masterKeys";
+import { encryptAes256Gcm, generateDataKey, generateIv, wrapDataKey } from "@/lib/encryption";
+import { getActiveMasterKeyOrThrow } from "@/lib/masterKeys";
 import { getRouteTimeoutMs, isRouteTimeoutError, withRouteTimeout } from "@/lib/routeTimeout";
 import { assertRuntimeEnv, isRuntimeEnvError } from "@/lib/runtimeEnv";
 
@@ -192,25 +193,13 @@ export async function POST(req: NextRequest) {
     const verifyRows = (await sql`
       select
         size_bytes::bigint as size_bytes,
-        encryption_enabled::boolean as encryption_enabled,
-        coalesce(enc_alg, '')::text as enc_alg,
-        enc_iv as enc_iv,
-        coalesce(enc_key_version, '')::text as enc_key_version,
-        enc_wrapped_key as enc_wrapped_key,
-        enc_wrap_iv as enc_wrap_iv,
-        enc_wrap_tag as enc_wrap_tag
+        encryption_enabled::boolean as encryption_enabled
       from public.docs
       where id = ${docId}::uuid
       limit 1
     `) as unknown as Array<{
       size_bytes: number | string | null;
       encryption_enabled: boolean | null;
-      enc_alg: string;
-      enc_iv: Buffer | null;
-      enc_key_version: string;
-      enc_wrapped_key: Buffer | null;
-      enc_wrap_iv: Buffer | null;
-      enc_wrap_tag: Buffer | null;
     }>;
 
     const expectedPlain = Number(verifyRows?.[0]?.size_bytes ?? 0);
@@ -272,9 +261,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: "object_too_large" }, { status: 413 });
     }
 
-    // Encrypted uploads store ciphertext with a 16-byte GCM tag appended.
     if (Number.isFinite(expectedPlain) && expectedPlain > 0) {
-      const allowedSizes = new Set<number>([expectedPlain + 16]);
+      const allowedSizes = new Set<number>([expectedPlain]);
       if (!allowedSizes.has(contentLength)) {
         await logSecurityEvent({
           type: "upload_complete_size_mismatch",
@@ -336,84 +324,40 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: "not_pdf" }, { status: 409 });
     }
 
-    if (ct && ct !== "application/octet-stream") {
+    if (ct && ct !== "application/pdf" && ct !== "application/x-pdf" && ct !== "application/octet-stream") {
       await logSecurityEvent({
         type: "upload_complete_ciphertext_ct_mismatch",
         severity: "high",
         ip: ipInfo.ip,
         docId,
         scope: "upload_complete",
-        message: "Encrypted object content-type must be application/octet-stream",
+        message: "Upload object content-type is not a supported PDF type",
         meta: { contentType: ct },
       });
       await cleanupRejectedObject("invalid_content_type", { encryptionEnabled: true, contentType: ct });
       return NextResponse.json({ ok: false, error: "invalid_content_type" }, { status: 409 });
     }
 
-    // 4) Validate encrypted PDF by decrypting server-side and running PDF safety checks.
+    // 4) Read uploaded PDF bytes and validate server-side before encryption.
     let scanStatus: string = "unscanned";
     let riskLevel: string = "low";
     let riskFlags: any = null;
-
-    const encMeta = verifyRows?.[0];
-    if (
-      !encMeta?.enc_alg ||
-      !encMeta?.enc_iv ||
-      !encMeta?.enc_key_version ||
-      !encMeta?.enc_wrapped_key ||
-      !encMeta?.enc_wrap_iv ||
-      !encMeta?.enc_wrap_tag
-    ) {
-      await logSecurityEvent({
-        type: "upload_complete_encryption_meta_missing",
-        severity: "high",
-        ip: ipInfo.ip,
-        docId,
-        scope: "upload_complete",
-        message: "Encrypted upload missing key metadata",
-      });
-      await cleanupRejectedObject("encryption_metadata_missing");
-      return NextResponse.json({ ok: false, error: "encryption_metadata_missing" }, { status: 409 });
-    }
-
-    let decrypted: Buffer;
+    let uploadedBytes: Buffer;
     try {
-      const mk = await getMasterKeyByIdOrThrow(encMeta.enc_key_version);
-      const dataKey = unwrapDataKey({
-        wrapped: encMeta.enc_wrapped_key,
-        wrapIv: encMeta.enc_wrap_iv,
-        wrapTag: encMeta.enc_wrap_tag,
-        masterKey: mk.key,
-      });
-
-      const encryptedObj = await r2Client.send(
+      const uploadedObj = await r2Client.send(
         new GetObjectCommand({
           Bucket: docBucket,
           Key: docKey,
         })
       );
-      const ciphertext = await streamToBuffer((encryptedObj as any).Body);
-      decrypted = decryptAes256Gcm({
-        ciphertext,
-        iv: encMeta.enc_iv,
-        key: dataKey,
-      });
-    } catch (e: any) {
-      await logSecurityEvent({
-        type: "upload_complete_decrypt_failed",
-        severity: "high",
-        ip: ipInfo.ip,
-        docId,
-        scope: "upload_complete",
-        message: "Encrypted upload could not be decrypted for validation",
-        meta: { error: String(e?.message || e) },
-      });
-      await cleanupRejectedObject("decrypt_failed", { error: String(e?.message || e) });
-      return NextResponse.json({ ok: false, error: "decrypt_failed" }, { status: 409 });
+      uploadedBytes = await streamToBuffer((uploadedObj as any).Body);
+    } catch {
+      await cleanupRejectedObject("object_read_failed");
+      return NextResponse.json({ ok: false, error: "object_read_failed" }, { status: 409 });
     }
 
     const safety = validatePdfBuffer({
-      bytes: decrypted,
+      bytes: uploadedBytes,
       absMaxBytes: absMax,
       maxPdfPages: Number(process.env.PDF_MAX_PAGES || 2000),
     });
@@ -424,18 +368,56 @@ export async function POST(req: NextRequest) {
         ip: ipInfo.ip,
         docId,
         scope: "upload_complete",
-        message: "PDF validation failed after decrypt",
+        message: "PDF validation failed before encryption",
         meta: { error: safety.error, message: safety.message, details: safety.details ?? null },
       });
-      await cleanupRejectedObject("pdf_validation_failed_after_decrypt", { error: safety.error });
+      await cleanupRejectedObject("pdf_validation_failed_before_encrypt", { error: safety.error });
       return NextResponse.json({ ok: false, error: safety.error, message: safety.message }, { status: 409 });
     }
 
     scanStatus = safety.riskLevel === "low" ? "clean" : "risky";
     riskLevel = safety.riskLevel;
-    riskFlags = { flags: safety.flags, details: safety.details, mode: "decrypted_validation" };
+    riskFlags = { flags: safety.flags, details: safety.details, mode: "server_validation" };
 
-// 4) Mark doc ready + update metadata (best-effort)
+    // 5) Encrypt file server-side and overwrite uploaded plaintext object.
+    let encAlg = "AES-256-GCM";
+    let encIv: Buffer | null = null;
+    let encKeyVersion = "";
+    let encWrappedKey: Buffer | null = null;
+    let encWrapIv: Buffer | null = null;
+    let encWrapTag: Buffer | null = null;
+    try {
+      const mk = await getActiveMasterKeyOrThrow();
+      const dataKey = generateDataKey();
+      encIv = generateIv();
+      const wrap = wrapDataKey({ dataKey, masterKey: mk.key });
+      const ciphertext = encryptAes256Gcm({ plaintext: uploadedBytes, iv: encIv, key: dataKey });
+      await r2Client.send(
+        new PutObjectCommand({
+          Bucket: docBucket,
+          Key: docKey,
+          Body: ciphertext,
+          ContentType: "application/octet-stream",
+          Metadata: {
+            "doc-id": docId,
+            "orig-content-type": "application/pdf",
+          },
+        })
+      );
+      encKeyVersion = mk.id;
+      encWrappedKey = wrap.wrapped;
+      encWrapIv = wrap.iv;
+      encWrapTag = wrap.tag;
+    } catch {
+      await cleanupRejectedObject("server_side_encrypt_failed");
+      return NextResponse.json({ ok: false, error: "server_side_encrypt_failed" }, { status: 500 });
+    }
+    if (!encIv || !encKeyVersion || !encWrappedKey || !encWrapIv || !encWrapTag) {
+      await cleanupRejectedObject("server_side_encrypt_metadata_missing");
+      return NextResponse.json({ ok: false, error: "server_side_encrypt_metadata_missing" }, { status: 500 });
+    }
+
+// 6) Mark doc ready + update metadata (best-effort)
     await sql`
       update public.docs
       set
@@ -445,6 +427,12 @@ export async function POST(req: NextRequest) {
         scan_status = ${scanStatus}::text,
         risk_level = ${riskLevel}::text,
         risk_flags = ${riskFlags}::jsonb,
+        enc_alg = ${encAlg},
+        enc_iv = ${encIv},
+        enc_key_version = ${encKeyVersion},
+        enc_wrapped_key = ${encWrappedKey},
+        enc_wrap_iv = ${encWrapIv},
+        enc_wrap_tag = ${encWrapTag},
         moderation_status = case when ${riskLevel}::text = 'high' then 'quarantined' else coalesce(moderation_status, 'active') end
       where id = ${docId}::uuid
     `;

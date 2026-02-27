@@ -241,7 +241,7 @@ if (shouldCountView(req)) {
   if (ownerId) {
     const allowed = await assertCanServeView(ownerId);
     if (!allowed.ok) {
-      return new Response("Temporarily unavailable", { status: 429 });
+      return new Response(allowed.message || "Plan limit reached. Upgrade required.", { status: 402 });
     }
 
     try {
