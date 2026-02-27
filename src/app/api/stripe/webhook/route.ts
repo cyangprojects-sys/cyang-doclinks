@@ -15,7 +15,13 @@ import {
   upsertStripeSubscription,
 } from "@/lib/billingSubscription";
 import { appendImmutableAudit } from "@/lib/immutableAudit";
-import { logDbErrorEvent, logSecurityEvent } from "@/lib/securityTelemetry";
+import {
+  enforceGlobalApiRateLimit,
+  enforceIpAbuseBlock,
+  logDbErrorEvent,
+  logSecurityEvent,
+  maybeBlockIpOnAbuse,
+} from "@/lib/securityTelemetry";
 import { getRouteTimeoutMs, isRouteTimeoutError, withRouteTimeout } from "@/lib/routeTimeout";
 import { assertRuntimeEnv, isRuntimeEnvError } from "@/lib/runtimeEnv";
 
@@ -50,6 +56,26 @@ export async function POST(req: NextRequest) {
     return await withRouteTimeout(
       (async () => {
         assertRuntimeEnv("stripe_webhook");
+        const abuseBlock = await enforceIpAbuseBlock({ req, scope: "billing_webhook" });
+        if (!abuseBlock.ok) {
+          return NextResponse.json(
+            { ok: false, error: "ABUSE_BLOCKED" },
+            { status: 403, headers: { "Retry-After": String(abuseBlock.retryAfterSeconds) } }
+          );
+        }
+        const webhookRl = await enforceGlobalApiRateLimit({
+          req,
+          scope: "ip:stripe_webhook",
+          limit: Number(process.env.RATE_LIMIT_STRIPE_WEBHOOK_IP_PER_MIN || 300),
+          windowSeconds: 60,
+          strict: true,
+        });
+        if (!webhookRl.ok) {
+          return NextResponse.json(
+            { ok: false, error: "RATE_LIMIT" },
+            { status: webhookRl.status, headers: { "Retry-After": String(webhookRl.retryAfterSeconds) } }
+          );
+        }
 
         const rawBody = await req.text();
         const signature = req.headers.get("stripe-signature");
@@ -61,13 +87,25 @@ export async function POST(req: NextRequest) {
         });
 
         if (!verified.ok) {
+          const ip = req.headers.get("x-forwarded-for") || null;
           await logSecurityEvent({
             type: "stripe_webhook_invalid_signature",
             severity: "high",
-            ip: req.headers.get("x-forwarded-for") || null,
+            ip,
             scope: "billing_webhook",
             message: verified.error,
           });
+          if (ip) {
+            await maybeBlockIpOnAbuse({
+              ip,
+              category: "stripe_webhook_invalid_signature",
+              scope: "billing_webhook",
+              threshold: Number(process.env.ABUSE_BLOCK_STRIPE_SIG_THRESHOLD || 15),
+              windowSeconds: Number(process.env.ABUSE_BLOCK_STRIPE_SIG_WINDOW_SECONDS || 600),
+              blockSeconds: Number(process.env.ABUSE_BLOCK_TTL_SECONDS || 3600),
+              reason: "Repeated invalid Stripe webhook signatures",
+            });
+          }
           return NextResponse.json({ ok: false, error: "INVALID_SIGNATURE" }, { status: 400 });
         }
 

@@ -61,6 +61,125 @@ export function clientIpKey(req: Request): { ip: string; ipHash: string } {
   return { ip, ipHash: hashIp(ip) };
 }
 
+let abuseIpBlocksTableExistsCache: boolean | null = null;
+
+async function abuseIpBlocksTableExists(): Promise<boolean> {
+  if (abuseIpBlocksTableExistsCache != null) return abuseIpBlocksTableExistsCache;
+  try {
+    const rows = (await sql`
+      select to_regclass('public.abuse_ip_blocks')::text as reg
+    `) as unknown as Array<{ reg: string | null }>;
+    abuseIpBlocksTableExistsCache = Boolean(rows?.[0]?.reg);
+    return abuseIpBlocksTableExistsCache;
+  } catch {
+    abuseIpBlocksTableExistsCache = false;
+    return false;
+  }
+}
+
+export async function isIpAbuseBlocked(ip: string): Promise<boolean> {
+  if (!ip) return false;
+  if (!(await abuseIpBlocksTableExists())) return false;
+  try {
+    const rows = (await sql`
+      select 1
+      from public.abuse_ip_blocks
+      where ip_hash = ${hashIp(ip)}
+        and (expires_at is null or expires_at > now())
+      limit 1
+    `) as unknown as Array<{ "?column?": number }>;
+    return rows.length > 0;
+  } catch {
+    return false;
+  }
+}
+
+export async function enforceIpAbuseBlock(args: {
+  req: Request;
+  scope: string;
+}): Promise<{ ok: true } | { ok: false; retryAfterSeconds: number }> {
+  const { ip } = clientIpKey(args.req);
+  const blocked = await isIpAbuseBlocked(ip);
+  if (!blocked) return { ok: true };
+
+  await logSecurityEvent({
+    type: "abuse_ip_block_hit",
+    severity: "high",
+    ip,
+    scope: args.scope,
+    message: "Request denied due to abuse IP block",
+  });
+  return { ok: false, retryAfterSeconds: 3600 };
+}
+
+export async function maybeBlockIpOnAbuse(args: {
+  ip: string;
+  category: string;
+  scope: string;
+  threshold: number;
+  windowSeconds: number;
+  blockSeconds: number;
+  reason?: string | null;
+  meta?: Record<string, unknown>;
+}) {
+  if (!args.ip || !(await abuseIpBlocksTableExists())) return;
+  const threshold = Math.max(1, Math.floor(args.threshold));
+  const windowSeconds = Math.max(1, Math.floor(args.windowSeconds));
+  const blockSeconds = Math.max(60, Math.floor(args.blockSeconds));
+
+  const counter = await rateLimit({
+    scope: `abuse:${args.category}`,
+    id: hashIp(args.ip),
+    limit: threshold,
+    windowSeconds,
+    failClosed: true,
+  });
+
+  if (counter.count < threshold) return;
+
+  try {
+    const expiresAt = new Date(Date.now() + blockSeconds * 1000).toISOString();
+    await sql`
+      insert into public.abuse_ip_blocks (ip_hash, reason, source, expires_at, meta)
+      values (
+        ${hashIp(args.ip)},
+        ${args.reason ?? `abuse:${args.category}`},
+        ${args.scope},
+        ${expiresAt}::timestamptz,
+        ${JSON.stringify({
+          threshold,
+          windowSeconds,
+          blockSeconds,
+          ...(args.meta ?? {}),
+        })}::jsonb
+      )
+      on conflict (ip_hash)
+      do update set
+        reason = excluded.reason,
+        source = excluded.source,
+        expires_at = greatest(coalesce(public.abuse_ip_blocks.expires_at, now()), excluded.expires_at),
+        meta = excluded.meta
+    `;
+  } catch {
+    // best-effort
+  }
+
+  await logSecurityEvent({
+    type: "abuse_ip_blocked",
+    severity: "high",
+    ip: args.ip,
+    scope: args.scope,
+    message: args.reason ?? `Blocked due to abuse threshold (${args.category})`,
+    meta: {
+      category: args.category,
+      threshold,
+      windowSeconds,
+      blockSeconds,
+      ...(args.meta ?? {}),
+    },
+  });
+}
+
 /**
  * Log security event
  */

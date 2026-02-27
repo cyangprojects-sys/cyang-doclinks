@@ -9,7 +9,14 @@ import { getR2Bucket, r2Client } from "@/lib/r2";
 import { requireUser } from "@/lib/authz";
 import { assertCanUpload } from "@/lib/monetization";
 import { enforcePlanLimitsEnabled } from "@/lib/billingFlags";
-import { enforceGlobalApiRateLimit, clientIpKey, logSecurityEvent, detectPresignFailureSpike } from "@/lib/securityTelemetry";
+import {
+  enforceGlobalApiRateLimit,
+  clientIpKey,
+  detectPresignFailureSpike,
+  enforceIpAbuseBlock,
+  logSecurityEvent,
+  maybeBlockIpOnAbuse,
+} from "@/lib/securityTelemetry";
 import { generateDataKey, generateIv, wrapDataKey } from "@/lib/encryption";
 import { getActiveMasterKeyOrThrow } from "@/lib/masterKeys";
 import { appendImmutableAudit } from "@/lib/immutableAudit";
@@ -50,6 +57,13 @@ function getKeyPrefix() {
 export async function POST(req: Request) {
   const ipInfo = clientIpKey(req);
   try {
+    const abuseBlock = await enforceIpAbuseBlock({ req, scope: "upload_presign" });
+    if (!abuseBlock.ok) {
+      return NextResponse.json(
+        { ok: false, error: "ABUSE_BLOCKED" },
+        { status: 403, headers: { "Retry-After": String(abuseBlock.retryAfterSeconds) } }
+      );
+    }
     const r2Bucket = getR2Bucket();
     const user = await requireUser();
 
@@ -89,6 +103,15 @@ export async function POST(req: Request) {
         orgId: user.orgId ?? null,
         scope: "ip:upload_presign",
         message: "Upload presign throttled",
+      });
+      await maybeBlockIpOnAbuse({
+        ip: ipInfo.ip,
+        category: "upload_presign_abuse",
+        scope: "upload_presign",
+        threshold: Number(process.env.ABUSE_BLOCK_PRESIGN_THRESHOLD || 20),
+        windowSeconds: Number(process.env.ABUSE_BLOCK_PRESIGN_WINDOW_SECONDS || 600),
+        blockSeconds: Number(process.env.ABUSE_BLOCK_TTL_SECONDS || 3600),
+        reason: "Repeated upload presign abuse",
       });
       return NextResponse.json(
         { ok: false, error: "RATE_LIMIT" },

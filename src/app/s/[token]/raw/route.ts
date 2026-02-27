@@ -14,7 +14,13 @@ import { appendImmutableAudit } from "@/lib/immutableAudit";
 import { getR2Bucket } from "@/lib/r2";
 import { isSecurityTestNoDbMode, isShareServingDisabled } from "@/lib/securityPolicy";
 import { getRouteTimeoutMs, isRouteTimeoutError, withRouteTimeout } from "@/lib/routeTimeout";
-import { detectTokenAccessDeniedSpike, logDbErrorEvent, logSecurityEvent } from "@/lib/securityTelemetry";
+import {
+  detectTokenAccessDeniedSpike,
+  enforceIpAbuseBlock,
+  logDbErrorEvent,
+  logSecurityEvent,
+  maybeBlockIpOnAbuse,
+} from "@/lib/securityTelemetry";
 import { assertRuntimeEnv, isRuntimeEnvError } from "@/lib/runtimeEnv";
 
 export const runtime = "nodejs";
@@ -135,6 +141,13 @@ export async function GET(
 
   const r2Bucket = getR2Bucket();
   const { token } = await params;
+  const abuseBlock = await enforceIpAbuseBlock({ req, scope: "share_raw" });
+  if (!abuseBlock.ok) {
+    return new NextResponse("Forbidden", {
+      status: 403,
+      headers: { "Retry-After": String(abuseBlock.retryAfterSeconds) },
+    });
+  }
   const deny = async (reason: string, status = 404, body?: string) => {
     await logSecurityEvent({
       type: "share_access_denied",
@@ -145,6 +158,23 @@ export async function GET(
       meta: { token, reason, status },
     });
     await detectTokenAccessDeniedSpike({ ip });
+    if (
+      reason === "not_found" ||
+      reason === "password_required" ||
+      reason === "ip_rate_limit" ||
+      reason === "token_rate_limit"
+    ) {
+      await maybeBlockIpOnAbuse({
+        ip,
+        category: "share_token_abuse",
+        scope: "share_raw",
+        threshold: Number(process.env.ABUSE_BLOCK_TOKEN_THRESHOLD || 25),
+        windowSeconds: Number(process.env.ABUSE_BLOCK_TOKEN_WINDOW_SECONDS || 600),
+        blockSeconds: Number(process.env.ABUSE_BLOCK_TTL_SECONDS || 3600),
+        reason: "Repeated share token abuse attempts",
+        meta: { reason, status },
+      });
+    }
     return new NextResponse(body ?? (status === 429 ? "Too Many Requests" : "Not found"), { status });
   };
 

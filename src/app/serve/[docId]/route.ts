@@ -16,7 +16,7 @@ import { enforcePlanLimitsEnabled } from "@/lib/billingFlags";
 import { getAuthedUser, roleAtLeast } from "@/lib/authz";
 import { isGlobalServeDisabled, isSecurityTestNoDbMode } from "@/lib/securityPolicy";
 import { getRouteTimeoutMs, isRouteTimeoutError, withRouteTimeout } from "@/lib/routeTimeout";
-import { logDbErrorEvent, logSecurityEvent } from "@/lib/securityTelemetry";
+import { enforceIpAbuseBlock, logDbErrorEvent, logSecurityEvent, maybeBlockIpOnAbuse } from "@/lib/securityTelemetry";
 import { assertRuntimeEnv, isRuntimeEnvError } from "@/lib/runtimeEnv";
 
 function getClientIp(req: NextRequest) {
@@ -54,6 +54,14 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ docId: stri
 
   if (await isGlobalServeDisabled()) {
     return new Response("Unavailable", { status: 503 });
+  }
+
+  const abuseBlock = await enforceIpAbuseBlock({ req, scope: "serve" });
+  if (!abuseBlock.ok) {
+    return new Response("Forbidden", {
+      status: 403,
+      headers: { "Retry-After": String(abuseBlock.retryAfterSeconds) },
+    });
   }
 
   const { docId } = await ctx.params;
@@ -111,6 +119,22 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ docId: stri
   });
 
   if (!ipRl.ok) {
+    await logSecurityEvent({
+      type: "serve_rate_limited",
+      severity: "medium",
+      ip,
+      scope: "serve",
+      message: "Serve IP rate limit exceeded",
+    });
+    await maybeBlockIpOnAbuse({
+      ip,
+      category: "serve_rate_limit",
+      scope: "serve",
+      threshold: Number(process.env.ABUSE_BLOCK_SERVE_THRESHOLD || 20),
+      windowSeconds: Number(process.env.ABUSE_BLOCK_SERVE_WINDOW_SECONDS || 600),
+      blockSeconds: Number(process.env.ABUSE_BLOCK_TTL_SECONDS || 3600),
+      reason: "Repeated serve rate-limit violations",
+    });
     return new Response("Too Many Requests", {
       status: 429,
       headers: {
@@ -129,6 +153,22 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ docId: stri
       failClosed: true,
     });
     if (!tokenRl.ok) {
+      await logSecurityEvent({
+        type: "serve_token_rate_limited",
+        severity: "medium",
+        ip,
+        scope: "serve",
+        message: "Serve token rate limit exceeded",
+      });
+      await maybeBlockIpOnAbuse({
+        ip,
+        category: "serve_token_rate_limit",
+        scope: "serve",
+        threshold: Number(process.env.ABUSE_BLOCK_TOKEN_THRESHOLD || 25),
+        windowSeconds: Number(process.env.ABUSE_BLOCK_TOKEN_WINDOW_SECONDS || 600),
+        blockSeconds: Number(process.env.ABUSE_BLOCK_TTL_SECONDS || 3600),
+        reason: "Repeated token abuse on serve route",
+      });
       return new Response("Too Many Requests", {
         status: 429,
         headers: {

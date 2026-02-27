@@ -8,7 +8,7 @@ import { DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { validatePdfBuffer } from "@/lib/pdfSafety";
 import { sql } from "@/lib/db";
 import { slugify } from "@/lib/slug";
-import { requireDocWrite } from "@/lib/authz";
+import { requireDocWrite, requireUser } from "@/lib/authz";
 import { incrementUploads } from "@/lib/monetization";
 import { enforceGlobalApiRateLimit, clientIpKey, logDbErrorEvent, logSecurityEvent, detectStorageSpike } from "@/lib/securityTelemetry";
 import { getR2Bucket, r2Client } from "@/lib/r2";
@@ -46,6 +46,7 @@ export async function POST(req: NextRequest) {
         assertRuntimeEnv("upload_complete");
 
         const r2Bucket = getR2Bucket();
+        await requireUser();
         // Global API throttle (best-effort)
         const globalRl = await enforceGlobalApiRateLimit({
           req,
