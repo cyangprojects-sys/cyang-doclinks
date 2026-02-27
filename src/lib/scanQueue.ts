@@ -4,7 +4,7 @@ import { sql } from "@/lib/db";
 /**
  * Enqueue a malware scan job for a doc (idempotent).
  * - Creates/updates malware_scan_jobs for the doc
- * - Sets docs.scan_status to 'queued' (best-effort)
+ * - Sets docs.scan_status to 'pending' (best-effort)
  */
 export async function enqueueDocScan(opts: { docId: string; bucket: string; key: string }) {
   const { docId, bucket, key } = opts;
@@ -23,12 +23,12 @@ export async function enqueueDocScan(opts: { docId: string; bucket: string; key:
           last_error = null
   `;
 
-  // Mark queued (do not override quarantine/disabled/deleted).
+  // Mark pending (do not override quarantine/disabled/deleted).
   await sql`
     update public.docs
       set scan_status = case
         when lower(coalesce(moderation_status,'active')) in ('disabled','quarantined','deleted') then scan_status
-        else 'queued'
+        else 'pending'
       end
     where id = ${docId}::uuid
   `;

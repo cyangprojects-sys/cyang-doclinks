@@ -65,8 +65,19 @@ export default async function ShareTokenViewPage(props: {
     return <FailState token={t} title="Unavailable" body="This document is no longer available." />;
   }
 
+  const scanStatus = (meta.scanStatus || "unscanned").toLowerCase();
+  const clean = scanStatus === "clean";
   const risk = (meta.riskLevel || "low").toLowerCase();
-  const risky = risk === "high" || (meta.scanStatus || "").toLowerCase() === "risky";
+  const risky = risk === "high" || scanStatus === "risky";
+  if (!clean) {
+    return (
+      <FailState
+        token={t}
+        title="Unavailable"
+        body={`This document is not available yet. Current scan status: ${scanStatus}.`}
+      />
+    );
+  }
   const enabled =
     Boolean(meta.watermarkEnabled) ||
     String(process.env.WATERMARK_DEFAULT_ENABLED || "").trim() === "1" ||
@@ -95,7 +106,7 @@ export default async function ShareTokenViewPage(props: {
           {meta.maxViews !== null ? (
             <ShareBadge>{meta.maxViews === 0 ? "Unlimited views" : `Max views ${meta.maxViews}`}</ShareBadge>
           ) : null}
-          <ShareBadge tone={risky ? "warn" : "good"}>Scan: {risky ? "Risky" : "Clean"}</ShareBadge>
+          <ShareBadge tone={risky ? "warn" : "good"}>Scan: {clean ? "Clean" : scanStatus}</ShareBadge>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">

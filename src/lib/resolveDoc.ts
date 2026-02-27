@@ -1,7 +1,6 @@
 // src/lib/resolveDoc.ts
 import { sql } from "@/lib/db";
 import { getR2Bucket } from "@/lib/r2";
-import { hasActiveQuarantineOverride } from "@/lib/quarantineOverride";
 
 export type ResolveInput =
     | { alias: string }
@@ -198,24 +197,13 @@ async function getDocPointer(
     const lifecycle = (r.status || "").toLowerCase();
     const moderation = (r.moderation_status || "active").toLowerCase();
     const scanStatus = (r.scan_status || "unscanned").toLowerCase();
-    const blockedScanStates = new Set([
-      "unscanned",
-      "queued",
-      "running",
-      "failed",
-      "error",
-      "infected",
-      "quarantined",
-    ]);
 
     if (lifecycle === "deleted") return { ok: false };
     if (r.org_disabled === true || r.org_active === false) return { ok: false };
     if (moderation === "deleted" || moderation === "disabled") return { ok: false };
-    if (moderation === "quarantined") {
-      const override = await hasActiveQuarantineOverride(r.id);
-      if (!override) return { ok: false };
-    }
-    if (blockedScanStates.has(scanStatus)) return { ok: false };
+    if (moderation === "quarantined") return { ok: false };
+    // Critical invariant: public serving is only allowed when scan is explicitly clean.
+    if (scanStatus !== "clean") return { ok: false };
     if (!r.bucket || !r.r2_key) return { ok: false };
 
     return {

@@ -10,7 +10,6 @@ import { hashUserAgent, hashIpForTicket } from "@/lib/accessTicket";
 import { Readable } from "node:stream";
 import { appendImmutableAudit } from "@/lib/immutableAudit";
 import { allowUnencryptedServing, isSecurityTestNoDbMode, isTicketServingDisabled } from "@/lib/securityPolicy";
-import { hasActiveQuarantineOverride } from "@/lib/quarantineOverride";
 import { getRouteTimeoutMs, isRouteTimeoutError, withRouteTimeout } from "@/lib/routeTimeout";
 import { assertRuntimeEnv, isRuntimeEnvError } from "@/lib/runtimeEnv";
 
@@ -128,16 +127,6 @@ export async function GET(
   }
 
   const t = consumed.ticket;
-  const blockedScanStates = new Set([
-    "unscanned",
-    "queued",
-    "running",
-    "failed",
-    "error",
-    "infected",
-    "quarantined",
-  ]);
-
   if (t.doc_id) {
     try {
       const rows = (await sql`
@@ -157,12 +146,10 @@ export async function GET(
         return new NextResponse("Unavailable", { status: 404, headers: secureDocHeaders() });
       }
       if (moderation === "quarantined") {
-        const override = await hasActiveQuarantineOverride(t.doc_id);
-        if (!override) {
-          return new NextResponse("Unavailable", { status: 404, headers: secureDocHeaders() });
-        }
+        return new NextResponse("Unavailable", { status: 404, headers: secureDocHeaders() });
       }
-      if (blockedScanStates.has(scanStatus)) {
+      // Critical invariant: serve/download only after scan is explicitly clean.
+      if (scanStatus !== "clean") {
         return new NextResponse("Unavailable", { status: 404, headers: secureDocHeaders() });
       }
     } catch {

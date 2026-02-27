@@ -9,7 +9,6 @@ import crypto from "crypto";
 import { rateLimit, rateLimitHeaders, stableHash } from "@/lib/rateLimit";
 import { mintAccessTicket } from "@/lib/accessTicket";
 import { geoDecisionForRequest, getCountryFromHeaders } from "@/lib/geo";
-import { hasActiveQuarantineOverride } from "@/lib/quarantineOverride";
 import { appendImmutableAudit } from "@/lib/immutableAudit";
 import { getR2Bucket } from "@/lib/r2";
 import { isSecurityTestNoDbMode, isShareServingDisabled } from "@/lib/securityPolicy";
@@ -288,20 +287,10 @@ export async function GET(
   if (!share.share_active) return await deny("inactive", 404, "Unavailable");
   const moderation = (share.moderation_status || "active").toLowerCase();
   if (moderation !== "active") {
-    if (moderation !== "quarantined") return await deny(`moderation_${moderation}`, 404, "Unavailable");
-    const override = await hasActiveQuarantineOverride(share.doc_id);
-    if (!override) return await deny("quarantined", 404, "Unavailable");
+    return await deny(`moderation_${moderation}`, 404, "Unavailable");
   }
-  const blockedScanStates = new Set([
-    "unscanned",
-    "queued",
-    "running",
-    "failed",
-    "error",
-    "infected",
-    "quarantined",
-  ]);
-  if (blockedScanStates.has((share.scan_status || "unscanned").toLowerCase())) {
+  // Critical invariant: serve/download only after scan is explicitly clean.
+  if ((share.scan_status || "unscanned").toLowerCase() !== "clean") {
     return await deny(`scan_${String(share.scan_status || "unscanned").toLowerCase()}`, 404, "Unavailable");
   }
 

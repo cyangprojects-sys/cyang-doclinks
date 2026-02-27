@@ -86,11 +86,11 @@ export async function GET(req: NextRequest) {
 
       const isHigh = verdict.riskLevel === "high";
       const scanStatus =
-        verdict.verdict === "infected"
-          ? "quarantined"
-          : verdict.verdict === "clean"
+        verdict.verdict === "clean"
           ? "clean"
-          : "risky";
+          : verdict.verdict === "infected"
+          ? "quarantined"
+          : "quarantined";
 
       // Update doc (trigger will auto-quarantine on risk_level='high')
       await sql`

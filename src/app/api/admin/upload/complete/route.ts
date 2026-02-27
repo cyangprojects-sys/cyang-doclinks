@@ -341,7 +341,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 4) Read uploaded PDF bytes and validate server-side before encryption.
-    let scanStatus: string = "unscanned";
+    let scanStatus: string = "pending";
     let riskLevel: string = "low";
     let riskFlags: any = null;
     let uploadedBytes: Buffer;
@@ -397,11 +397,11 @@ export async function POST(req: NextRequest) {
         await cleanupRejectedObject("pdf_validation_failed_before_encrypt", { error: safety.error });
         return NextResponse.json({ ok: false, error: safety.error, message: safety.message }, { status: 409 });
       }
-      scanStatus = "queued";
+      scanStatus = "pending";
       riskLevel = safety.riskLevel;
       riskFlags = { flags: safety.flags, details: safety.details, mode: "server_validation" };
     } else {
-      scanStatus = "queued";
+      scanStatus = "pending";
       riskLevel = "low";
       riskFlags = { flags: [], details: { mime: typeCheck.canonicalMime, ext: typeCheck.ext }, mode: "server_validation" };
     }

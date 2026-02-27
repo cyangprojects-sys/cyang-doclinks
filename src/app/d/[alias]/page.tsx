@@ -140,20 +140,12 @@ async function getDocAvailabilityHint(docId: string): Promise<string | null> {
     }
 
     const moderation = String(r.moderation_status || "active").toLowerCase();
-    if (moderation === "quarantined") return "This document is quarantined and cannot be served without an active override.";
+    if (moderation === "quarantined") return "This document is quarantined and cannot be served.";
     if (moderation === "disabled" || moderation === "deleted") return `This document is ${moderation} and unavailable.`;
 
-    const blockedScanStates = new Set([
-      "unscanned",
-      "queued",
-      "running",
-      "failed",
-      "error",
-      "infected",
-      "quarantined",
-    ]);
-    if (blockedScanStates.has(String(r.scan_status || "unscanned").toLowerCase())) {
-      return `Serving is blocked due to scan status: ${r.scan_status}.`;
+    const scan = String(r.scan_status || "unscanned").toLowerCase();
+    if (scan !== "clean") {
+      return `Serving is blocked due to scan status: ${r.scan_status}. File must be clean before it can be viewed or downloaded.`;
     }
   } catch {
     // ignore
