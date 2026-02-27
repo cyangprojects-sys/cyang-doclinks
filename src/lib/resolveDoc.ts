@@ -1,6 +1,6 @@
 // src/lib/resolveDoc.ts
 import { sql } from "@/lib/db";
-import { R2_BUCKET } from "@/lib/r2";
+import { getR2Bucket } from "@/lib/r2";
 import { hasActiveQuarantineOverride } from "@/lib/quarantineOverride";
 
 export type ResolveInput =
@@ -135,11 +135,12 @@ async function getDocPointer(
 > {
     const id = String(docId || "").trim();
     if (!id) return { ok: false };
+    const defaultBucket = getR2Bucket();
 
     const rows = (await sql`
     select
       d.id::text as id,
-      coalesce(d.r2_bucket::text, ${R2_BUCKET}) as bucket,
+      coalesce(d.r2_bucket::text, ${defaultBucket}) as bucket,
       d.r2_key::text as r2_key,
       d.title::text as title,
       d.original_filename::text as original_filename,
@@ -184,7 +185,7 @@ async function getDocPointer(
     return {
         ok: true,
         docId: r.id,
-        bucket: r.bucket || R2_BUCKET,
+        bucket: r.bucket || defaultBucket,
         r2Key: r.r2_key,
         title: r.title ?? null,
         originalFilename: r.original_filename ?? null,

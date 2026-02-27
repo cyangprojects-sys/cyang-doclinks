@@ -6,7 +6,7 @@ import { sql } from "@/lib/db";
 import { requireRole } from "@/lib/authz";
 
 import { HeadObjectCommand } from "@aws-sdk/client-s3";
-import { r2Client, r2Bucket } from "@/lib/r2";
+import { getR2Bucket, r2Client } from "@/lib/r2";
 
 type AliasRow = {
   alias: string;
@@ -29,6 +29,7 @@ async function tableExists(regclass: string) {
 
 export async function GET(req: NextRequest) {
   try {
+    const r2Bucket = getR2Bucket();
     const enabled =
       process.env.NODE_ENV !== "production" ||
       ["1", "true", "yes", "on"].includes(String(process.env.ADMIN_DEBUG_ENABLED || "").trim().toLowerCase());

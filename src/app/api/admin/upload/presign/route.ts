@@ -5,7 +5,7 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import crypto from "node:crypto";
 
 import { sql } from "@/lib/db";
-import { r2Client, r2Bucket } from "@/lib/r2";
+import { getR2Bucket, r2Client } from "@/lib/r2";
 import { requireUser } from "@/lib/authz";
 import { assertCanUpload } from "@/lib/monetization";
 import { enforcePlanLimitsEnabled } from "@/lib/billingFlags";
@@ -50,6 +50,7 @@ function getKeyPrefix() {
 export async function POST(req: Request) {
   const ipInfo = clientIpKey(req);
   try {
+    const r2Bucket = getR2Bucket();
     const user = await requireUser();
 
     // Global API throttle (best-effort)

@@ -11,7 +11,7 @@ import { slugify } from "@/lib/slug";
 import { requireDocWrite } from "@/lib/authz";
 import { incrementUploads } from "@/lib/monetization";
 import { enforceGlobalApiRateLimit, clientIpKey, logSecurityEvent, detectStorageSpike } from "@/lib/securityTelemetry";
-import { r2Client, r2Bucket } from "@/lib/r2";
+import { getR2Bucket, r2Client } from "@/lib/r2";
 import { enqueueDocScan } from "@/lib/scanQueue";
 import { decryptAes256Gcm, unwrapDataKey } from "@/lib/encryption";
 import { getMasterKeyByIdOrThrow } from "@/lib/masterKeys";
@@ -38,6 +38,7 @@ async function streamToBuffer(body: any): Promise<Buffer> {
 
 export async function POST(req: NextRequest) {
   try {
+    const r2Bucket = getR2Bucket();
     // Global API throttle (best-effort)
     const globalRl = await enforceGlobalApiRateLimit({
       req,

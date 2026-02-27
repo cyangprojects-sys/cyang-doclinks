@@ -1,6 +1,6 @@
 // src/lib/r2.ts
 //
-// Cloudflare R2 (S3-compatible) client + shared constants.
+// Cloudflare R2 (S3-compatible) client + shared helpers.
 //
 // IMPORTANT:
 // Browser presigned PUT uploads are sensitive to which headers are included in the signature.
@@ -15,39 +15,47 @@
 
 import { S3Client } from "@aws-sdk/client-s3";
 
-const R2_ENDPOINT = process.env.R2_ENDPOINT;
-const R2_ACCESS_KEY_ID = process.env.R2_ACCESS_KEY_ID;
-const R2_SECRET_ACCESS_KEY = process.env.R2_SECRET_ACCESS_KEY;
+function requireEnv(name: "R2_ENDPOINT" | "R2_ACCESS_KEY_ID" | "R2_SECRET_ACCESS_KEY"): string {
+  const value = (process.env[name] || "").trim();
+  if (!value) throw new Error(`Missing ${name} env var`);
+  return value;
+}
 
-// Keep existing exports used throughout the app.
-export const r2Bucket = process.env.R2_BUCKET || process.env.R2_BUCKET_NAME || "";
-export const R2_BUCKET = r2Bucket;
+export function getR2Bucket(): string {
+  const bucket = (process.env.R2_BUCKET || process.env.R2_BUCKET_NAME || "").trim();
+  if (!bucket) throw new Error("Missing R2_BUCKET env var");
+  return bucket;
+}
 
-// Optional object key prefix (defaults to "docs/").
-// Some parts of the codebase reference `r2Prefix`.
-export const r2Prefix = (() => {
+export function getR2Prefix(): string {
   const p = process.env.R2_PREFIX || "docs/";
   if (p.startsWith("r2://")) return "docs/";
   return p.endsWith("/") ? p : `${p}/`;
-})();
+}
 
-if (!R2_ENDPOINT) throw new Error("Missing R2_ENDPOINT env var");
-if (!R2_ACCESS_KEY_ID) throw new Error("Missing R2_ACCESS_KEY_ID env var");
-if (!R2_SECRET_ACCESS_KEY) throw new Error("Missing R2_SECRET_ACCESS_KEY env var");
-if (!r2Bucket) throw new Error("Missing R2_BUCKET env var");
+let cachedClient: S3Client | null = null;
 
-// NOTE: We intentionally cast to `any` to allow newer checksum-related config keys
-// even when the installed SDK's TypeScript types don't expose them.
-export const r2Client = new S3Client({
-  region: "auto",
-  endpoint: R2_ENDPOINT,
-  credentials: {
-    accessKeyId: R2_ACCESS_KEY_ID,
-    secretAccessKey: R2_SECRET_ACCESS_KEY,
+function getR2Client(): S3Client {
+  if (cachedClient) return cachedClient;
+  cachedClient = new S3Client({
+    region: "auto",
+    endpoint: requireEnv("R2_ENDPOINT"),
+    credentials: {
+      accessKeyId: requireEnv("R2_ACCESS_KEY_ID"),
+      secretAccessKey: requireEnv("R2_SECRET_ACCESS_KEY"),
+    },
+
+    // Prevent AWS SDK from injecting checksum requirements into presigned PUT URLs.
+    // (If unsupported by this SDK version at runtime, it will be ignored.)
+    requestChecksumCalculation: "NEVER",
+    responseChecksumValidation: "NEVER",
+  } as any);
+  return cachedClient;
+}
+
+// Keep existing import style while deferring env reads until first real client access.
+export const r2Client = new Proxy({} as S3Client, {
+  get(_target, prop, receiver) {
+    return Reflect.get(getR2Client() as object, prop, receiver);
   },
-
-  // Prevent AWS SDK from injecting checksum requirements into presigned PUT URLs.
-  // (If unsupported by this SDK version at runtime, it will be ignored.)
-  requestChecksumCalculation: "NEVER",
-  responseChecksumValidation: "NEVER",
-} as any);
+});

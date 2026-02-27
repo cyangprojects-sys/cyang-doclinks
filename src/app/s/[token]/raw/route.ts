@@ -11,6 +11,7 @@ import { mintAccessTicket } from "@/lib/accessTicket";
 import { geoDecisionForRequest, getCountryFromHeaders } from "@/lib/geo";
 import { hasActiveQuarantineOverride } from "@/lib/quarantineOverride";
 import { appendImmutableAudit } from "@/lib/immutableAudit";
+import { getR2Bucket } from "@/lib/r2";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -69,8 +70,6 @@ async function isUnlocked(token: string): Promise<boolean> {
   return rows.length > 0;
 }
 
-const R2_BUCKET = (process.env.R2_BUCKET || "").trim();
-
 type ShareLookupRow = {
   token: string;
   doc_id: string;
@@ -115,6 +114,7 @@ export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ token: string }> }
 ) {
+  const r2Bucket = getR2Bucket();
   const { token } = await params;
 
   if (isBlockedTopLevelOpen(req)) {
@@ -343,7 +343,7 @@ export async function GET(
     shareToken: token,
     alias: null,
     purpose: "preview_view",
-    r2Bucket: R2_BUCKET,
+    r2Bucket,
     r2Key: share.r2_key,
     responseContentType: "application/pdf",
     responseContentDisposition: "inline",

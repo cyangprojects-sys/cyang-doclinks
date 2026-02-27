@@ -1,9 +1,11 @@
 // src/lib/oauth-google.ts
 import * as client from "openid-client";
 
-if (!process.env.APP_URL) throw new Error("Missing APP_URL");
-if (!process.env.GOOGLE_CLIENT_ID) throw new Error("Missing GOOGLE_CLIENT_ID");
-if (!process.env.GOOGLE_CLIENT_SECRET) throw new Error("Missing GOOGLE_CLIENT_SECRET");
+function requireEnv(name: "APP_URL" | "GOOGLE_CLIENT_ID" | "GOOGLE_CLIENT_SECRET"): string {
+  const value = (process.env[name] || "").trim();
+  if (!value) throw new Error(`Missing ${name}`);
+  return value;
+}
 
 /**
  * Google OIDC issuer URL (issuer identifier).
@@ -20,8 +22,8 @@ export async function getGoogleConfig(): Promise<client.Configuration> {
   if (!_configPromise) {
     _configPromise = client.discovery(
       GOOGLE_ISSUER,
-      process.env.GOOGLE_CLIENT_ID!,
-      process.env.GOOGLE_CLIENT_SECRET!
+      requireEnv("GOOGLE_CLIENT_ID"),
+      requireEnv("GOOGLE_CLIENT_SECRET")
     );
   }
   return _configPromise;
@@ -32,7 +34,7 @@ export async function getGoogleConfig(): Promise<client.Configuration> {
  * Update this path if your callback route differs.
  */
 export function googleRedirectUri(): string {
-  return `${process.env.APP_URL}/auth/google/callback`;
+  return `${requireEnv("APP_URL")}/auth/google/callback`;
 }
 
 export type GoogleAuthRequest = {

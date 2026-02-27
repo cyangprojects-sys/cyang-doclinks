@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache";
 import bcrypt from "bcryptjs";
 
 import { sql } from "@/lib/db";
-import { r2Bucket, r2Client, r2Prefix } from "@/lib/r2";
+import { getR2Bucket, getR2Prefix, r2Client } from "@/lib/r2";
 import { sendMail } from "@/lib/email";
 import { requireDocWrite, requireRole, requireUser } from "@/lib/authz";
 import { setRetentionSettings, setExpirationAlertSettings, getExpirationAlertSettings } from "@/lib/settings";
@@ -63,6 +63,8 @@ async function requireShareWrite(token: string) {
 }
 
 async function resolveR2LocationForDoc(docId: string): Promise<{ bucket: string; key: string }> {
+  const r2Prefix = getR2Prefix();
+  const r2Bucket = getR2Bucket();
   // Attempt 1: docs.pointer = "r2://bucket/key"
   try {
     const rows = (await sql`

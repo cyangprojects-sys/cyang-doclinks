@@ -1,6 +1,6 @@
 import { GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 import { sql } from "@/lib/db";
-import { r2Client, r2Bucket } from "@/lib/r2";
+import { getR2Bucket, r2Client } from "@/lib/r2";
 import { encryptAes256Gcm, generateDataKey, generateIv, wrapDataKey } from "@/lib/encryption";
 import { getActiveMasterKeyOrThrow } from "@/lib/masterKeys";
 import { appendImmutableAudit } from "@/lib/immutableAudit";
@@ -47,6 +47,7 @@ export async function migrateLegacyEncryptionBatch(args: {
   actorUserId?: string | null;
   orgId?: string | null;
 }) {
+  const r2Bucket = getR2Bucket();
   const limit = Math.max(1, Math.min(250, Math.floor(args.limit || 25)));
   const dryRun = Boolean(args.dryRun);
   const maxBytes = Math.max(

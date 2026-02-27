@@ -1,7 +1,12 @@
-if (!process.env.RESEND_API_KEY) throw new Error("Missing RESEND_API_KEY");
-if (!process.env.EMAIL_FROM) throw new Error("Missing EMAIL_FROM");
+function requireEnv(name: "RESEND_API_KEY" | "EMAIL_FROM"): string {
+  const value = (process.env[name] || "").trim();
+  if (!value) throw new Error(`Missing ${name}`);
+  return value;
+}
 
 export async function sendSignInEmail(to: string, signInUrl: string) {
+  const resendApiKey = requireEnv("RESEND_API_KEY");
+  const emailFrom = requireEnv("EMAIL_FROM");
   const subject = "Sign in to view your document";
 
   const text =
@@ -20,19 +25,19 @@ export async function sendSignInEmail(to: string, signInUrl: string) {
   const resp = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+      Authorization: `Bearer ${resendApiKey}`,
       "Content-Type": "application/json",
       // Optional but often helpful for auth links:
       "X-Entity-Ref-ID": `signin-${Date.now()}`,
     },
     body: JSON.stringify({
-      from: process.env.EMAIL_FROM, // "DocLinks <login@cyang.io>"
+      from: emailFrom, // "DocLinks <login@cyang.io>"
       to,
       subject,
       text,
       html,
-      // Optional but can help reduce “no-reply” spam scoring:
-      reply_to: process.env.EMAIL_FROM,
+      // Optional but can help reduce no-reply spam scoring:
+      reply_to: emailFrom,
       headers: {
         // Helps some clients show a single thread per sign-in attempt:
         "X-Auto-Response-Suppress": "All",
@@ -45,4 +50,3 @@ export async function sendSignInEmail(to: string, signInUrl: string) {
     throw new Error(`Resend error: ${resp.status} ${text}`);
   }
 }
-

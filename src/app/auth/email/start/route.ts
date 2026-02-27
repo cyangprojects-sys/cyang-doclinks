@@ -2,7 +2,11 @@ import { sql } from "@/lib/db";
 import { randomToken, hmacSha256Hex } from "@/lib/crypto";
 import { sendSignInEmail } from "@/lib/resend";
 
-if (!process.env.APP_URL) throw new Error("Missing APP_URL");
+function requireAppUrl(): string {
+  const appUrl = (process.env.APP_URL || "").trim();
+  if (!appUrl) throw new Error("Missing APP_URL");
+  return appUrl;
+}
 
 export async function POST(req: Request) {
   const form = await req.formData();
@@ -34,7 +38,7 @@ const ok = (await sql`
     values (${tokenHash}, ${email}, ${alias}, ${expiresAt.toISOString()})
   `;
 
-  const link = `${process.env.APP_URL}/auth/email/consume?t=${encodeURIComponent(token)}&alias=${encodeURIComponent(alias)}`;
+  const link = `${requireAppUrl()}/auth/email/consume?t=${encodeURIComponent(token)}&alias=${encodeURIComponent(alias)}`;
   await sendSignInEmail(email, link);
 
   return new Response(
