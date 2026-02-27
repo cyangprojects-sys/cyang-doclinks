@@ -16,6 +16,13 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
+function isBlockedTopLevelTicketOpen(req: NextRequest): boolean {
+  const dest = (req.headers.get("sec-fetch-dest") || "").toLowerCase();
+  const mode = (req.headers.get("sec-fetch-mode") || "").toLowerCase();
+  const user = (req.headers.get("sec-fetch-user") || "").toLowerCase();
+  return dest === "document" && mode === "navigate" && user === "?1";
+}
+
 function secureDocHeaders(extra?: Record<string, string>): Record<string, string> {
   return {
     "Cache-Control": "private, no-store, max-age=0",
@@ -62,6 +69,13 @@ export async function GET(
   { params }: { params: Promise<{ ticketId: string }> }
 ) {
   const { ticketId } = await params;
+
+  if (isBlockedTopLevelTicketOpen(req)) {
+    return new NextResponse("Direct open is disabled for this protected document.", {
+      status: 403,
+      headers: secureDocHeaders(),
+    });
+  }
 
   // Throttle ticket exchange (prevents hotlink storms)
   const ticketRl = await enforceGlobalApiRateLimit({

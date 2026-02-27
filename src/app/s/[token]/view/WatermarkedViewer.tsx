@@ -37,9 +37,24 @@ export default function WatermarkedViewer(props: {
       }
     };
 
+    const onBeforePrint = (e: Event) => {
+      e.preventDefault();
+      notify("Printing is disabled for protected viewing.", true);
+    };
+
     const onContextMenu = (e: MouseEvent) => {
       e.preventDefault();
       notify("Right-click is disabled for protected viewing.", false);
+    };
+
+    const onCopy = (e: ClipboardEvent) => {
+      e.preventDefault();
+      notify("Copy is disabled for protected viewing.", false);
+    };
+
+    const onDragStart = (e: DragEvent) => {
+      e.preventDefault();
+      notify("Drag/export is disabled for protected viewing.", false);
     };
 
     const onVisibility = () => {
@@ -49,12 +64,18 @@ export default function WatermarkedViewer(props: {
     };
 
     window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("beforeprint", onBeforePrint);
     window.addEventListener("contextmenu", onContextMenu);
+    window.addEventListener("copy", onCopy);
+    window.addEventListener("dragstart", onDragStart);
     document.addEventListener("visibilitychange", onVisibility);
 
     return () => {
       window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("beforeprint", onBeforePrint);
       window.removeEventListener("contextmenu", onContextMenu);
+      window.removeEventListener("copy", onCopy);
+      window.removeEventListener("dragstart", onDragStart);
       document.removeEventListener("visibilitychange", onVisibility);
       if (noticeTimer) clearTimeout(noticeTimer);
       if (shieldTimer) clearTimeout(shieldTimer);
@@ -97,11 +118,12 @@ export default function WatermarkedViewer(props: {
     <div className="relative h-[calc(100vh-64px)] w-full overflow-hidden rounded-2xl border border-white/10 bg-black">
       <iframe
         title="Document"
-        src={props.rawUrl}
+        src={`${props.rawUrl}#toolbar=0&navpanes=0&scrollbar=0&statusbar=0`}
         className="h-full w-full"
         // Chrome/Edge PDF rendering requires script execution in the embedded viewer.
         // Without allow-scripts, some documents show a blank canvas in iframe mode.
-        sandbox="allow-same-origin allow-scripts allow-downloads"
+        sandbox="allow-same-origin allow-scripts"
+        referrerPolicy="no-referrer"
       />
       {overlay}
       {shield ? (
