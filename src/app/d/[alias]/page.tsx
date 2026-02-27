@@ -161,6 +161,21 @@ async function getDocAvailabilityHint(docId: string): Promise<string | null> {
   return null;
 }
 
+async function getDocContentType(docId: string): Promise<string | null> {
+  try {
+    const rows = (await sql`
+      select coalesce(content_type::text, '') as content_type
+      from public.docs
+      where id = ${docId}::uuid
+      limit 1
+    `) as unknown as Array<{ content_type: string }>;
+    const ct = String(rows?.[0]?.content_type || "").trim();
+    return ct || null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Fetch alias row including password_hash (for public password gate).
  */
@@ -267,10 +282,11 @@ export default async function SharePage({
 
   if (isPrivileged) {
     const availabilityHint = await getDocAvailabilityHint(bypass.docId);
+    const contentType = await getDocContentType(bypass.docId);
     return (
       <main className="mx-auto max-w-5xl px-4 py-10">
         <ShareForm docId={bypass.docId} />
-        <DocumentViewer alias={alias} availabilityHint={availabilityHint} />
+        <DocumentViewer alias={alias} contentType={contentType} availabilityHint={availabilityHint} />
       </main>
     );
   }
@@ -302,12 +318,20 @@ export default async function SharePage({
 
   return (
     <main className="mx-auto max-w-5xl px-4 py-10">
-      <DocumentViewer alias={alias} />
+      <DocumentViewer alias={alias} contentType={resolved.contentType} />
     </main>
   );
 }
 
-function DocumentViewer({ alias, availabilityHint }: { alias: string; availabilityHint?: string | null }) {
+function DocumentViewer({
+  alias,
+  contentType,
+  availabilityHint,
+}: {
+  alias: string;
+  contentType?: string | null;
+  availabilityHint?: string | null;
+}) {
   const viewerUrl = `/d/${encodeURIComponent(alias)}/raw`;
 
   return (
@@ -318,7 +342,7 @@ function DocumentViewer({ alias, availabilityHint }: { alias: string; availabili
         </div>
       ) : null}
       <div className="overflow-hidden rounded-xl border border-white/10 bg-white/5">
-        <SecurePdfCanvasViewer rawUrl={viewerUrl} className="h-[78vh]" />
+        <SecurePdfCanvasViewer rawUrl={viewerUrl} mimeType={contentType} className="h-[78vh]" />
       </div>
 
       <div className="mt-3 text-xs text-neutral-400">

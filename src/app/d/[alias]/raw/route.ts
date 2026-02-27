@@ -216,8 +216,8 @@ export async function GET(
       return new Response("Not found", { status: 404 });
     }
 
-    const filename = pickFilename(resolved.title, resolved.originalFilename, alias) + ".pdf";
-    const contentType = resolved.contentType || "application/pdf";
+    const filename = pickFilename(resolved.title, resolved.originalFilename, alias);
+    const contentType = resolved.contentType || "application/octet-stream";
     const disposition = parseDisposition(req);
 // --- Monetization / plan limits (hidden) ---
 // Enforce the document owner's monthly view quota.

@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import SecurePdfCanvasViewer from "@/app/components/SecurePdfCanvasViewer";
 import { resolveShareMeta } from "@/lib/resolveDoc";
 import { ShareBadge, ShareShell } from "../ShareShell";
+import { sql } from "@/lib/db";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -73,12 +74,22 @@ export default async function ShareTokenViewPage(props: {
 
   const text = (meta.watermarkText || "").trim() || defaultWatermarkText(t);
   const rawUrl = `/s/${encodeURIComponent(t)}/raw`;
+  const contentTypeRows = (await sql`
+    select coalesce(content_type::text, '') as content_type
+    from public.docs
+    where id = ${meta.docId}::uuid
+    limit 1
+  `) as unknown as Array<{ content_type: string }>;
+  const contentType = String(contentTypeRows?.[0]?.content_type || "").trim() || "application/pdf";
+  const typeLabel = contentType.includes("/")
+    ? contentType.split("/")[1]?.toUpperCase() || "FILE"
+    : "FILE";
 
   return (
     <ShareShell token={t} title="Secure Document" subtitle="View-only document delivery with policy controls.">
       <div className="space-y-4">
         <div className="flex flex-wrap items-center gap-2">
-          <ShareBadge>PDF</ShareBadge>
+          <ShareBadge>{typeLabel}</ShareBadge>
           <ShareBadge tone="good">Encrypted</ShareBadge>
           <ShareBadge>{meta.expiresAt ? `Expires ${new Date(meta.expiresAt).toLocaleString()}` : "No expiration"}</ShareBadge>
           {meta.maxViews !== null ? (
@@ -101,6 +112,7 @@ export default async function ShareTokenViewPage(props: {
           <div className="overflow-hidden rounded-2xl border border-white/15 bg-black/20">
             <SecurePdfCanvasViewer
               rawUrl={rawUrl}
+              mimeType={contentType}
               watermarkEnabled={enabled}
               watermarkText={text}
               className="h-[calc(100vh-220px)]"

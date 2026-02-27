@@ -89,6 +89,7 @@ type ShareLookupRow = {
   revoked_at: string | null;
   password_hash: string | null;
   r2_key: string;
+  content_type: string | null;
 
   // Moderation/scan
   moderation_status: string;
@@ -249,6 +250,7 @@ export async function GET(
         s.revoked_at::text as revoked_at,
         s.password_hash::text as password_hash,
         d.r2_key::text as r2_key,
+        d.content_type::text as content_type,
         coalesce(d.moderation_status::text, 'active') as moderation_status,
         coalesce(d.scan_status::text, 'unscanned') as scan_status,
         coalesce(d.risk_level::text, 'low') as risk_level,
@@ -269,6 +271,7 @@ export async function GET(
         s.revoked_at::text as revoked_at,
         s.password_hash::text as password_hash,
         d.r2_key::text as r2_key,
+        d.content_type::text as content_type,
         coalesce(d.moderation_status::text, 'active') as moderation_status,
         coalesce(d.scan_status::text, 'unscanned') as scan_status,
         coalesce(d.risk_level::text, 'low') as risk_level,
@@ -457,7 +460,7 @@ export async function GET(
     purpose: "preview_view",
     r2Bucket,
     r2Key: share.r2_key,
-    responseContentType: "application/pdf",
+    responseContentType: share.content_type || "application/octet-stream",
     responseContentDisposition: "inline",
   });
 
