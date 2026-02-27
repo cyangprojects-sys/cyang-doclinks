@@ -154,6 +154,9 @@ jobs:
       - name: Security State Integration
         run: npm run test:security:state:ci
 
+      - name: Security Freeze Integration
+        run: npm run test:security:freeze:ci
+
   lighthouse-nightly:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
