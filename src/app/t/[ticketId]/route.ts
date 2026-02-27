@@ -182,6 +182,7 @@ export async function GET(
         wrapTag: Buffer;
       }
     | { enabled: false } = { enabled: false };
+  let encryptionMetaInvalid: { missingKeyVersion: boolean } | null = null;
 
   if (t.doc_id) {
     try {
@@ -208,28 +209,47 @@ export async function GET(
       }>;
 
       const r = rows?.[0];
-      if (
-        r?.encryption_enabled &&
-        r.enc_alg &&
-        r.enc_iv &&
-        r.enc_key_version &&
-        r.enc_wrapped_key &&
-        r.enc_wrap_iv &&
-        r.enc_wrap_tag
-      ) {
-        enc = {
-          enabled: true,
-          alg: r.enc_alg,
-          iv: r.enc_iv,
-          keyVersion: r.enc_key_version,
-          wrappedKey: r.enc_wrapped_key,
-          wrapIv: r.enc_wrap_iv,
-          wrapTag: r.enc_wrap_tag,
-        };
+      if (r?.encryption_enabled) {
+        const hasAllEncryptionMeta = Boolean(
+          r.enc_alg &&
+            r.enc_iv &&
+            r.enc_key_version &&
+            r.enc_wrapped_key &&
+            r.enc_wrap_iv &&
+            r.enc_wrap_tag
+        );
+        if (!hasAllEncryptionMeta) {
+          encryptionMetaInvalid = { missingKeyVersion: !r.enc_key_version };
+        } else {
+          enc = {
+            enabled: true,
+            alg: r.enc_alg,
+            iv: r.enc_iv,
+            keyVersion: r.enc_key_version,
+            wrappedKey: r.enc_wrapped_key,
+            wrapIv: r.enc_wrap_iv,
+            wrapTag: r.enc_wrap_tag,
+          };
+        }
       }
     } catch {
       // ignore
     }
+  }
+
+  if (encryptionMetaInvalid) {
+    void logSecurityEvent({
+      type: "ticket_serve_encryption_meta_missing",
+      severity: "high",
+      ip: clientIpKey(req).ip,
+      docId: t.doc_id,
+      scope: "ticket_serve",
+      message: "Encrypted document is missing required key metadata",
+      meta: {
+        missingKeyVersion: encryptionMetaInvalid.missingKeyVersion,
+      },
+    });
+    return new NextResponse("Unavailable", { status: 500, headers: secureDocHeaders() });
   }
 
   if (enc.enabled) {
