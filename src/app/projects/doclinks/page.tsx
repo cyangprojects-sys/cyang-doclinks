@@ -8,7 +8,7 @@ import { DEMO_DOC_URL } from "@/lib/demo";
 export const metadata: Metadata = {
   title: "Doclinks — cyang.io",
   description:
-    "Doclinks is a security-first document sharing tool: upload PDFs, share via short links, enforce access rules server-side, and keep an audit trail.",
+    "Doclinks is a security-first document sharing platform with encryption by default, immutable audit logging, strict share gating, and owner/admin operations.",
 };
 
 export default function DoclinksPage() {
@@ -38,10 +38,12 @@ export default function DoclinksPage() {
           </p>
 
           <div className="mt-6 flex flex-wrap gap-2 text-xs text-white/60">
+            <Pill>Encryption default</Pill>
+            <Pill>Immutable audit log</Pill>
+            <Pill>Quarantine enforcement</Pill>
             <Pill>Expires shares</Pill>
             <Pill>Max views</Pill>
             <Pill>Revocation</Pill>
-            <Pill>Audit logs</Pill>
             <Pill>Rate limiting</Pill>
           </div>
 
@@ -60,9 +62,9 @@ export default function DoclinksPage() {
           </div>
 
           <div className="mt-10 grid gap-4 sm:grid-cols-3">
-            <Stat title="Storage" value="Cloudflare R2" />
-            <Stat title="Enforcement" value="Server-side gating" />
-            <Stat title="Observability" value="Audit logging" />
+            <Stat title="Storage + Crypto" value="R2 + AES-256-GCM" />
+            <Stat title="Enforcement" value="Alias/token + ticket checks" />
+            <Stat title="Observability" value="Immutable + exportable logs" />
           </div>
         </div>
 
@@ -228,6 +230,41 @@ export default function DoclinksPage() {
                 <Control title="Cap usage" desc="Max views stops infinite forwarding." />
                 <Control title="Revoke instantly" desc="Disable a token server-side." />
                 <Control title="Review access" desc="Logs help you validate behavior." />
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="mt-16">
+        <h2 className="text-2xl font-semibold tracking-tight">Current build status</h2>
+        <div className="mt-6 grid gap-4 md:grid-cols-12">
+          <div className="md:col-span-7">
+            <div className="rounded-3xl bg-white/5 p-6 ring-1 ring-white/10">
+              <ul className="space-y-3 text-sm text-white/70">
+                <ListItem>
+                  <b className="text-white/85">Encryption is default.</b> New uploads are encrypted and legacy migration tooling is in place.
+                </ListItem>
+                <ListItem>
+                  <b className="text-white/85">Share enforcement is stricter.</b> Expiry, revocation, max-views, password gates, and quarantine/scan blocks are enforced server-side.
+                </ListItem>
+                <ListItem>
+                  <b className="text-white/85">Viewer hardening shipped.</b> Public inline flows are view-oriented with reduced direct-open and raw URL exposure.
+                </ListItem>
+                <ListItem>
+                  <b className="text-white/85">Monetization guardrails active.</b> View, storage, and active-share limits are enforced by plan.
+                </ListItem>
+              </ul>
+            </div>
+          </div>
+          <div className="md:col-span-5">
+            <div className="rounded-3xl bg-white/5 p-6 ring-1 ring-white/10">
+              <h3 className="text-sm font-medium text-white/90">Ops and governance</h3>
+              <div className="mt-4 grid gap-3">
+                <Control title="Immutable audit trail" desc="Upload/view/share/admin actions append to tamper-evident logs." />
+                <Control title="Org access model" desc="Membership and invite flows back enterprise RBAC." />
+                <Control title="Cron automation" desc="Cloudflare cron handles scan, retention, and rotation operational jobs." />
+                <Control title="Build hygiene" desc="Runtime-only env loading avoids build-time module crashes." />
               </div>
             </div>
           </div>
@@ -424,4 +461,8 @@ function ListItem({ children }: { children: React.ReactNode }) {
     </li>
   );
 }
+
+
+
+
 
