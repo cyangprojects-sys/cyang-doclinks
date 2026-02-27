@@ -80,9 +80,9 @@ export async function getPlanForUser(userId: string): Promise<Plan> {
       name: "Free",
       maxViewsPerMonth: 100,
       maxActiveShares: 3,
-      maxStorageBytes: 524288000,
+      maxStorageBytes: 104857600,
       maxUploadsPerDay: 10,
-      maxFileSizeBytes: 26214400,
+      maxFileSizeBytes: 10485760,
       allowCustomExpiration: false,
       allowAuditExport: false,
     };
@@ -95,9 +95,9 @@ export async function getPlanForUser(userId: string): Promise<Plan> {
       name: "Free",
       maxViewsPerMonth: 100,
       maxActiveShares: 3,
-      maxStorageBytes: 524288000,
+      maxStorageBytes: 104857600,
       maxUploadsPerDay: 10,
-      maxFileSizeBytes: 26214400,
+      maxFileSizeBytes: 10485760,
       allowCustomExpiration: false,
       allowAuditExport: false,
     };
@@ -115,9 +115,9 @@ export async function getPlanForUser(userId: string): Promise<Plan> {
           name: "Free",
           maxViewsPerMonth: 100,
           maxActiveShares: 3,
-          maxStorageBytes: 524288000,
+          maxStorageBytes: 104857600,
           maxUploadsPerDay: 10,
-          maxFileSizeBytes: 26214400,
+          maxFileSizeBytes: 10485760,
           allowCustomExpiration: false,
           allowAuditExport: false,
         };
@@ -309,7 +309,7 @@ export function normalizeExpiresAtForPlan(args: {
 
   // Plan disallows custom expiration (e.g. Free tier):
   // always enforce a fixed TTL from now, ignoring caller-provided timestamps.
-  const days = Math.max(1, Math.floor(args.defaultDaysIfNotAllowed ?? Number(process.env.FREE_SHARE_TTL_DAYS || 14)));
+  const days = Math.max(1, Math.floor(args.defaultDaysIfNotAllowed ?? Number(process.env.FREE_SHARE_TTL_DAYS || 30)));
   const fixedT = Date.now() + days * 24 * 60 * 60 * 1000;
   return new Date(fixedT).toISOString();
 }

@@ -51,19 +51,22 @@ export default async function ViewerUpgradePage(props: {
 
       <section className="glass-card-strong rounded-2xl p-4">
         <div className="text-sm text-white/70">
-          Current plan: <span className="font-semibold text-white">{plan.name}</span> · Entitlement:{" "}
+          Current plan: <span className="font-semibold text-white">{plan.name}</span> - Entitlement:{" "}
           <span className="font-semibold text-white">{entitlement}</span>
         </div>
       </section>
 
       <section className="grid gap-4 md:grid-cols-2">
         <article className="glass-card rounded-2xl p-4">
-          <h2 className="text-lg font-semibold">Free</h2>
+          <h2 className="text-lg font-semibold">Free - $0</h2>
           <ul className="mt-3 space-y-2 text-sm text-white/75">
-            <li>100 monthly views</li>
+            <li>100 MB storage</li>
             <li>3 active shares</li>
-            <li>500 MB storage</li>
+            <li>100 views/month</li>
+            <li>Max 10 MB per file</li>
             <li>10 uploads/day</li>
+            <li>30-day auto-delete</li>
+            <li>Basic audit log</li>
           </ul>
         </article>
 

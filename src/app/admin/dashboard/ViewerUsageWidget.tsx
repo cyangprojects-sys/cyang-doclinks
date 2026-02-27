@@ -46,7 +46,7 @@ export default async function ViewerUsageWidget(props: { userId: string }) {
   let planName = "Free";
   let planId: string = "free";
   let maxActiveShares: number | null = 3;
-  let maxStorageBytes: number | null = 524288000;
+  let maxStorageBytes: number | null = 104857600;
   let maxViewsPerMonth: number | null = 100;
   let maxUploadsPerDay: number | null = 10;
 

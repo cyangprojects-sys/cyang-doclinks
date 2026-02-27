@@ -69,7 +69,7 @@ const plan = await getPlanForUser(auth.ownerId);
   const expiresAtRaw = String(body?.expires_at || body?.expiresAt || "").trim();
   const expiresAt = expiresAtRaw && !Number.isNaN(Date.parse(expiresAtRaw)) ? new Date(expiresAtRaw).toISOString() : null;
 
-  const normalizedExpiresAt = normalizeExpiresAtForPlan({ plan, requestedExpiresAtIso: expiresAt, defaultDaysIfNotAllowed: 14 });
+  const normalizedExpiresAt = normalizeExpiresAtForPlan({ plan, requestedExpiresAtIso: expiresAt, defaultDaysIfNotAllowed: 30 });
 
   const maxViewsRaw = body?.max_views ?? body?.maxViews;
   const maxViewsNum = maxViewsRaw === null || maxViewsRaw === undefined ? null : Number(maxViewsRaw);

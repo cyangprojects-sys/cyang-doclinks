@@ -9,9 +9,9 @@
 -- Free tier limits (hidden):
 -- - 100 views / month
 -- - 3 active shares
--- - 500 MB storage
+-- - 100 MB storage
 -- - 10 uploads / day
--- - 25 MB max file size
+-- - 10 MB max file size
 --
 -- Pro is currently "unlimited" (null limits) and can be activated later.
 
@@ -45,7 +45,7 @@ insert into public.plans (
   allow_audit_export
 )
 values
-  ('free', 'Free', 100, 3, 524288000, 10, 26214400, false, false),
+  ('free', 'Free', 100, 3, 104857600, 10, 10485760, false, false),
   ('pro', 'Pro', null, null, null, null, null, true, true)
 on conflict (id) do update set
   name = excluded.name,
