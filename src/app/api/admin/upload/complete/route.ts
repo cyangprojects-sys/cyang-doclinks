@@ -15,6 +15,7 @@ import { getR2Bucket, r2Client } from "@/lib/r2";
 import { enqueueDocScan } from "@/lib/scanQueue";
 import { decryptAes256Gcm, unwrapDataKey } from "@/lib/encryption";
 import { getMasterKeyByIdOrThrow } from "@/lib/masterKeys";
+import { getRouteTimeoutMs, isRouteTimeoutError, withRouteTimeout } from "@/lib/routeTimeout";
 
 type CompleteRequest = {
   // Newer flow: doc_id from /presign response
@@ -37,45 +38,48 @@ async function streamToBuffer(body: any): Promise<Buffer> {
 }
 
 export async function POST(req: NextRequest) {
+  const timeoutMs = getRouteTimeoutMs("ROUTE_TIMEOUT_UPLOAD_COMPLETE_MS", 45_000);
   try {
-    const r2Bucket = getR2Bucket();
-    // Global API throttle (best-effort)
-    const globalRl = await enforceGlobalApiRateLimit({
-      req,
-      scope: "ip:api",
-      limit: Number(process.env.RATE_LIMIT_API_IP_PER_MIN || 240),
-      windowSeconds: 60,
-      strict: true,
-    });
-    if (!globalRl.ok) {
-      return NextResponse.json(
-        { ok: false, error: "RATE_LIMIT" },
-        { status: globalRl.status, headers: { "Retry-After": String(globalRl.retryAfterSeconds) } }
-      );
-    }
+    return await withRouteTimeout(
+      (async () => {
+        const r2Bucket = getR2Bucket();
+        // Global API throttle (best-effort)
+        const globalRl = await enforceGlobalApiRateLimit({
+          req,
+          scope: "ip:api",
+          limit: Number(process.env.RATE_LIMIT_API_IP_PER_MIN || 240),
+          windowSeconds: 60,
+          strict: true,
+        });
+        if (!globalRl.ok) {
+          return NextResponse.json(
+            { ok: false, error: "RATE_LIMIT" },
+            { status: globalRl.status, headers: { "Retry-After": String(globalRl.retryAfterSeconds) } }
+          );
+        }
 
-    // Upload complete throttle per-IP
-    const ipInfo = clientIpKey(req);
-    const completeRl = await enforceGlobalApiRateLimit({
-      req,
-      scope: "ip:upload_complete",
-      limit: Number(process.env.RATE_LIMIT_UPLOAD_COMPLETE_IP_PER_MIN || 30),
-      windowSeconds: 60,
-      strict: true,
-    });
-    if (!completeRl.ok) {
-      await logSecurityEvent({
-        type: "upload_throttle",
-        severity: "medium",
-        ip: ipInfo.ip,
-        scope: "ip:upload_complete",
-        message: "Upload complete throttled",
-      });
-      return NextResponse.json(
-        { ok: false, error: "RATE_LIMIT" },
-        { status: completeRl.status, headers: { "Retry-After": String(completeRl.retryAfterSeconds) } }
-      );
-    }
+        // Upload complete throttle per-IP
+        const ipInfo = clientIpKey(req);
+        const completeRl = await enforceGlobalApiRateLimit({
+          req,
+          scope: "ip:upload_complete",
+          limit: Number(process.env.RATE_LIMIT_UPLOAD_COMPLETE_IP_PER_MIN || 30),
+          windowSeconds: 60,
+          strict: true,
+        });
+        if (!completeRl.ok) {
+          await logSecurityEvent({
+            type: "upload_throttle",
+            severity: "medium",
+            ip: ipInfo.ip,
+            scope: "ip:upload_complete",
+            message: "Upload complete throttled",
+          });
+          return NextResponse.json(
+            { ok: false, error: "RATE_LIMIT" },
+            { status: completeRl.status, headers: { "Retry-After": String(completeRl.retryAfterSeconds) } }
+          );
+        }
 
     const body = (await req.json()) as CompleteRequest;
 
@@ -516,13 +520,27 @@ try {
       process.env.NEXT_PUBLIC_SITE_URL ||
       (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000");
 
-    return NextResponse.json({
-      ok: true,
-      doc_id: docId,
-      alias: finalAlias,
-      view_url: `${baseUrl}/d/${encodeURIComponent(finalAlias)}`,
-    });
+        return NextResponse.json({
+          ok: true,
+          doc_id: docId,
+          alias: finalAlias,
+          view_url: `${baseUrl}/d/${encodeURIComponent(finalAlias)}`,
+        });
+      })(),
+      timeoutMs
+    );
   } catch (e: any) {
+    if (isRouteTimeoutError(e)) {
+      await logSecurityEvent({
+        type: "upload_complete_timeout",
+        severity: "high",
+        ip: clientIpKey(req).ip,
+        scope: "upload_complete",
+        message: "Upload completion exceeded timeout",
+        meta: { timeoutMs },
+      });
+      return NextResponse.json({ ok: false, error: "TIMEOUT" }, { status: 504 });
+    }
     return NextResponse.json(
       { ok: false, error: "server_error", message: e?.message || "Unknown error" },
       { status: 500 }

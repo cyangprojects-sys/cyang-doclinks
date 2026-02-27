@@ -101,7 +101,7 @@ export async function GET() {
         select 1
         from pg_index i
         where i.indrelid = fk_cols.conrelid
-          and i.indkey::smallint[] [1:cardinality(fk_cols.fk_attnums)] = fk_cols.fk_attnums
+          and (i.indkey::smallint[])[1:cardinality(fk_cols.fk_attnums)] = fk_cols.fk_attnums
       )
       order by fk_cols.table_name, fk_cols.conname
       limit 30

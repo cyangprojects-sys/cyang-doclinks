@@ -10,8 +10,10 @@ import { rateLimit, rateLimitHeaders, stableHash } from "@/lib/rateLimit";
 import { mintAccessTicket } from "@/lib/accessTicket";
 import { assertCanServeView, incrementMonthlyViews } from "@/lib/monetization";
 import { enforcePlanLimitsEnabled } from "@/lib/billingFlags";
+import { clientIpKey, logSecurityEvent } from "@/lib/securityTelemetry";
 import crypto from "crypto";
 import { isAliasServingDisabled, isSecurityTestNoDbMode } from "@/lib/securityPolicy";
+import { getRouteTimeoutMs, isRouteTimeoutError, withRouteTimeout } from "@/lib/routeTimeout";
 
 function normAlias(alias: string): string {
   return decodeURIComponent(String(alias || "")).trim().toLowerCase();
@@ -127,10 +129,13 @@ export async function GET(
   req: NextRequest,
   ctx: { params: Promise<{ alias: string }> }
 ): Promise<Response> {
+  const timeoutMs = getRouteTimeoutMs("ROUTE_TIMEOUT_ALIAS_RAW_MS", 25_000);
   try {
-    if (isSecurityTestNoDbMode()) {
-      return new Response("Not found", { status: 404 });
-    }
+    return await withRouteTimeout(
+      (async () => {
+        if (isSecurityTestNoDbMode()) {
+          return new Response("Not found", { status: 404 });
+        }
 
     if (await isAliasServingDisabled()) {
       return new Response("Unavailable", { status: 503 });
@@ -271,15 +276,29 @@ if (shouldCountView(req)) {
       });
     }
 
-    return new Response(null, {
-      status: 302,
-      headers: {
-        Location: new URL(`/t/${ticketId}`, req.url).toString(),
-        ...rateLimitHeaders(ipRl),
-        "Cache-Control": "private, no-store",
-      },
-    });
+        return new Response(null, {
+          status: 302,
+          headers: {
+            Location: new URL(`/t/${ticketId}`, req.url).toString(),
+            ...rateLimitHeaders(ipRl),
+            "Cache-Control": "private, no-store",
+          },
+        });
+      })(),
+      timeoutMs
+    );
   } catch (err: any) {
+    if (isRouteTimeoutError(err)) {
+      await logSecurityEvent({
+        type: "alias_raw_timeout",
+        severity: "high",
+        ip: clientIpKey(req).ip,
+        scope: "alias_raw",
+        message: "Alias raw route exceeded timeout",
+        meta: { timeoutMs },
+      });
+      return new Response("Gateway Timeout", { status: 504 });
+    }
     console.error("RAW ROUTE ERROR:", err);
     return new Response("Internal server error", { status: 500 });
   }

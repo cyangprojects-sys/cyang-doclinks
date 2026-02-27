@@ -11,6 +11,7 @@ import { Readable } from "node:stream";
 import { appendImmutableAudit } from "@/lib/immutableAudit";
 import { allowUnencryptedServing, isSecurityTestNoDbMode, isTicketServingDisabled } from "@/lib/securityPolicy";
 import { hasActiveQuarantineOverride } from "@/lib/quarantineOverride";
+import { getRouteTimeoutMs, isRouteTimeoutError, withRouteTimeout } from "@/lib/routeTimeout";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -68,12 +69,16 @@ export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ ticketId: string }> }
 ) {
-  if (isSecurityTestNoDbMode()) {
-    return new NextResponse("Direct open is disabled for this protected document.", {
-      status: 403,
-      headers: secureDocHeaders(),
-    });
-  }
+  const timeoutMs = getRouteTimeoutMs("ROUTE_TIMEOUT_TICKET_SERVE_MS", 30_000);
+  try {
+    return await withRouteTimeout(
+      (async () => {
+        if (isSecurityTestNoDbMode()) {
+          return new NextResponse("Direct open is disabled for this protected document.", {
+            status: 403,
+            headers: secureDocHeaders(),
+          });
+        }
 
   if (await isTicketServingDisabled()) {
     return new NextResponse("Unavailable", { status: 503, headers: secureDocHeaders() });
@@ -346,8 +351,25 @@ export async function GET(
   if (contentRange) headers["Content-Range"] = contentRange;
   if (typeof contentLength === "number") headers["Content-Length"] = String(contentLength);
 
-  return new NextResponse(toWebStream((obj as any).Body), {
-    status: contentRange ? 206 : 200,
-    headers,
-  });
+        return new NextResponse(toWebStream((obj as any).Body), {
+          status: contentRange ? 206 : 200,
+          headers,
+        });
+      })(),
+      timeoutMs
+    );
+  } catch (e: unknown) {
+    if (isRouteTimeoutError(e)) {
+      void logSecurityEvent({
+        type: "ticket_serve_timeout",
+        severity: "high",
+        ip: clientIpKey(req).ip,
+        scope: "ticket_serve",
+        message: "Ticket serve exceeded timeout",
+        meta: { timeoutMs },
+      });
+      return new NextResponse("Gateway Timeout", { status: 504, headers: secureDocHeaders() });
+    }
+    throw e;
+  }
 }

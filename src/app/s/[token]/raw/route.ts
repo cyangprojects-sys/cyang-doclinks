@@ -13,6 +13,8 @@ import { hasActiveQuarantineOverride } from "@/lib/quarantineOverride";
 import { appendImmutableAudit } from "@/lib/immutableAudit";
 import { getR2Bucket } from "@/lib/r2";
 import { isSecurityTestNoDbMode, isShareServingDisabled } from "@/lib/securityPolicy";
+import { getRouteTimeoutMs, isRouteTimeoutError, withRouteTimeout } from "@/lib/routeTimeout";
+import { logSecurityEvent } from "@/lib/securityTelemetry";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -116,9 +118,13 @@ export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ token: string }> }
 ) {
-  if (isSecurityTestNoDbMode()) {
-    return new NextResponse("Not found", { status: 404 });
-  }
+  const timeoutMs = getRouteTimeoutMs("ROUTE_TIMEOUT_SHARE_RAW_MS", 25_000);
+  try {
+    return await withRouteTimeout(
+      (async () => {
+        if (isSecurityTestNoDbMode()) {
+          return new NextResponse("Not found", { status: 404 });
+        }
 
   if (await isShareServingDisabled()) {
     return new NextResponse("Unavailable", { status: 503 });
@@ -402,14 +408,31 @@ export async function GET(
     });
   }
 
-  return new NextResponse(null, {
-    status: 302,
-    headers: {
-      Location: new URL(`/t/${ticketId}`, req.url).toString(),
-      ...rateLimitHeaders(ipRl),
-      "Cache-Control": "private, no-store",
-    },
-  });
+        return new NextResponse(null, {
+          status: 302,
+          headers: {
+            Location: new URL(`/t/${ticketId}`, req.url).toString(),
+            ...rateLimitHeaders(ipRl),
+            "Cache-Control": "private, no-store",
+          },
+        });
+      })(),
+      timeoutMs
+    );
+  } catch (e: unknown) {
+    if (isRouteTimeoutError(e)) {
+      await logSecurityEvent({
+        type: "share_raw_timeout",
+        severity: "high",
+        ip: getClientIpFromHeaders(req.headers) || null,
+        scope: "share_raw",
+        message: "Share raw route exceeded timeout",
+        meta: { timeoutMs },
+      });
+      return new NextResponse("Gateway Timeout", { status: 504 });
+    }
+    throw e;
+  }
 }
 
 

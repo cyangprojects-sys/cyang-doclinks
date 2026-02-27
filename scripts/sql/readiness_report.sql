@@ -49,18 +49,58 @@ left join recent r on r.job = e.job
 order by e.job;
 
 -- 6) Backup + recovery freshness
+create temporary table if not exists pg_temp._readiness_backup_recovery (
+  last_backup_status text,
+  backup_hours_since_last_success double precision,
+  recovery_days_since_last_success double precision
+);
+truncate table pg_temp._readiness_backup_recovery;
+
+insert into pg_temp._readiness_backup_recovery
+values (null, null, null);
+
+do $$
+begin
+  if to_regclass('public.backup_runs') is not null then
+    execute $sql$
+      update pg_temp._readiness_backup_recovery t
+      set
+        last_backup_status = x.last_backup_status,
+        backup_hours_since_last_success = x.backup_hours_since_last_success
+      from (
+        select
+          (select status::text from public.backup_runs order by created_at desc limit 1) as last_backup_status,
+          (
+            select extract(epoch from (now() - max(created_at))) / 3600.0
+            from public.backup_runs
+            where status in ('ok','success')
+          ) as backup_hours_since_last_success
+      ) x
+    $sql$;
+  end if;
+
+  if to_regclass('public.recovery_drills') is not null then
+    execute $sql$
+      update pg_temp._readiness_backup_recovery t
+      set
+        recovery_days_since_last_success = x.recovery_days_since_last_success
+      from (
+        select
+          (
+            select extract(epoch from (now() - max(ran_at))) / 86400.0
+            from public.recovery_drills
+            where status = 'success'
+          ) as recovery_days_since_last_success
+      ) x
+    $sql$;
+  end if;
+end $$;
+
 select
-  (select status::text from public.backup_runs order by created_at desc limit 1) as last_backup_status,
-  (
-    select extract(epoch from (now() - max(created_at))) / 3600.0
-    from public.backup_runs
-    where status in ('ok','success')
-  ) as backup_hours_since_last_success,
-  (
-    select extract(epoch from (now() - max(ran_at))) / 86400.0
-    from public.recovery_drills
-    where status = 'success'
-  ) as recovery_days_since_last_success;
+  last_backup_status,
+  backup_hours_since_last_success,
+  recovery_days_since_last_success
+from pg_temp._readiness_backup_recovery;
 
 -- 7) Index and scan health (high-level)
 select

@@ -15,6 +15,8 @@ import { assertCanServeView, incrementMonthlyViews } from "@/lib/monetization";
 import { enforcePlanLimitsEnabled } from "@/lib/billingFlags";
 import { getAuthedUser, roleAtLeast } from "@/lib/authz";
 import { isGlobalServeDisabled, isSecurityTestNoDbMode } from "@/lib/securityPolicy";
+import { getRouteTimeoutMs, isRouteTimeoutError, withRouteTimeout } from "@/lib/routeTimeout";
+import { logSecurityEvent } from "@/lib/securityTelemetry";
 
 function getClientIp(req: NextRequest) {
   const xff = req.headers.get("x-forwarded-for") || "";
@@ -39,9 +41,13 @@ function parseDisposition(req: NextRequest): "inline" | "attachment" {
 }
 
 export async function GET(req: NextRequest, ctx: { params: Promise<{ docId: string }> }) {
-  if (isSecurityTestNoDbMode()) {
-    return new Response("Not found", { status: 404 });
-  }
+  const timeoutMs = getRouteTimeoutMs("ROUTE_TIMEOUT_SERVE_MS", 25_000);
+  try {
+    return await withRouteTimeout(
+      (async () => {
+        if (isSecurityTestNoDbMode()) {
+          return new Response("Not found", { status: 404 });
+        }
 
   if (await isGlobalServeDisabled()) {
     return new Response("Unavailable", { status: 503 });
@@ -253,11 +259,28 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ docId: stri
     });
   }
 
-  return new Response(null, {
-    status: 302,
-    headers: {
-      Location: new URL(`/t/${ticketId}`, req.url).toString(),
-      ...rateLimitHeaders(ipRl),
-    },
-  });
+        return new Response(null, {
+          status: 302,
+          headers: {
+            Location: new URL(`/t/${ticketId}`, req.url).toString(),
+            ...rateLimitHeaders(ipRl),
+          },
+        });
+      })(),
+      timeoutMs
+    );
+  } catch (e: unknown) {
+    if (isRouteTimeoutError(e)) {
+      void logSecurityEvent({
+        type: "serve_timeout",
+        severity: "high",
+        ip: getClientIpFromHeaders(req.headers) || null,
+        scope: "serve",
+        message: "Serve route exceeded timeout",
+        meta: { timeoutMs },
+      });
+      return new Response("Gateway Timeout", { status: 504 });
+    }
+    throw e;
+  }
 }

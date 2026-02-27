@@ -16,6 +16,7 @@ import {
 } from "@/lib/billingSubscription";
 import { appendImmutableAudit } from "@/lib/immutableAudit";
 import { logSecurityEvent } from "@/lib/securityTelemetry";
+import { getRouteTimeoutMs, isRouteTimeoutError, withRouteTimeout } from "@/lib/routeTimeout";
 
 function planFromStripePriceId(priceId: string | null): "free" | "pro" {
   const proPrices = String(process.env.STRIPE_PRO_PRICE_IDS || "")
@@ -43,44 +44,48 @@ function getGraceDays(): number {
 }
 
 export async function POST(req: NextRequest) {
-  const rawBody = await req.text();
-  const signature = req.headers.get("stripe-signature");
-  const verified = verifyStripeWebhookSignature({
-    rawBody,
-    signatureHeader: signature,
-    secret: process.env.STRIPE_WEBHOOK_SECRET ?? null,
-    toleranceSeconds: Number(process.env.STRIPE_WEBHOOK_TOLERANCE_SECONDS || 300),
-  });
-
-  if (!verified.ok) {
-    await logSecurityEvent({
-      type: "stripe_webhook_invalid_signature",
-      severity: "high",
-      ip: req.headers.get("x-forwarded-for") || null,
-      scope: "billing_webhook",
-      message: verified.error,
-    });
-    return NextResponse.json({ ok: false, error: "INVALID_SIGNATURE" }, { status: 400 });
-  }
-
-  const ready = await billingTablesReady();
-  if (!ready) {
-    return NextResponse.json({ ok: false, error: "BILLING_TABLES_NOT_READY" }, { status: 503 });
-  }
-
-  const dedupe = await beginWebhookEvent(verified.eventId, verified.eventType, verified.payload);
-  if (dedupe === "duplicate") {
-    return NextResponse.json({ ok: true, duplicate: true });
-  }
-
-  const event = verified.payload;
-  const obj = event?.data?.object ?? {};
-  const eventType = String(event?.type || "");
-
-  let webhookStatus: "processed" | "ignored" | "failed" = "processed";
-  let webhookMessage: string | null = null;
-
+  const timeoutMs = getRouteTimeoutMs("ROUTE_TIMEOUT_STRIPE_WEBHOOK_MS", 15_000);
   try {
+    return await withRouteTimeout(
+      (async () => {
+        const rawBody = await req.text();
+        const signature = req.headers.get("stripe-signature");
+        const verified = verifyStripeWebhookSignature({
+          rawBody,
+          signatureHeader: signature,
+          secret: process.env.STRIPE_WEBHOOK_SECRET ?? null,
+          toleranceSeconds: Number(process.env.STRIPE_WEBHOOK_TOLERANCE_SECONDS || 300),
+        });
+
+        if (!verified.ok) {
+          await logSecurityEvent({
+            type: "stripe_webhook_invalid_signature",
+            severity: "high",
+            ip: req.headers.get("x-forwarded-for") || null,
+            scope: "billing_webhook",
+            message: verified.error,
+          });
+          return NextResponse.json({ ok: false, error: "INVALID_SIGNATURE" }, { status: 400 });
+        }
+
+        const ready = await billingTablesReady();
+        if (!ready) {
+          return NextResponse.json({ ok: false, error: "BILLING_TABLES_NOT_READY" }, { status: 503 });
+        }
+
+        const dedupe = await beginWebhookEvent(verified.eventId, verified.eventType, verified.payload);
+        if (dedupe === "duplicate") {
+          return NextResponse.json({ ok: true, duplicate: true });
+        }
+
+        const event = verified.payload;
+        const obj = event?.data?.object ?? {};
+        const eventType = String(event?.type || "");
+
+        let webhookStatus: "processed" | "ignored" | "failed" = "processed";
+        let webhookMessage: string | null = null;
+
+        try {
     if (
       eventType === "customer.subscription.created" ||
       eventType === "customer.subscription.updated" ||
@@ -134,32 +139,49 @@ export async function POST(req: NextRequest) {
       webhookMessage = `Unhandled event type: ${eventType}`;
     }
 
-    await appendImmutableAudit({
-      streamKey: "billing:stripe_webhook",
-      action: `billing.stripe.${eventType}`,
-      subjectId: verified.eventId,
-      payload: {
-        eventType,
-      },
-    });
-  } catch (e: any) {
-    webhookStatus = "failed";
-    webhookMessage = String(e?.message || e || "webhook_failed");
-    await logSecurityEvent({
-      type: "stripe_webhook_processing_failed",
-      severity: "high",
-      ip: req.headers.get("x-forwarded-for") || null,
-      scope: "billing_webhook",
-      message: webhookMessage,
-      meta: { eventType, eventId: verified.eventId },
-    });
+          await appendImmutableAudit({
+            streamKey: "billing:stripe_webhook",
+            action: `billing.stripe.${eventType}`,
+            subjectId: verified.eventId,
+            payload: {
+              eventType,
+            },
+          });
+        } catch (e: any) {
+          webhookStatus = "failed";
+          webhookMessage = String(e?.message || e || "webhook_failed");
+          await logSecurityEvent({
+            type: "stripe_webhook_processing_failed",
+            severity: "high",
+            ip: req.headers.get("x-forwarded-for") || null,
+            scope: "billing_webhook",
+            message: webhookMessage,
+            meta: { eventType, eventId: verified.eventId },
+          });
+        }
+
+        await completeWebhookEvent(verified.eventId, webhookStatus, webhookMessage);
+
+        if (webhookStatus === "failed") {
+          return NextResponse.json({ ok: false, error: webhookMessage || "failed" }, { status: 500 });
+        }
+
+        return NextResponse.json({ ok: true, status: webhookStatus });
+      })(),
+      timeoutMs
+    );
+  } catch (e: unknown) {
+    if (isRouteTimeoutError(e)) {
+      await logSecurityEvent({
+        type: "stripe_webhook_timeout",
+        severity: "high",
+        ip: req.headers.get("x-forwarded-for") || null,
+        scope: "billing_webhook",
+        message: "Stripe webhook processing exceeded timeout",
+        meta: { timeoutMs },
+      });
+      return NextResponse.json({ ok: false, error: "TIMEOUT" }, { status: 504 });
+    }
+    throw e;
   }
-
-  await completeWebhookEvent(verified.eventId, webhookStatus, webhookMessage);
-
-  if (webhookStatus === "failed") {
-    return NextResponse.json({ ok: false, error: webhookMessage || "failed" }, { status: 500 });
-  }
-
-  return NextResponse.json({ ok: true, status: webhookStatus });
 }
