@@ -4,28 +4,37 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
 
+type NavLinkProps = {
+  href: string;
+  label: string;
+  active: boolean;
+};
+
+type SessionUserLike = {
+  role?: string;
+};
+
+function NavLink({ href, label, active }: NavLinkProps) {
+  return (
+    <Link
+      href={href}
+      className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+        active
+          ? "bg-foreground text-background"
+          : "text-muted-foreground hover:bg-muted hover:text-foreground"
+      }`}
+    >
+      {label}
+    </Link>
+  );
+}
+
 export default function AdminHeader() {
   const { data: session } = useSession();
   const pathname = usePathname();
 
-  const role = ((session?.user as any)?.role as string | undefined) ?? "viewer";
+  const role = ((session?.user as SessionUserLike | undefined)?.role as string | undefined) ?? "viewer";
   const isOwnerTools = role === "owner" || role === "admin";
-
-  function NavLink({ href, label }: { href: string; label: string }) {
-    const active = pathname === href;
-    return (
-      <Link
-        href={href}
-        className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-          active
-            ? "bg-foreground text-background"
-            : "text-muted-foreground hover:bg-muted hover:text-foreground"
-        }`}
-      >
-        {label}
-      </Link>
-    );
-  }
 
   return (
     <header className="sticky top-0 z-50 bg-background border-b border-border">
@@ -36,12 +45,12 @@ export default function AdminHeader() {
           </Link>
 
           <nav className="flex gap-2">
-            <NavLink href="/admin/dashboard" label="Dashboard" />
+            <NavLink href="/admin/dashboard" label="Dashboard" active={pathname === "/admin/dashboard"} />
             {isOwnerTools && (
               <>
-                <NavLink href="/admin/audit" label="Audit" />
-                <NavLink href="/admin/api-keys" label="API Keys" />
-                <NavLink href="/admin/webhooks" label="Webhooks" />
+                <NavLink href="/admin/audit" label="Audit" active={pathname === "/admin/audit"} />
+                <NavLink href="/admin/api-keys" label="API Keys" active={pathname === "/admin/api-keys"} />
+                <NavLink href="/admin/webhooks" label="Webhooks" active={pathname === "/admin/webhooks"} />
               </>
             )}
           </nav>

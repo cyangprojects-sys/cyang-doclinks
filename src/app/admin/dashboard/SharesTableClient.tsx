@@ -2,7 +2,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import RevokeShareForm from "./RevokeShareForm";
 import SharePasswordForm from "./SharePasswordForm";
@@ -48,9 +48,9 @@ function maxLabel(n: number | null) {
 type Status = "all" | "active" | "expired" | "maxed" | "revoked";
 type StatusFilter = Status | "expiring";
 
-function computeStatus(s: ShareRow): Exclude<Status, "all"> {
+function computeStatus(s: ShareRow, nowTs: number): Exclude<Status, "all"> {
   if (s.revoked_at) return "revoked";
-  if (s.expires_at && new Date(s.expires_at).getTime() <= Date.now()) return "expired";
+  if (s.expires_at && new Date(s.expires_at).getTime() <= nowTs) return "expired";
   if (s.max_views != null && s.max_views !== 0 && s.view_count >= s.max_views) return "maxed";
   return "active";
 }
@@ -68,37 +68,31 @@ function statusBadge(status: Exclude<Status, "all">) {
   }
 }
 
-export default function SharesTableClient(props: { shares: ShareRow[] }) {
+export default function SharesTableClient(props: { shares: ShareRow[]; nowTs: number }) {
   const sp = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
 
-  const [q, setQ] = useState("");
-  const [status, setStatus] = useState<StatusFilter>("all");
   const [selected, setSelected] = useState<Record<string, boolean>>({});
 
-  useEffect(() => {
-    const nextQ = (sp.get("shareQ") || "").trim();
-    const nextStatus = (sp.get("shareStatus") || "all") as StatusFilter;
-    setQ(nextQ);
-    setStatus(nextStatus);
-  }, [sp]);
+  const q = (sp.get("shareQ") || "").trim();
+  const status = (sp.get("shareStatus") || "all") as StatusFilter;
+  const nowTs = props.nowTs;
 
   const normalizedQ = q.trim().toLowerCase();
 
   const filtered = useMemo(() => {
     return props.shares.filter((s) => {
-      const st = computeStatus(s);
+      const st = computeStatus(s, nowTs);
       if (status !== "all") {
         if (status === "expiring") {
           if (st !== "active") return false;
           if (!s.expires_at) return false;
           const exp = new Date(s.expires_at).getTime();
-          const now = Date.now();
           const sevenDays = 7 * 24 * 60 * 60 * 1000;
           if (Number.isNaN(exp)) return false;
-          if (exp <= now) return false;
-          if (exp > now + sevenDays) return false;
+          if (exp <= nowTs) return false;
+          if (exp > nowTs + sevenDays) return false;
         } else if (st !== status) {
           return false;
         }
@@ -107,27 +101,26 @@ export default function SharesTableClient(props: { shares: ShareRow[] }) {
       const hay = [s.to_email ?? "", s.token, s.doc_title ?? "", s.alias ?? "", s.doc_id, s.has_password ? "password protected" : "no password"].join(" ").toLowerCase();
       return hay.includes(normalizedQ);
     });
-  }, [props.shares, normalizedQ, status]);
+  }, [props.shares, normalizedQ, status, nowTs]);
 
   const counts = useMemo(() => {
     const c = { all: props.shares.length, active: 0, expired: 0, maxed: 0, revoked: 0 };
-    for (const s of props.shares) c[computeStatus(s)] += 1;
+    for (const s of props.shares) c[computeStatus(s, nowTs)] += 1;
     return c;
-  }, [props.shares]);
+  }, [props.shares, nowTs]);
 
   const expiringCount = useMemo(() => {
-    const now = Date.now();
     const sevenDays = 7 * 24 * 60 * 60 * 1000;
     let n = 0;
     for (const s of props.shares) {
-      if (computeStatus(s) !== "active") continue;
+      if (computeStatus(s, nowTs) !== "active") continue;
       if (!s.expires_at) continue;
       const exp = new Date(s.expires_at).getTime();
       if (Number.isNaN(exp)) continue;
-      if (exp > now && exp <= now + sevenDays) n += 1;
+      if (exp > nowTs && exp <= nowTs + sevenDays) n += 1;
     }
     return n;
-  }, [props.shares]);
+  }, [props.shares, nowTs]);
 
   function syncUrl(next: { shareQ?: string; shareStatus?: StatusFilter }) {
     const params = new URLSearchParams(sp.toString());
@@ -181,12 +174,12 @@ export default function SharesTableClient(props: { shares: ShareRow[] }) {
       <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div className="flex flex-col gap-2 md:flex-row md:items-center">
           <div>
-            <label className="block text-xs text-white/60">Search</label>
+            <label htmlFor="share-search" className="block text-xs text-white/60">Search</label>
             <input
+              id="share-search"
               value={q}
               onChange={(e) => {
                 const v = e.target.value;
-                setQ(v);
                 syncUrl({ shareQ: v });
               }}
               placeholder="email, alias, title, token..."
@@ -194,12 +187,12 @@ export default function SharesTableClient(props: { shares: ShareRow[] }) {
             />
           </div>
           <div>
-            <label className="block text-xs text-white/60">Status</label>
+            <label htmlFor="share-status" className="block text-xs text-white/60">Status</label>
             <select
+              id="share-status"
               value={status}
               onChange={(e) => {
                 const v = e.target.value as StatusFilter;
-                setStatus(v);
                 syncUrl({ shareStatus: v });
               }}
               className="mt-1 w-full rounded-xl border border-white/20 bg-black/20 px-3 py-2 text-sm text-white focus:border-cyan-300/55 focus:outline-none md:w-[190px]"
@@ -214,8 +207,6 @@ export default function SharesTableClient(props: { shares: ShareRow[] }) {
           </div>
           <button
             onClick={() => {
-              setQ("");
-              setStatus("all");
               syncUrl({ shareQ: "", shareStatus: "all" });
             }}
             className="btn-base btn-secondary rounded-xl px-3 py-2 text-sm md:mb-[2px]"
@@ -253,7 +244,7 @@ export default function SharesTableClient(props: { shares: ShareRow[] }) {
                 <tr><td colSpan={10} className="px-4 py-6 text-white/60">No shares match your filters.</td></tr>
               ) : (
                 filtered.map((s) => {
-                  const st = computeStatus(s);
+                  const st = computeStatus(s, nowTs);
                   const badge = statusBadge(st);
                   const tokenShort = s.token.length > 16 ? `${s.token.slice(0, 8)}...${s.token.slice(-4)}` : s.token;
                   return (

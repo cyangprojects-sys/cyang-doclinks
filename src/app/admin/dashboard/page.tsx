@@ -50,6 +50,7 @@ export default async function AdminDashboardPage() {
 
   const canSeeAll = roleAtLeast(u.role, "admin");
   const canCheckEncryptionStatus = roleAtLeast(u.role, "owner");
+  const nowTs = Date.now();
 
   const hasDocs = await tableExists("public.docs");
   const hasDocViews = await tableExists("public.doc_views");
@@ -266,7 +267,7 @@ const docFilter = sql`${orgFilter} ${ownerFilter}`;
       {/* Shares */}
       <section id="shares" className="space-y-3">
         <h2 className="text-lg font-semibold">Shares</h2>
-        <SharesTableClient shares={shares} />
+        <SharesTableClient shares={shares} nowTs={nowTs} />
       </section>
     </div>
   );

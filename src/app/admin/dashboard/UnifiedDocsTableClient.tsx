@@ -4,7 +4,7 @@
 import Link from "next/link";
 import DeleteDocForm from "../DeleteDocForm";
 import { deleteDocAction } from "../actions";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 export type UnifiedDocRow = {
@@ -105,24 +105,13 @@ export default function UnifiedDocsTableClient(props: {
   const pathname = usePathname();
   const showDelete = !!props.showDelete;
 
-  const [q, setQ] = useState("");
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
-  const [sortKey, setSortKey] = useState<SortKey>("total_views");
-  const [sortDir, setSortDir] = useState<SortDir>("desc");
-
-  useEffect(() => {
-    const nextQ = (sp.get("docQ") || "").trim();
-    const p = Number(sp.get("docPage") || "1");
-    const ps = Number(sp.get("docPageSize") || String(props.defaultPageSize ?? 10));
-    const sk = (sp.get("docSort") || "total_views") as SortKey;
-    const sd = (sp.get("docDir") || "desc") as SortDir;
-    setQ(nextQ);
-    setPage(Number.isFinite(p) && p > 0 ? p : 1);
-    setPageSize(Number.isFinite(ps) && ps > 0 ? ps : props.defaultPageSize ?? 10);
-    setSortKey(sk);
-    setSortDir(sd === "asc" ? "asc" : "desc");
-  }, [sp, props.defaultPageSize]);
+  const q = (sp.get("docQ") || "").trim();
+  const pageRaw = Number(sp.get("docPage") || "1");
+  const page = Number.isFinite(pageRaw) && pageRaw > 0 ? pageRaw : 1;
+  const pageSizeRaw = Number(sp.get("docPageSize") || String(props.defaultPageSize ?? 10));
+  const pageSize = Number.isFinite(pageSizeRaw) && pageSizeRaw > 0 ? pageSizeRaw : (props.defaultPageSize ?? 10);
+  const sortKey = ((sp.get("docSort") || "total_views") as SortKey);
+  const sortDir: SortDir = (sp.get("docDir") || "desc") === "asc" ? "asc" : "desc";
 
   function syncUrl(next: Partial<{ docQ: string; docPage: number; docPageSize: number; docSort: SortKey; docDir: SortDir }>) {
     const params = new URLSearchParams(sp.toString());
@@ -153,8 +142,6 @@ export default function UnifiedDocsTableClient(props: {
     const dir = sortDir === "asc" ? 1 : -1;
     const a = [...filtered];
     a.sort((x, y) => {
-      const sx = statusFor(x).label;
-      const sy = statusFor(y).label;
       const getVal = (r: UnifiedDocRow) => {
         switch (sortKey) {
           case "doc_title":
@@ -168,11 +155,11 @@ export default function UnifiedDocsTableClient(props: {
           case "alias_expires_at":
             return r.alias_expires_at ? new Date(r.alias_expires_at).getTime() : 0;
           case "status":
-            return r.alias ? sx : "zzzz";
+            return r.alias ? statusFor(r).label : "zzzz";
         }
       };
-      const vx = getVal(x) as any;
-      const vy = getVal(y) as any;
+      const vx = getVal(x);
+      const vy = getVal(y);
       if (typeof vx === "number" && typeof vy === "number") {
         if (vx === vy) return 0;
         return vx > vy ? dir : -dir;
@@ -197,13 +184,10 @@ export default function UnifiedDocsTableClient(props: {
   function toggleSort(k: SortKey) {
     if (k === sortKey) {
       const nextDir: SortDir = sortDir === "asc" ? "desc" : "asc";
-      setSortDir(nextDir);
       syncUrl({ docSort: k, docDir: nextDir, docPage: 1 });
       return;
     }
     const nextDir: SortDir = k === "doc_title" || k === "status" ? "asc" : "desc";
-    setSortKey(k);
-    setSortDir(nextDir);
     syncUrl({ docSort: k, docDir: nextDir, docPage: 1 });
   }
 
@@ -215,7 +199,6 @@ export default function UnifiedDocsTableClient(props: {
           <input
             value={q}
             onChange={(e) => {
-              setQ(e.target.value);
               syncUrl({ docQ: e.target.value, docPage: 1 });
             }}
             placeholder="title, alias, doc id"
@@ -230,7 +213,6 @@ export default function UnifiedDocsTableClient(props: {
               value={pageSize}
               onChange={(e) => {
                 const next = Number(e.target.value);
-                setPageSize(next);
                 syncUrl({ docPageSize: next, docPage: 1 });
               }}
               className="rounded-lg border border-white/20 bg-black/20 px-2 py-1 text-white"
@@ -307,4 +289,3 @@ export default function UnifiedDocsTableClient(props: {
     </div>
   );
 }
-
