@@ -7,6 +7,71 @@ type PdfJsModule = {
   getDocument: (src: { data: ArrayBuffer }) => { promise: Promise<any> };
 };
 
+type PageDims = { width: number; height: number };
+
+function isOfficeMime(mimeType: string): boolean {
+  const m = String(mimeType || "").toLowerCase();
+  return (
+    m === "application/msword" ||
+    m === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+    m === "application/vnd.ms-excel" ||
+    m === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
+    m === "application/vnd.ms-powerpoint" ||
+    m === "application/vnd.openxmlformats-officedocument.presentationml.presentation" ||
+    m === "application/vnd.oasis.opendocument.text"
+  );
+}
+
+function viewerTypeOf(mimeType: string): "pdf" | "image" | "video" | "audio" | "text" | "office" | "binary" {
+  const m = String(mimeType || "").toLowerCase();
+  if (!m) return "binary";
+  if (m === "application/pdf") return "pdf";
+  if (m.startsWith("image/")) return "image";
+  if (m.startsWith("video/")) return "video";
+  if (m.startsWith("audio/")) return "audio";
+  if (isOfficeMime(m)) return "office";
+  if (m.startsWith("text/") || m === "application/json" || m === "application/xml" || m === "application/rtf") return "text";
+  return "binary";
+}
+
+function PdfPageCanvas({
+  doc,
+  pageNo,
+  scale,
+  dims,
+}: {
+  doc: any;
+  pageNo: number;
+  scale: number;
+  dims: PageDims;
+}) {
+  const ref = useRef<HTMLCanvasElement | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const canvas = ref.current;
+      if (!canvas || !doc) return;
+      const pdfPage = await doc.getPage(pageNo);
+      if (cancelled || !canvas) return;
+      const viewport = pdfPage.getViewport({ scale });
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = Math.max(1, Math.floor(viewport.width * dpr));
+      canvas.height = Math.max(1, Math.floor(viewport.height * dpr));
+      canvas.style.width = `${Math.floor(viewport.width)}px`;
+      canvas.style.height = `${Math.floor(viewport.height)}px`;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      await pdfPage.render({ canvasContext: ctx, viewport }).promise;
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [doc, pageNo, scale]);
+
+  return <canvas ref={ref} style={{ width: dims.width * scale, height: dims.height * scale }} />;
+}
+
 export default function SecurePdfCanvasViewer(props: {
   rawUrl: string;
   mimeType?: string | null;
@@ -14,40 +79,33 @@ export default function SecurePdfCanvasViewer(props: {
   watermarkText?: string;
   className?: string;
 }) {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const [pdfjs, setPdfjs] = useState<PdfJsModule | null>(null);
-  const [doc, setDoc] = useState<any>(null);
-  const [numPages, setNumPages] = useState(0);
-  const [page, setPage] = useState(1);
-  const [scale, setScale] = useState(1.1);
+  const mimeType = String(props.mimeType || "").trim().toLowerCase();
+  const mode = useMemo(() => viewerTypeOf(mimeType), [mimeType]);
+  const [notice, setNotice] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
+  const [scale, setScale] = useState(1);
+
+  const [pdfjs, setPdfjs] = useState<PdfJsModule | null>(null);
+  const [pdfDoc, setPdfDoc] = useState<any>(null);
+  const [numPages, setNumPages] = useState(0);
+  const [pageDims, setPageDims] = useState<Record<number, PageDims>>({});
+  const [visibleRange, setVisibleRange] = useState<{ start: number; end: number }>({ start: 1, end: 3 });
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+
+  const [textContent, setTextContent] = useState("");
+  const [officeHtml, setOfficeHtml] = useState("");
+
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [videoReady, setVideoReady] = useState(false);
   const [videoDuration, setVideoDuration] = useState(0);
   const [videoTime, setVideoTime] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
 
-  const mime = String(props.mimeType || "").trim().toLowerCase();
-  const viewerKind: "pdf" | "image" | "video" | "audio" | "text" | "binary" = useMemo(() => {
-    if (!mime) return "binary";
-    if (mime === "application/pdf") return "pdf";
-    if (mime.startsWith("image/")) return "image";
-    if (mime.startsWith("video/")) return "video";
-    if (mime.startsWith("audio/")) return "audio";
-    if (
-      mime.startsWith("text/") ||
-      mime === "application/json" ||
-      mime === "application/xml" ||
-      mime === "application/rtf"
-    ) {
-      return "text";
-    }
-    return "binary";
-  }, [mime]);
-
-  const [textContent, setTextContent] = useState<string>("");
+  function deter(msg: string) {
+    setNotice(msg);
+    window.setTimeout(() => setNotice(null), 1800);
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -61,25 +119,29 @@ export default function SecurePdfCanvasViewer(props: {
         ).toString();
         setPdfjs(lib);
       } catch {
-        if (cancelled) return;
-        setError("Viewer runtime unavailable.");
+        if (!cancelled && mode === "pdf") setError("Viewer runtime unavailable.");
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [mode]);
 
   useEffect(() => {
-    if (!pdfjs || viewerKind !== "pdf") return;
-    let cancelled = false;
-    let localDoc: any = null;
     setLoading(true);
     setError(null);
-    setDoc(null);
+    setTextContent("");
+    setOfficeHtml("");
+    setPdfDoc(null);
     setNumPages(0);
-    setPage(1);
+    setPageDims({});
+    setVisibleRange({ start: 1, end: 3 });
+  }, [props.rawUrl, mode]);
 
+  useEffect(() => {
+    if (mode !== "pdf" || !pdfjs) return;
+    let cancelled = false;
+    let localDoc: any = null;
     (async () => {
       try {
         const res = await fetch(props.rawUrl, {
@@ -88,51 +150,48 @@ export default function SecurePdfCanvasViewer(props: {
           cache: "no-store",
           headers: { accept: "application/pdf,*/*" },
         });
-        if (!res.ok) {
-          throw new Error(`Document unavailable (${res.status})`);
-        }
+        if (!res.ok) throw new Error(`Document unavailable (${res.status})`);
         const data = await res.arrayBuffer();
-        const loadingTask = pdfjs.getDocument({ data });
-        localDoc = await loadingTask.promise;
+        const task = pdfjs.getDocument({ data });
+        localDoc = await task.promise;
         if (cancelled) return;
-        setDoc(localDoc);
-        setNumPages(Number(localDoc.numPages || 0));
+        setPdfDoc(localDoc);
+        const pages = Number(localDoc.numPages || 0);
+        setNumPages(pages);
+        if (pages > 0) {
+          const first = await localDoc.getPage(1);
+          const vp = first.getViewport({ scale: 1 });
+          setPageDims({ 1: { width: vp.width, height: vp.height } });
+        }
       } catch (e: any) {
-        if (cancelled) return;
-        setError(e?.message || "Unable to load document.");
+        if (!cancelled) setError(e?.message || "Unable to load PDF.");
       } finally {
         if (!cancelled) setLoading(false);
       }
     })();
-
     return () => {
       cancelled = true;
-      if (localDoc?.destroy) {
-        void localDoc.destroy();
-      }
+      if (localDoc?.destroy) void localDoc.destroy();
     };
-  }, [pdfjs, props.rawUrl, viewerKind]);
+  }, [mode, pdfjs, props.rawUrl]);
 
   useEffect(() => {
-    if (viewerKind !== "text") return;
+    if (mode !== "text") return;
     let cancelled = false;
-    setLoading(true);
-    setError(null);
-    setTextContent("");
     (async () => {
       try {
         const res = await fetch(props.rawUrl, {
           method: "GET",
           credentials: "include",
           cache: "no-store",
-          headers: { accept: `${mime || "text/plain"},text/plain,*/*` },
+          headers: { accept: `${mimeType || "text/plain"},*/*` },
         });
         if (!res.ok) throw new Error(`Document unavailable (${res.status})`);
         const data = await res.arrayBuffer();
         const decoded = new TextDecoder("utf-8", { fatal: false }).decode(data);
         if (!cancelled) setTextContent(decoded);
       } catch (e: any) {
-        if (!cancelled) setError(e?.message || "Unable to load text content.");
+        if (!cancelled) setError(e?.message || "Unable to load text preview.");
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -140,47 +199,60 @@ export default function SecurePdfCanvasViewer(props: {
     return () => {
       cancelled = true;
     };
-  }, [viewerKind, props.rawUrl, mime]);
+  }, [mode, props.rawUrl, mimeType]);
 
   useEffect(() => {
-    if (viewerKind === "pdf" || viewerKind === "text" || viewerKind === "video" || viewerKind === "audio") return;
-    setLoading(false);
-    setError(null);
-  }, [viewerKind]);
-
-  useEffect(() => {
-    if (!doc || !canvasRef.current) return;
+    if (mode !== "office") return;
     let cancelled = false;
-
     (async () => {
       try {
-        const pdfPage = await doc.getPage(page);
-        if (cancelled || !canvasRef.current) return;
-        const viewport = pdfPage.getViewport({ scale });
-        const canvas = canvasRef.current;
-        const ctx = canvas.getContext("2d");
-        if (!ctx) return;
-        const dpr = window.devicePixelRatio || 1;
-        canvas.width = Math.max(1, Math.floor(viewport.width * dpr));
-        canvas.height = Math.max(1, Math.floor(viewport.height * dpr));
-        canvas.style.width = `${Math.floor(viewport.width)}px`;
-        canvas.style.height = `${Math.floor(viewport.height)}px`;
-        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-        await pdfPage.render({ canvasContext: ctx, viewport }).promise;
-      } catch {
-        if (!cancelled) setError("Unable to render this page.");
+        const r = await fetch("/api/viewer/office", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ rawPath: props.rawUrl, mimeType }),
+        });
+        const j = (await r.json().catch(() => null)) as { ok?: boolean; html?: string; message?: string } | null;
+        if (!r.ok || !j?.ok || !j?.html) {
+          throw new Error(j?.message || `Conversion failed (${r.status})`);
+        }
+        if (!cancelled) setOfficeHtml(j.html);
+      } catch (e: any) {
+        if (!cancelled) setError(e?.message || "Unable to render office preview.");
+      } finally {
+        if (!cancelled) setLoading(false);
       }
     })();
-
     return () => {
       cancelled = true;
     };
-  }, [doc, page, scale]);
+  }, [mode, props.rawUrl, mimeType]);
 
-  function deterrence(msg: string) {
-    setNotice(msg);
-    window.setTimeout(() => setNotice(null), 1800);
-  }
+  useEffect(() => {
+    if (mode === "image" || mode === "audio" || mode === "video" || mode === "binary") {
+      setLoading(false);
+      setError(null);
+    }
+  }, [mode]);
+
+  useEffect(() => {
+    if (mode !== "pdf") return;
+    const el = scrollRef.current;
+    if (!el || numPages <= 0) return;
+    const firstDims = pageDims[1] || { width: 800, height: 1100 };
+    const rowH = firstDims.height * scale + 24;
+    const onScroll = () => {
+      const top = el.scrollTop;
+      const h = el.clientHeight;
+      const start = Math.max(1, Math.floor(top / rowH) - 2);
+      const end = Math.min(numPages, Math.ceil((top + h) / rowH) + 2);
+      setVisibleRange({ start, end });
+    };
+    onScroll();
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      el.removeEventListener("scroll", onScroll);
+    };
+  }, [mode, numPages, pageDims, scale]);
 
   const watermark = useMemo(() => {
     if (!props.watermarkEnabled) return null;
@@ -208,22 +280,22 @@ export default function SecurePdfCanvasViewer(props: {
     );
   }, [props.watermarkEnabled, props.watermarkText]);
 
-  const showZoom = viewerKind === "pdf" || viewerKind === "image" || viewerKind === "video" || viewerKind === "text";
-  const zoomLabel = `${Math.round(scale * 100)}%`;
+  const zoomAllowed = mode === "pdf" || mode === "image" || mode === "video" || mode === "text" || mode === "office";
+  const modeLabel = mode.toUpperCase();
 
   return (
     <div
       className={`relative rounded-2xl border border-white/10 bg-black/40 ${props.className || ""}`}
       onContextMenu={(e) => {
         e.preventDefault();
-        deterrence("Context actions are disabled for protected viewing.");
+        deter("Context actions are disabled for protected viewing.");
       }}
       onKeyDownCapture={(e) => {
         const k = String(e.key || "").toLowerCase();
         const cmd = e.metaKey || e.ctrlKey;
         if ((cmd && (k === "s" || k === "p")) || k === "printscreen") {
           e.preventDefault();
-          deterrence("Export and print shortcuts are disabled.");
+          deter("Export and print shortcuts are disabled.");
         }
       }}
       tabIndex={0}
@@ -232,34 +304,11 @@ export default function SecurePdfCanvasViewer(props: {
     >
       <div className="sticky top-0 z-20 flex items-center justify-between gap-3 border-b border-white/10 bg-black/70 px-3 py-2 text-xs text-white/80 backdrop-blur">
         <div className="flex items-center gap-2">
-          {viewerKind === "pdf" ? (
-            <>
-              <button
-                type="button"
-                className="rounded border border-white/20 px-2 py-1 disabled:opacity-40"
-                disabled={loading || !!error || page <= 1}
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-              >
-                Prev
-              </button>
-              <button
-                type="button"
-                className="rounded border border-white/20 px-2 py-1 disabled:opacity-40"
-                disabled={loading || !!error || page >= numPages}
-                onClick={() => setPage((p) => Math.min(numPages || 1, p + 1))}
-              >
-                Next
-              </button>
-              <span>
-                Page {numPages ? page : "-"} / {numPages || "-"}
-              </span>
-            </>
-          ) : (
-            <span>{viewerKind.toUpperCase()} preview</span>
-          )}
+          <span>{modeLabel} preview</span>
+          {mode === "pdf" ? <span>{numPages ? `${numPages} pages` : ""}</span> : null}
         </div>
         <div className="flex items-center gap-2">
-          {showZoom ? (
+          {zoomAllowed ? (
             <>
               <button
                 type="button"
@@ -269,7 +318,7 @@ export default function SecurePdfCanvasViewer(props: {
               >
                 -
               </button>
-              <span>{zoomLabel}</span>
+              <span>{Math.round(scale * 100)}%</span>
               <button
                 type="button"
                 className="rounded border border-white/20 px-2 py-1 disabled:opacity-40"
@@ -279,132 +328,138 @@ export default function SecurePdfCanvasViewer(props: {
                 +
               </button>
             </>
-          ) : (
-            <span className="text-white/60">{mime || "unknown type"}</span>
-          )}
+          ) : null}
         </div>
       </div>
 
-      <div className="relative overflow-auto p-3">
+      <div ref={scrollRef} className="relative h-full overflow-auto p-3">
         {loading ? <div className="py-16 text-center text-sm text-white/70">Loading document...</div> : null}
         {error ? <div className="py-16 text-center text-sm text-red-200">{error}</div> : null}
-        <div className="relative mx-auto w-fit">
-          {viewerKind === "pdf" ? (
-            <canvas ref={canvasRef} className={loading || !!error ? "hidden" : "block"} />
-          ) : null}
-          {viewerKind === "image" ? (
-            <img
-              src={props.rawUrl}
-              alt="Protected document image"
-              className={loading || !!error ? "hidden" : "block max-w-none"}
-              style={{ transform: `scale(${scale})`, transformOrigin: "top left" }}
-              draggable={false}
-              onLoad={() => setLoading(false)}
-              onError={() => {
-                setLoading(false);
-                setError("Unable to load image content.");
-              }}
-            />
-          ) : null}
-          {viewerKind === "video" ? (
-            <div className="space-y-2">
-              <video
-                ref={videoRef}
+        {!loading && !error ? (
+          <div className="relative mx-auto w-fit">
+            {mode === "pdf" ? (
+              <div className="space-y-6">
+                {Array.from({ length: numPages }, (_, i) => i + 1).map((pageNo) => {
+                  const dims = pageDims[pageNo] || pageDims[1] || { width: 800, height: 1100 };
+                  const shouldRender = pageNo >= visibleRange.start && pageNo <= visibleRange.end;
+                  return (
+                    <div key={pageNo} className="relative flex justify-center">
+                      {shouldRender ? (
+                        <PdfPageCanvas doc={pdfDoc} pageNo={pageNo} scale={scale} dims={dims} />
+                      ) : (
+                        <div
+                          className="rounded border border-white/5 bg-white/[0.03]"
+                          style={{ width: dims.width * scale, height: dims.height * scale }}
+                        />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : null}
+
+            {mode === "image" ? (
+              <img
                 src={props.rawUrl}
-                className={loading || !!error ? "hidden" : "block max-w-none bg-black"}
+                alt="Protected document image"
+                className="block max-w-none"
                 style={{ transform: `scale(${scale})`, transformOrigin: "top left" }}
-                controls={false}
-                controlsList="nodownload noplaybackrate nofullscreen"
-                onLoadedMetadata={() => {
-                  const v = videoRef.current;
-                  if (!v) return;
-                  setVideoReady(true);
-                  setVideoDuration(Number.isFinite(v.duration) ? v.duration : 0);
-                  setLoading(false);
-                }}
-                onTimeUpdate={() => {
-                  const v = videoRef.current;
-                  if (!v) return;
-                  setVideoTime(v.currentTime || 0);
-                }}
-                onPlay={() => setIsPlaying(true)}
-                onPause={() => setIsPlaying(false)}
-                onError={() => {
-                  setLoading(false);
-                  setError("Unable to load video content.");
-                }}
-                onContextMenu={(e) => {
-                  e.preventDefault();
-                  deterrence("Context actions are disabled for protected viewing.");
-                }}
+                draggable={false}
               />
-              <div className="flex items-center gap-2 text-xs text-white/80">
-                <button
-                  type="button"
-                  className="rounded border border-white/20 px-2 py-1 disabled:opacity-40"
-                  disabled={!videoReady}
-                  onClick={() => {
+            ) : null}
+
+            {mode === "video" ? (
+              <div className="space-y-2">
+                <video
+                  ref={videoRef}
+                  src={props.rawUrl}
+                  className="block max-w-none bg-black"
+                  style={{ transform: `scale(${scale})`, transformOrigin: "top left" }}
+                  controls={false}
+                  controlsList="nodownload noplaybackrate nofullscreen"
+                  onLoadedMetadata={() => {
                     const v = videoRef.current;
                     if (!v) return;
-                    if (v.paused) void v.play();
-                    else v.pause();
+                    setVideoReady(true);
+                    setVideoDuration(Number.isFinite(v.duration) ? v.duration : 0);
                   }}
-                >
-                  {isPlaying ? "Pause" : "Play"}
-                </button>
-                <input
-                  type="range"
-                  min={0}
-                  max={Math.max(0, videoDuration)}
-                  step={0.1}
-                  value={Math.min(videoTime, videoDuration || 0)}
-                  disabled={!videoReady}
-                  onChange={(e) => {
+                  onTimeUpdate={() => {
                     const v = videoRef.current;
                     if (!v) return;
-                    v.currentTime = Number(e.target.value || 0);
                     setVideoTime(v.currentTime || 0);
                   }}
-                  className="w-64"
+                  onPlay={() => setIsPlaying(true)}
+                  onPause={() => setIsPlaying(false)}
                 />
-                <span>
-                  {Math.floor(videoTime)}s / {Math.floor(videoDuration)}s
-                </span>
+                <div className="flex items-center gap-2 text-xs text-white/80">
+                  <button
+                    type="button"
+                    className="rounded border border-white/20 px-2 py-1 disabled:opacity-40"
+                    disabled={!videoReady}
+                    onClick={() => {
+                      const v = videoRef.current;
+                      if (!v) return;
+                      if (v.paused) void v.play();
+                      else v.pause();
+                    }}
+                  >
+                    {isPlaying ? "Pause" : "Play"}
+                  </button>
+                  <input
+                    type="range"
+                    min={0}
+                    max={Math.max(0, videoDuration)}
+                    step={0.1}
+                    value={Math.min(videoTime, videoDuration || 0)}
+                    disabled={!videoReady}
+                    onChange={(e) => {
+                      const v = videoRef.current;
+                      if (!v) return;
+                      v.currentTime = Number(e.target.value || 0);
+                      setVideoTime(v.currentTime || 0);
+                    }}
+                    className="w-64"
+                  />
+                  <span>
+                    {Math.floor(videoTime)}s / {Math.floor(videoDuration)}s
+                  </span>
+                </div>
               </div>
-            </div>
-          ) : null}
-          {viewerKind === "audio" ? (
-            <audio
-              src={props.rawUrl}
-              className={loading || !!error ? "hidden" : "block w-full min-w-[340px]"}
-              controls
-              controlsList="nodownload noplaybackrate"
-              onLoadedMetadata={() => setLoading(false)}
-              onError={() => {
-                setLoading(false);
-                setError("Unable to load audio content.");
-              }}
-              onContextMenu={(e) => {
-                e.preventDefault();
-                deterrence("Context actions are disabled for protected viewing.");
-              }}
-            />
-          ) : null}
-          {viewerKind === "text" ? (
-            <pre
-              className={loading || !!error ? "hidden" : "max-w-[90vw] overflow-auto rounded border border-white/10 bg-black/30 p-3 text-white/90"}
-              style={{ fontSize: `${Math.max(10, Math.floor(14 * scale))}px`, lineHeight: 1.5 }}
-            >
-              {textContent}
-            </pre>
-          ) : null}
-          {viewerKind === "binary" ? (
-            <div className="rounded border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-100">
-              Preview is not available for this file type in the secure inline viewer yet.
-            </div>
-          ) : null}
-          {watermark}
-        </div>
+            ) : null}
+
+            {mode === "audio" ? (
+              <audio src={props.rawUrl} className="block w-full min-w-[340px]" controls controlsList="nodownload noplaybackrate" />
+            ) : null}
+
+            {mode === "text" ? (
+              <pre
+                className="max-w-[90vw] overflow-auto rounded border border-white/10 bg-black/30 p-3 text-white/90"
+                style={{ fontSize: `${Math.max(10, Math.floor(14 * scale))}px`, lineHeight: 1.5 }}
+              >
+                {textContent}
+              </pre>
+            ) : null}
+
+            {mode === "office" ? (
+              <iframe
+                title="Office preview"
+                srcDoc={officeHtml}
+                className="h-[80vh] w-[min(1000px,90vw)] rounded border border-white/10 bg-black"
+                sandbox="allow-same-origin"
+                referrerPolicy="no-referrer"
+                style={{ transform: `scale(${scale})`, transformOrigin: "top left" }}
+              />
+            ) : null}
+
+            {mode === "binary" ? (
+              <div className="rounded border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-100">
+                Preview is not available for this file type in the secure inline viewer yet.
+              </div>
+            ) : null}
+
+            {watermark}
+          </div>
+        ) : null}
       </div>
 
       {notice ? (
@@ -415,3 +470,4 @@ export default function SecurePdfCanvasViewer(props: {
     </div>
   );
 }
+
