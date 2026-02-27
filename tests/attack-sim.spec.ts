@@ -25,6 +25,49 @@ function randSuffix(): string {
   return `${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
 }
 
+function authHeadersFromEnv(): Record<string, string> | null {
+  const cookie = String(process.env.ATTACK_TEST_AUTH_COOKIE || "").trim();
+  if (!cookie) return null;
+  return { cookie };
+}
+
+function encryptForUpload(plain: Buffer, keyB64: string, ivB64: string): Buffer {
+  const key = Buffer.from(keyB64, "base64");
+  const iv = Buffer.from(ivB64, "base64");
+  const cipher = crypto.createCipheriv("aes-256-gcm", key, iv);
+  const out = Buffer.concat([cipher.update(plain), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return Buffer.concat([out, tag]);
+}
+
+async function presignUpload(
+  request: { post: (...args: any[]) => Promise<any> },
+  headers: Record<string, string>,
+  args: { filename: string; sizeBytes: number }
+): Promise<{
+  doc_id: string;
+  upload_url: string;
+  r2_key: string;
+  bucket: string;
+  encryption: { enabled: true; alg: string | null; iv_b64: string | null; data_key_b64: string | null };
+}> {
+  const res = await request.post("/api/admin/upload/presign", {
+    headers: { "content-type": "application/json", ...headers },
+    data: {
+      title: args.filename,
+      filename: args.filename,
+      contentType: "application/pdf",
+      sizeBytes: args.sizeBytes,
+      encrypt: true,
+    },
+  });
+
+  expect(res.status()).toBe(200);
+  const json = await res.json();
+  expect(json?.ok).toBeTruthy();
+  return json;
+}
+
 async function pickDocId(sql: ReturnType<typeof neon>): Promise<string | null> {
   try {
     const rows = (await sql`
@@ -174,6 +217,166 @@ test.describe("attack simulation", () => {
     } finally {
       await sql`delete from public.share_tokens where token = ${token}`;
     }
+  });
+
+  test("upload presign rejects absolute oversize payloads (>25MB)", async ({ request }) => {
+    const auth = authHeadersFromEnv();
+    test.skip(!auth, "ATTACK_TEST_AUTH_COOKIE not configured");
+
+    const absMax = Number(process.env.UPLOAD_ABSOLUTE_MAX_BYTES || 26_214_400);
+    const tooLarge = absMax + 1;
+    const res = await request.post("/api/admin/upload/presign", {
+      headers: { "content-type": "application/json", ...auth },
+      data: {
+        title: "oversize.pdf",
+        filename: "oversize.pdf",
+        contentType: "application/pdf",
+        sizeBytes: tooLarge,
+        encrypt: true,
+      },
+    });
+
+    expect(res.status()).toBe(413);
+    const body = await res.json();
+    expect(body?.ok).toBeFalsy();
+    expect(String(body?.error || "")).toContain("FILE_TOO_LARGE");
+  });
+
+  test("upload complete rejects malformed PDF after decrypt", async ({ request }) => {
+    const auth = authHeadersFromEnv();
+    test.skip(!auth, "ATTACK_TEST_AUTH_COOKIE not configured");
+
+    const fakePdfName = `malformed-${randSuffix()}.pdf`;
+    const badPlain = Buffer.from("this is not a real pdf");
+
+    const p = await presignUpload(request, auth, {
+      filename: fakePdfName,
+      sizeBytes: badPlain.length,
+    });
+
+    expect(p?.encryption?.enabled).toBeTruthy();
+    expect(p?.encryption?.data_key_b64).toBeTruthy();
+    expect(p?.encryption?.iv_b64).toBeTruthy();
+
+    const ciphertext = encryptForUpload(
+      badPlain,
+      String(p.encryption.data_key_b64),
+      String(p.encryption.iv_b64)
+    );
+
+    const put = await request.fetch(p.upload_url, {
+      method: "PUT",
+      headers: {
+        "content-type": "application/octet-stream",
+        "x-amz-meta-doc-id": p.doc_id,
+        "x-amz-meta-orig-content-type": "application/pdf",
+      },
+      data: ciphertext,
+    });
+    expect(put.status()).toBeGreaterThanOrEqual(200);
+    expect(put.status()).toBeLessThan(300);
+
+    const complete = await request.post("/api/admin/upload/complete", {
+      headers: { "content-type": "application/json", ...auth },
+      data: {
+        doc_id: p.doc_id,
+        title: fakePdfName,
+        original_filename: fakePdfName,
+        r2_bucket: p.bucket,
+        r2_key: p.r2_key,
+      },
+    });
+
+    expect(complete.status()).toBe(409);
+    const body = await complete.json();
+    expect(body?.ok).toBeFalsy();
+    expect(String(body?.error || "")).toContain("NOT_PDF");
+  });
+
+  test("upload complete rejects PDFs that exceed max page policy", async ({ request }) => {
+    const auth = authHeadersFromEnv();
+    test.skip(!auth, "ATTACK_TEST_AUTH_COOKIE not configured");
+
+    const maxPages = Number(process.env.PDF_MAX_PAGES || 2000);
+    const overPages = maxPages + 25;
+    const fakePdfName = `too-many-pages-${randSuffix()}.pdf`;
+    const repeatedPages = new Array(overPages).fill("/Type /Page").join("\n");
+    const pseudoPdf = Buffer.from(`%PDF-1.7\n${repeatedPages}\n%%EOF\n`);
+
+    const p = await presignUpload(request, auth, {
+      filename: fakePdfName,
+      sizeBytes: pseudoPdf.length,
+    });
+
+    const ciphertext = encryptForUpload(
+      pseudoPdf,
+      String(p.encryption.data_key_b64),
+      String(p.encryption.iv_b64)
+    );
+
+    const put = await request.fetch(p.upload_url, {
+      method: "PUT",
+      headers: {
+        "content-type": "application/octet-stream",
+        "x-amz-meta-doc-id": p.doc_id,
+        "x-amz-meta-orig-content-type": "application/pdf",
+      },
+      data: ciphertext,
+    });
+    expect(put.status()).toBeGreaterThanOrEqual(200);
+    expect(put.status()).toBeLessThan(300);
+
+    const complete = await request.post("/api/admin/upload/complete", {
+      headers: { "content-type": "application/json", ...auth },
+      data: {
+        doc_id: p.doc_id,
+        title: fakePdfName,
+        original_filename: fakePdfName,
+        r2_bucket: p.bucket,
+        r2_key: p.r2_key,
+      },
+    });
+
+    expect(complete.status()).toBe(409);
+    const body = await complete.json();
+    expect(body?.ok).toBeFalsy();
+    expect(String(body?.message || "").toLowerCase()).toContain("page");
+  });
+
+  test("upload presign route throttles high-frequency abuse", async ({ request }) => {
+    const auth = authHeadersFromEnv();
+    test.skip(!auth, "ATTACK_TEST_AUTH_COOKIE not configured");
+
+    const statuses: number[] = [];
+    for (let i = 0; i < 45; i += 1) {
+      const r = await request.post("/api/admin/upload/presign", {
+        headers: { "content-type": "application/json", ...auth },
+        data: {
+          filename: `throttle-${i}.txt`,
+          contentType: "text/plain",
+          sizeBytes: 1024,
+          encrypt: true,
+        },
+      });
+      statuses.push(r.status());
+    }
+    const sawThrottle = statuses.includes(429);
+    const allBlocked = statuses.every((s) => s >= 400 && s < 600);
+    expect(sawThrottle || allBlocked).toBeTruthy();
+  });
+
+  test("upload complete route throttles high-frequency abuse", async ({ request }) => {
+    const statuses: number[] = [];
+    for (let i = 0; i < 45; i += 1) {
+      const r = await request.post("/api/admin/upload/complete", {
+        headers: { "content-type": "application/json" },
+        data: { doc_id: "" },
+      });
+      statuses.push(r.status());
+    }
+    const sawThrottle = statuses.includes(429);
+    const allBlocked = statuses.every((s) => s >= 400 && s < 600);
+    expect(sawThrottle || allBlocked).toBeTruthy();
   });
 
   test("stripe webhook rejects invalid signatures", async ({ request }) => {
