@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import crypto from "node:crypto";
+import { neon } from "@neondatabase/serverless";
 
 function isBlockedStatus(status: number): boolean {
   return (
@@ -18,6 +19,25 @@ function stripeSignature(payload: unknown, secret: string, timestamp?: number): 
   const raw = JSON.stringify(payload);
   const v1 = crypto.createHmac("sha256", secret).update(`${ts}.${raw}`).digest("hex");
   return `t=${ts},v1=${v1}`;
+}
+
+function randSuffix(): string {
+  return `${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+}
+
+async function pickDocId(sql: ReturnType<typeof neon>): Promise<string | null> {
+  try {
+    const rows = (await sql`
+      select d.id::text as id
+      from public.docs d
+      where coalesce(d.status::text, 'ready') <> 'deleted'
+      order by d.created_at desc
+      limit 1
+    `) as unknown as Array<{ id: string }>;
+    return rows?.[0]?.id ?? null;
+  } catch {
+    return null;
+  }
 }
 
 test.describe("attack simulation", () => {
@@ -67,6 +87,93 @@ test.describe("attack simulation", () => {
     const sawThrottle = statuses.includes(429);
     const allBlocked = statuses.every((s) => isBlockedStatus(s) || s === 500);
     expect(sawThrottle || allBlocked).toBeTruthy();
+  });
+
+  test("attempt serve before scan finishes is blocked", async ({ request }) => {
+    const databaseUrl = String(process.env.DATABASE_URL || "").trim();
+    test.skip(!databaseUrl, "DATABASE_URL not available");
+    const sql = neon(databaseUrl);
+
+    const docId = await pickDocId(sql);
+    test.skip(!docId, "No doc available for fixture setup");
+
+    const token = `tok_attack_prescan_${randSuffix()}`.slice(0, 64);
+    await sql`
+      insert into public.share_tokens (token, doc_id, max_views, views_count)
+      values (${token}, ${docId}::uuid, null, 0)
+    `;
+
+    const before = (await sql`
+      select
+        coalesce(scan_status::text, 'unscanned') as scan_status,
+        coalesce(moderation_status::text, 'active') as moderation_status,
+        coalesce(risk_level::text, 'low') as risk_level
+      from public.docs
+      where id = ${docId}::uuid
+      limit 1
+    `) as unknown as Array<{
+      scan_status: string;
+      moderation_status: string;
+      risk_level: string;
+    }>;
+
+    try {
+      await sql`update public.docs set scan_status = 'queued' where id = ${docId}::uuid`;
+      const r = await request.get(`/s/${token}/raw`);
+      expect([404, 429]).toContain(r.status());
+    } finally {
+      if (before?.[0]) {
+        await sql`
+          update public.docs
+          set
+            scan_status = ${before[0].scan_status},
+            moderation_status = ${before[0].moderation_status},
+            risk_level = ${before[0].risk_level}
+          where id = ${docId}::uuid
+        `;
+      }
+      await sql`delete from public.share_tokens where token = ${token}`;
+    }
+  });
+
+  test("forged tenant header does not grant raw doc access", async ({ request }) => {
+    const fakeDocId = "00000000-0000-0000-0000-000000000000";
+    const r = await request.get(`/serve/${fakeDocId}`, {
+      headers: {
+        "x-org-id": "00000000-0000-0000-0000-000000000001",
+        "x-tenant-id": "forged-tenant",
+      },
+    });
+    expect([403, 404, 429, 503]).toContain(r.status());
+  });
+
+  test("share raw path does not expose direct object-store URL", async ({ request }) => {
+    const databaseUrl = String(process.env.DATABASE_URL || "").trim();
+    test.skip(!databaseUrl, "DATABASE_URL not available");
+    const sql = neon(databaseUrl);
+
+    const docId = await pickDocId(sql);
+    test.skip(!docId, "No doc available for fixture setup");
+
+    const token = `tok_attack_redirect_${randSuffix()}`.slice(0, 64);
+    await sql`
+      insert into public.share_tokens (token, doc_id, max_views, views_count)
+      values (${token}, ${docId}::uuid, null, 0)
+    `;
+
+    try {
+      const r = await request.get(`/s/${token}/raw`, {
+        maxRedirects: 0,
+      });
+      if (r.status() === 429) test.skip(true, "Rate limited in environment");
+      expect(r.status()).toBe(302);
+      const loc = r.headers()["location"] || "";
+      expect(loc).toContain("/t/");
+      expect(loc).not.toContain(".r2.");
+      expect(loc).not.toContain("amazonaws.com");
+    } finally {
+      await sql`delete from public.share_tokens where token = ${token}`;
+    }
   });
 
   test("stripe webhook rejects invalid signatures", async ({ request }) => {
