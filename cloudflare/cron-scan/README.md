@@ -26,10 +26,6 @@ if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
 ```
 
 3) Set `CRON_SECRET` in **Vercel** Environment Variables.
-4) If using ClamAV service, set these in **Vercel** too:
-   - `CLAMAV_SCAN_URL`
-   - `CLAMAV_SCAN_TOKEN`
-   - optional: `CLAMAV_SCAN_TIMEOUT_MS`
 
 ## Deploy the Cloudflare Worker
 
