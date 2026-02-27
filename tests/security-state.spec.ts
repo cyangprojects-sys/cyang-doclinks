@@ -31,6 +31,27 @@ async function pickDoc(sql: ReturnType<typeof neon>): Promise<DocRow | null> {
   }
 }
 
+async function pickServableDoc(sql: ReturnType<typeof neon>): Promise<DocRow | null> {
+  try {
+    const rows = (await sql`
+      select
+        d.id::text as id,
+        coalesce(d.moderation_status::text, 'active') as moderation_status,
+        coalesce(d.scan_status::text, 'clean') as scan_status,
+        coalesce(d.risk_level::text, 'low') as risk_level
+      from public.docs d
+      where coalesce(d.status::text, 'ready') <> 'deleted'
+        and coalesce(d.moderation_status::text, 'active') = 'active'
+        and coalesce(d.scan_status::text, 'clean') = 'clean'
+      order by d.created_at desc
+      limit 1
+    `) as unknown as DocRow[];
+    return rows?.[0] ?? null;
+  } catch {
+    return null;
+  }
+}
+
 async function columnExists(
   sql: ReturnType<typeof neon>,
   tableName: string,
@@ -274,5 +295,86 @@ test.describe("security state enforcement", () => {
       delete from public.doc_aliases
       where alias in (${aliasInactive}, ${aliasExpired}, ${aliasRevoked})
     `;
+  });
+
+  test("emergency revoke flow blocks active share immediately", async ({ request }) => {
+    const databaseUrl = String(process.env.DATABASE_URL || "").trim();
+    test.skip(!databaseUrl, "DATABASE_URL not available");
+    const sql = neon(databaseUrl);
+
+    const doc = await pickServableDoc(sql);
+    test.skip(!doc, "No servable docs available for fixture setup");
+
+    const token = `tok_live_revoke_${randSuffix()}`.slice(0, 64);
+    await sql`
+      insert into public.share_tokens (token, doc_id, max_views, views_count)
+      values (${token}, ${doc.id}::uuid, null, 0)
+    `;
+
+    try {
+      const before = await request.get(`/s/${token}/raw`);
+      expect([302, 429]).toContain(before.status());
+      if (before.status() === 429) {
+        test.skip(true, "Rate-limited in environment; cannot validate live revoke sequence");
+      }
+
+      await sql`
+        update public.share_tokens
+        set revoked_at = now()
+        where token = ${token}
+      `;
+
+      const after = await request.get(`/s/${token}/raw`);
+      expect(after.status()).toBe(410);
+    } finally {
+      await sql`delete from public.share_tokens where token = ${token}`;
+    }
+  });
+
+  test("emergency revoke flow blocks active alias immediately", async ({ request }) => {
+    const databaseUrl = String(process.env.DATABASE_URL || "").trim();
+    test.skip(!databaseUrl, "DATABASE_URL not available");
+    const sql = neon(databaseUrl);
+
+    const hasDocAliases = await tableExists(sql, "doc_aliases");
+    test.skip(!hasDocAliases, "doc_aliases table not available");
+
+    const doc = await pickServableDoc(sql);
+    test.skip(!doc, "No servable docs available for fixture setup");
+
+    const alias = `a-live-revoke-${randSuffix()}`.toLowerCase();
+    const hasRevokedAt = await columnExists(sql, "doc_aliases", "revoked_at");
+
+    await sql`
+      insert into public.doc_aliases (alias, doc_id, is_active, expires_at)
+      values (${alias}, ${doc.id}::uuid, true, null)
+    `;
+
+    try {
+      const before = await request.get(`/d/${alias}/raw`);
+      expect([302, 429]).toContain(before.status());
+      if (before.status() === 429) {
+        test.skip(true, "Rate-limited in environment; cannot validate live alias revoke sequence");
+      }
+
+      if (hasRevokedAt) {
+        await sql`
+          update public.doc_aliases
+          set revoked_at = now()
+          where alias = ${alias}
+        `;
+      } else {
+        await sql`
+          update public.doc_aliases
+          set is_active = false
+          where alias = ${alias}
+        `;
+      }
+
+      const after = await request.get(`/d/${alias}/raw`);
+      expect(after.status()).toBe(404);
+    } finally {
+      await sql`delete from public.doc_aliases where alias = ${alias}`;
+    }
   });
 });
