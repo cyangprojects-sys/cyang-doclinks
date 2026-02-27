@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "FORBIDDEN";
     const status = msg === "UNAUTHENTICATED" ? 401 : 403;
-    return NextResponse.json({ ok: false, error: msg }, { status });
+    return NextResponse.json({ ok: false, error: status === 401 ? "UNAUTHENTICATED" : "FORBIDDEN" }, { status });
   }
 
   const ipInfo = clientIpKey(req);

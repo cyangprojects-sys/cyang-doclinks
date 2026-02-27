@@ -193,9 +193,6 @@ export async function GET(req: NextRequest) {
     });
   } catch (err: any) {
     console.error("ADMIN DEBUG ERROR:", err);
-    return NextResponse.json(
-      { ok: false, error: "SERVER_ERROR", message: err?.message ?? String(err) },
-      { status: 500 }
-    );
+    return NextResponse.json({ ok: false, error: "SERVER_ERROR", message: "Debug inspection failed." }, { status: 500 });
   }
 }

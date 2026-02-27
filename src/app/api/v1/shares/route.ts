@@ -59,7 +59,10 @@ export async function POST(req: NextRequest) {
 // --- Monetization / plan limits (hidden) ---
 const shareAllowed = await assertCanCreateShare(auth.ownerId);
 if (!shareAllowed.ok) {
-  return NextResponse.json({ ok: false, error: shareAllowed.error, message: shareAllowed.message }, { status: 403 });
+  return NextResponse.json(
+    { ok: false, error: "PAYMENT_REQUIRED", message: shareAllowed.message || "Upgrade required for more active shares." },
+    { status: 402 }
+  );
 }
 const plan = await getPlanForUser(auth.ownerId);
 

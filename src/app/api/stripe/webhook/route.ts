@@ -216,7 +216,7 @@ export async function POST(req: NextRequest) {
         await completeWebhookEvent(verified.eventId, webhookStatus, webhookMessage);
 
         if (webhookStatus === "failed") {
-          return NextResponse.json({ ok: false, error: webhookMessage || "failed" }, { status: 500 });
+          return NextResponse.json({ ok: false, error: "WEBHOOK_PROCESSING_FAILED" }, { status: 500 });
         }
 
         return NextResponse.json({ ok: true, status: webhookStatus });

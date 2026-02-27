@@ -88,8 +88,8 @@ export async function GET(req: NextRequest) {
     }
     const msg = String(e?.message || e || "failed");
     if (msg === "FORBIDDEN" || msg === "UNAUTHENTICATED") {
-      return NextResponse.json({ ok: false, error: msg }, { status: 403 });
+      return NextResponse.json({ ok: false, error: "FORBIDDEN" }, { status: 403 });
     }
-    return NextResponse.json({ ok: false, error: msg }, { status: 502 });
+    return NextResponse.json({ ok: false, error: "BILLING_UPSTREAM_ERROR" }, { status: 502 });
   }
 }

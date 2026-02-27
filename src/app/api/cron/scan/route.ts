@@ -192,7 +192,7 @@ export async function GET(req: NextRequest) {
         context: { jobId: job.id, docId: job.doc_id },
       });
 
-      results.push({ id: job.id, ok: false, error: msg });
+      results.push({ id: job.id, ok: false, error: "SCAN_JOB_FAILED" });
     }
   }
 
@@ -217,6 +217,6 @@ export async function GET(req: NextRequest) {
       durationMs: duration,
       meta: { error: msg },
     });
-    return NextResponse.json({ ok: false, error: msg }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "CRON_SCAN_FAILED" }, { status: 500 });
   }
 }

@@ -565,7 +565,7 @@ try {
       meta: { route: "/api/admin/upload/complete" },
     });
     return NextResponse.json(
-      { ok: false, error: "server_error", message: e?.message || "Unknown error" },
+      { ok: false, error: "server_error", message: "Unable to finalize upload." },
       { status: 500 }
     );
   }

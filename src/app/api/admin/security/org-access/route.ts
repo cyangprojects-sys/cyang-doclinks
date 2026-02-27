@@ -44,7 +44,8 @@ export async function GET() {
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "SERVER_ERROR";
     const status = msg === "FORBIDDEN" || msg === "UNAUTHENTICATED" ? 403 : msg === "ORG_REQUIRED" ? 400 : 500;
-    return NextResponse.json({ ok: false, error: msg }, { status });
+    const safeError = msg === "ORG_REQUIRED" ? "ORG_REQUIRED" : status === 403 ? "FORBIDDEN" : "SERVER_ERROR";
+    return NextResponse.json({ ok: false, error: safeError }, { status });
   }
 }
 
@@ -136,7 +137,7 @@ export async function POST(req: Request) {
     return NextResponse.redirect(new URL("/admin/security?error=bad_action", req.url), { status: 303 });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "SERVER_ERROR";
-    return NextResponse.redirect(new URL(`/admin/security?error=${encodeURIComponent(msg)}`, req.url), { status: 303 });
+    const safeError = msg === "FORBIDDEN" || msg === "UNAUTHENTICATED" ? "FORBIDDEN" : "SERVER_ERROR";
+    return NextResponse.redirect(new URL(`/admin/security?error=${encodeURIComponent(safeError)}`, req.url), { status: 303 });
   }
 }
-

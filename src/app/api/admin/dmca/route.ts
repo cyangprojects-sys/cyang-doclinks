@@ -160,7 +160,7 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({ ok: false, error: "UNKNOWN_ACTION" }, { status: 400 });
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: "SERVER_ERROR", message: String(e?.message || e) }, { status: 500 });
+  } catch {
+    return NextResponse.json({ ok: false, error: "SERVER_ERROR", message: "Unable to process DMCA action." }, { status: 500 });
   }
 }

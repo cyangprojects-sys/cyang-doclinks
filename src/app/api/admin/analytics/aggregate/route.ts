@@ -15,12 +15,11 @@ export async function GET() {
   try {
     const res = await aggregateDocViewDaily({ daysBack });
     return NextResponse.json(res);
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
+  } catch {
     return NextResponse.json(
       {
         ok: false,
-        error: msg,
+        error: "SERVER_ERROR",
         hint:
           "Ensure public.doc_view_daily exists (scripts/sql/doc_view_daily.sql) and public.doc_views exists.",
       },

@@ -164,7 +164,10 @@ export async function POST(req: Request) {
     // --- Monetization / plan limits (hidden) ---
     const canUpload = await assertCanUpload({ userId: user.id, sizeBytes: sizeBytes ?? null });
     if (!canUpload.ok) {
-      return NextResponse.json({ ok: false, error: canUpload.error, message: canUpload.message }, { status: 403 });
+      return NextResponse.json(
+        { ok: false, error: "PAYMENT_REQUIRED", message: canUpload.message || "Upgrade required to upload." },
+        { status: 402 }
+      );
     }
 
     // --- Mandatory encryption configuration ---
@@ -185,7 +188,7 @@ export async function POST(req: Request) {
       });
       await detectPresignFailureSpike({ ip: ipInfo.ip });
       return NextResponse.json(
-        { ok: false, error: "ENCRYPTION_NOT_CONFIGURED", message: msg },
+        { ok: false, error: "ENCRYPTION_NOT_CONFIGURED", message: "Encryption configuration unavailable." },
         { status: 500 }
       );
     }
@@ -316,7 +319,7 @@ export async function POST(req: Request) {
       context: { route: "/api/admin/upload/presign" },
     });
     return NextResponse.json(
-      { ok: false, error: "SERVER_ERROR", message: err instanceof Error ? err.message : String(err) },
+      { ok: false, error: "SERVER_ERROR", message: "Unable to initialize upload." },
       { status: 500 }
     );
   }

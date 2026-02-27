@@ -38,8 +38,7 @@ export async function GET() {
       job_summary: jobSummary,
     });
   } catch (e: any) {
-    const msg = e?.message || "Server error";
-    const status = msg === "FORBIDDEN" || msg === "UNAUTHENTICATED" ? 403 : 500;
-    return NextResponse.json({ ok: false, error: msg }, { status });
+    const status = e?.message === "FORBIDDEN" || e?.message === "UNAUTHENTICATED" ? 403 : 500;
+    return NextResponse.json({ ok: false, error: status === 403 ? "FORBIDDEN" : "SERVER_ERROR" }, { status });
   }
 }

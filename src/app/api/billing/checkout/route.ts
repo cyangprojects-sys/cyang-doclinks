@@ -125,12 +125,19 @@ export async function POST(req: NextRequest) {
       return NextResponse.redirect(new URL("/admin/upgrade?error=TIMEOUT", req.url), { status: 303 });
     }
     const msg = String(e?.message || e || "checkout_failed");
+    const safeError =
+      msg === "FORBIDDEN" || msg === "UNAUTHENTICATED"
+        ? "FORBIDDEN"
+        : msg === "STRIPE_PRO_PRICE_IDS is not configured"
+          ? "ENV_MISCONFIGURED"
+          : "CHECKOUT_FAILED";
     await logSecurityEvent({
       type: "billing_checkout_failed",
       severity: "medium",
       scope: "billing",
-      message: msg,
+      message: "Viewer checkout session creation failed",
+      meta: { code: safeError },
     });
-    return NextResponse.redirect(new URL(`/admin/upgrade?error=${encodeURIComponent(msg)}`, req.url), { status: 303 });
+    return NextResponse.redirect(new URL(`/admin/upgrade?error=${encodeURIComponent(safeError)}`, req.url), { status: 303 });
   }
 }

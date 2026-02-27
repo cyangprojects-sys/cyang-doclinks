@@ -38,8 +38,8 @@ export async function GET() {
     }
     const msg = String(e?.message || e || "failed");
     if (msg === "FORBIDDEN" || msg === "UNAUTHENTICATED") {
-      return NextResponse.json({ ok: false, error: msg }, { status: 403 });
+      return NextResponse.json({ ok: false, error: "FORBIDDEN" }, { status: 403 });
     }
-    return NextResponse.json({ ok: false, error: msg }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "SERVER_ERROR" }, { status: 500 });
   }
 }

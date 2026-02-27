@@ -139,6 +139,6 @@ export async function GET(req: NextRequest) {
       durationMs: duration,
       meta: { error: msg },
     });
-    return NextResponse.json({ ok: false, error: msg }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "CRON_NIGHTLY_FAILED" }, { status: 500 });
   }
 }

@@ -32,6 +32,6 @@ export async function GET(req: NextRequest) {
       durationMs: duration,
       meta: { maxJobs, error: msg },
     });
-    return NextResponse.json({ ok: false, error: msg }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "CRON_KEY_ROTATION_FAILED" }, { status: 500 });
   }
 }

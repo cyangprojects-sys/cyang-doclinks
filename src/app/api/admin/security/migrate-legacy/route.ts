@@ -49,6 +49,6 @@ export async function POST(req: Request) {
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "SERVER_ERROR";
     const status = msg === "FORBIDDEN" || msg === "UNAUTHENTICATED" ? 403 : 500;
-    return NextResponse.json({ ok: false, error: msg }, { status });
+    return NextResponse.json({ ok: false, error: status === 403 ? "FORBIDDEN" : "SERVER_ERROR" }, { status });
   }
 }
