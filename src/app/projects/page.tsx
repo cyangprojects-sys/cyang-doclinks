@@ -79,7 +79,7 @@ export default function ProjectsPage() {
                   <div className="mt-1 text-2xl font-semibold">Doclinks</div>
                   <p className="mt-2 text-sm leading-relaxed text-white/70">
                     Secure document sharing with short links — built for
-                    DocSend-level polish, with a smaller attack surface and server-side
+                    enterprise-grade polish, with a smaller attack surface and server-side
                     enforcement.
                   </p>
                 </div>
@@ -309,3 +309,4 @@ function QuickLink(props: { name: string; desc: string; href: string }) {
     </Link>
   );
 }
+

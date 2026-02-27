@@ -33,7 +33,7 @@ export default function DoclinksPage() {
 
           <p className="mt-5 max-w-2xl text-base leading-relaxed text-white/70">
             Doclinks uploads PDFs and serves them behind strict, server-side access checks.
-            Links are friendly; rules are enforced. The goal is DocSend-style UX with a
+            Links are friendly; rules are enforced. The goal is polished UX with a
             smaller, safer surface area.
           </p>
 
@@ -247,7 +247,7 @@ export default function DoclinksPage() {
             a="The intended posture is private objects with access mediated by the app. The app decides if a request is allowed, then serves the content."
           />
           <Faq
-            q="Is this a DocSend clone?"
+            q="Is this a competitor clone?"
             a="No. It’s a focused subset with a smaller surface area: fast sharing + strong defaults + auditability."
           />
           <Faq
@@ -424,3 +424,4 @@ function ListItem({ children }: { children: React.ReactNode }) {
     </li>
   );
 }
+
