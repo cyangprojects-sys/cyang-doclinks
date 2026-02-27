@@ -101,6 +101,51 @@ async function resolveR2LocationForDoc(docId: string): Promise<{ bucket: string;
   return { bucket: r2b, key: r2k };
 }
 
+async function tableExists(name: string): Promise<boolean> {
+  try {
+    const rows = (await sql`select to_regclass(${name})::text as reg`) as unknown as Array<{ reg: string | null }>;
+    return Boolean(rows?.[0]?.reg);
+  } catch {
+    return false;
+  }
+}
+
+async function purgeDocGraphRows(docId: string): Promise<boolean> {
+  const shareTokensExists = await tableExists("public.share_tokens");
+  const shareUnlocksExists = await tableExists("public.share_unlocks");
+  const docAliasesExists = await tableExists("public.doc_aliases");
+  const docAccessGrantsExists = await tableExists("public.doc_access_grants");
+  const scanJobsExists = await tableExists("public.malware_scan_jobs");
+
+  if (shareUnlocksExists && shareTokensExists) {
+    await sql`
+      delete from public.share_unlocks
+      where token in (
+        select token from public.share_tokens where doc_id = ${docId}::uuid
+      )
+    `;
+  }
+  if (shareTokensExists) {
+    await sql`delete from public.share_tokens where doc_id = ${docId}::uuid`;
+  }
+  if (docAliasesExists) {
+    await sql`delete from public.doc_aliases where doc_id = ${docId}::uuid`;
+  }
+  if (docAccessGrantsExists) {
+    await sql`delete from public.doc_access_grants where doc_id = ${docId}::uuid`;
+  }
+  if (scanJobsExists) {
+    await sql`delete from public.malware_scan_jobs where doc_id = ${docId}::uuid`;
+  }
+
+  const deleted = (await sql`
+    delete from public.docs
+    where id = ${docId}::uuid
+    returning id::text as id
+  `) as unknown as Array<{ id: string }>;
+  return deleted.length > 0;
+}
+
 // Back-compat export expected by older admin UI
 export async function uploadPdfAction(): Promise<void> {
   await requireRole("admin");
@@ -120,12 +165,15 @@ export async function createOrAssignAliasAction(formData: FormData): Promise<voi
     throw new Error("Alias must be 3-80 chars: letters, numbers, underscore, dash.");
   }
 
-  await sql`
+  const created = (await sql`
     insert into doc_aliases (alias, doc_id)
     values (${alias}, ${docId}::uuid)
-    on conflict (alias)
-    do update set doc_id = excluded.doc_id
-  `;
+    on conflict (alias) do nothing
+    returning alias::text as alias
+  `) as unknown as Array<{ alias: string }>;
+  if (!created.length) {
+    throw new Error("Alias is already in use.");
+  }
 
   emitWebhook("alias.created", { alias, doc_id: docId });
   await appendAdminAudit({
@@ -258,23 +306,24 @@ export async function deleteDocAction(formData: FormData): Promise<void> {
     })
   );
 
-  await sql`delete from docs where id = ${docId}::uuid`;
-
-  try {
-    await sql`delete from doc_aliases where doc_id = ${docId}::uuid`;
-  } catch {
-    // ignore if table doesn't exist
+  const deleted = await purgeDocGraphRows(docId);
+  if (!deleted) {
+    throw new Error("Document not found.");
   }
 
   revalidatePath("/admin");
   revalidatePath("/admin/dashboard");
 
   emitWebhook("doc.deleted", { doc_id: docId, title });
-  await appendAdminAudit({
-    action: "doc.deleted",
-    docId,
-    payload: { title, reason, via: "admin_action" },
-  });
+  await appendImmutableAudit(
+    {
+      streamKey: `doc:${docId}`,
+      action: "doc.deleted",
+      docId,
+      payload: { title, reason, via: "admin_action" },
+    },
+    { strict: true }
+  );
 }
 
 /**
@@ -679,19 +728,18 @@ export async function bulkDeleteDocsAction(formData: FormData): Promise<void> {
           Key: key,
         })
       );
-      await sql`delete from docs where id = ${id}::uuid`;
-      try {
-        await sql`delete from doc_aliases where doc_id = ${id}::uuid`;
-      } catch {
-        // ignore
-      }
+      await purgeDocGraphRows(id);
 
       emitWebhook("doc.deleted", { doc_id: id, title, bulk: true, reason });
-      await appendAdminAudit({
-        action: "doc.deleted",
-        docId: id,
-        payload: { title, reason, via: "owner_bulk_delete" },
-      });
+      await appendImmutableAudit(
+        {
+          streamKey: `doc:${id}`,
+          action: "doc.deleted",
+          docId: id,
+          payload: { title, reason, via: "owner_bulk_delete" },
+        },
+        { strict: true }
+      );
     } catch {
       // continue processing other selected docs
     }

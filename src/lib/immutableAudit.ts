@@ -24,7 +24,10 @@ function sha256Hex(input: string): string {
   return crypto.createHash("sha256").update(input).digest("hex");
 }
 
-export async function appendImmutableAudit(event: ImmutableAuditEvent): Promise<void> {
+export async function appendImmutableAudit(
+  event: ImmutableAuditEvent,
+  options?: { strict?: boolean }
+): Promise<void> {
   const streamKey = String(event.streamKey || "").trim();
   const action = String(event.action || "").trim();
   if (!streamKey || !action) return;
@@ -69,7 +72,10 @@ export async function appendImmutableAudit(event: ImmutableAuditEvent): Promise<
           ${occurredAt}::timestamptz
         )
     `;
-  } catch {
+  } catch (e) {
+    if (options?.strict || String(process.env.IMMUTABLE_AUDIT_STRICT || "").trim() === "1") {
+      throw e;
+    }
     // best-effort
   }
 }

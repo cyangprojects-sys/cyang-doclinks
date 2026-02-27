@@ -301,7 +301,7 @@ export async function runRetention(): Promise<RetentionRun> {
     : envBool("RETENTION_DELETE_EXPIRED_SHARES", true);
   const shareGraceDays = dbSettings.ok ? dbSettings.settings.shareGraceDays : envInt("RETENTION_SHARE_GRACE_DAYS", 0);
   const auditR2Orphans = envBool("RETENTION_AUDIT_R2_ORPHANS", true);
-  const deleteR2Orphans = envBool("RETENTION_DELETE_R2_ORPHANS", false);
+  const deleteR2Orphans = envBool("RETENTION_DELETE_R2_ORPHANS", true);
   const r2AuditMaxObjects = envInt("RETENTION_R2_AUDIT_MAX_OBJECTS", 5000);
 
   const results: RetentionResult[] = [];

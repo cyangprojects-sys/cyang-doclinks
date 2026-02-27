@@ -52,26 +52,32 @@ export async function POST(req: NextRequest) {
   `) as unknown as Array<{ "?column?": number }>;
   if (!owns.length) return NextResponse.json({ ok: false, error: "FORBIDDEN" }, { status: 403 });
 
-  await sql`
+  const created = (await sql`
     insert into public.doc_aliases (alias, doc_id)
     values (${alias}, ${docId}::uuid)
-    on conflict (alias)
-    do update set doc_id = excluded.doc_id
-  `;
+    on conflict (alias) do nothing
+    returning alias::text as alias
+  `) as unknown as Array<{ alias: string }>;
+  if (!created.length) {
+    return NextResponse.json({ ok: false, error: "ALIAS_TAKEN" }, { status: 409 });
+  }
 
   emitWebhook("alias.created", { alias, doc_id: docId, created_via: "api" });
-  await appendImmutableAudit({
-    streamKey: `doc:${docId}`,
-    action: "doc.alias_created",
-    actorUserId: auth.ownerId,
-    docId,
-    subjectId: alias,
-    ipHash: ipInfo.ipHash,
-    payload: {
-      alias,
-      via: "api",
+  await appendImmutableAudit(
+    {
+      streamKey: `doc:${docId}`,
+      action: "doc.alias_created",
+      actorUserId: auth.ownerId,
+      docId,
+      subjectId: alias,
+      ipHash: ipInfo.ipHash,
+      payload: {
+        alias,
+        via: "api",
+      },
     },
-  });
+    { strict: true }
+  );
 
   return NextResponse.json({ ok: true, alias, doc_id: docId });
 }
