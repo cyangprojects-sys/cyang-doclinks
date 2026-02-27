@@ -60,6 +60,7 @@ function requiredForScope(scope: RuntimeEnvScope): string[] {
     case "alias_raw":
     case "ticket_serve":
       requireAny(["VIEW_SALT", "NEXTAUTH_SECRET"], "VIEW_SALT|NEXTAUTH_SECRET");
+      require("DOC_MASTER_KEYS");
       break;
     case "upload_complete":
       require("DOC_MASTER_KEYS");
@@ -67,6 +68,8 @@ function requiredForScope(scope: RuntimeEnvScope): string[] {
       require("R2_ENDPOINT");
       require("R2_ACCESS_KEY_ID");
       require("R2_SECRET_ACCESS_KEY");
+      require("UPLOAD_ABSOLUTE_MAX_BYTES");
+      require("PDF_MAX_PAGES");
       break;
     case "upload_presign":
       require("DOC_MASTER_KEYS");
@@ -74,12 +77,15 @@ function requiredForScope(scope: RuntimeEnvScope): string[] {
       require("R2_ENDPOINT");
       require("R2_ACCESS_KEY_ID");
       require("R2_SECRET_ACCESS_KEY");
+      require("UPLOAD_ABSOLUTE_MAX_BYTES");
       break;
     case "stripe_webhook":
       require("STRIPE_WEBHOOK_SECRET");
+      require("STRIPE_PRO_PRICE_IDS");
       break;
     case "stripe_admin":
       require("STRIPE_SECRET_KEY");
+      require("STRIPE_PRO_PRICE_IDS");
       break;
   }
 

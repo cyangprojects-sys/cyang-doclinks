@@ -232,6 +232,8 @@ export default async function AnalyticsWidgets({ ownerId }: { ownerId?: string; 
   let backupHoursSinceLastSuccess: number | null = null;
   let backupFreshOk = false;
   let topSecurityTypes: Array<{ type: string; c: number }> = [];
+  let unencryptedDocs = 0;
+  let encryptedMissingKeyVersion = 0;
 
   if (hasSecurityEvents) {
     try {
@@ -362,6 +364,21 @@ export default async function AnalyticsWidgets({ ownerId }: { ownerId?: string; 
           ${ownerId ? sql`and d.owner_id = ${ownerId}::uuid` : sql``}
       `) as unknown as Array<{ c: number }>;
       deadLetterBacklog = Number(rows?.[0]?.c ?? 0);
+    } catch {
+      // ignore
+    }
+  }
+
+  if (hasDocs && !isViewerScoped) {
+    try {
+      const rows = (await sql`
+        select
+          coalesce(sum(case when coalesce(d.encryption_enabled, false) = false then 1 else 0 end), 0)::int as unencrypted_docs,
+          coalesce(sum(case when coalesce(d.encryption_enabled, false) = true and coalesce(d.enc_key_version::text, '') = '' then 1 else 0 end), 0)::int as encrypted_missing_key
+        from public.docs d
+      `) as unknown as Array<{ unencrypted_docs: number; encrypted_missing_key: number }>;
+      unencryptedDocs = Number(rows?.[0]?.unencrypted_docs ?? 0);
+      encryptedMissingKeyVersion = Number(rows?.[0]?.encrypted_missing_key ?? 0);
     } catch {
       // ignore
     }
@@ -516,6 +533,23 @@ export default async function AnalyticsWidgets({ ownerId }: { ownerId?: string; 
                   <li className="text-xs text-white/60">No security events in the last 24 hours.</li>
                 )}
               </ol>
+            </div>
+
+            <div className="glass-card-strong rounded-2xl p-4">
+              <div className="text-xs text-white/60">Encryption health</div>
+              <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
+                <div>
+                  <div className="text-xl font-semibold text-white">{fmtInt(unencryptedDocs)}</div>
+                  <div className="text-xs text-white/60">Unencrypted docs</div>
+                </div>
+                <div>
+                  <div className="text-xl font-semibold text-white">{fmtInt(encryptedMissingKeyVersion)}</div>
+                  <div className="text-xs text-white/60">Missing key version</div>
+                </div>
+              </div>
+              <div className={`mt-3 text-xs ${unencryptedDocs === 0 ? "text-emerald-300" : "text-amber-300"}`}>
+                Invariant: unencrypted docs must be 0.
+              </div>
             </div>
           </>
         ) : null}

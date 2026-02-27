@@ -121,10 +121,17 @@ export async function POST(req: Request) {
     }
     const contentType = (parsed.data.contentType ?? "application/pdf").toLowerCase();
     const sizeBytes = parsed.data.sizeBytes ?? null;
+    const absMax = Number(process.env.UPLOAD_ABSOLUTE_MAX_BYTES || 26_214_400); // 25 MB default
 
     // Hard enforcement needs an explicit sizeBytes to prevent bypassing storage/file-size caps.
     if (enforcePlanLimitsEnabled() && (sizeBytes == null || !Number.isFinite(sizeBytes) || sizeBytes <= 0)) {
       return NextResponse.json({ ok: false, error: "MISSING_SIZE", message: "sizeBytes is required." }, { status: 400 });
+    }
+    if (sizeBytes != null && Number.isFinite(absMax) && absMax > 0 && sizeBytes > absMax) {
+      return NextResponse.json(
+        { ok: false, error: "FILE_TOO_LARGE", message: `File exceeds absolute limit (${absMax} bytes).` },
+        { status: 413 }
+      );
     }
 
     if (contentType !== "application/pdf" && contentType !== "application/x-pdf") {
