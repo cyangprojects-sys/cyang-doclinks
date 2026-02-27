@@ -1,7 +1,7 @@
 // src/app/d/[alias]/ShareForm.tsx
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { createAndEmailShareToken, getShareStatsByToken } from "./actions";
 
 function fmtIso(iso: string | null) {
@@ -34,13 +34,6 @@ export default function ShareForm({ docId, alias }: { docId: string; alias?: str
   const [err, setErr] = useState<string | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [stats, setStats] = useState<any>(null);
-
-  const shareUrl = useMemo(() => {
-    if (!token) return null;
-    const origin =
-      typeof window !== "undefined" ? window.location.origin : "";
-    return `${origin}/s/${token}`;
-  }, [token]);
 
   async function onCreate() {
     setErr(null);
@@ -84,15 +77,6 @@ export default function ShareForm({ docId, alias }: { docId: string; alias?: str
       setErr(e?.message || "Unexpected error.");
     } finally {
       setBusy(false);
-    }
-  }
-
-  async function copyShareUrl() {
-    if (!shareUrl) return;
-    try {
-      await navigator.clipboard.writeText(shareUrl);
-    } catch {
-      // ignore
     }
   }
 
@@ -199,28 +183,6 @@ export default function ShareForm({ docId, alias }: { docId: string; alias?: str
         {err ? (
           <div className="rounded-lg border border-red-900/40 bg-red-950/30 p-3 text-sm text-red-200">
             {err}
-          </div>
-        ) : null}
-
-        {shareUrl ? (
-          <div className="rounded-lg border border-neutral-800 bg-neutral-950 p-3">
-            <div className="mb-1 text-xs font-medium uppercase tracking-wide text-neutral-500">
-              Share URL
-            </div>
-            <div className="flex gap-2">
-              <input
-                readOnly
-                value={shareUrl}
-                className="w-full rounded-md border border-neutral-800 bg-neutral-900 px-2 py-1 font-mono text-xs text-neutral-100 focus:outline-none"
-              />
-              <button
-                type="button"
-                onClick={copyShareUrl}
-                className="rounded-md border border-neutral-700 bg-neutral-900 px-2 py-1 text-xs text-neutral-200 hover:bg-neutral-800"
-              >
-                Copy
-              </button>
-            </div>
           </div>
         ) : null}
 

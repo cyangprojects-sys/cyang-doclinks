@@ -300,7 +300,6 @@ export default async function SharePage({
 
 function DocumentViewer({ alias, availabilityHint }: { alias: string; availabilityHint?: string | null }) {
   const viewerUrl = `/d/${encodeURIComponent(alias)}/raw`;
-  const downloadUrl = `/d/${encodeURIComponent(alias)}/raw?disposition=attachment`;
 
   return (
     <div className="mt-4">
@@ -319,27 +318,9 @@ function DocumentViewer({ alias, availabilityHint }: { alias: string; availabili
       </div>
 
       <div className="mt-3 text-xs text-neutral-400">
-        If the viewer doesn’t load,{" "}
-        <a
-          href={viewerUrl}
-          target="_blank"
-          rel="noreferrer"
-          className="text-neutral-200 underline"
-        >
-          open the document in a new tab
-        </a>
-        .{" "}
-        <a
-          href={downloadUrl}
-          className="ml-2 text-neutral-200 underline"
-        >
-          Download
-        </a>
-        .{" "}
-        <a href={`/report?alias=${encodeURIComponent(alias)}`} className="ml-2 text-neutral-200 underline">
+        <a href={`/report?alias=${encodeURIComponent(alias)}`} className="text-neutral-200 underline">
           Report abuse
         </a>
-        .
       </div>
     </div>
   );

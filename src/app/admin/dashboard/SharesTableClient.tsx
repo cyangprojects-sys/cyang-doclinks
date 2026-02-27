@@ -267,11 +267,7 @@ export default function SharesTableClient(props: { shares: ShareRow[] }) {
                       </td>
                       <td className="px-4 py-3">
                         <div className="font-mono text-xs text-white/90">{tokenShort}</div>
-                        <div className="mt-1 text-xs text-white/60">
-                          <Link href={`/s/${s.token}`} target="_blank" className="text-cyan-200 hover:underline">Open</Link>
-                          <span className="text-white/40"> · </span>
-                          <Link href={`/s/${s.token}/raw`} target="_blank" className="text-cyan-200 hover:underline">Raw</Link>
-                        </div>
+                        <div className="mt-1 text-xs text-white/50">Hidden share path</div>
                       </td>
                       <td className="px-4 py-3">
                         <div className="text-white">{s.doc_title || "Untitled"}</div>
@@ -294,17 +290,6 @@ export default function SharesTableClient(props: { shares: ShareRow[] }) {
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-right">
                         <div className="flex flex-wrap items-center justify-end gap-2">
-                          <button
-                            type="button"
-                            onClick={async () => {
-                              const link = `${window.location.origin}/s/${encodeURIComponent(s.token)}`;
-                              await navigator.clipboard.writeText(link);
-                            }}
-                            className="btn-base btn-secondary rounded-lg px-2.5 py-1.5 text-xs"
-                          >
-                            Copy
-                          </button>
-
                           <form action={extendShareExpirationAction}>
                             <input type="hidden" name="token" value={s.token} />
                             <input type="hidden" name="days" value="7" />
@@ -390,4 +375,3 @@ export default function SharesTableClient(props: { shares: ShareRow[] }) {
     </div>
   );
 }
-

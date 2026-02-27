@@ -74,7 +74,7 @@ export default function DoclinksPage() {
               <Step
                 n="1"
                 title="Resolve link"
-                desc="Map /d/<alias> or /s/<token> to a document record."
+                desc="Map a short alias or token to a document record."
               />
               <Step
                 n="2"

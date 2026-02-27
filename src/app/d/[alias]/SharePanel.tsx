@@ -43,13 +43,6 @@ export default function SharePanel({
         [shares, selectedToken]
     );
 
-    const shareUrl = useMemo(() => {
-        if (!selectedToken) return null;
-        const origin =
-            typeof window !== "undefined" ? window.location.origin : "https://www.cyang.io";
-        return `${origin}/d/${alias}?t=${selectedToken}`;
-    }, [alias, selectedToken]);
-
     function upsertRow(row: ShareRow) {
         setShares((prev) => {
             const exists = prev.some((r) => r.token === row.token);
@@ -242,29 +235,9 @@ export default function SharePanel({
                                             </div>
                                         </div>
 
-                                        {isSelected && shareUrl ? (
-                                            <div className="mt-2 rounded-md bg-neutral-50 p-2">
-                                                <div className="mb-1 text-xs text-neutral-600">Share URL</div>
-                                                <div className="flex items-center gap-2">
-                                                    <input
-                                                        readOnly
-                                                        value={shareUrl}
-                                                        className="w-full rounded-md border border-neutral-200 bg-white px-2 py-1 font-mono text-xs"
-                                                    />
-                                                    <button
-                                                        type="button"
-                                                        className="rounded-md bg-black px-2 py-1 text-xs text-white"
-                                                        onClick={async () => {
-                                                            try {
-                                                                await navigator.clipboard.writeText(shareUrl);
-                                                            } catch {
-                                                                // ignore
-                                                            }
-                                                        }}
-                                                    >
-                                                        Copy
-                                                    </button>
-                                                </div>
+                                        {isSelected ? (
+                                            <div className="mt-2 rounded-md bg-neutral-50 p-2 text-xs text-neutral-600">
+                                                Share link generated.
                                             </div>
                                         ) : null}
                                     </li>
