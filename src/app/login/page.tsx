@@ -13,7 +13,7 @@ export default function LoginPage() {
                     <h1 className="mt-2 text-2xl font-semibold">Sign in</h1>
                     <p className="mt-2 text-sm text-white/70">
                         This admin area is restricted to the site owner.
-                        <span className="ml-1 text-white/40">(Enterprise SSO appears only if configured.)</span>
+                        <span className="ml-1 text-white/60">(Enterprise SSO appears only if configured.)</span>
                     </p>
 
                     <button
