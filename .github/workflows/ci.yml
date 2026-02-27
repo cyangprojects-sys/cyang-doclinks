@@ -33,6 +33,9 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Admin Route Guard Audit
+        run: npm run audit:admin-routes
+
       - name: Build
         run: npm run build
 

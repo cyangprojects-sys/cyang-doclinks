@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "audit:admin-routes": "node scripts/audit-admin-route-guards.mjs",
     "test:a11y": "playwright test tests/a11y.spec.ts",
     "test:a11y:ci": "start-server-and-test \"npm run start\" http://127.0.0.1:3000 \"npm run test:a11y\"",
     "test:attack": "playwright test tests/attack-sim.spec.ts",
