@@ -172,5 +172,92 @@ test.describe("billing webhook integration", () => {
 
     await sql`delete from public.billing_webhook_events where event_id = ${eventId}`;
   });
-});
 
+  test("ignores stale out-of-order payment_failed after newer payment_succeeded", async ({ request }) => {
+    const webhookSecret = String(process.env.STRIPE_WEBHOOK_SECRET || "").trim();
+    const databaseUrl = String(process.env.DATABASE_URL || "").trim();
+    test.skip(!webhookSecret, "STRIPE_WEBHOOK_SECRET not available");
+    test.skip(!databaseUrl, "DATABASE_URL not available");
+
+    const sql = neon(databaseUrl);
+    const ready = await canUseBillingTables(sql);
+    test.skip(!ready, "billing_subscriptions table not available");
+
+    const subId = `sub_test_ooo_${randSuffix()}`;
+    const customerId = `cus_test_ooo_${randSuffix()}`;
+    const successEventId = `evt_billing_ooo_success_${randSuffix()}`;
+    const failedEventId = `evt_billing_ooo_failed_${randSuffix()}`;
+
+    await sql`
+      insert into public.billing_subscriptions
+        (user_id, stripe_customer_id, stripe_subscription_id, status, plan_id, current_period_end, cancel_at_period_end, grace_until, updated_at)
+      values
+        (null, ${customerId}, ${subId}, 'past_due', 'pro', now() + interval '30 days', false, now() + interval '7 days', now())
+      on conflict (stripe_subscription_id)
+      do update set
+        stripe_customer_id = excluded.stripe_customer_id,
+        status = excluded.status,
+        plan_id = excluded.plan_id,
+        current_period_end = excluded.current_period_end,
+        cancel_at_period_end = excluded.cancel_at_period_end,
+        grace_until = excluded.grace_until,
+        updated_at = now()
+    `;
+
+    const nowUnix = Math.floor(Date.now() / 1000);
+    const successPayload = {
+      id: successEventId,
+      type: "invoice.payment_succeeded",
+      created: nowUnix,
+      data: {
+        object: {
+          customer: customerId,
+          subscription: subId,
+        },
+      },
+    };
+    const failedPayload = {
+      id: failedEventId,
+      type: "invoice.payment_failed",
+      created: nowUnix - 600,
+      data: {
+        object: {
+          customer: customerId,
+          subscription: subId,
+        },
+      },
+    };
+
+    const successResp = await request.post("/api/stripe/webhook", {
+      data: successPayload,
+      headers: {
+        "stripe-signature": stripeSignature(successPayload, webhookSecret),
+      },
+    });
+    expect(successResp.status()).toBe(200);
+
+    const failedResp = await request.post("/api/stripe/webhook", {
+      data: failedPayload,
+      headers: {
+        "stripe-signature": stripeSignature(failedPayload, webhookSecret),
+      },
+    });
+    expect(failedResp.status()).toBe(200);
+
+    const rows = (await sql`
+      select status::text as status
+      from public.billing_subscriptions
+      where stripe_subscription_id = ${subId}
+      limit 1
+    `) as unknown as Array<{ status: string }>;
+
+    expect(rows.length).toBe(1);
+    expect(rows[0].status).toBe("active");
+
+    await sql`delete from public.billing_subscriptions where stripe_subscription_id = ${subId}`;
+    await sql`
+      delete from public.billing_webhook_events
+      where event_id in (${successEventId}, ${failedEventId})
+    `;
+  });
+});

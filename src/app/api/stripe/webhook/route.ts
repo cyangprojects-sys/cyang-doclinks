@@ -84,6 +84,9 @@ export async function POST(req: NextRequest) {
         const event = verified.payload;
         const obj = event?.data?.object ?? {};
         const eventType = String(event?.type || "");
+        const eventCreatedUnix = Number.isFinite(Number(event?.created))
+          ? Math.max(0, Math.floor(Number(event.created)))
+          : null;
 
         let webhookStatus: "processed" | "ignored" | "failed" = "processed";
         let webhookMessage: string | null = null;
@@ -113,6 +116,7 @@ export async function POST(req: NextRequest) {
               currentPeriodEnd,
               cancelAtPeriodEnd,
               graceUntil: null,
+              eventCreatedUnix,
             });
 
             if (userId) {
@@ -126,6 +130,7 @@ export async function POST(req: NextRequest) {
               stripeSubscriptionId,
               stripeCustomerId,
               graceDays: getGraceDays(),
+              eventCreatedUnix,
             });
             if (userId) await syncUserPlanFromSubscription(userId);
           } else if (eventType === "invoice.payment_succeeded") {
@@ -135,6 +140,7 @@ export async function POST(req: NextRequest) {
             await markPaymentSucceeded({
               stripeSubscriptionId,
               stripeCustomerId,
+              eventCreatedUnix,
             });
             if (userId) await syncUserPlanFromSubscription(userId);
           } else {

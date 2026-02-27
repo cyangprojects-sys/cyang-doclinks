@@ -9,6 +9,7 @@ type StripeSubUpsertArgs = {
   currentPeriodEnd: string | null;
   cancelAtPeriodEnd: boolean;
   graceUntil: string | null;
+  eventCreatedUnix: number | null;
 };
 
 let billingTableExistsCache: boolean | null = null;
@@ -54,39 +55,83 @@ export async function upsertStripeSubscription(args: StripeSubUpsertArgs): Promi
   if (!(await billingTableExists())) return;
   if (!args.userId && !args.stripeCustomerId) return;
 
-  await sql`
-    insert into public.billing_subscriptions (
-      user_id,
-      stripe_customer_id,
-      stripe_subscription_id,
-      status,
-      plan_id,
-      current_period_end,
-      cancel_at_period_end,
-      grace_until,
-      updated_at
-    ) values (
-      ${args.userId}::uuid,
-      ${args.stripeCustomerId},
-      ${args.stripeSubscriptionId},
-      ${args.status},
-      ${args.planId},
-      ${args.currentPeriodEnd ? args.currentPeriodEnd : null}::timestamptz,
-      ${args.cancelAtPeriodEnd},
-      ${args.graceUntil ? args.graceUntil : null}::timestamptz,
-      now()
-    )
-    on conflict (stripe_subscription_id)
-    do update set
-      user_id = excluded.user_id,
-      stripe_customer_id = excluded.stripe_customer_id,
-      status = excluded.status,
-      plan_id = excluded.plan_id,
-      current_period_end = excluded.current_period_end,
-      cancel_at_period_end = excluded.cancel_at_period_end,
-      grace_until = excluded.grace_until,
-      updated_at = now()
-  `;
+  const eventCreated = Number.isFinite(args.eventCreatedUnix as number)
+    ? Math.max(0, Math.floor(Number(args.eventCreatedUnix)))
+    : 0;
+  try {
+    await sql`
+      insert into public.billing_subscriptions (
+        user_id,
+        stripe_customer_id,
+        stripe_subscription_id,
+        status,
+        plan_id,
+        current_period_end,
+        cancel_at_period_end,
+        grace_until,
+        last_event_created,
+        updated_at
+      ) values (
+        ${args.userId}::uuid,
+        ${args.stripeCustomerId},
+        ${args.stripeSubscriptionId},
+        ${args.status},
+        ${args.planId},
+        ${args.currentPeriodEnd ? args.currentPeriodEnd : null}::timestamptz,
+        ${args.cancelAtPeriodEnd},
+        ${args.graceUntil ? args.graceUntil : null}::timestamptz,
+        ${eventCreated}::bigint,
+        now()
+      )
+      on conflict (stripe_subscription_id)
+      do update set
+        user_id = excluded.user_id,
+        stripe_customer_id = excluded.stripe_customer_id,
+        status = excluded.status,
+        plan_id = excluded.plan_id,
+        current_period_end = excluded.current_period_end,
+        cancel_at_period_end = excluded.cancel_at_period_end,
+        grace_until = excluded.grace_until,
+        last_event_created = excluded.last_event_created,
+        updated_at = now()
+      where coalesce(public.billing_subscriptions.last_event_created, 0) <= excluded.last_event_created
+    `;
+  } catch {
+    // Backward compatibility for schemas without last_event_created.
+    await sql`
+      insert into public.billing_subscriptions (
+        user_id,
+        stripe_customer_id,
+        stripe_subscription_id,
+        status,
+        plan_id,
+        current_period_end,
+        cancel_at_period_end,
+        grace_until,
+        updated_at
+      ) values (
+        ${args.userId}::uuid,
+        ${args.stripeCustomerId},
+        ${args.stripeSubscriptionId},
+        ${args.status},
+        ${args.planId},
+        ${args.currentPeriodEnd ? args.currentPeriodEnd : null}::timestamptz,
+        ${args.cancelAtPeriodEnd},
+        ${args.graceUntil ? args.graceUntil : null}::timestamptz,
+        now()
+      )
+      on conflict (stripe_subscription_id)
+      do update set
+        user_id = excluded.user_id,
+        stripe_customer_id = excluded.stripe_customer_id,
+        status = excluded.status,
+        plan_id = excluded.plan_id,
+        current_period_end = excluded.current_period_end,
+        cancel_at_period_end = excluded.cancel_at_period_end,
+        grace_until = excluded.grace_until,
+        updated_at = now()
+    `;
+  }
 
   if (args.userId && args.stripeCustomerId) {
     try {
@@ -105,6 +150,7 @@ export async function markPaymentFailure(args: {
   stripeSubscriptionId: string | null;
   stripeCustomerId: string | null;
   graceDays: number;
+  eventCreatedUnix: number | null;
 }): Promise<void> {
   if (!(await billingTableExists())) return;
 
@@ -112,21 +158,41 @@ export async function markPaymentFailure(args: {
   const customerId = String(args.stripeCustomerId || "").trim();
   if (!subId && !customerId) return;
 
-  await sql`
-    update public.billing_subscriptions
-    set
-      status = 'past_due',
-      grace_until = now() + (${Math.max(0, Math.floor(args.graceDays))}::int * interval '1 day'),
-      updated_at = now()
-    where
-      (${subId} <> '' and stripe_subscription_id = ${subId})
-      or (${customerId} <> '' and stripe_customer_id = ${customerId})
-  `;
+  const eventCreated = Number.isFinite(args.eventCreatedUnix as number)
+    ? Math.max(0, Math.floor(Number(args.eventCreatedUnix)))
+    : 0;
+  try {
+    await sql`
+      update public.billing_subscriptions
+      set
+        status = 'past_due',
+        grace_until = now() + (${Math.max(0, Math.floor(args.graceDays))}::int * interval '1 day'),
+        last_event_created = ${eventCreated}::bigint,
+        updated_at = now()
+      where (
+        (${subId} <> '' and stripe_subscription_id = ${subId})
+        or (${customerId} <> '' and stripe_customer_id = ${customerId})
+      )
+      and coalesce(last_event_created, 0) <= ${eventCreated}::bigint
+    `;
+  } catch {
+    await sql`
+      update public.billing_subscriptions
+      set
+        status = 'past_due',
+        grace_until = now() + (${Math.max(0, Math.floor(args.graceDays))}::int * interval '1 day'),
+        updated_at = now()
+      where
+        (${subId} <> '' and stripe_subscription_id = ${subId})
+        or (${customerId} <> '' and stripe_customer_id = ${customerId})
+    `;
+  }
 }
 
 export async function markPaymentSucceeded(args: {
   stripeSubscriptionId: string | null;
   stripeCustomerId: string | null;
+  eventCreatedUnix: number | null;
 }): Promise<void> {
   if (!(await billingTableExists())) return;
 
@@ -134,16 +200,35 @@ export async function markPaymentSucceeded(args: {
   const customerId = String(args.stripeCustomerId || "").trim();
   if (!subId && !customerId) return;
 
-  await sql`
-    update public.billing_subscriptions
-    set
-      status = 'active',
-      grace_until = null,
-      updated_at = now()
-    where
-      (${subId} <> '' and stripe_subscription_id = ${subId})
-      or (${customerId} <> '' and stripe_customer_id = ${customerId})
-  `;
+  const eventCreated = Number.isFinite(args.eventCreatedUnix as number)
+    ? Math.max(0, Math.floor(Number(args.eventCreatedUnix)))
+    : 0;
+  try {
+    await sql`
+      update public.billing_subscriptions
+      set
+        status = 'active',
+        grace_until = null,
+        last_event_created = ${eventCreated}::bigint,
+        updated_at = now()
+      where (
+        (${subId} <> '' and stripe_subscription_id = ${subId})
+        or (${customerId} <> '' and stripe_customer_id = ${customerId})
+      )
+      and coalesce(last_event_created, 0) <= ${eventCreated}::bigint
+    `;
+  } catch {
+    await sql`
+      update public.billing_subscriptions
+      set
+        status = 'active',
+        grace_until = null,
+        updated_at = now()
+      where
+        (${subId} <> '' and stripe_subscription_id = ${subId})
+        or (${customerId} <> '' and stripe_customer_id = ${customerId})
+    `;
+  }
 }
 
 export async function syncUserPlanFromSubscription(userId: string | null): Promise<"free" | "pro" | null> {
