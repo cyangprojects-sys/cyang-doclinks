@@ -14,7 +14,7 @@ import { appendImmutableAudit } from "@/lib/immutableAudit";
 import { getR2Bucket } from "@/lib/r2";
 import { isSecurityTestNoDbMode, isShareServingDisabled } from "@/lib/securityPolicy";
 import { getRouteTimeoutMs, isRouteTimeoutError, withRouteTimeout } from "@/lib/routeTimeout";
-import { logDbErrorEvent, logSecurityEvent } from "@/lib/securityTelemetry";
+import { detectTokenAccessDeniedSpike, logDbErrorEvent, logSecurityEvent } from "@/lib/securityTelemetry";
 import { assertRuntimeEnv, isRuntimeEnvError } from "@/lib/runtimeEnv";
 
 export const runtime = "nodejs";
@@ -135,9 +135,21 @@ export async function GET(
 
   const r2Bucket = getR2Bucket();
   const { token } = await params;
+  const deny = async (reason: string, status = 404, body?: string) => {
+    await logSecurityEvent({
+      type: "share_access_denied",
+      severity: status === 429 ? "medium" : "low",
+      ip,
+      scope: "share_raw",
+      message: "Share raw access denied",
+      meta: { token, reason, status },
+    });
+    await detectTokenAccessDeniedSpike({ ip });
+    return new NextResponse(body ?? (status === 429 ? "Too Many Requests" : "Not found"), { status });
+  };
 
   if (isBlockedTopLevelOpen(req)) {
-    return new NextResponse("Direct open is disabled for this shared document.", { status: 403 });
+    return await deny("top_level_blocked", 403, "Direct open is disabled for this shared document.");
   }
 
   // --- Rate limiting (best-effort) ---
@@ -152,6 +164,15 @@ export async function GET(
     windowSeconds: 60,
   });
   if (!ipRl.ok) {
+    await logSecurityEvent({
+      type: "share_access_denied",
+      severity: "medium",
+      ip,
+      scope: "share_raw",
+      message: "Share raw rate-limited",
+      meta: { token, reason: "ip_rate_limit", status: 429 },
+    });
+    await detectTokenAccessDeniedSpike({ ip });
     return new NextResponse("Too Many Requests", {
       status: 429,
       headers: {
@@ -168,6 +189,15 @@ export async function GET(
     windowSeconds: 60,
   });
   if (!tokenRl.ok) {
+    await logSecurityEvent({
+      type: "share_access_denied",
+      severity: "medium",
+      ip,
+      scope: "share_raw",
+      message: "Share raw rate-limited",
+      meta: { token, reason: "token_rate_limit", status: 429 },
+    });
+    await detectTokenAccessDeniedSpike({ ip });
     return new NextResponse("Too Many Requests", {
       status: 429,
       headers: {
@@ -221,13 +251,13 @@ export async function GET(
   }
 
   const share = rows[0];
-  if (!share) return new NextResponse("Not found", { status: 404 });
-  if (!share.share_active) return new NextResponse("Unavailable", { status: 404 });
+  if (!share) return await deny("not_found");
+  if (!share.share_active) return await deny("inactive", 404, "Unavailable");
   const moderation = (share.moderation_status || "active").toLowerCase();
   if (moderation !== "active") {
-    if (moderation !== "quarantined") return new NextResponse("Unavailable", { status: 404 });
+    if (moderation !== "quarantined") return await deny(`moderation_${moderation}`, 404, "Unavailable");
     const override = await hasActiveQuarantineOverride(share.doc_id);
-    if (!override) return new NextResponse("Unavailable", { status: 404 });
+    if (!override) return await deny("quarantined", 404, "Unavailable");
   }
   const blockedScanStates = new Set([
     "unscanned",
@@ -239,28 +269,28 @@ export async function GET(
     "quarantined",
   ]);
   if (blockedScanStates.has((share.scan_status || "unscanned").toLowerCase())) {
-    return new NextResponse("Unavailable", { status: 404 });
+    return await deny(`scan_${String(share.scan_status || "unscanned").toLowerCase()}`, 404, "Unavailable");
   }
 
   const risk = (share.risk_level || "low").toLowerCase();
   const riskyInline = risk === "high" || (share.scan_status || "").toLowerCase() === "risky";
   if (riskyInline) {
     // Inline viewing is disabled for high-risk docs; download route can still serve as attachment.
-    return new NextResponse("Inline viewing disabled", { status: 403 });
+    return await deny("risky_inline_blocked", 403, "Inline viewing disabled");
   }
 
 
   // Geo-based restriction (best-effort)
   const country = getCountryFromHeaders(req.headers);
   const geo = await geoDecisionForRequest({ country, docId: share.doc_id, token });
-  if (!geo.allowed) return new NextResponse("Forbidden", { status: 403 });
+  if (!geo.allowed) return await deny("geo_blocked", 403, "Forbidden");
 
-  if (share.revoked_at) return new NextResponse("Revoked", { status: 410 });
-  if (isExpired(share.expires_at)) return new NextResponse("Link expired", { status: 410 });
+  if (share.revoked_at) return await deny("revoked", 410, "Revoked");
+  if (isExpired(share.expires_at)) return await deny("expired", 410, "Link expired");
 
   const viewCount = share.views_count ?? 0;
   if (isMaxed(viewCount, share.max_views)) {
-    return new NextResponse("Max views reached", { status: 410 });
+    return await deny("maxed", 410, "Max views reached");
   }
 
   // If share is password protected, require an active unlock record (set by /s/[token] gate)
@@ -271,7 +301,7 @@ export async function GET(
         const url = new URL(`/s/${token}`, req.url);
         return NextResponse.redirect(url);
       }
-      return new NextResponse("Unauthorized", { status: 401 });
+      return await deny("password_required", 401, "Unauthorized");
     }
   }
 
@@ -294,7 +324,7 @@ export async function GET(
       if (ownerIdForLimit) {
         const allowed = await assertCanServeView(ownerIdForLimit);
         if (!allowed.ok) {
-          return new NextResponse("Temporarily unavailable", { status: 429 });
+          return await deny("owner_view_limit_reached", 429, "Temporarily unavailable");
         }
       }
     } catch {
@@ -308,13 +338,13 @@ export async function GET(
     if (!consumed.ok) {
       switch (consumed.error) {
         case "REVOKED":
-          return new NextResponse("Revoked", { status: 410 });
+          return await deny("revoked_after_consume", 410, "Revoked");
         case "EXPIRED":
-          return new NextResponse("Link expired", { status: 410 });
+          return await deny("expired_after_consume", 410, "Link expired");
         case "MAXED":
-          return new NextResponse("Max views reached", { status: 410 });
+          return await deny("maxed_after_consume", 410, "Max views reached");
         default:
-          return new NextResponse("Not found", { status: 404 });
+          return await deny("not_found_after_consume");
       }
     }
 

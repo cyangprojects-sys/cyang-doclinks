@@ -10,7 +10,7 @@ import { rateLimit, rateLimitHeaders, stableHash } from "@/lib/rateLimit";
 import { mintAccessTicket } from "@/lib/accessTicket";
 import { assertCanServeView, incrementMonthlyViews } from "@/lib/monetization";
 import { enforcePlanLimitsEnabled } from "@/lib/billingFlags";
-import { clientIpKey, logDbErrorEvent, logSecurityEvent } from "@/lib/securityTelemetry";
+import { clientIpKey, detectAliasAccessDeniedSpike, logDbErrorEvent, logSecurityEvent } from "@/lib/securityTelemetry";
 import crypto from "crypto";
 import { isAliasServingDisabled, isSecurityTestNoDbMode } from "@/lib/securityPolicy";
 import { getRouteTimeoutMs, isRouteTimeoutError, withRouteTimeout } from "@/lib/routeTimeout";
@@ -146,14 +146,27 @@ export async function GET(
 
     const { alias: rawAlias } = await ctx.params;
     const alias = normAlias(rawAlias || "");
+    const ip = clientIpKey(req).ip;
+    const deny = async (reason: string, status = 404) => {
+      await logSecurityEvent({
+        type: "alias_access_denied",
+        severity: status === 429 ? "medium" : "low",
+        ip,
+        scope: "alias_raw",
+        message: "Alias raw access denied",
+        meta: { alias, reason, status },
+      });
+      await detectAliasAccessDeniedSpike({ ip });
+      return new Response(status === 429 ? "Too Many Requests" : "Not found", { status });
+    };
 
     if (!alias) return new Response("Missing alias", { status: 400 });
 
     // Resolve alias row ourselves so we can enforce the device-trust cookie.
     const row = await getAliasRow(alias);
-    if (!row.ok) return new Response("Not found", { status: 404 });
-    if (row.revokedAt) return new Response("Not found", { status: 404 });
-    if (isExpired(row.expiresAt)) return new Response("Not found", { status: 404 });
+    if (!row.ok) return await deny("not_found");
+    if (row.revokedAt) return await deny("revoked");
+    if (isExpired(row.expiresAt)) return await deny("expired");
 
     if (row.passwordHash) {
       const v = req.cookies.get(aliasTrustCookieName(alias))?.value;
@@ -168,8 +181,8 @@ export async function GET(
 
     // --- Rate limiting (best-effort) ---
     const xff = req.headers.get("x-forwarded-for") || "";
-    const ip = xff.split(",")[0]?.trim() || "";
-    const ipKey = stableHash(ip, "VIEW_SALT");
+    const ipFromXff = xff.split(",")[0]?.trim() || "";
+    const ipKey = stableHash(ipFromXff, "VIEW_SALT");
     const ipRl = await rateLimit({
       scope: "ip:alias_raw",
       id: ipKey,
@@ -178,6 +191,15 @@ export async function GET(
       failClosed: true,
     });
     if (!ipRl.ok) {
+      await logSecurityEvent({
+        type: "alias_access_denied",
+        severity: "medium",
+        ip,
+        scope: "alias_raw",
+        message: "Alias raw rate-limited",
+        meta: { alias, reason: "rate_limit", status: 429 },
+      });
+      await detectAliasAccessDeniedSpike({ ip });
       return new Response("Too Many Requests", {
         status: 429,
         headers: {
@@ -188,7 +210,7 @@ export async function GET(
     }
 
     const resolved = await resolveDoc({ alias });
-    if (!resolved.ok) return new Response("Not found", { status: 404 });
+    if (!resolved.ok) return await deny(`resolve_${resolved.error}`);
 
     if (!resolved.bucket || !resolved.r2Key) {
       return new Response("Not found", { status: 404 });

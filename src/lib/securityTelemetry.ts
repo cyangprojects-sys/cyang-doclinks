@@ -384,6 +384,60 @@ export async function detectDbErrorSpike() {
   });
 }
 
+export async function detectAliasAccessDeniedSpike(args: { ip?: string | null }) {
+  const threshold = Math.max(1, Number(process.env.ALIAS_DENIED_SPIKE_THRESHOLD || 60));
+  const windowMinutes = Math.max(1, Number(process.env.ALIAS_DENIED_SPIKE_WINDOW_MINUTES || 10));
+  await detectEventSpike({
+    eventType: "alias_access_denied",
+    threshold,
+    windowMinutes,
+    alertType: "alias_guess_spike",
+    severity: "high",
+    ip: args.ip ?? null,
+    scope: "alias_raw",
+    message: "Alias access denials spiked",
+  });
+}
+
+export async function detectTokenAccessDeniedSpike(args: { ip?: string | null }) {
+  const threshold = Math.max(1, Number(process.env.TOKEN_DENIED_SPIKE_THRESHOLD || 80));
+  const windowMinutes = Math.max(1, Number(process.env.TOKEN_DENIED_SPIKE_WINDOW_MINUTES || 10));
+  await detectEventSpike({
+    eventType: "share_access_denied",
+    threshold,
+    windowMinutes,
+    alertType: "token_guess_spike",
+    severity: "high",
+    ip: args.ip ?? null,
+    scope: "share_raw",
+    message: "Share token access denials spiked",
+  });
+}
+
+export async function detectViewSpike() {
+  const threshold = Math.max(1, Number(process.env.VIEW_SPIKE_THRESHOLD || 2000));
+  const windowMinutes = Math.max(1, Number(process.env.VIEW_SPIKE_WINDOW_MINUTES || 10));
+  try {
+    const rows = (await sql`
+      select count(*)::int as c
+      from public.doc_views
+      where created_at > now() - (${windowMinutes}::text || ' minutes')::interval
+    `) as unknown as Array<{ c: number }>;
+    const count = Number(rows?.[0]?.c ?? 0);
+    if (count < threshold) return;
+
+    await logSecurityEvent({
+      type: "view_spike_alert",
+      severity: "high",
+      scope: "doc_views",
+      message: "Document view volume spiked",
+      meta: { count, threshold, windowMinutes },
+    });
+  } catch {
+    // ignore
+  }
+}
+
 function looksLikeDbErrorMessage(message: string): boolean {
   const msg = String(message || "").toLowerCase();
   if (!msg) return false;

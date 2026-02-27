@@ -11,7 +11,15 @@ import { runBackupRecoveryCheck } from "@/lib/backupRecovery";
 import { processKeyRotationJobs } from "@/lib/keyRotationJobs";
 import { revokeExpiredSharesBatch } from "@/lib/shareLifecycle";
 import { runUsageMaintenance } from "@/lib/usageMaintenance";
-import { detectDbErrorSpike, detectScanFailureSpike, detectUploadCompletionSpike, logSecurityEvent } from "@/lib/securityTelemetry";
+import {
+  detectAliasAccessDeniedSpike,
+  detectDbErrorSpike,
+  detectScanFailureSpike,
+  detectTokenAccessDeniedSpike,
+  detectUploadCompletionSpike,
+  detectViewSpike,
+  logSecurityEvent,
+} from "@/lib/securityTelemetry";
 import { logCronRun } from "@/lib/cronTelemetry";
 import { runBillingMaintenance } from "@/lib/billingSubscription";
 
@@ -79,6 +87,9 @@ export async function GET(req: NextRequest) {
   await detectScanFailureSpike();
   await detectUploadCompletionSpike();
   await detectDbErrorSpike();
+  await detectAliasAccessDeniedSpike({});
+  await detectTokenAccessDeniedSpike({});
+  await detectViewSpike();
 
   if (expiredSharesRevoked.revoked > 0) {
     await logSecurityEvent({
