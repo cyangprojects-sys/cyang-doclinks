@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import AdminShell from "./_components/AdminShell";
+import { getBillingFlags } from "@/lib/settings";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,9 +19,10 @@ export default async function AdminLayout({
 
   const role = (session.user as any)?.role as string | undefined;
   const isOwner = role === "owner";
+  const billingFlags = await getBillingFlags();
 
   return (
-    <AdminShell email={session.user.email} isOwner={isOwner}>
+    <AdminShell email={session.user.email} isOwner={isOwner} showPricingUi={billingFlags.flags.pricingUiEnabled}>
       {children}
     </AdminShell>
   );

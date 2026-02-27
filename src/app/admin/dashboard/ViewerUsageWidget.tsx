@@ -7,6 +7,7 @@ import {
   getMonthlyViewCount,
   getDailyUploadCount,
 } from "@/lib/monetization";
+import { getBillingFlags } from "@/lib/settings";
 
 export const runtime = "nodejs";
 
@@ -43,6 +44,7 @@ export default async function ViewerUsageWidget(props: { userId: string }) {
   const hasDaily = await tableExists("public.user_usage_daily");
 
   let planName = "Free";
+  let planId: string = "free";
   let maxActiveShares: number | null = 3;
   let maxStorageBytes: number | null = 524288000;
   let maxViewsPerMonth: number | null = 100;
@@ -51,6 +53,7 @@ export default async function ViewerUsageWidget(props: { userId: string }) {
   try {
     if (hasPlans && hasUsers) {
       const plan = await getPlanForUser(userId);
+      planId = String(plan.id || "free");
       planName = plan.name;
       maxActiveShares = plan.maxActiveShares;
       maxStorageBytes = plan.maxStorageBytes;
@@ -102,6 +105,8 @@ export default async function ViewerUsageWidget(props: { userId: string }) {
     maxViewsPerMonth == null || monthlyViews == null ? null : Math.max(0, maxViewsPerMonth - monthlyViews);
   const uploadsLeft =
     maxUploadsPerDay == null || dailyUploads == null ? null : Math.max(0, maxUploadsPerDay - dailyUploads);
+  const billingFlags = await getBillingFlags();
+  const showUpgrade = billingFlags.flags.pricingUiEnabled && planId !== "pro";
 
   return (
     <section className="glass-card-strong rounded-2xl p-4">
@@ -110,9 +115,16 @@ export default async function ViewerUsageWidget(props: { userId: string }) {
           <div className="text-sm font-medium text-white">Your usage</div>
           <div className="mt-0.5 text-xs text-white/60">Plan: {planName}</div>
         </div>
-        <a href="#shares" className="btn-base btn-secondary rounded-lg px-3 py-1.5 text-xs">
-          Manage shares
-        </a>
+        <div className="flex items-center gap-2">
+          {showUpgrade ? (
+            <a href="/admin/upgrade" className="btn-base rounded-lg border border-cyan-400/35 bg-cyan-400/20 px-3 py-1.5 text-xs text-cyan-50 hover:bg-cyan-400/30">
+              Upgrade
+            </a>
+          ) : null}
+          <a href="#shares" className="btn-base btn-secondary rounded-lg px-3 py-1.5 text-xs">
+            Manage shares
+          </a>
+        </div>
       </div>
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
@@ -169,4 +181,3 @@ function MetricCard(props: {
     </div>
   );
 }
-

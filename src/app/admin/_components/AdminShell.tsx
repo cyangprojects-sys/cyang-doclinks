@@ -8,6 +8,7 @@ import { useMemo, useState } from "react";
 type AdminShellProps = {
   email?: string | null;
   isOwner: boolean;
+  showPricingUi: boolean;
   children: React.ReactNode;
 };
 
@@ -15,12 +16,14 @@ type NavItem = {
   href: string;
   label: string;
   ownerOnly?: boolean;
+  pricingOnly?: boolean;
 };
 
 const NAV_ITEMS: NavItem[] = [
   { href: "/admin/dashboard", label: "Dashboard" },
   { href: "/admin/upload", label: "Uploads" },
   { href: "/admin/dashboard#shares", label: "Shares" },
+  { href: "/admin/upgrade", label: "Upgrade", pricingOnly: true },
   { href: "/admin/viewer-uploads", label: "Viewer Uploads", ownerOnly: true },
   { href: "/admin/audit", label: "Audit", ownerOnly: true },
   { href: "/admin/security", label: "Security", ownerOnly: true },
@@ -39,13 +42,18 @@ function isActive(pathname: string, href: string) {
   return pathname === route || pathname.startsWith(`${route}/`);
 }
 
-export default function AdminShell({ email, isOwner, children }: AdminShellProps) {
+export default function AdminShell({ email, isOwner, showPricingUi, children }: AdminShellProps) {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
 
   const visibleItems = useMemo(
-    () => NAV_ITEMS.filter((item) => !item.ownerOnly || isOwner),
-    [isOwner]
+    () =>
+      NAV_ITEMS.filter((item) => {
+        if (item.ownerOnly && !isOwner) return false;
+        if (item.pricingOnly && !showPricingUi) return false;
+        return true;
+      }),
+    [isOwner, showPricingUi]
   );
 
   const currentTitle = useMemo(() => {
