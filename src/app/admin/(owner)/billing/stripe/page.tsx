@@ -97,25 +97,34 @@ export default async function StripeBillingPage(props: {
   const error = Array.isArray(sp.error) ? sp.error[0] : sp.error;
 
   const u = await requirePermission("billing.manage");
-  const existingCustomerId = await readExistingCustomerId(u.id);
-  const customerId = await ensureStripeCustomer({
-    userId: u.id,
-    email: u.email,
-    existingCustomerId,
-  });
-  if (customerId !== existingCustomerId) {
-    await persistCustomerId(u.id, customerId);
+
+  let customerId: string | null = null;
+  let stripeConfigError: string | null = null;
+  try {
+    const existingCustomerId = await readExistingCustomerId(u.id);
+    customerId = await ensureStripeCustomer({
+      userId: u.id,
+      email: u.email,
+      existingCustomerId,
+    });
+    if (customerId !== existingCustomerId) {
+      await persistCustomerId(u.id, customerId);
+    }
+  } catch (e: any) {
+    stripeConfigError = String(e?.message || e || "Stripe configuration error");
   }
 
   let invoices: any[] = [];
   let invoicesError: string | null = null;
-  try {
-    const data = await stripeApi(`invoices?customer=${encodeURIComponent(customerId)}&limit=25`, {
-      method: "GET",
-    });
-    invoices = Array.isArray(data?.data) ? data.data : [];
-  } catch (e: any) {
-    invoicesError = String(e?.message || e || "Failed to load invoices");
+  if (customerId) {
+    try {
+      const data = await stripeApi(`invoices?customer=${encodeURIComponent(customerId)}&limit=25`, {
+        method: "GET",
+      });
+      invoices = Array.isArray(data?.data) ? data.data : [];
+    } catch (e: any) {
+      invoicesError = String(e?.message || e || "Failed to load invoices");
+    }
   }
 
   const snapshot = await getBillingSnapshotForUser(u.id);
@@ -144,6 +153,11 @@ export default async function StripeBillingPage(props: {
           {decodeURIComponent(String(error))}
         </div>
       ) : null}
+      {stripeConfigError ? (
+        <div className="mt-3 rounded-lg border border-red-900/60 bg-red-950/30 px-3 py-2 text-sm text-red-200">
+          Stripe is not configured for this environment: {stripeConfigError}
+        </div>
+      ) : null}
       <div className={`mt-3 rounded-lg border px-3 py-2 text-sm ${guidance.tone}`}>
         <div className="font-medium">{guidance.title}</div>
         <div className="mt-1 text-xs opacity-90">{guidance.body}</div>
@@ -153,20 +167,32 @@ export default async function StripeBillingPage(props: {
         <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-4">
           <div className="text-sm font-medium">Customer</div>
           <div className="mt-2 text-xs text-neutral-400">Stripe customer id</div>
-          <div className="mt-1 font-mono text-sm text-neutral-200">{customerId}</div>
+          <div className="mt-1 font-mono text-sm text-neutral-200">{customerId || "-"}</div>
           <div className="mt-3 flex gap-2">
             <form action="/api/admin/billing/checkout" method="post">
-              <button type="submit" className="rounded-md border border-sky-500/40 bg-sky-500/20 px-3 py-2 text-sm text-sky-100 hover:bg-sky-500/30">
+              <button
+                type="submit"
+                disabled={!customerId}
+                className="rounded-md border border-sky-500/40 bg-sky-500/20 px-3 py-2 text-sm text-sky-100 hover:bg-sky-500/30 disabled:cursor-not-allowed disabled:opacity-60"
+              >
                 Start Checkout
               </button>
             </form>
             <form action="/api/admin/billing/portal" method="post">
-              <button type="submit" className="rounded-md border border-white/15 bg-white/5 px-3 py-2 text-sm hover:bg-white/10">
+              <button
+                type="submit"
+                disabled={!customerId}
+                className="rounded-md border border-white/15 bg-white/5 px-3 py-2 text-sm hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+              >
                 Open Portal
               </button>
             </form>
             <form action="/api/admin/billing/sync" method="post">
-              <button type="submit" className="rounded-md border border-white/15 bg-white/5 px-3 py-2 text-sm hover:bg-white/10">
+              <button
+                type="submit"
+                disabled={!customerId}
+                className="rounded-md border border-white/15 bg-white/5 px-3 py-2 text-sm hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+              >
                 Run Sync Now
               </button>
             </form>
@@ -188,13 +214,13 @@ export default async function StripeBillingPage(props: {
                 Current period end:{" "}
                 {snapshot.subscription.currentPeriodEnd
                   ? new Date(snapshot.subscription.currentPeriodEnd).toLocaleString()
-                  : "—"}
+                  : "-"}
               </div>
               <div>
                 Grace until:{" "}
                 {snapshot.subscription.graceUntil
                   ? new Date(snapshot.subscription.graceUntil).toLocaleString()
-                  : "—"}
+                  : "-"}
               </div>
             </div>
           ) : (
@@ -226,10 +252,10 @@ export default async function StripeBillingPage(props: {
                 {invoices.map((inv, idx) => (
                   <tr key={String(inv?.id || `${inv?.number || "row"}-${idx}`)} className="border-t border-neutral-800">
                     <td className="px-3 py-2 text-neutral-300">
-                      {inv?.created ? new Date(Number(inv.created) * 1000).toLocaleString() : "—"}
+                      {inv?.created ? new Date(Number(inv.created) * 1000).toLocaleString() : "-"}
                     </td>
-                    <td className="px-3 py-2 font-mono text-neutral-200">{String(inv?.number || inv?.id || "—")}</td>
-                    <td className="px-3 py-2 text-neutral-200">{String(inv?.status || "—")}</td>
+                    <td className="px-3 py-2 font-mono text-neutral-200">{String(inv?.number || inv?.id || "-")}</td>
+                    <td className="px-3 py-2 text-neutral-200">{String(inv?.status || "-")}</td>
                     <td className="px-3 py-2 text-neutral-200">{fmtMoney(Number(inv?.amount_due || 0), String(inv?.currency || "USD"))}</td>
                     <td className="px-3 py-2 text-neutral-200">{fmtMoney(Number(inv?.amount_paid || 0), String(inv?.currency || "USD"))}</td>
                     <td className="px-3 py-2">
