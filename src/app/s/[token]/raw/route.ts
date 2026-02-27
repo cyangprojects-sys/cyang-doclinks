@@ -15,6 +15,15 @@ import { appendImmutableAudit } from "@/lib/immutableAudit";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+function isBlockedTopLevelOpen(req: NextRequest): boolean {
+  const dest = (req.headers.get("sec-fetch-dest") || "").toLowerCase();
+  const mode = (req.headers.get("sec-fetch-mode") || "").toLowerCase();
+  const user = (req.headers.get("sec-fetch-user") || "").toLowerCase();
+  // Block user-initiated top-level navigation (address bar / new-tab open).
+  // Keep iframe/embed and internal range fetches working.
+  return dest === "document" && mode === "navigate" && user === "?1";
+}
+
 function hashIp(ip: string | null) {
   const salt = (process.env.VIEW_SALT || "").trim();
   if (!salt || !ip) return null;
@@ -107,6 +116,10 @@ export async function GET(
   { params }: { params: Promise<{ token: string }> }
 ) {
   const { token } = await params;
+
+  if (isBlockedTopLevelOpen(req)) {
+    return new NextResponse("Direct open is disabled for this shared document.", { status: 403 });
+  }
 
   // --- Rate limiting (best-effort) ---
   const ip = getClientIpFromHeaders(req.headers) || "";

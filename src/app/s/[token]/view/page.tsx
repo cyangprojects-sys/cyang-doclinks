@@ -88,15 +88,6 @@ export default async function ShareTokenViewPage(props: {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <Link
-            href={`/s/${encodeURIComponent(t)}/download`}
-            className="btn-base btn-primary rounded-xl px-4 py-2 text-sm font-medium"
-          >
-            Download
-          </Link>
-          <Link href={rawUrl} target="_blank" className="btn-base btn-secondary rounded-xl px-4 py-2 text-sm">
-            Open in new tab
-          </Link>
           <Link href="/" className="btn-base btn-secondary rounded-xl px-4 py-2 text-sm">
             Home
           </Link>
@@ -115,4 +106,3 @@ export default async function ShareTokenViewPage(props: {
     </ShareShell>
   );
 }
-
