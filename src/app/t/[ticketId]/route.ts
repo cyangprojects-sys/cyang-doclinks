@@ -224,11 +224,11 @@ export async function GET(
           enc = {
             enabled: true,
             alg: r.enc_alg,
-            iv: r.enc_iv,
+            iv: r.enc_iv!,
             keyVersion: r.enc_key_version,
-            wrappedKey: r.enc_wrapped_key,
-            wrapIv: r.enc_wrap_iv,
-            wrapTag: r.enc_wrap_tag,
+            wrappedKey: r.enc_wrapped_key!,
+            wrapIv: r.enc_wrap_iv!,
+            wrapTag: r.enc_wrap_tag!,
           };
         }
       }
