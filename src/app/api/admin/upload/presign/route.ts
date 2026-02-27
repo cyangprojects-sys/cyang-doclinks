@@ -271,6 +271,12 @@ export async function POST(req: Request) {
       r2_key: key,
       bucket: r2Bucket,
       expires_in: expiresIn,
+      upload_headers: {
+        "content-type": contentType,
+        "x-amz-meta-doc-id": docId,
+        "x-amz-meta-orig-content-type": contentType,
+        "x-amz-meta-orig-ext": declaredType.ext,
+      },
     });
   } catch (err: unknown) {
     await logSecurityEvent({

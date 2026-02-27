@@ -126,6 +126,7 @@ const docFilter = sql`${orgFilter} ${ownerFilter}`;
             )
         ) s on true
         where 1=1
+          and coalesce(d.status::text, 'ready') = 'ready'
           ${docFilter}
         order by coalesce(v.total_views, 0) desc, d.created_at desc
       `) as unknown as UnifiedDocRow[];
@@ -156,6 +157,7 @@ const docFilter = sql`${orgFilter} ${ownerFilter}`;
           limit 1
         ) a on true
         where 1=1
+          and coalesce(d.status::text, 'ready') = 'ready'
           ${docFilter}
         group by d.id, d.title, a.alias
         order by views desc, last_view desc nulls last

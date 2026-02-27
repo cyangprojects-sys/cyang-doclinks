@@ -11,6 +11,7 @@ type PresignResponse =
       r2_key: string;
       bucket: string;
       expires_in: number;
+      upload_headers?: Record<string, string>;
     }
   | { ok: false; error: string; message?: string };
 
@@ -30,6 +31,10 @@ type UploadItem = {
   viewUrl?: string;
   docId?: string;
 };
+
+function isTerminalStatus(status: UploadItem["status"]): boolean {
+  return status === "done" || status === "error";
+}
 
 const ALLOWED_EXTS = new Set([
   "pdf",
@@ -215,14 +220,15 @@ export default function UploadPanel({
     }
     if (!allowed.length) return;
     setError(null);
-    setItems((prev) => [
-      ...prev,
-      ...allowed.map((file) => ({
-        id: `${file.name}-${file.size}-${file.lastModified}-${crypto.randomUUID()}`,
-        file,
-        status: "queued" as const,
-      })),
-    ]);
+    const nextItems = allowed.map((file) => ({
+      id: `${file.name}-${file.size}-${file.lastModified}-${crypto.randomUUID()}`,
+      file,
+      status: "queued" as const,
+    }));
+    setItems((prev) => {
+      const shouldReset = prev.length > 0 && prev.every((i) => isTerminalStatus(i.status));
+      return shouldReset ? nextItems : [...prev, ...nextItems];
+    });
   }
 
   function updateItem(id: string, patch: Partial<UploadItem>) {
@@ -233,6 +239,22 @@ export default function UploadPanel({
     const file = item.file;
     updateItem(item.id, { status: "uploading", message: undefined });
 
+    let presignJson: Extract<PresignResponse, { ok: true }> | null = null;
+
+    const abortIfStaged = async () => {
+      if (!presignJson?.doc_id) return;
+      try {
+        await fetch("/api/admin/upload/abort", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ doc_id: presignJson.doc_id }),
+        });
+      } catch {
+        // Best-effort cleanup; upload error is still surfaced to UI.
+      }
+    };
+
+    try {
     const presignRes = await fetch("/api/admin/upload/presign", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -245,19 +267,26 @@ export default function UploadPanel({
       }),
     });
 
-    const presignJson = (await presignRes.json().catch(() => null)) as PresignResponse | null;
-    if (!presignRes.ok || !presignJson || presignJson.ok !== true) {
-      const msg = (presignJson as any)?.message || (presignJson as any)?.error || `Init failed (${presignRes.status})`;
+    const presignParsed = (await presignRes.json().catch(() => null)) as PresignResponse | null;
+    if (!presignRes.ok || !presignParsed || presignParsed.ok !== true) {
+      const msg = (presignParsed as any)?.message || (presignParsed as any)?.error || `Init failed (${presignRes.status})`;
       throw new Error(msg);
     }
+    presignJson = presignParsed;
+
+    const uploadHeaders: Record<string, string> =
+      presignJson.upload_headers && typeof presignJson.upload_headers === "object"
+        ? presignJson.upload_headers
+        : {
+            "content-type": file.type || guessMimeFromFilename(file.name),
+            "x-amz-meta-doc-id": presignJson.doc_id,
+            "x-amz-meta-orig-content-type": file.type || guessMimeFromFilename(file.name),
+            "x-amz-meta-orig-ext": extOf(file.name),
+          };
 
     const putRes = await fetch(presignJson.upload_url, {
       method: "PUT",
-      headers: {
-        "content-type": file.type || guessMimeFromFilename(file.name),
-        "x-amz-meta-doc-id": presignJson.doc_id,
-        "x-amz-meta-orig-content-type": file.type || guessMimeFromFilename(file.name),
-      },
+      headers: uploadHeaders,
       body: file,
     });
     if (!putRes.ok) {
@@ -288,6 +317,10 @@ export default function UploadPanel({
       docId: completeJson.doc_id,
       viewUrl: completeJson.view_url,
     });
+    } catch (e) {
+      await abortIfStaged();
+      throw e;
+    }
   }
 
   async function onUploadAll() {

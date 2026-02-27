@@ -40,7 +40,7 @@ export default function HomePage() {
           </div>
           <div className="mt-8 grid gap-3 sm:grid-cols-3">
             <Stat title="Default posture" value="Secure by default" />
-            <Stat title="Primary focus" value="Doc delivery" />
+            <Stat title="Primary focus" value="Secure Document Delivery Infrastructure" />
             <Stat title="Operating mode" value="Fast iteration" />
           </div>
         </div>
@@ -161,3 +161,4 @@ function Step(props: { title: string; desc: string; href: string }) {
     </Link>
   );
 }
+
