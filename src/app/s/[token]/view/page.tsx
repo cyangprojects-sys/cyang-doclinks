@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import WatermarkedViewer from "./WatermarkedViewer";
+import SecurePdfCanvasViewer from "@/app/components/SecurePdfCanvasViewer";
 import { resolveShareMeta } from "@/lib/resolveDoc";
 import { ShareBadge, ShareShell } from "../ShareShell";
 
@@ -99,7 +99,12 @@ export default async function ShareTokenViewPage(props: {
           </div>
         ) : (
           <div className="overflow-hidden rounded-2xl border border-white/15 bg-black/20">
-            <WatermarkedViewer rawUrl={rawUrl} enabled={enabled} text={text} />
+            <SecurePdfCanvasViewer
+              rawUrl={rawUrl}
+              watermarkEnabled={enabled}
+              watermarkText={text}
+              className="h-[calc(100vh-220px)]"
+            />
           </div>
         )}
       </div>

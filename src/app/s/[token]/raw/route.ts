@@ -141,6 +141,7 @@ export async function GET(
 
   const r2Bucket = getR2Bucket();
   const { token } = await params;
+  const ip = getClientIpFromHeaders(req.headers) || "";
   const abuseBlock = await enforceIpAbuseBlock({ req, scope: "share_raw" });
   if (!abuseBlock.ok) {
     return new NextResponse("Forbidden", {
@@ -183,7 +184,6 @@ export async function GET(
   }
 
   // --- Rate limiting (best-effort) ---
-  const ip = getClientIpFromHeaders(req.headers) || "";
   const ipKey = stableHash(ip, "VIEW_SALT");
   const tokenKey = stableHash(String(token), "VIEW_SALT");
 

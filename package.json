@@ -34,6 +34,7 @@
     "nodemailer": "^7.0.13",
     "openid-client": "^6.8.1",
     "pdf-lib": "^1.17.1",
+    "pdfjs-dist": "^5.4.624",
     "postgres": "^3.4.8",
     "react": "19.2.3",
     "react-dom": "19.2.3",

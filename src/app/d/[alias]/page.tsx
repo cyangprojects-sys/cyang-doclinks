@@ -11,6 +11,7 @@ import { sql } from "@/lib/db";
 import { isAliasUnlockedAction } from "./unlockActions";
 import { getAuthedUser, roleAtLeast } from "@/lib/authz";
 import { allowUnencryptedServing } from "@/lib/securityPolicy";
+import SecurePdfCanvasViewer from "@/app/components/SecurePdfCanvasViewer";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -317,12 +318,7 @@ function DocumentViewer({ alias, availabilityHint }: { alias: string; availabili
         </div>
       ) : null}
       <div className="overflow-hidden rounded-xl border border-white/10 bg-white/5">
-        <iframe
-          title="Document viewer"
-          src={viewerUrl}
-          className="block h-[78vh] w-full border-0 bg-transparent"
-          allow="fullscreen"
-        />
+        <SecurePdfCanvasViewer rawUrl={viewerUrl} className="h-[78vh]" />
       </div>
 
       <div className="mt-3 text-xs text-neutral-400">
