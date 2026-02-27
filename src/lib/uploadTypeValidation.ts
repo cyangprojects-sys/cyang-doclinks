@@ -57,16 +57,25 @@ const ALLOWED: AllowedSpec[] = [
 const BY_EXT = new Map(ALLOWED.map((s) => [s.ext, s]));
 
 const BLOCKED_EXT = new Set([
+  "js",
+  "mjs",
+  "cjs",
+  "vbs",
+  "vbe",
+  "ps1",
+  "psm1",
+  "py",
+  "php",
   "exe",
   "msi",
   "com",
   "scr",
   "dll",
+  "sys",
+  "lnk",
+  "pif",
   "bat",
   "cmd",
-  "ps1",
-  "vbs",
-  "vbe",
   "wsf",
   "jar",
   "apk",
@@ -75,6 +84,9 @@ const BLOCKED_EXT = new Set([
   "rpm",
   "bin",
   "sh",
+  "docm",
+  "xlsm",
+  "pptm",
 ]);
 
 const BLOCKED_MIME_PREFIXES = ["application/x-msdownload", "application/x-executable"];

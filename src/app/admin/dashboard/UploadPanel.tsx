@@ -60,19 +60,32 @@ const ALLOWED_EXTS = new Set([
 ]);
 
 const EXECUTABLE_EXTS = new Set([
+  "js",
+  "mjs",
+  "cjs",
+  "vbs",
+  "vbe",
+  "ps1",
+  "psm1",
+  "py",
+  "php",
   "exe",
   "msi",
   "com",
   "scr",
   "dll",
+  "sys",
+  "lnk",
+  "pif",
   "bat",
   "cmd",
-  "ps1",
-  "vbs",
   "jar",
   "apk",
   "sh",
   "bin",
+  "docm",
+  "xlsm",
+  "pptm",
 ]);
 
 const ACCEPT_ATTR =
