@@ -13,7 +13,7 @@ export default function AcceptableUsePage() {
         <div>
           <div className="text-xs text-white/60">cyang.io</div>
           <h1 className="mt-1 text-2xl font-semibold text-white">Acceptable Use Policy</h1>
-          <div className="mt-2 text-sm text-white/60">Policy for use of cyang-doclinks services.</div>
+          <div className="mt-2 text-sm text-white/60">Policy for cyang-doclinks content and behavior.</div>
         </div>
         <Link href="/" className="rounded-xl bg-white/10 px-4 py-2 text-sm text-white hover:bg-white/15">
           Home
@@ -22,21 +22,32 @@ export default function AcceptableUsePage() {
 
       <div className="mt-8 space-y-6 text-sm text-white/75">
         <section>
-          <h2 className="text-base font-semibold text-white">You may not upload or share</h2>
+          <h2 className="text-base font-semibold text-white">Prohibited content and activity</h2>
           <ul className="mt-2 list-disc space-y-1 pl-5">
-            <li>Content that is illegal, or facilitates illegal activity.</li>
-            <li>Child sexual abuse material (CSAM) or exploitative content involving minors.</li>
-            <li>Malware, phishing documents, or content intended to compromise systems/accounts.</li>
-            <li>Copyright-infringing content you do not have rights to distribute.</li>
-            <li>Doxxing or content that violates privacy or safety of others.</li>
+            <li>Illegal content or content facilitating illegal activity.</li>
+            <li>Child sexual abuse material or exploitative content involving minors.</li>
+            <li>Phishing, malware distribution, credential theft, or malicious payload delivery.</li>
+            <li>Unauthorized copyrighted material.</li>
+            <li>Harassment, doxxing, or content that threatens privacy or personal safety.</li>
+            <li>Attempts to bypass plan limits, access controls, or rate limits.</li>
           </ul>
         </section>
 
         <section>
-          <h2 className="text-base font-semibold text-white">Enforcement</h2>
+          <h2 className="text-base font-semibold text-white">Upload safety rules</h2>
+          <p className="mt-2">Uploads are allowlist-only and validated by extension, MIME type, and file signature where applicable.</p>
+          <ul className="mt-2 list-disc space-y-1 pl-5">
+            <li>Disallowed: executables, scripts, shortcut/system binaries, and macro-enabled office files.</li>
+            <li>Rejected examples include .exe, .bat, .cmd, .msi, .js, .vbs, .ps1, .py, .php, .dll, .sys, .lnk, .pif, .scr, .docm, .xlsm, and .pptm.</li>
+            <li>Unsupported or mismatched file types are blocked even if renamed.</li>
+          </ul>
+        </section>
+
+        <section>
+          <h2 className="text-base font-semibold text-white">Enforcement actions</h2>
           <p className="mt-2">
-            We may disable access to a document, revoke a share link, or suspend accounts to protect users and comply with
-            legal obligations.
+            We may quarantine documents, revoke shares, disable tenant access, limit API actions,
+            or suspend accounts to protect users and maintain service integrity.
           </p>
         </section>
 
@@ -47,11 +58,11 @@ export default function AcceptableUsePage() {
             <Link href="/report" className="underline text-white/90 hover:text-white">
               /report
             </Link>{" "}
-            for abuse reporting and{" "}
+            to submit abuse reports and{" "}
             <Link href="/dmca" className="underline text-white/90 hover:text-white">
               /dmca
             </Link>{" "}
-            for copyright notices. General contact:{" "}
+            for copyright notices. Contact: {" "}
             <a className="underline text-white/90 hover:text-white" href={`mailto:${supportEmail}`}>
               {supportEmail}
             </a>
@@ -62,4 +73,3 @@ export default function AcceptableUsePage() {
     </main>
   );
 }
-

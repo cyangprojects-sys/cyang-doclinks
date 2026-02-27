@@ -14,7 +14,7 @@ export default function DataRetentionPage() {
           <div className="text-xs text-white/60">cyang.io</div>
           <h1 className="mt-1 text-2xl font-semibold text-white">Data Retention Disclosure</h1>
           <div className="mt-2 text-sm text-white/60">
-            Effective date: February 27, 2026. Operational retention controls for doclinks.
+            Effective date: February 27, 2026. Lifecycle controls for cyang-doclinks documents and security data.
           </div>
         </div>
         <Link href="/" className="rounded-xl bg-white/10 px-4 py-2 text-sm text-white hover:bg-white/15">
@@ -24,43 +24,45 @@ export default function DataRetentionPage() {
 
       <div className="mt-8 space-y-6 text-sm text-white/75">
         <section>
-          <h2 className="text-base font-semibold text-white">Document and share lifecycle</h2>
+          <h2 className="text-base font-semibold text-white">Document lifecycle</h2>
           <ul className="mt-2 list-disc space-y-1 pl-5">
-            <li>Free plan shares use fixed expiration windows and auto-delete policy defaults.</li>
-            <li>Expired share tokens are revoked/cleaned by scheduled retention jobs.</li>
-            <li>Deleted documents are removed from active serving paths immediately.</li>
+            <li>New uploads are encrypted and written with key-version metadata.</li>
+            <li>Share access is governed by expiry, revocation, quota, and scan status gates.</li>
+            <li>Free plan links use fixed expiry behavior and 30-day auto-delete policy defaults.</li>
+            <li>When a document is deleted, linked serving paths are disabled immediately.</li>
           </ul>
         </section>
 
         <section>
-          <h2 className="text-base font-semibold text-white">Operational logs</h2>
+          <h2 className="text-base font-semibold text-white">Security and audit retention</h2>
           <ul className="mt-2 list-disc space-y-1 pl-5">
-            <li>High-volume logs and analytics are retained according to configured retention windows.</li>
-            <li>Nightly jobs aggregate and prune raw telemetry where applicable.</li>
-            <li>Retention cleanup is automated and tracked in cron telemetry.</li>
+            <li>Audit logs are append-only for integrity and forensic review.</li>
+            <li>Security telemetry, abuse events, and billing enforcement events are retained by policy window.</li>
+            <li>Rate-limit and incident signals may be retained longer during active investigations.</li>
           </ul>
         </section>
 
         <section>
-          <h2 className="text-base font-semibold text-white">Audit records</h2>
+          <h2 className="text-base font-semibold text-white">Cleanup and consistency jobs</h2>
           <ul className="mt-2 list-disc space-y-1 pl-5">
-            <li>Security and administrative audit records are append-only by design.</li>
-            <li>Some immutable records may be retained longer than operational analytics.</li>
+            <li>Scheduled jobs clean expired shares and aged data according to configured retention rules.</li>
+            <li>Cleanup flows are designed to avoid orphaned storage objects and orphaned DB references.</li>
+            <li>Operational telemetry tracks cron job success and failures for recovery visibility.</li>
           </ul>
         </section>
 
         <section>
           <h2 className="text-base font-semibold text-white">Backups and recovery</h2>
           <ul className="mt-2 list-disc space-y-1 pl-5">
-            <li>Database and object-store recovery procedures are documented in internal runbooks.</li>
-            <li>Retention cleanup is designed to avoid orphaned references and stale object drift.</li>
+            <li>Database and object-storage recovery procedures are documented for incident response.</li>
+            <li>Recovery drills are tracked separately from routine backup runs.</li>
           </ul>
         </section>
 
         <section>
           <h2 className="text-base font-semibold text-white">Contact</h2>
           <p className="mt-2">
-            For retention/privacy inquiries, contact{" "}
+            For retention or privacy inquiries, contact{" "}
             <a className="underline text-white/90 hover:text-white" href={`mailto:${privacyEmail}`}>
               {privacyEmail}
             </a>

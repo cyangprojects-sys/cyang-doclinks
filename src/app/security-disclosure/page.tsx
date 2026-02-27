@@ -14,7 +14,7 @@ export default function SecurityDisclosurePage() {
           <div className="text-xs text-white/60">cyang.io</div>
           <h1 className="mt-1 text-2xl font-semibold text-white">Security Disclosure Policy</h1>
           <div className="mt-2 text-sm text-white/60">
-            Effective date: February 27, 2026. Report security issues privately.
+            Effective date: February 27, 2026. Report security issues privately and responsibly.
           </div>
         </div>
         <Link href="/" className="rounded-xl bg-white/10 px-4 py-2 text-sm text-white hover:bg-white/15">
@@ -30,35 +30,36 @@ export default function SecurityDisclosurePage() {
             <a className="underline text-white/90 hover:text-white" href={`mailto:${securityEmail}`}>
               {securityEmail}
             </a>
-            {" "}with clear reproduction steps, impact, and affected endpoints/routes.
+            {" "}with reproduction steps, impact, and affected routes or flows.
           </p>
         </section>
 
         <section>
-          <h2 className="text-base font-semibold text-white">Scope</h2>
+          <h2 className="text-base font-semibold text-white">Priority scope</h2>
           <ul className="mt-2 list-disc space-y-1 pl-5">
-            <li>Authentication, authorization, and access-control bypasses.</li>
-            <li>Data exposure across tenants, users, or shares.</li>
-            <li>Encryption/key handling weaknesses and unsafe fallback behavior.</li>
-            <li>Rate-limit bypass or abuse paths that materially affect security.</li>
+            <li>Auth/authz bypass, cross-tenant or cross-user access, and share resolution flaws.</li>
+            <li>Encryption handling issues, key-version misuse, or plaintext serve paths.</li>
+            <li>Upload validation bypasses and scan/quarantine bypasses.</li>
+            <li>Rate-limit bypasses, brute-force paths, or token/alias abuse vectors.</li>
+            <li>Billing entitlement bypasses and subscription state drift vulnerabilities.</li>
           </ul>
         </section>
 
         <section>
-          <h2 className="text-base font-semibold text-white">Safe harbor expectations</h2>
+          <h2 className="text-base font-semibold text-white">Testing expectations</h2>
           <ul className="mt-2 list-disc space-y-1 pl-5">
-            <li>Do not access or alter data you do not own beyond what is needed to demonstrate risk.</li>
-            <li>Do not perform denial-of-service or destructive testing.</li>
-            <li>Do not publish details before the issue is reviewed and fixed.</li>
+            <li>Do not exfiltrate, modify, or delete data you do not own.</li>
+            <li>Do not perform denial-of-service or destructive testing in production.</li>
+            <li>Keep details private until triage and remediation are complete.</li>
           </ul>
         </section>
 
         <section>
           <h2 className="text-base font-semibold text-white">Response targets</h2>
           <ul className="mt-2 list-disc space-y-1 pl-5">
-            <li>Initial triage acknowledgment within 2 business days.</li>
-            <li>Severity classification and remediation plan after validation.</li>
-            <li>Status updates for critical findings until resolved.</li>
+            <li>Acknowledgment within 2 business days.</li>
+            <li>Triage and severity assignment after validation.</li>
+            <li>Status updates for critical findings through remediation.</li>
           </ul>
         </section>
       </div>

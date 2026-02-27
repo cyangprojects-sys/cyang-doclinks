@@ -15,7 +15,7 @@ export default function PrivacyPage() {
           <div className="text-xs text-white/60">cyang.io</div>
           <h1 className="mt-1 text-2xl font-semibold text-white">Privacy Policy</h1>
           <div className="mt-2 text-sm text-white/60">
-            Effective date: February 26, 2026. This policy explains how doclinks data is collected and used.
+            Effective date: February 27, 2026. How cyang-doclinks handles account, document, and security data.
           </div>
         </div>
         <Link href="/" className="rounded-xl bg-white/10 px-4 py-2 text-sm text-white hover:bg-white/15">
@@ -27,36 +27,42 @@ export default function PrivacyPage() {
         <section>
           <h2 className="text-base font-semibold text-white">Data we collect</h2>
           <ul className="mt-2 list-disc space-y-1 pl-5">
-            <li>Account identifiers (email, auth provider metadata).</li>
-            <li>Uploaded document metadata (filename, size, type, timestamps).</li>
-            <li>Access logs and security telemetry (hashed IP where configured, user agent, timestamps).</li>
-            <li>Operational events (audit logs, key management actions, abuse/DMCA workflows).</li>
+            <li>Account identifiers, login metadata, and tenant/org role context.</li>
+            <li>Document metadata such as filename, size, type, encryption version, and timestamps.</li>
+            <li>Share and access metadata such as alias/token outcomes, hashed IPs, and user-agent data.</li>
+            <li>Security and billing events, including rate-limit, abuse, and subscription lifecycle logs.</li>
           </ul>
         </section>
 
         <section>
-          <h2 className="text-base font-semibold text-white">How we use data</h2>
+          <h2 className="text-base font-semibold text-white">How data is used</h2>
           <ul className="mt-2 list-disc space-y-1 pl-5">
-            <li>Provide secure document sharing and access control.</li>
-            <li>Detect abuse, malware, and policy violations.</li>
-            <li>Enforce plan limits and prevent service misuse.</li>
-            <li>Maintain auditability for operational and compliance workflows.</li>
+            <li>Operate secure upload, scan, and share workflows.</li>
+            <li>Enforce authentication, authorization, anti-abuse, and quota controls.</li>
+            <li>Investigate incidents and maintain immutable operational audit records.</li>
+            <li>Support subscription and entitlement enforcement through verified billing events.</li>
           </ul>
         </section>
 
         <section>
-          <h2 className="text-base font-semibold text-white">Retention</h2>
-          <p className="mt-2">
-            We retain operational logs according to configured retention settings. Some immutable security/audit records
-            may be retained longer for safety and compliance.
-          </p>
+          <h2 className="text-base font-semibold text-white">Security controls</h2>
+          <ul className="mt-2 list-disc space-y-1 pl-5">
+            <li>Encryption is on by default and plaintext serving is blocked in production.</li>
+            <li>File acceptance uses explicit allowlists and rejects disallowed executable/script/macro classes.</li>
+            <li>Public serving is blocked for failed, infected, or quarantined scan states.</li>
+            <li>Rate limits and anomaly telemetry protect sensitive routes.</li>
+          </ul>
         </section>
 
         <section>
-          <h2 className="text-base font-semibold text-white">Security</h2>
+          <h2 className="text-base font-semibold text-white">Retention and deletion</h2>
           <p className="mt-2">
-            Documents are encrypted by default. Access controls, rate limits, malware scanning, and audit trails are used
-            to reduce risk, but no system is guaranteed to be perfectly secure.
+            Retention windows differ by data class. Security and compliance records may be retained
+            longer than high-volume analytics data. For details, see{" "}
+            <Link href="/data-retention" className="underline text-white/90 hover:text-white">
+              Data Retention Disclosure
+            </Link>
+            .
           </p>
         </section>
 
@@ -82,4 +88,3 @@ export default function PrivacyPage() {
     </main>
   );
 }
-

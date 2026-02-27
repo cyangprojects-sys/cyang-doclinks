@@ -1,12 +1,11 @@
-// app/about/page.tsx
 import type { Metadata } from "next";
 import Link from "next/link";
 import { SiteShell } from "../components/SiteShell";
 
 export const metadata: Metadata = {
-  title: "About — cyang.io",
+  title: "About - cyang.io",
   description:
-    "About Chang Yang and cyang.io: a small hub for practical tools, experiments, and security-first builds like Doclinks.",
+    "About Chang Yang and cyang.io: practical tools with secure defaults, enforced policy gates, and audit-ready operations.",
 };
 
 export default function AboutPage() {
@@ -25,25 +24,25 @@ export default function AboutPage() {
 
         <h1 className="mt-6 text-4xl font-semibold tracking-tight md:text-5xl">
           About
-          <span className="block text-white/70">How I build and what I’m optimizing for.</span>
+          <span className="block text-white/70">How I build and what I optimize for.</span>
         </h1>
 
         <p className="mt-6 max-w-3xl text-base leading-relaxed text-white/70">
-          cyang.io is a small, product-minded portfolio — a handful of tools that stay
-          maintained, get safer over time, and feel professional to use. I’m especially
-          interested in secure sharing, operational clarity, and fast UX.
+          cyang.io is a small product portfolio built around secure document operations. The
+          direction is simple: enforce controls on the server, keep policy deterministic, and make
+          operations reviewable through immutable logs.
         </p>
 
         <div className="mt-10 grid gap-4 md:grid-cols-12">
           <div className="md:col-span-7">
             <Card
               title="How I build"
-              desc="A short playbook that keeps things shipping and hard to misuse."
+              desc="Principles that keep features shippable and difficult to misuse."
               items={[
-                "Start minimal → iterate quickly",
-                "Prefer boring tech that scales",
-                "Keep the surface area small",
-                "Make safe defaults the easy path",
+                "Server-side enforcement over client trust",
+                "Encryption enabled by default and no plaintext serving",
+                "Scan and quarantine gates before any public serve",
+                "Clear limits, clear errors, clear audit trail",
               ]}
             />
           </div>
@@ -54,26 +53,26 @@ export default function AboutPage() {
               <div className="mt-3 space-y-3">
                 <FocusRow
                   title="Doclinks"
-                  desc="Security-first file sharing with short links, immutable logs, and strict upload validation."
+                  desc="Short-link sharing with immutable audit logging and strict serve-time checks."
                   href="/projects/doclinks"
                 />
                 <FocusRow
-                  title="Admin tools"
-                  desc="Operational clarity: uploads, access logs, analytics, guardrails."
+                  title="Upload hardening"
+                  desc="Extension + MIME + file-signature allowlist with executable and macro blocking."
+                  href="/projects/doclinks"
+                />
+                <FocusRow
+                  title="Operations"
+                  desc="Cron-backed scan queue, abuse controls, billing limits, and dashboard observability."
                   href="/admin"
-                />
-                <FocusRow
-                  title="Hardening"
-                  desc="MIME/signature checks, executable/macro blocking, and scan-first serving."
-                  href="/projects/doclinks"
                 />
               </div>
 
               <div className="mt-6 rounded-2xl bg-black/40 p-4 ring-1 ring-white/10">
                 <div className="text-xs text-white/60">Guiding constraint</div>
-                <div className="mt-1 text-sm font-medium text-white/90">Security is the priority.</div>
+                <div className="mt-1 text-sm font-medium text-white/90">Security defaults are non-negotiable.</div>
                 <p className="mt-2 text-xs leading-relaxed text-white/60">
-                  If a feature increases risk or ambiguity, it needs guardrails or it doesn’t ship.
+                  If a feature introduces ambiguity, it ships with guardrails or it does not ship.
                 </p>
               </div>
             </div>
@@ -82,74 +81,44 @@ export default function AboutPage() {
 
         <div className="mt-10 grid gap-4 md:grid-cols-2">
           <Card
-            title="What I like building"
-            desc="The kinds of projects that stay fun to maintain."
+            title="What this platform enforces"
+            desc="Core controls now active in production builds."
             items={[
-              "Simple tools with strong UX",
-              "Automation that removes friction",
-              "Secure sharing and clean access control",
-              "Systems that are easy to operate and debug",
+              "No decryption toggle and no unencrypted serve path",
+              "Blocked serve for failed, infected, or quarantined scan states",
+              "Rate limits on upload, token access, serve, and abuse-sensitive routes",
+              "Plan limits enforced server-side for storage, shares, and monthly views",
             ]}
           />
           <Card
             title="What I optimize for"
-            desc="A short set of priorities that guide most decisions."
+            desc="Priorities that drive product and architecture choices."
             items={[
-              "Security-first where it matters",
-              "Auditability and operational clarity",
-              "Performance and responsiveness",
-              "Minimal UI and predictable behavior",
+              "Reliable access control boundaries",
+              "Operational visibility without sensitive leakage",
+              "Fast, predictable UX with meaningful error states",
+              "Simple systems that are easy to audit and recover",
             ]}
           />
         </div>
 
-        <div className="mt-10 grid gap-4 md:grid-cols-12">
-          <div className="md:col-span-7">
-            <div className="rounded-3xl bg-white/5 p-6 ring-1 ring-white/10">
-              <h2 className="text-lg font-semibold">What “competitor-level” means here</h2>
-              <p className="mt-2 text-sm leading-relaxed text-white/70">
-                Clean UX is table stakes. The differentiator is safer defaults and operational
-                confidence: logs you can trust, policies you can reason about, and fewer places
-                to be wrong.
-              </p>
-
-              <div className="mt-6 grid gap-3 sm:grid-cols-2">
-                <Pill title="Predictable policy" desc="Expiry/max views/revocation behave the same everywhere." />
-                <Pill title="Observable" desc="Audit events + analytics rollups make behavior reviewable." />
-                <Pill title="Secure by default" desc="Server-side enforcement, private storage posture." />
-                <Pill title="Fast" desc="Minimal pages and snappy interactions." />
-              </div>
-            </div>
-          </div>
-
-          <div className="md:col-span-5">
-            <div className="rounded-3xl bg-white/5 p-6 ring-1 ring-white/10">
-              <h2 className="text-lg font-semibold">Where to start</h2>
-              <div className="mt-4 grid gap-3">
-                <StartCard title="Doclinks product page" desc="Controls, security model, roadmap." href="/projects/doclinks" />
-                <StartCard title="Upload files" desc="Create a doc and generate a share link." href="/admin" />
-                <StartCard title="Project list" desc="Everything else that’s maintained." href="/projects" />
-              </div>
-            </div>
-          </div>
-        </div>
-
         <div className="mt-10 rounded-3xl bg-white/5 p-6 ring-1 ring-white/10">
-          <h2 className="text-lg font-semibold">What’s on this site</h2>
+          <h2 className="text-lg font-semibold">What is on this site</h2>
           <p className="mt-2 text-sm leading-relaxed text-white/70">
-            Some pages are public-facing (projects, writeups). Some are tools (doc upload,
-            magic links). The point is not to be big — it’s to be useful.
+            Public pages explain the security model, legal policy, and reporting process. Admin pages
+            run document operations with upload validation, scan enforcement, audit logging, and plan
+            controls.
           </p>
 
           <div className="mt-5 flex flex-wrap gap-3">
-            <Tag>Next.js</Tag>
-            <Tag>Vercel</Tag>
-            <Tag>Cloudflare R2</Tag>
-            <Tag>Postgres</Tag>
-            <Tag>Magic Links</Tag>
-            <Tag>Audit Logs</Tag>
-            <Tag>MIME Validation</Tag>
+            <Tag>Encrypted Uploads</Tag>
+            <Tag>MIME and Signature Validation</Tag>
+            <Tag>Immutable Audit Log</Tag>
             <Tag>Scan-first Serve</Tag>
+            <Tag>Quarantine Enforcement</Tag>
+            <Tag>Rate Limits</Tag>
+            <Tag>Stripe Billing Controls</Tag>
+            <Tag>Org and Role Boundaries</Tag>
           </div>
 
           <div className="mt-6 flex flex-col gap-3 sm:flex-row">
@@ -163,7 +132,7 @@ export default function AboutPage() {
               href="/projects/doclinks"
               className="rounded-2xl bg-white/10 px-5 py-3 text-sm font-medium text-white ring-1 ring-white/10 hover:bg-white/15"
             >
-              See Doclinks →
+              See Doclinks {"->"}
             </Link>
           </div>
         </div>
@@ -215,31 +184,8 @@ function FocusRow(props: { title: string; desc: string; href: string }) {
         <div className="text-sm font-medium text-white/90">{props.title}</div>
         <div className="mt-1 text-xs leading-relaxed text-white/60">{props.desc}</div>
       </div>
-      <span className="mt-0.5 text-white/50">→</span>
+      <span className="mt-0.5 text-white/50">{"->"}</span>
     </Link>
   );
 }
 
-function Pill(props: { title: string; desc: string }) {
-  return (
-    <div className="rounded-2xl bg-white/5 p-4 ring-1 ring-white/10">
-      <div className="text-sm font-medium text-white/90">{props.title}</div>
-      <div className="mt-1 text-xs leading-relaxed text-white/60">{props.desc}</div>
-    </div>
-  );
-}
-
-function StartCard(props: { title: string; desc: string; href: string }) {
-  return (
-    <Link
-      href={props.href}
-      className="flex items-start justify-between gap-6 rounded-2xl bg-white/5 p-5 ring-1 ring-white/10 hover:bg-white/10"
-    >
-      <div>
-        <div className="text-sm font-medium text-white/90">{props.title}</div>
-        <div className="mt-1 text-xs leading-relaxed text-white/60">{props.desc}</div>
-      </div>
-      <span className="mt-0.5 text-white/50">→</span>
-    </Link>
-  );
-}

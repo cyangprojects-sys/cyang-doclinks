@@ -21,7 +21,7 @@ export default async function ReportPage(props: {
           <div className="text-xs text-white/60">cyang.io</div>
           <h1 className="mt-1 text-xl font-semibold text-white">Report abuse</h1>
           <div className="mt-1 text-sm text-white/60">
-            If this link is being used to share illegal content, phishing, or malware, report it here.
+            Report malware, phishing, illegal content, policy abuse, or suspicious share behavior.
           </div>
         </div>
         <Link href="/" className="rounded-xl bg-white/10 px-4 py-2 text-sm text-white hover:bg-white/15">
@@ -29,12 +29,18 @@ export default async function ReportPage(props: {
         </Link>
       </div>
 
+      <div className="mt-4 rounded-xl border border-white/10 bg-white/5 p-4 text-xs text-white/70">
+        Include token or alias details when available. Reports feed directly into abuse moderation,
+        quarantine actions, and immutable security events.
+      </div>
+
       <div className="mt-6">
         <ReportForm token={token || null} alias={alias || null} />
       </div>
 
-      <div className="mt-6 text-xs text-white/40">
-        Abuse reports are reviewed by the site owner. False reports may result in access restrictions.
+      <div className="mt-6 text-xs text-white/50">
+        Abuse reports are reviewed by the owner/admin team. Intentional false reports may result in
+        access restrictions.
       </div>
     </main>
   );
