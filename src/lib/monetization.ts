@@ -14,6 +14,18 @@ export type Plan = {
   allowAuditExport: boolean;
 };
 
+const FREE_PLAN: Plan = {
+  id: "free",
+  name: "Free",
+  maxViewsPerMonth: 100,
+  maxActiveShares: 3,
+  maxStorageBytes: 104857600, // 100 MB
+  maxUploadsPerDay: 10,
+  maxFileSizeBytes: 10485760, // 10 MB
+  allowCustomExpiration: false,
+  allowAuditExport: false,
+};
+
 let billingSubscriptionsTableExistsCache: boolean | null = null;
 
 async function billingSubscriptionsTableExists(): Promise<boolean> {
@@ -75,32 +87,15 @@ export async function getPlanForUser(userId: string): Promise<Plan> {
   const r = rows?.[0];
   if (!r) {
     // Fail closed to Free if user row exists but plan missing.
-    return {
-      id: "free",
-      name: "Free",
-      maxViewsPerMonth: 100,
-      maxActiveShares: 3,
-      maxStorageBytes: 104857600,
-      maxUploadsPerDay: 10,
-      maxFileSizeBytes: 10485760,
-      allowCustomExpiration: false,
-      allowAuditExport: false,
-    };
+    return FREE_PLAN;
   }
+
+  // Free policy is a product invariant; enforce canonical values even if DB row is stale.
+  if (String(r.id) === "free") return FREE_PLAN;
 
   // Hidden pricing flag: "pro" is present but does not grant unlimited behavior until enabled.
   if (String(r.id) === "pro" && !billing.proPlanEnabled) {
-    return {
-      id: "free",
-      name: "Free",
-      maxViewsPerMonth: 100,
-      maxActiveShares: 3,
-      maxStorageBytes: 104857600,
-      maxUploadsPerDay: 10,
-      maxFileSizeBytes: 10485760,
-      allowCustomExpiration: false,
-      allowAuditExport: false,
-    };
+    return FREE_PLAN;
   }
 
   // Optional Stripe entitlement hardening:
@@ -110,17 +105,7 @@ export async function getPlanForUser(userId: string): Promise<Plan> {
     if (enforceStripeEntitlement) {
       const entitled = await userHasActiveProEntitlement(userId);
       if (!entitled) {
-        return {
-          id: "free",
-          name: "Free",
-          maxViewsPerMonth: 100,
-          maxActiveShares: 3,
-          maxStorageBytes: 104857600,
-          maxUploadsPerDay: 10,
-          maxFileSizeBytes: 10485760,
-          allowCustomExpiration: false,
-          allowAuditExport: false,
-        };
+        return FREE_PLAN;
       }
     }
   }

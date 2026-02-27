@@ -12,14 +12,21 @@
 // - RETENTION_ENABLED (true/false) [fallback only; DB toggle preferred]
 // - RETENTION_DELETE_EXPIRED_SHARES (true/false) [fallback only; DB toggle preferred]
 // - RETENTION_SHARE_GRACE_DAYS (int >= 0) [fallback only; DB toggle preferred]
+// - RETENTION_AUDIT_R2_ORPHANS (true/false; default true)
+// - RETENTION_DELETE_R2_ORPHANS (true/false; default false)
+// - RETENTION_R2_AUDIT_MAX_OBJECTS (int; default 5000)
 
 import { sql } from "@/lib/db";
 import { getRetentionSettings } from "@/lib/settings";
+import { getR2Bucket, getR2Prefix, r2Client } from "@/lib/r2";
+import { DeleteObjectsCommand, ListObjectsV2Command } from "@aws-sdk/client-s3";
 
 export type RetentionResult = {
   table: string;
   ok: boolean;
   deleted?: number;
+  scanned?: number;
+  note?: string;
   error?: string;
 };
 
@@ -189,6 +196,97 @@ async function deleteExpiredShareTokens(args: { graceDays: number }): Promise<Re
   }
 }
 
+async function auditR2OrphanedObjects(args: {
+  maxObjects: number;
+  deleteOrphans: boolean;
+}): Promise<RetentionResult> {
+  const maxObjects = Math.max(1, Math.min(50_000, Math.floor(args.maxObjects)));
+  const deleteOrphans = Boolean(args.deleteOrphans);
+
+  try {
+    const bucket = getR2Bucket();
+    const prefix = getR2Prefix();
+
+    const listed: string[] = [];
+    let continuationToken: string | undefined = undefined;
+    let truncated = false;
+
+    while (listed.length < maxObjects) {
+      const listRes: any = await r2Client.send(
+        new ListObjectsV2Command({
+          Bucket: bucket,
+          Prefix: prefix,
+          ContinuationToken: continuationToken,
+          MaxKeys: Math.min(1000, maxObjects - listed.length),
+        })
+      );
+      const keys = (listRes.Contents || [])
+        .map((o: any) => String(o.Key || "").trim())
+        .filter(Boolean);
+      listed.push(...keys);
+      if (!listRes.IsTruncated || !listRes.NextContinuationToken) {
+        truncated = Boolean(listRes.IsTruncated);
+        break;
+      }
+      continuationToken = listRes.NextContinuationToken;
+      truncated = true;
+    }
+
+    if (!listed.length) {
+      return {
+        table: "r2.orphaned_objects",
+        ok: true,
+        scanned: 0,
+        deleted: 0,
+        note: "No objects found under configured prefix.",
+      };
+    }
+
+    const rows = (await sql`
+      select d.r2_key::text as r2_key
+      from public.docs d
+      where d.r2_bucket = ${bucket}
+        and d.r2_key = any(${listed}::text[])
+        and coalesce(d.status, 'ready') <> 'deleted'
+    `) as unknown as Array<{ r2_key: string }>;
+    const live = new Set(rows.map((r) => String(r.r2_key || "").trim()).filter(Boolean));
+    const orphans = listed.filter((k) => !live.has(k));
+
+    let removed = 0;
+    if (deleteOrphans && orphans.length) {
+      const chunkSize = 1000;
+      for (let i = 0; i < orphans.length; i += chunkSize) {
+        const chunk = orphans.slice(i, i + chunkSize);
+        const del: any = await r2Client.send(
+          new DeleteObjectsCommand({
+            Bucket: bucket,
+            Delete: {
+              Objects: chunk.map((k) => ({ Key: k })),
+              Quiet: true,
+            },
+          })
+        );
+        removed += (del.Deleted || []).length;
+      }
+    }
+
+    const noteParts: string[] = [];
+    if (truncated) noteParts.push(`scan capped at ${maxObjects} objects`);
+    if (!deleteOrphans) noteParts.push("audit-only mode (no deletes)");
+
+    return {
+      table: "r2.orphaned_objects",
+      ok: true,
+      scanned: listed.length,
+      deleted: deleteOrphans ? removed : orphans.length,
+      note: noteParts.join("; ") || undefined,
+    };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return { table: "r2.orphaned_objects", ok: false, error: msg };
+  }
+}
+
 export async function runRetention(): Promise<RetentionRun> {
   const rawDays = envInt("RETENTION_DAYS", 90);
   const dailyDays = envInt("RETENTION_DAYS_DAILY", 365);
@@ -202,6 +300,9 @@ export async function runRetention(): Promise<RetentionRun> {
     ? dbSettings.settings.deleteExpiredShares
     : envBool("RETENTION_DELETE_EXPIRED_SHARES", true);
   const shareGraceDays = dbSettings.ok ? dbSettings.settings.shareGraceDays : envInt("RETENTION_SHARE_GRACE_DAYS", 0);
+  const auditR2Orphans = envBool("RETENTION_AUDIT_R2_ORPHANS", true);
+  const deleteR2Orphans = envBool("RETENTION_DELETE_R2_ORPHANS", false);
+  const r2AuditMaxObjects = envInt("RETENTION_R2_AUDIT_MAX_OBJECTS", 5000);
 
   const results: RetentionResult[] = [];
 
@@ -256,6 +357,14 @@ export async function runRetention(): Promise<RetentionRun> {
 
   if (deleteExpiredShares) {
     results.push(await deleteExpiredShareTokens({ graceDays: shareGraceDays }));
+  }
+  if (auditR2Orphans) {
+    results.push(
+      await auditR2OrphanedObjects({
+        maxObjects: r2AuditMaxObjects,
+        deleteOrphans: deleteR2Orphans,
+      })
+    );
   }
 
   return {
