@@ -21,11 +21,17 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/admin/dashboard", label: "Dashboard" },
   { href: "/admin/upload", label: "Uploads" },
   { href: "/admin/dashboard#shares", label: "Shares" },
+  { href: "/admin/viewer-uploads", label: "Viewer Uploads", ownerOnly: true },
+  { href: "/admin/audit", label: "Audit", ownerOnly: true },
   { href: "/admin/security", label: "Security", ownerOnly: true },
   { href: "/admin/api-keys", label: "Keys", ownerOnly: true },
+  { href: "/admin/billing", label: "Billing", ownerOnly: true },
   { href: "/admin/billing/stripe", label: "Stripe", ownerOnly: true },
+  { href: "/admin/webhooks", label: "Webhooks", ownerOnly: true },
   { href: "/admin/abuse", label: "Abuse", ownerOnly: true },
-  { href: "/admin/webhooks", label: "Settings", ownerOnly: true },
+  { href: "/admin/dmca", label: "DMCA", ownerOnly: true },
+  { href: "/admin/db-debug", label: "DB Debug", ownerOnly: true },
+  { href: "/admin/debug", label: "Debug", ownerOnly: true },
 ];
 
 function isActive(pathname: string, href: string) {
