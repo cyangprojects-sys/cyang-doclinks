@@ -15,6 +15,8 @@ export function SiteFooter() {
             <Link href="/terms" className="hover:text-white">Terms</Link>
             <Link href="/acceptable-use" className="hover:text-white">Acceptable Use</Link>
             <Link href="/privacy" className="hover:text-white">Privacy</Link>
+            <Link href="/data-retention" className="hover:text-white">Data Retention</Link>
+            <Link href="/security-disclosure" className="hover:text-white">Security Disclosure</Link>
             <Link href="/report" className="hover:text-white">Report</Link>
           </div>
         </div>
@@ -22,4 +24,3 @@ export function SiteFooter() {
     </footer>
   );
 }
-

@@ -25,3 +25,10 @@ export function getPrivacyEmail(): string {
   return normEmail(process.env.PRIVACY_EMAIL) || getSupportEmail();
 }
 
+export function getSecurityEmail(): string {
+  return (
+    normEmail(process.env.SECURITY_EMAIL) ||
+    normEmail(process.env.RESPONSIBLE_DISCLOSURE_EMAIL) ||
+    getSupportEmail()
+  );
+}
