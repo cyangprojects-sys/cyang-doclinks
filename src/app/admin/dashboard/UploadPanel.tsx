@@ -31,6 +31,91 @@ type UploadItem = {
   docId?: string;
 };
 
+const ALLOWED_EXTS = new Set([
+  "pdf",
+  "doc",
+  "docx",
+  "txt",
+  "rtf",
+  "odt",
+  "xls",
+  "xlsx",
+  "csv",
+  "ppt",
+  "pptx",
+  "jpg",
+  "jpeg",
+  "png",
+  "gif",
+  "bmp",
+  "svg",
+  "heic",
+  "zip",
+  "rar",
+  "mp3",
+  "wav",
+  "mp4",
+  "mov",
+  "avi",
+]);
+
+const EXECUTABLE_EXTS = new Set([
+  "exe",
+  "msi",
+  "com",
+  "scr",
+  "dll",
+  "bat",
+  "cmd",
+  "ps1",
+  "vbs",
+  "jar",
+  "apk",
+  "sh",
+  "bin",
+]);
+
+const ACCEPT_ATTR =
+  ".pdf,.doc,.docx,.txt,.rtf,.odt,.xls,.xlsx,.csv,.ppt,.pptx,.jpg,.jpeg,.png,.gif,.bmp,.svg,.heic,.zip,.rar,.mp3,.wav,.mp4,.mov,.avi";
+
+function extOf(name: string): string {
+  const n = String(name || "").trim().toLowerCase();
+  const idx = n.lastIndexOf(".");
+  return idx >= 0 ? n.slice(idx + 1) : "";
+}
+
+function guessMimeFromFilename(name: string): string {
+  const ext = extOf(name);
+  const map: Record<string, string> = {
+    pdf: "application/pdf",
+    doc: "application/msword",
+    docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    txt: "text/plain",
+    rtf: "application/rtf",
+    odt: "application/vnd.oasis.opendocument.text",
+    xls: "application/vnd.ms-excel",
+    xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    csv: "text/csv",
+    ppt: "application/vnd.ms-powerpoint",
+    pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    jpg: "image/jpeg",
+    jpeg: "image/jpeg",
+    png: "image/png",
+    gif: "image/gif",
+    bmp: "image/bmp",
+    svg: "image/svg+xml",
+    heic: "image/heic",
+    zip: "application/zip",
+    rar: "application/vnd.rar",
+    mp3: "audio/mpeg",
+    wav: "audio/wav",
+    mp4: "video/mp4",
+    mov: "video/quicktime",
+    avi: "video/x-msvideo",
+  };
+  return map[ext] || "application/octet-stream";
+}
+
 function fmtBytes(n: number) {
   if (!Number.isFinite(n)) return "";
   if (n < 1024) return `${n} B`;
@@ -103,16 +188,21 @@ export default function UploadPanel({
 
   function addFiles(files: FileList | File[]) {
     const arr = Array.from(files || []);
-    const onlyPdf = arr.filter((f) => f.type === "application/pdf" || f.name.toLowerCase().endsWith(".pdf"));
-    if (arr.length && !onlyPdf.length) {
-      setError("Only PDF files are allowed.");
+    const allowed = arr.filter((f) => {
+      const ext = extOf(f.name);
+      if (!ext) return false;
+      if (EXECUTABLE_EXTS.has(ext)) return false;
+      return ALLOWED_EXTS.has(ext);
+    });
+    if (arr.length && !allowed.length) {
+      setError("Unsupported file type. Executable file types are blocked.");
       return;
     }
-    if (!onlyPdf.length) return;
+    if (!allowed.length) return;
     setError(null);
     setItems((prev) => [
       ...prev,
-      ...onlyPdf.map((file) => ({
+      ...allowed.map((file) => ({
         id: `${file.name}-${file.size}-${file.lastModified}-${crypto.randomUUID()}`,
         file,
         status: "queued" as const,
@@ -134,7 +224,7 @@ export default function UploadPanel({
       body: JSON.stringify({
         title: file.name,
         filename: file.name,
-        contentType: "application/pdf",
+        contentType: file.type || guessMimeFromFilename(file.name),
         sizeBytes: file.size,
         encrypt: true,
       }),
@@ -149,9 +239,9 @@ export default function UploadPanel({
     const putRes = await fetch(presignJson.upload_url, {
       method: "PUT",
       headers: {
-        "content-type": "application/pdf",
+        "content-type": file.type || guessMimeFromFilename(file.name),
         "x-amz-meta-doc-id": presignJson.doc_id,
-        "x-amz-meta-orig-content-type": "application/pdf",
+        "x-amz-meta-orig-content-type": file.type || guessMimeFromFilename(file.name),
       },
       body: file,
     });
@@ -192,7 +282,7 @@ export default function UploadPanel({
       return;
     }
     if (!items.some((i) => i.status === "queued")) {
-      setError("Add at least one PDF first.");
+      setError("Add at least one supported file first.");
       return;
     }
 
@@ -220,7 +310,7 @@ export default function UploadPanel({
         <div>
           <h2 className="text-lg font-semibold">Upload documents</h2>
           <p className="mt-1 text-sm text-white/60">
-            Drag and drop one or many PDFs. Document title is automatically set from filename.
+            Drag and drop one or many supported files. Document title is automatically set from filename.
           </p>
         </div>
 
@@ -237,7 +327,7 @@ export default function UploadPanel({
         <div
           role="button"
           tabIndex={0}
-          aria-label="Upload PDF files"
+          aria-label="Upload files"
           aria-describedby="upload-dropzone-help"
           onDragOver={(e) => {
             e.preventDefault();
@@ -260,15 +350,15 @@ export default function UploadPanel({
             dragOver ? "border-sky-300 bg-sky-500/10" : "border-white/20 bg-black/30 hover:border-white/40"
           }`}
         >
-          <div className="text-sm font-medium text-white">Drop PDF files here</div>
+          <div className="text-sm font-medium text-white">Drop files here</div>
           <div id="upload-dropzone-help" className="mt-1 text-xs text-white/60">or click to browse multiple files</div>
           <input
             id={inputId}
             ref={fileInputRef}
             type="file"
-            aria-label="Choose PDF files to upload"
+            aria-label="Choose files to upload"
             multiple
-            accept="application/pdf"
+            accept={ACCEPT_ATTR}
             className="hidden"
             onChange={(e) => {
               if (e.target.files?.length) addFiles(e.target.files);

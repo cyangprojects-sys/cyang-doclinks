@@ -20,6 +20,7 @@ import {
 import { getActiveMasterKeyOrThrow } from "@/lib/masterKeys";
 import { appendImmutableAudit } from "@/lib/immutableAudit";
 import { reportException } from "@/lib/observability";
+import { validateUploadType } from "@/lib/uploadTypeValidation";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -36,15 +37,6 @@ const BodySchema = z.object({
 
 function safeKeyPart(name: string) {
   return name.replace(/[^a-zA-Z0-9._-]+/g, "_").replace(/_+/g, "_").slice(0, 120);
-}
-
-function isSafeUploadFilename(name: string): boolean {
-  const n = String(name || "").trim();
-  if (!n) return false;
-  if (n.length > 240) return false;
-  if (/[\\/:*?"<>|]/.test(n)) return false;
-  if (n.includes("..")) return false;
-  return /\.pdf$/i.test(n);
 }
 
 function getKeyPrefix() {
@@ -125,9 +117,13 @@ export async function POST(req: Request) {
     }
 
     const { title, filename } = parsed.data;
-    if (!isSafeUploadFilename(filename)) {
+    const declaredType = validateUploadType({
+      filename,
+      declaredMime: parsed.data.contentType ?? null,
+    });
+    if (!declaredType.ok) {
       return NextResponse.json(
-        { ok: false, error: "BAD_FILENAME", message: "filename must be a safe .pdf filename." },
+        { ok: false, error: declaredType.error, message: declaredType.message },
         { status: 400 }
       );
     }
@@ -141,7 +137,7 @@ export async function POST(req: Request) {
         { status: 400 }
       );
     }
-    const contentType = (parsed.data.contentType ?? "application/pdf").toLowerCase();
+    const contentType = declaredType.canonicalMime;
     const sizeBytes = parsed.data.sizeBytes ?? null;
     const absMax = Number(process.env.UPLOAD_ABSOLUTE_MAX_BYTES || 26_214_400); // 25 MB default
 
@@ -154,10 +150,6 @@ export async function POST(req: Request) {
         { ok: false, error: "FILE_TOO_LARGE", message: `File exceeds absolute limit (${absMax} bytes).` },
         { status: 413 }
       );
-    }
-
-    if (contentType !== "application/pdf" && contentType !== "application/x-pdf") {
-      return NextResponse.json({ ok: false, error: "NOT_PDF" }, { status: 400 });
     }
 
     // --- Monetization / plan limits (hidden) ---
@@ -194,7 +186,7 @@ export async function POST(req: Request) {
 
     const docId = crypto.randomUUID();
     const keyPrefix = getKeyPrefix();
-    const safeName = safeKeyPart(filename.toLowerCase().endsWith(".pdf") ? filename : `${filename}.pdf`);
+    const safeName = safeKeyPart(filename);
     const key = `${keyPrefix}${docId}_${safeName}`;
 
     const createdByEmail = user.email;
@@ -252,10 +244,11 @@ export async function POST(req: Request) {
     const putParams: any = {
       Bucket: r2Bucket,
       Key: key,
-      ContentType: "application/pdf",
+      ContentType: contentType,
       Metadata: {
         "doc-id": docId,
-        "orig-content-type": "application/pdf",
+        "orig-content-type": contentType,
+        "orig-ext": declaredType.ext,
       },
     };
 
@@ -263,6 +256,7 @@ export async function POST(req: Request) {
       "content-type",
       "x-amz-meta-doc-id",
       "x-amz-meta-orig-content-type",
+      "x-amz-meta-orig-ext",
     ]);
 
     const uploadUrl = await getSignedUrl(r2Client, new PutObjectCommand(putParams), {

@@ -18,6 +18,7 @@ import { encryptAes256Gcm, generateDataKey, generateIv, wrapDataKey } from "@/li
 import { getActiveMasterKeyOrThrow } from "@/lib/masterKeys";
 import { getRouteTimeoutMs, isRouteTimeoutError, withRouteTimeout } from "@/lib/routeTimeout";
 import { assertRuntimeEnv, isRuntimeEnvError } from "@/lib/runtimeEnv";
+import { validateUploadType } from "@/lib/uploadTypeValidation";
 
 type CompleteRequest = {
   // Newer flow: doc_id from /presign response
@@ -130,12 +131,13 @@ export async function POST(req: NextRequest) {
       select
         id::text as id,
         coalesce(original_filename, title, '')::text as name,
+        coalesce(content_type, '')::text as content_type,
         r2_bucket::text as r2_bucket,
         r2_key::text as r2_key
       from public.docs
       where id = ${docId}::uuid
       limit 1
-    `) as { id: string; name: string; r2_bucket: string | null; r2_key: string | null }[];
+    `) as { id: string; name: string; content_type: string; r2_bucket: string | null; r2_key: string | null }[];
 
     if (!docRows.length) {
       return NextResponse.json({ ok: false, error: "doc_not_found" }, { status: 404 });
@@ -281,6 +283,7 @@ export async function POST(req: NextRequest) {
     // Verify signed metadata we attached during presign.
     const metaDocId = (meta["doc-id"] || meta["doc_id"] || "").toString();
     const metaOrigCt = (meta["orig-content-type"] || meta["orig_content_type"] || "").toString();
+    const metaOrigExt = (meta["orig-ext"] || meta["orig_ext"] || "").toString();
 
     if (!metaDocId) {
       await logSecurityEvent({
@@ -309,33 +312,32 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: "metadata_mismatch" }, { status: 409 });
     }
 
-    // If present, require original to be PDF.
-    if (!metaOrigCt || metaOrigCt !== "application/pdf") {
+    if (!metaOrigCt) {
       await logSecurityEvent({
-        type: "upload_complete_not_pdf",
+        type: "upload_complete_mime_missing",
         severity: "high",
         ip: ipInfo.ip,
         docId,
         scope: "upload_complete",
-        message: "R2 metadata orig-content-type is not application/pdf",
-        meta: { metaOrigCt, ct },
+        message: "R2 metadata orig-content-type is missing",
+        meta: { metaOrigCt, ct, metaOrigExt },
       });
-      await cleanupRejectedObject("not_pdf", { metaOrigCt, contentType: ct });
-      return NextResponse.json({ ok: false, error: "not_pdf" }, { status: 409 });
+      await cleanupRejectedObject("mime_missing", { metaOrigCt, contentType: ct, metaOrigExt });
+      return NextResponse.json({ ok: false, error: "mime_missing" }, { status: 409 });
     }
 
-    if (ct && ct !== "application/pdf" && ct !== "application/x-pdf" && ct !== "application/octet-stream") {
+    if (ct && ct !== metaOrigCt) {
       await logSecurityEvent({
-        type: "upload_complete_ciphertext_ct_mismatch",
+        type: "upload_complete_content_type_mismatch",
         severity: "high",
         ip: ipInfo.ip,
         docId,
         scope: "upload_complete",
-        message: "Upload object content-type is not a supported PDF type",
-        meta: { contentType: ct },
+        message: "Upload object content-type mismatch with declared metadata",
+        meta: { contentType: ct, metaOrigCt },
       });
-      await cleanupRejectedObject("invalid_content_type", { encryptionEnabled: true, contentType: ct });
-      return NextResponse.json({ ok: false, error: "invalid_content_type" }, { status: 409 });
+      await cleanupRejectedObject("content_type_mismatch", { encryptionEnabled: true, contentType: ct, metaOrigCt });
+      return NextResponse.json({ ok: false, error: "content_type_mismatch" }, { status: 409 });
     }
 
     // 4) Read uploaded PDF bytes and validate server-side before encryption.
@@ -356,28 +358,53 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: "object_read_failed" }, { status: 409 });
     }
 
-    const safety = validatePdfBuffer({
+    const filenameForValidation = (originalFilename || docRows[0].name || "upload.bin").trim();
+    const typeCheck = validateUploadType({
+      filename: filenameForValidation,
+      declaredMime: metaOrigCt || docRows[0].content_type || null,
       bytes: uploadedBytes,
-      absMaxBytes: absMax,
-      maxPdfPages: Number(process.env.PDF_MAX_PAGES || 2000),
     });
-    if (!safety.ok) {
+    if (!typeCheck.ok) {
       await logSecurityEvent({
-        type: "upload_complete_pdf_validation_failed",
+        type: "upload_complete_type_validation_failed",
         severity: "high",
         ip: ipInfo.ip,
         docId,
         scope: "upload_complete",
-        message: "PDF validation failed before encryption",
-        meta: { error: safety.error, message: safety.message, details: safety.details ?? null },
+        message: "File type validation failed before encryption",
+        meta: { error: typeCheck.error, message: typeCheck.message, metaOrigCt, filenameForValidation },
       });
-      await cleanupRejectedObject("pdf_validation_failed_before_encrypt", { error: safety.error });
-      return NextResponse.json({ ok: false, error: safety.error, message: safety.message }, { status: 409 });
+      await cleanupRejectedObject("type_validation_failed_before_encrypt", { error: typeCheck.error });
+      return NextResponse.json({ ok: false, error: typeCheck.error, message: typeCheck.message }, { status: 409 });
     }
 
-    scanStatus = safety.riskLevel === "low" ? "clean" : "risky";
-    riskLevel = safety.riskLevel;
-    riskFlags = { flags: safety.flags, details: safety.details, mode: "server_validation" };
+    if (typeCheck.canonicalMime === "application/pdf") {
+      const safety = validatePdfBuffer({
+        bytes: uploadedBytes,
+        absMaxBytes: absMax,
+        maxPdfPages: Number(process.env.PDF_MAX_PAGES || 2000),
+      });
+      if (!safety.ok) {
+        await logSecurityEvent({
+          type: "upload_complete_pdf_validation_failed",
+          severity: "high",
+          ip: ipInfo.ip,
+          docId,
+          scope: "upload_complete",
+          message: "PDF validation failed before encryption",
+          meta: { error: safety.error, message: safety.message, details: safety.details ?? null },
+        });
+        await cleanupRejectedObject("pdf_validation_failed_before_encrypt", { error: safety.error });
+        return NextResponse.json({ ok: false, error: safety.error, message: safety.message }, { status: 409 });
+      }
+      scanStatus = safety.riskLevel === "low" ? "clean" : "risky";
+      riskLevel = safety.riskLevel;
+      riskFlags = { flags: safety.flags, details: safety.details, mode: "server_validation" };
+    } else {
+      scanStatus = "clean";
+      riskLevel = "low";
+      riskFlags = { flags: [], details: { mime: typeCheck.canonicalMime, ext: typeCheck.ext }, mode: "server_validation" };
+    }
 
     // 5) Encrypt file server-side and overwrite uploaded plaintext object.
     let encAlg = "AES-256-GCM";
@@ -400,7 +427,8 @@ export async function POST(req: NextRequest) {
           ContentType: "application/octet-stream",
           Metadata: {
             "doc-id": docId,
-            "orig-content-type": "application/pdf",
+            "orig-content-type": typeCheck.canonicalMime,
+            "orig-ext": typeCheck.ext,
           },
         })
       );
@@ -423,6 +451,7 @@ export async function POST(req: NextRequest) {
       set
         title = coalesce(${title}, title),
         original_filename = coalesce(${originalFilename}, original_filename),
+        content_type = ${typeCheck.canonicalMime},
         status = 'ready',
         scan_status = ${scanStatus}::text,
         risk_level = ${riskLevel}::text,
