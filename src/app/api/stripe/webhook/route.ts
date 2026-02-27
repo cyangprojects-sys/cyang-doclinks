@@ -25,7 +25,7 @@ function planFromStripePriceId(priceId: string | null): "free" | "pro" {
     .map((s) => s.trim())
     .filter(Boolean);
   if (priceId && proPrices.includes(priceId)) return "pro";
-  return "pro";
+  return "free";
 }
 
 function getSubPriceId(obj: any): string | null {
@@ -89,58 +89,58 @@ export async function POST(req: NextRequest) {
         let webhookMessage: string | null = null;
 
         try {
-    if (
-      eventType === "customer.subscription.created" ||
-      eventType === "customer.subscription.updated" ||
-      eventType === "customer.subscription.deleted"
-    ) {
-      const stripeSubscriptionId = String(obj?.id || "").trim();
-      const stripeCustomerId = String(obj?.customer || "").trim() || null;
-      const metadataUserId = String(obj?.metadata?.user_id || "").trim() || null;
-      const userId = metadataUserId || (await getUserIdByStripeCustomerId(stripeCustomerId));
+          if (
+            eventType === "customer.subscription.created" ||
+            eventType === "customer.subscription.updated" ||
+            eventType === "customer.subscription.deleted"
+          ) {
+            const stripeSubscriptionId = String(obj?.id || "").trim();
+            const stripeCustomerId = String(obj?.customer || "").trim() || null;
+            const metadataUserId = String(obj?.metadata?.user_id || "").trim() || null;
+            const userId = metadataUserId || (await getUserIdByStripeCustomerId(stripeCustomerId));
 
-      const status = String(obj?.status || (eventType.endsWith(".deleted") ? "canceled" : "incomplete")).toLowerCase();
-      const planId = planFromStripePriceId(getSubPriceId(obj));
-      const currentPeriodEnd = unixToIso(obj?.current_period_end);
-      const cancelAtPeriodEnd = Boolean(obj?.cancel_at_period_end);
+            const status = String(obj?.status || (eventType.endsWith(".deleted") ? "canceled" : "incomplete")).toLowerCase();
+            const planId = planFromStripePriceId(getSubPriceId(obj));
+            const currentPeriodEnd = unixToIso(obj?.current_period_end);
+            const cancelAtPeriodEnd = Boolean(obj?.cancel_at_period_end);
 
-      await upsertStripeSubscription({
-        userId,
-        stripeCustomerId,
-        stripeSubscriptionId,
-        status,
-        planId,
-        currentPeriodEnd,
-        cancelAtPeriodEnd,
-        graceUntil: null,
-      });
+            await upsertStripeSubscription({
+              userId,
+              stripeCustomerId,
+              stripeSubscriptionId,
+              status,
+              planId,
+              currentPeriodEnd,
+              cancelAtPeriodEnd,
+              graceUntil: null,
+            });
 
-      if (userId) {
-        await syncUserPlanFromSubscription(userId);
-      }
-    } else if (eventType === "invoice.payment_failed") {
-      const stripeSubscriptionId = String(obj?.subscription || "").trim() || null;
-      const stripeCustomerId = String(obj?.customer || "").trim() || null;
-      const userId = await getUserIdByStripeCustomerId(stripeCustomerId);
-      await markPaymentFailure({
-        stripeSubscriptionId,
-        stripeCustomerId,
-        graceDays: getGraceDays(),
-      });
-      if (userId) await syncUserPlanFromSubscription(userId);
-    } else if (eventType === "invoice.payment_succeeded") {
-      const stripeSubscriptionId = String(obj?.subscription || "").trim() || null;
-      const stripeCustomerId = String(obj?.customer || "").trim() || null;
-      const userId = await getUserIdByStripeCustomerId(stripeCustomerId);
-      await markPaymentSucceeded({
-        stripeSubscriptionId,
-        stripeCustomerId,
-      });
-      if (userId) await syncUserPlanFromSubscription(userId);
-    } else {
-      webhookStatus = "ignored";
-      webhookMessage = `Unhandled event type: ${eventType}`;
-    }
+            if (userId) {
+              await syncUserPlanFromSubscription(userId);
+            }
+          } else if (eventType === "invoice.payment_failed") {
+            const stripeSubscriptionId = String(obj?.subscription || "").trim() || null;
+            const stripeCustomerId = String(obj?.customer || "").trim() || null;
+            const userId = await getUserIdByStripeCustomerId(stripeCustomerId);
+            await markPaymentFailure({
+              stripeSubscriptionId,
+              stripeCustomerId,
+              graceDays: getGraceDays(),
+            });
+            if (userId) await syncUserPlanFromSubscription(userId);
+          } else if (eventType === "invoice.payment_succeeded") {
+            const stripeSubscriptionId = String(obj?.subscription || "").trim() || null;
+            const stripeCustomerId = String(obj?.customer || "").trim() || null;
+            const userId = await getUserIdByStripeCustomerId(stripeCustomerId);
+            await markPaymentSucceeded({
+              stripeSubscriptionId,
+              stripeCustomerId,
+            });
+            if (userId) await syncUserPlanFromSubscription(userId);
+          } else {
+            webhookStatus = "ignored";
+            webhookMessage = `Unhandled event type: ${eventType}`;
+          }
 
           await appendImmutableAudit({
             streamKey: "billing:stripe_webhook",
