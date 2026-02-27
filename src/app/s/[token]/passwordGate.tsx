@@ -20,6 +20,8 @@ export default function PasswordGate({
   const [email, setEmail] = useState("");
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const emailInputId = `share-email-${token}`;
+  const passwordInputId = `share-password-${token}`;
 
   const title = useMemo(() => {
     if (hasPassword && requireEmail) return "Password and recipient email required";
@@ -53,32 +55,46 @@ export default function PasswordGate({
       ) : null}
 
       {err ? (
-        <div className="mt-3 rounded-xl border border-red-400/35 bg-red-500/10 px-3 py-2 text-sm text-red-100">
+        <div role="alert" aria-live="assertive" className="mt-3 rounded-xl border border-red-400/35 bg-red-500/10 px-3 py-2 text-sm text-red-100">
           {err}
         </div>
       ) : null}
 
       <div className="mt-4 space-y-3">
         {requireEmail ? (
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder={emailHint ? `Email (${emailHint})` : "Recipient email"}
-            className="w-full rounded-xl border border-white/20 bg-black/20 px-3 py-2 text-sm text-white placeholder:text-white/45 focus:border-cyan-300/55 focus:outline-none"
-            autoComplete="email"
-          />
+          <div>
+            <label htmlFor={emailInputId} className="mb-1.5 block text-xs text-white/65">
+              Recipient email
+            </label>
+            <input
+              id={emailInputId}
+              type="email"
+              aria-label="Recipient email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder={emailHint ? `Email (${emailHint})` : "Recipient email"}
+              className="w-full rounded-xl border border-white/20 bg-black/20 px-3 py-2 text-sm text-white placeholder:text-white/45 focus:border-cyan-300/55 focus:outline-none"
+              autoComplete="email"
+            />
+          </div>
         ) : null}
 
         {hasPassword ? (
-          <input
-            type="password"
-            value={pw}
-            onChange={(e) => setPw(e.target.value)}
-            placeholder="Password"
-            className="w-full rounded-xl border border-white/20 bg-black/20 px-3 py-2 text-sm text-white placeholder:text-white/45 focus:border-cyan-300/55 focus:outline-none"
-            autoComplete="current-password"
-          />
+          <div>
+            <label htmlFor={passwordInputId} className="mb-1.5 block text-xs text-white/65">
+              Password
+            </label>
+            <input
+              id={passwordInputId}
+              type="password"
+              aria-label="Password"
+              value={pw}
+              onChange={(e) => setPw(e.target.value)}
+              placeholder="Password"
+              className="w-full rounded-xl border border-white/20 bg-black/20 px-3 py-2 text-sm text-white placeholder:text-white/45 focus:border-cyan-300/55 focus:outline-none"
+              autoComplete="current-password"
+            />
+          </div>
         ) : null}
 
         <button
@@ -111,4 +127,3 @@ export default function PasswordGate({
     </div>
   );
 }
-

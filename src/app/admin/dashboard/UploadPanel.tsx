@@ -58,6 +58,7 @@ export default function UploadPanel({
 
   const [encryptionReady, setEncryptionReady] = useState<boolean | null>(null);
   const [encryptionMsg, setEncryptionMsg] = useState<string | null>(null);
+  const inputId = "upload-panel-file-input";
 
   const queuedCount = useMemo(() => items.filter((i) => i.status === "queued").length, [items]);
   const doneCount = useMemo(() => items.filter((i) => i.status === "done").length, [items]);
@@ -251,6 +252,10 @@ export default function UploadPanel({
 
       <div className="mt-4">
         <div
+          role="button"
+          tabIndex={0}
+          aria-label="Upload PDF files"
+          aria-describedby="upload-dropzone-help"
           onDragOver={(e) => {
             e.preventDefault();
             setDragOver(true);
@@ -262,15 +267,23 @@ export default function UploadPanel({
             if (e.dataTransfer?.files?.length) addFiles(e.dataTransfer.files);
           }}
           onClick={() => fileInputRef.current?.click()}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              fileInputRef.current?.click();
+            }
+          }}
           className={`cursor-pointer rounded-xl border-2 border-dashed px-4 py-8 text-center transition ${
             dragOver ? "border-sky-300 bg-sky-500/10" : "border-white/20 bg-black/30 hover:border-white/40"
           }`}
         >
           <div className="text-sm font-medium text-white">Drop PDF files here</div>
-          <div className="mt-1 text-xs text-white/60">or click to browse multiple files</div>
+          <div id="upload-dropzone-help" className="mt-1 text-xs text-white/60">or click to browse multiple files</div>
           <input
+            id={inputId}
             ref={fileInputRef}
             type="file"
+            aria-label="Choose PDF files to upload"
             multiple
             accept="application/pdf"
             className="hidden"
@@ -287,10 +300,10 @@ export default function UploadPanel({
       </div>
 
       {canCheckEncryptionStatus && encryptionReady === false && (
-        <div className="mt-2 text-sm text-red-300">{encryptionMsg ?? "Encryption not configured."}</div>
+        <div role="status" aria-live="polite" className="mt-2 text-sm text-red-300">{encryptionMsg ?? "Encryption not configured."}</div>
       )}
 
-      {error && <div className="mt-3 text-sm text-red-300">{error}</div>}
+      {error && <div role="alert" aria-live="assertive" className="mt-3 text-sm text-red-300">{error}</div>}
 
       {items.length > 0 ? (
         <div className="mt-4 rounded-lg border border-white/10 bg-black/30 p-3 text-sm">

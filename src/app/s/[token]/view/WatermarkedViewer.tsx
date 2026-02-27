@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 
 export default function WatermarkedViewer(props: {
   rawUrl: string;
@@ -12,6 +12,7 @@ export default function WatermarkedViewer(props: {
   const [shield, setShield] = useState(false);
 
   useEffect(() => {
+    if (!props.enabled) return;
     let noticeTimer: ReturnType<typeof setTimeout> | null = null;
     let shieldTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -26,35 +27,9 @@ export default function WatermarkedViewer(props: {
       }
     };
 
-    const onKeyDown = (e: KeyboardEvent) => {
-      const k = String(e.key || "").toLowerCase();
-      const cmd = e.metaKey || e.ctrlKey;
-
-      // Best-effort deterrence for common exfiltration shortcuts.
-      if ((cmd && (k === "p" || k === "s")) || k === "printscreen") {
-        e.preventDefault();
-        notify("Capture/export is restricted for this document.", true);
-      }
-    };
-
     const onBeforePrint = (e: Event) => {
       e.preventDefault();
       notify("Printing is disabled for protected viewing.", true);
-    };
-
-    const onContextMenu = (e: MouseEvent) => {
-      e.preventDefault();
-      notify("Right-click is disabled for protected viewing.", false);
-    };
-
-    const onCopy = (e: ClipboardEvent) => {
-      e.preventDefault();
-      notify("Copy is disabled for protected viewing.", false);
-    };
-
-    const onDragStart = (e: DragEvent) => {
-      e.preventDefault();
-      notify("Drag/export is disabled for protected viewing.", false);
     };
 
     const onVisibility = () => {
@@ -63,24 +38,34 @@ export default function WatermarkedViewer(props: {
       }
     };
 
-    window.addEventListener("keydown", onKeyDown);
     window.addEventListener("beforeprint", onBeforePrint);
-    window.addEventListener("contextmenu", onContextMenu);
-    window.addEventListener("copy", onCopy);
-    window.addEventListener("dragstart", onDragStart);
     document.addEventListener("visibilitychange", onVisibility);
 
     return () => {
-      window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("beforeprint", onBeforePrint);
-      window.removeEventListener("contextmenu", onContextMenu);
-      window.removeEventListener("copy", onCopy);
-      window.removeEventListener("dragstart", onDragStart);
       document.removeEventListener("visibilitychange", onVisibility);
       if (noticeTimer) clearTimeout(noticeTimer);
       if (shieldTimer) clearTimeout(shieldTimer);
     };
-  }, []);
+  }, [props.enabled]);
+
+  function notify(message: string, showShield: boolean) {
+    setDeterrenceNotice(message);
+    if (showShield) {
+      setShield(true);
+      window.setTimeout(() => setShield(false), 2200);
+    }
+    window.setTimeout(() => setDeterrenceNotice(null), 2200);
+  }
+
+  function onProtectedKeyDown(e: ReactKeyboardEvent<HTMLDivElement>) {
+    const k = String(e.key || "").toLowerCase();
+    const cmd = e.metaKey || e.ctrlKey;
+    if ((cmd && (k === "p" || k === "s")) || k === "printscreen") {
+      e.preventDefault();
+      notify("Capture/export is restricted for this document.", true);
+    }
+  }
 
   const overlay = useMemo(() => {
     if (!props.enabled) return null;
@@ -115,7 +100,13 @@ export default function WatermarkedViewer(props: {
   }, [props.enabled, text]);
 
   return (
-    <div className="relative h-[calc(100vh-64px)] w-full overflow-hidden rounded-2xl border border-white/10 bg-black">
+    <div
+      className="relative h-[calc(100vh-64px)] w-full overflow-hidden rounded-2xl border border-white/10 bg-black"
+      role="application"
+      tabIndex={0}
+      aria-label="Protected document viewer"
+      onKeyDownCapture={onProtectedKeyDown}
+    >
       <iframe
         title="Document"
         src={`${props.rawUrl}#toolbar=0&navpanes=0&scrollbar=0&statusbar=0`}
@@ -133,7 +124,7 @@ export default function WatermarkedViewer(props: {
         />
       ) : null}
       {deterrenceNotice ? (
-        <div className="pointer-events-none absolute bottom-3 right-3 z-20 rounded-lg border border-red-500/30 bg-red-500/15 px-3 py-2 text-xs text-red-100">
+        <div role="status" aria-live="polite" className="pointer-events-none absolute bottom-3 right-3 z-20 rounded-lg border border-red-500/30 bg-red-500/15 px-3 py-2 text-xs text-red-100">
           {deterrenceNotice}
         </div>
       ) : null}
