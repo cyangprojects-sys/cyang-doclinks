@@ -397,11 +397,11 @@ export async function POST(req: NextRequest) {
         await cleanupRejectedObject("pdf_validation_failed_before_encrypt", { error: safety.error });
         return NextResponse.json({ ok: false, error: safety.error, message: safety.message }, { status: 409 });
       }
-      scanStatus = safety.riskLevel === "low" ? "clean" : "risky";
+      scanStatus = "queued";
       riskLevel = safety.riskLevel;
       riskFlags = { flags: safety.flags, details: safety.details, mode: "server_validation" };
     } else {
-      scanStatus = "clean";
+      scanStatus = "queued";
       riskLevel = "low";
       riskFlags = { flags: [], details: { mime: typeCheck.canonicalMime, ext: typeCheck.ext }, mode: "server_validation" };
     }

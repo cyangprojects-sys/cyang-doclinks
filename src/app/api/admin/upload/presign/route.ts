@@ -30,7 +30,7 @@ export const dynamic = "force-dynamic";
 const BodySchema = z.object({
   title: z.string().optional(),
   filename: z.string().min(1).max(240),
-  contentType: z.string().optional(),
+  contentType: z.string().min(1),
   sizeBytes: z.number().int().positive().optional(),
   encrypt: z.boolean().optional(),
 });
@@ -119,7 +119,7 @@ export async function POST(req: Request) {
     const { title, filename } = parsed.data;
     const declaredType = validateUploadType({
       filename,
-      declaredMime: parsed.data.contentType ?? null,
+      declaredMime: parsed.data.contentType,
     });
     if (!declaredType.ok) {
       return NextResponse.json(

@@ -43,7 +43,6 @@ const ALLOWED: AllowedSpec[] = [
   { ext: "png", mimes: ["image/png"], canonical: "image/png", family: "image" },
   { ext: "gif", mimes: ["image/gif"], canonical: "image/gif", family: "image" },
   { ext: "bmp", mimes: ["image/bmp"], canonical: "image/bmp", family: "image" },
-  { ext: "svg", mimes: ["image/svg+xml"], canonical: "image/svg+xml", family: "image" },
   { ext: "heic", mimes: ["image/heic", "image/heif"], canonical: "image/heic", family: "image" },
   { ext: "zip", mimes: ["application/zip", "application/x-zip-compressed"], canonical: "application/zip", family: "archive" },
   { ext: "rar", mimes: ["application/vnd.rar", "application/x-rar-compressed"], canonical: "application/vnd.rar", family: "archive" },
@@ -87,6 +86,7 @@ const BLOCKED_EXT = new Set([
   "docm",
   "xlsm",
   "pptm",
+  "svg",
 ]);
 
 const BLOCKED_MIME_PREFIXES = ["application/x-msdownload", "application/x-executable"];
@@ -96,6 +96,10 @@ const BLOCKED_MIME_EXACT = new Set([
   "application/x-mach-binary",
   "application/java-archive",
   "application/x-sh",
+  "text/html",
+  "application/javascript",
+  "text/javascript",
+  "image/svg+xml",
 ]);
 
 export const ALLOWED_UPLOAD_EXTENSIONS = ALLOWED.map((s) => s.ext);
@@ -127,6 +131,19 @@ function startsWithAscii(bytes: Buffer, text: string): boolean {
   return bytes.subarray(0, text.length).toString("ascii") === text;
 }
 
+function isLikelyText(bytes: Buffer): boolean {
+  const sample = bytes.subarray(0, Math.min(bytes.length, 4096));
+  if (!sample.length) return false;
+  let printable = 0;
+  let nulls = 0;
+  for (const b of sample) {
+    if (b === 0x00) nulls++;
+    if (b === 0x09 || b === 0x0a || b === 0x0d || (b >= 0x20 && b <= 0x7e)) printable++;
+  }
+  if (nulls > 0) return false;
+  return printable / sample.length >= 0.9;
+}
+
 function detectMimeFromBytes(bytes: Buffer, filename: string): string | null {
   if (!bytes.length) return null;
   if (startsWithAscii(bytes, "%PDF-")) return "application/pdf";
@@ -152,7 +169,8 @@ function detectMimeFromBytes(bytes: Buffer, filename: string): string | null {
     return spec ? spec.canonical : "application/x-ole-storage";
   }
   const headText = bytes.subarray(0, Math.min(bytes.length, 4096)).toString("utf8").trimStart();
-  if (headText.startsWith("<svg") || headText.startsWith("<?xml") && headText.toLowerCase().includes("<svg")) return "image/svg+xml";
+  if (headText.startsWith("<svg") || (headText.startsWith("<?xml") && headText.toLowerCase().includes("<svg"))) return "image/svg+xml";
+  if (headText.startsWith("{\\rtf")) return "application/rtf";
   if (/^[\t\r\n\x20-\x7e]+$/.test(headText)) {
     const ext = extOf(filename);
     if (ext === "csv") return "text/csv";
@@ -206,11 +224,19 @@ export function validateUploadType(args: {
       if (!detectedAllowed) {
         return { ok: false, error: "MIME_MISMATCH", message: "Detected MIME type does not match allowed type." };
       }
-    } else if (declared) {
-      // If no deterministic signature is available, keep the declared MIME gate.
-      const declaredAllowed = spec.mimes.includes(declared);
-      if (!declaredAllowed) {
-        return { ok: false, error: "MIME_MISMATCH", message: "Unable to validate file MIME type." };
+    } else {
+      // Fail closed on unknown binary signatures.
+      if (["txt", "csv"].includes(ext)) {
+        if (!isLikelyText(args.bytes)) {
+          return { ok: false, error: "MIME_MISMATCH", message: "Text file validation failed." };
+        }
+      } else if (ext === "rtf") {
+        const sample = args.bytes.subarray(0, Math.min(args.bytes.length, 32)).toString("utf8");
+        if (!sample.startsWith("{\\rtf")) {
+          return { ok: false, error: "MIME_MISMATCH", message: "RTF signature validation failed." };
+        }
+      } else {
+        return { ok: false, error: "MIME_MISMATCH", message: "Unable to validate file signature." };
       }
     }
   }

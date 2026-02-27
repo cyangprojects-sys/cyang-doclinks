@@ -48,7 +48,6 @@ const ALLOWED_EXTS = new Set([
   "png",
   "gif",
   "bmp",
-  "svg",
   "heic",
   "zip",
   "rar",
@@ -86,10 +85,11 @@ const EXECUTABLE_EXTS = new Set([
   "docm",
   "xlsm",
   "pptm",
+  "svg",
 ]);
 
 const ACCEPT_ATTR =
-  ".pdf,.doc,.docx,.txt,.rtf,.odt,.xls,.xlsx,.csv,.ppt,.pptx,.jpg,.jpeg,.png,.gif,.bmp,.svg,.heic,.zip,.rar,.mp3,.wav,.mp4,.mov,.avi";
+  ".pdf,.doc,.docx,.txt,.rtf,.odt,.xls,.xlsx,.csv,.ppt,.pptx,.jpg,.jpeg,.png,.gif,.bmp,.heic,.zip,.rar,.mp3,.wav,.mp4,.mov,.avi";
 
 function extOf(name: string): string {
   const n = String(name || "").trim().toLowerCase();
