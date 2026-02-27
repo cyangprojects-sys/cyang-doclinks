@@ -99,8 +99,9 @@ export default function WatermarkedViewer(props: {
         title="Document"
         src={props.rawUrl}
         className="h-full w-full"
-        // Keep scripts disabled in frame context to reduce scriptable surface.
-        sandbox="allow-same-origin allow-downloads"
+        // Chrome/Edge PDF rendering requires script execution in the embedded viewer.
+        // Without allow-scripts, some documents show a blank canvas in iframe mode.
+        sandbox="allow-same-origin allow-scripts allow-downloads"
       />
       {overlay}
       {shield ? (
