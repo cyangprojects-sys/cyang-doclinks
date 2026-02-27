@@ -303,7 +303,7 @@ export default async function AnalyticsWidgets({ ownerId }: { ownerId?: string; 
 
   if (hasSecurityEvents) {
     try {
-      const expectedJobs = ["webhooks", "scan", "key-rotation", "aggregate", "nightly", "retention"];
+      const expectedJobs = ["webhooks", "scan", "key-rotation", "aggregate", "nightly", "retention", "billing-sync"];
       const rows = (await sql`
         select
           coalesce(se.meta->>'job', '')::text as job,

@@ -296,7 +296,7 @@ export default function UploadPanel({
       </div>
 
       <div className="mt-3 rounded-lg border border-emerald-400/10 bg-emerald-400/5 px-3 py-2 text-xs text-emerald-200/90">
-        Documents are encrypted end-to-end (AES-256-GCM). The server only decrypts when serving.
+        Documents are encrypted end-to-end (AES-256-GCM). Unencrypted upload/serve paths are disabled.
       </div>
 
       {canCheckEncryptionStatus && encryptionReady === false && (

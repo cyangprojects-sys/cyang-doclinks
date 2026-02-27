@@ -3,7 +3,7 @@ main = "src/index.ts"
 compatibility_date = "2025-01-01"
 
 [triggers]
-crons = ["*/5 * * * *", "*/10 * * * *", "*/15 * * * *", "*/30 * * * *", "5 * * * *", "17 2 * * *"]
+crons = ["*/5 * * * *", "*/10 * * * *", "*/15 * * * *", "*/30 * * * *", "5 * * * *", "25 * * * *", "17 2 * * *"]
 
 [vars]
 # Update if your route paths differ.
@@ -13,3 +13,4 @@ TARGET_NIGHTLY_URL = "https://www.cyang.io/api/cron/nightly"
 TARGET_WEBHOOKS_URL = "https://www.cyang.io/api/cron/webhooks"
 TARGET_AGGREGATE_URL = "https://www.cyang.io/api/cron/aggregate"
 TARGET_RETENTION_URL = "https://www.cyang.io/api/cron/retention"
+TARGET_BILLING_SYNC_URL = "https://www.cyang.io/api/cron/billing-sync"

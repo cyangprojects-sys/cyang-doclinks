@@ -18,6 +18,45 @@ export type AuthedUser = {
   orgSlug: string | null;
 };
 
+async function orgAccessDisabled(orgIdRaw: string | null | undefined): Promise<boolean> {
+  const orgId = String(orgIdRaw || "").trim();
+  if (!orgId) return false;
+  if (!(await organizationsTableExists())) return false;
+
+  try {
+    const rows = (await sql`
+      select
+        coalesce(disabled, false) as disabled,
+        coalesce(is_active, true) as is_active
+      from public.organizations
+      where id = ${orgId}::uuid
+      limit 1
+    `) as unknown as Array<{ disabled: boolean; is_active: boolean }>;
+    const r = rows?.[0];
+    if (!r) return true;
+    return Boolean(r.disabled) || !Boolean(r.is_active);
+  } catch {
+    // Older schemas may not have disabled/is_active flags.
+    try {
+      const rows = (await sql`
+        select 1
+        from public.organizations
+        where id = ${orgId}::uuid
+        limit 1
+      `) as unknown as Array<{ "?column?": number }>;
+      return rows.length === 0;
+    } catch {
+      return false;
+    }
+  }
+}
+
+export async function assertOrgActiveForAccess(orgIdRaw: string | null | undefined): Promise<void> {
+  if (await orgAccessDisabled(orgIdRaw)) {
+    throw new Error("ORG_DISABLED");
+  }
+}
+
 function normEmail(email: string): string {
   return String(email || "").trim().toLowerCase();
 }
@@ -154,6 +193,9 @@ export async function ensureUserByEmail(emailRaw: string, ctx: EnsureUserCtx): P
     orgId = await getDefaultOrgId();
     if (orgId && !orgSlug) orgSlug = "default";
   }
+  if (orgId) {
+    await assertOrgActiveForAccess(orgId);
+  }
 
   try {
     // If users table doesn't have org_id yet, keep older behavior.
@@ -279,6 +321,9 @@ export async function ensureUserByEmail(emailRaw: string, ctx: EnsureUserCtx): P
     if (msg.includes("org_membership_required")) {
       throw new Error("Organization membership is required. Ask an owner for an invite.");
     }
+    if (msg.includes("org_disabled")) {
+      throw new Error("Organization is disabled.");
+    }
 
     if (msg.includes("relation") && msg.includes("users") && msg.includes("does not exist")) {
       throw new Error(
@@ -332,6 +377,7 @@ export async function getAuthedUser(): Promise<AuthedUser | null> {
 export async function requireUser(): Promise<AuthedUser> {
   const u = await getAuthedUser();
   if (!u) throw new Error("UNAUTHENTICATED");
+  await assertOrgActiveForAccess(u.orgId);
   return u;
 }
 
@@ -375,6 +421,7 @@ export async function requireDocWrite(docIdRaw: string): Promise<void> {
   if (!docId) throw new Error("Missing docId.");
 
   const u = await requireUser();
+  await assertOrgActiveForAccess(u.orgId);
   if (u.role === "owner") {
     // Owner has full control across all documents.
     return;

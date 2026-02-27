@@ -1,10 +1,12 @@
 import { redirect } from "next/navigation";
 import { unstable_noStore as noStore } from "next/cache";
+import Link from "next/link";
 
 import { getAuthedUser } from "@/lib/authz";
 import { getBillingFlags } from "@/lib/settings";
 import { getPlanForUser, getStorageBytesForOwner } from "@/lib/monetization";
 import { getActiveViewLimitOverride } from "@/lib/viewLimitOverride";
+import { classifyBillingEntitlement, getBillingSnapshotForUser } from "@/lib/billingSubscription";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -44,7 +46,7 @@ function ToggleRow({
 export default async function BillingSettingsPage({
   searchParams,
 }: {
-  searchParams?: { saved?: string; error?: string };
+  searchParams?: { saved?: string; error?: string; checkout?: string };
 }) {
   noStore();
 
@@ -57,6 +59,8 @@ export default async function BillingSettingsPage({
   const plan = await getPlanForUser(u.id);
   const usedStorage = await getStorageBytesForOwner(u.id);
   const activeViewOverride = await getActiveViewLimitOverride(u.id);
+  const billingSnapshot = await getBillingSnapshotForUser(u.id);
+  const entitlement = classifyBillingEntitlement(billingSnapshot.subscription);
   const storagePct =
     plan.maxStorageBytes && plan.maxStorageBytes > 0
       ? Math.min(100, Math.max(0, Math.round((usedStorage / plan.maxStorageBytes) * 100)))
@@ -86,6 +90,128 @@ export default async function BillingSettingsPage({
           {error ? `Failed to save: ${error}` : "Saved."}
         </div>
       )}
+
+      {(searchParams?.checkout === "success" || searchParams?.checkout === "canceled") && (
+        <div
+          className={[
+            "mb-4 rounded-lg border p-3 text-sm",
+            searchParams?.checkout === "success"
+              ? "border-emerald-900/60 bg-emerald-950/30 text-emerald-200"
+              : "border-amber-900/60 bg-amber-950/30 text-amber-200",
+          ].join(" ")}
+        >
+          {searchParams?.checkout === "success"
+            ? "Checkout completed. Subscription status will update shortly."
+            : "Checkout was canceled."}
+        </div>
+      )}
+
+      <Card>
+        <div className="text-sm font-medium text-white">Current subscription state</div>
+        <div className="mt-2 text-xs text-neutral-400">
+          Effective plan: <span className="font-semibold text-white">{plan.name}</span>
+        </div>
+        {plan.id === "free" ? (
+          <div className="mt-1 text-xs text-amber-300">
+            Free tier uses fixed share expiration windows and does not allow custom expiration.
+          </div>
+        ) : null}
+        <div className="mt-2 text-xs text-neutral-400">
+          Entitlement state: <span className="font-semibold text-white">{entitlement}</span>
+        </div>
+        {billingSnapshot.subscription ? (
+          <div className="mt-3 rounded-lg border border-neutral-800 bg-black/30 p-3 text-xs text-neutral-200">
+            <div>Status: <span className="font-semibold">{billingSnapshot.subscription.status}</span></div>
+            <div>Plan ID: <span className="font-mono">{billingSnapshot.subscription.planId}</span></div>
+            <div>
+              Current period end:{" "}
+              {billingSnapshot.subscription.currentPeriodEnd
+                ? new Date(billingSnapshot.subscription.currentPeriodEnd).toLocaleString()
+                : "—"}
+            </div>
+            <div>
+              Grace until:{" "}
+              {billingSnapshot.subscription.graceUntil
+                ? new Date(billingSnapshot.subscription.graceUntil).toLocaleString()
+                : "—"}
+            </div>
+            <div>
+              Cancel at period end: {billingSnapshot.subscription.cancelAtPeriodEnd ? "Yes" : "No"}
+            </div>
+            <div className="text-neutral-400">
+              Subscription: {billingSnapshot.subscription.stripeSubscriptionId}
+            </div>
+            <div className="text-neutral-400">
+              Customer: {billingSnapshot.subscription.stripeCustomerId || "—"}
+            </div>
+          </div>
+        ) : (
+          <div className="mt-2 text-xs text-neutral-400">
+            No Stripe subscription record yet.
+          </div>
+        )}
+      </Card>
+
+      <Card>
+        <div className="text-sm font-medium text-white">Stripe billing</div>
+        <div className="mt-1 text-xs text-neutral-400">
+          Use checkout to start Pro, and customer portal to manage payment method/cancellation.
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Link
+            href="/admin/billing/stripe"
+            className="inline-flex items-center rounded-md border border-white/15 bg-white/5 px-3 py-2 text-sm text-white/90 hover:bg-white/10"
+          >
+            Open Stripe Billing Page
+          </Link>
+          <form action="/api/admin/billing/checkout" method="post">
+            <button
+              type="submit"
+              className="inline-flex items-center rounded-md border border-sky-500/40 bg-sky-500/20 px-3 py-2 text-sm text-sky-100 hover:bg-sky-500/30"
+            >
+              Upgrade via Stripe Checkout
+            </button>
+          </form>
+          <form action="/api/admin/billing/portal" method="post">
+            <button
+              type="submit"
+              className="inline-flex items-center rounded-md border border-white/15 bg-white/5 px-3 py-2 text-sm text-white/90 hover:bg-white/10"
+            >
+              Open Stripe Customer Portal
+            </button>
+          </form>
+        </div>
+      </Card>
+
+      <Card>
+        <div className="text-sm font-medium text-white">Recent Stripe webhook events</div>
+        {billingSnapshot.events.length ? (
+          <div className="mt-3 overflow-x-auto rounded-lg border border-neutral-800">
+            <table className="min-w-full text-left text-xs">
+              <thead className="bg-black/40 text-neutral-400">
+                <tr>
+                  <th className="px-3 py-2">Received</th>
+                  <th className="px-3 py-2">Type</th>
+                  <th className="px-3 py-2">Status</th>
+                  <th className="px-3 py-2">Message</th>
+                </tr>
+              </thead>
+              <tbody>
+                {billingSnapshot.events.map((e) => (
+                  <tr key={e.eventId} className="border-t border-neutral-800">
+                    <td className="px-3 py-2 whitespace-nowrap text-neutral-300">{new Date(e.receivedAt).toLocaleString()}</td>
+                    <td className="px-3 py-2 font-mono text-neutral-200">{e.eventType}</td>
+                    <td className="px-3 py-2 text-neutral-200">{e.status}</td>
+                    <td className="px-3 py-2 text-neutral-400">{e.message || "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="mt-2 text-xs text-neutral-400">No webhook events recorded yet.</div>
+        )}
+      </Card>
 
       <Card>
         <div className="text-sm font-medium text-white">Storage usage</div>

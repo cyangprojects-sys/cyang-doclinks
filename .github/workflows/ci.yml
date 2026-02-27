@@ -65,6 +65,95 @@ jobs:
       - name: Axe (Playwright)
         run: npm run test:a11y:ci
 
+  attack-sim:
+    if: github.event_name == 'push' || github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    needs: build-lint-audit
+    env:
+      STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+      DISABLE_SECURITY_TELEMETRY_DB: "1"
+      SECURITY_TEST_NO_DB: "1"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Build
+        run: npm run build
+
+      - name: Attack Simulation
+        run: npm run test:attack:ci
+
+  billing-webhook:
+    if: github.event_name == 'push' || github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    needs: build-lint-audit
+    env:
+      STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      DISABLE_SECURITY_TELEMETRY_DB: "1"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Build
+        run: npm run build
+
+      - name: Billing Webhook Integration
+        run: npm run test:billing:webhook:ci
+
+  security-state:
+    if: github.event_name == 'push' || github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    needs: build-lint-audit
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      DISABLE_SECURITY_TELEMETRY_DB: "1"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Build
+        run: npm run build
+
+      - name: Security State Integration
+        run: npm run test:security:state:ci
+
   lighthouse-nightly:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest

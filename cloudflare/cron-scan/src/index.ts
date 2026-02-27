@@ -5,6 +5,7 @@ export interface Env {
   TARGET_WEBHOOKS_URL: string;
   TARGET_AGGREGATE_URL: string;
   TARGET_RETENTION_URL: string;
+  TARGET_BILLING_SYNC_URL: string;
   CRON_SECRET: string; // stored as a Cloudflare secret
 }
 
@@ -33,6 +34,10 @@ async function runScheduled(event: ScheduledEvent, env: Env) {
   // hourly at minute 5
   if (cron === "5 * * * *") {
     jobs.push({ name: "nightly", url: env.TARGET_NIGHTLY_URL, method: "GET" });
+  }
+  // hourly at minute 25
+  if (cron === "25 * * * *") {
+    jobs.push({ name: "billing-sync", url: env.TARGET_BILLING_SYNC_URL, method: "GET" });
   }
   // daily at 02:17 UTC
   if (cron === "17 2 * * *") {

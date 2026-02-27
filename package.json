@@ -9,6 +9,12 @@
     "lint": "eslint",
     "test:a11y": "playwright test tests/a11y.spec.ts",
     "test:a11y:ci": "start-server-and-test \"npm run start\" http://127.0.0.1:3000 \"npm run test:a11y\"",
+    "test:attack": "playwright test tests/attack-sim.spec.ts",
+    "test:attack:ci": "start-server-and-test \"npm run start\" http://127.0.0.1:3000 \"npm run test:attack\"",
+    "test:billing:webhook": "playwright test tests/billing-webhook.spec.ts",
+    "test:billing:webhook:ci": "start-server-and-test \"npm run start\" http://127.0.0.1:3000 \"npm run test:billing:webhook\"",
+    "test:security:state": "playwright test tests/security-state.spec.ts",
+    "test:security:state:ci": "start-server-and-test \"npm run start\" http://127.0.0.1:3000 \"npm run test:security:state\"",
     "audit:lighthouse": "node scripts/run-lhci.mjs",
     "audit:browser": "npm run test:a11y:ci",
     "audit:browser:ci": "npm run test:a11y:ci && npm run audit:lighthouse"

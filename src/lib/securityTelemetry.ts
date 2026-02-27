@@ -3,6 +3,22 @@ import { sql } from "@/lib/db";
 import { rateLimit } from "@/lib/rateLimit";
 import { appendImmutableAudit } from "@/lib/immutableAudit";
 
+function securityTelemetryDbEnabled(): boolean {
+  const explicit = String(process.env.SECURITY_TELEMETRY_DB_ENABLED || "").trim().toLowerCase();
+  if (explicit === "0" || explicit === "false" || explicit === "off" || explicit === "no") return false;
+  if (explicit === "1" || explicit === "true" || explicit === "on" || explicit === "yes") return true;
+
+  const disableForTests = String(process.env.DISABLE_SECURITY_TELEMETRY_DB || "").trim().toLowerCase();
+  if (disableForTests === "1" || disableForTests === "true" || disableForTests === "on" || disableForTests === "yes") {
+    return false;
+  }
+
+  // Keep tests/log-only envs quiet by default unless explicitly enabled.
+  if (process.env.NODE_ENV === "test") return false;
+
+  return true;
+}
+
 /**
  * Hash IP address (privacy safe logging)
  */
@@ -66,6 +82,8 @@ export async function logSecurityEvent(
   details?: Record<string, any>,
   ip?: string
 ) {
+  if (!securityTelemetryDbEnabled()) return;
+
   try {
     let ev: SecurityEventInput;
     if (typeof typeOrEvent === "string") {
@@ -172,6 +190,8 @@ export async function enforceGlobalApiRateLimit(args: {
  * Log decrypt event
  */
 export async function logDecryptEvent(docId: string, ip?: string) {
+    if (!securityTelemetryDbEnabled()) return;
+
     try {
         await sql`
       insert into public.doc_decrypt_log (

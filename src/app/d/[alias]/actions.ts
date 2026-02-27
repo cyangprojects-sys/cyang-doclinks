@@ -6,7 +6,7 @@ import { requireDocWrite } from "@/lib/authz";
 import { randomBytes } from "crypto";
 import bcrypt from "bcryptjs";
 import { emitWebhook } from "@/lib/webhooks";
-import { assertCanCreateShare, getPlanForUser, normalizeExpiresAtForPlan } from "@/lib/monetization";
+import { assertCanCreateShare, getPlanForUser, normalizeExpiresAtForPlan, normalizeMaxViewsForPlan } from "@/lib/monetization";
 
 /**
  * NOTE:
@@ -131,8 +131,9 @@ export async function createAndEmailShareToken(
         ? new Date(expiresAtRaw).toISOString()
         : null;
 
-    const maxViews =
+    const requestedMaxViews =
       maxViewsRaw && /^\d+$/.test(maxViewsRaw) ? Number(maxViewsRaw) : null;
+    let maxViews: number | null = requestedMaxViews;
 
     const password = passwordRaw.trim();
     const passwordHash = password ? await bcrypt.hash(password, 10) : null;
@@ -163,6 +164,7 @@ if (ownerId) {
   const plan = await getPlanForUser(ownerId);
   const normalized = normalizeExpiresAtForPlan({ plan, requestedExpiresAtIso: expiresAt, defaultDaysIfNotAllowed: 14 });
       expiresAt = normalized;
+      maxViews = normalizeMaxViewsForPlan({ plan, requestedMaxViews });
 }
 
     const token = newToken();

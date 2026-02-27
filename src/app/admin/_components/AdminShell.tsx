@@ -23,6 +23,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/admin/dashboard#shares", label: "Shares" },
   { href: "/admin/security", label: "Security", ownerOnly: true },
   { href: "/admin/api-keys", label: "Keys", ownerOnly: true },
+  { href: "/admin/billing/stripe", label: "Stripe", ownerOnly: true },
   { href: "/admin/abuse", label: "Abuse", ownerOnly: true },
   { href: "/admin/webhooks", label: "Settings", ownerOnly: true },
 ];

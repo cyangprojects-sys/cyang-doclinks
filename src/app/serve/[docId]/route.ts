@@ -14,6 +14,7 @@ import { geoDecisionForRequest, getCountryFromHeaders } from "@/lib/geo";
 import { assertCanServeView, incrementMonthlyViews } from "@/lib/monetization";
 import { enforcePlanLimitsEnabled } from "@/lib/billingFlags";
 import { getAuthedUser, roleAtLeast } from "@/lib/authz";
+import { isGlobalServeDisabled, isSecurityTestNoDbMode } from "@/lib/securityPolicy";
 
 function getClientIp(req: NextRequest) {
   const xff = req.headers.get("x-forwarded-for") || "";
@@ -38,6 +39,14 @@ function parseDisposition(req: NextRequest): "inline" | "attachment" {
 }
 
 export async function GET(req: NextRequest, ctx: { params: Promise<{ docId: string }> }) {
+  if (isSecurityTestNoDbMode()) {
+    return new Response("Not found", { status: 404 });
+  }
+
+  if (await isGlobalServeDisabled()) {
+    return new Response("Unavailable", { status: 503 });
+  }
+
   const { docId } = await ctx.params;
   const url = new URL(req.url);
   const aliasParam = (url.searchParams.get("alias") || "").trim() || null;

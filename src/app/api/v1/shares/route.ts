@@ -6,7 +6,7 @@ import bcrypt from "bcryptjs";
 import { sql } from "@/lib/db";
 import { verifyApiKeyFromRequest } from "@/lib/apiAuth";
 import { emitWebhook } from "@/lib/webhooks";
-import { assertCanCreateShare, getPlanForUser, normalizeExpiresAtForPlan } from "@/lib/monetization";
+import { assertCanCreateShare, getPlanForUser, normalizeExpiresAtForPlan, normalizeMaxViewsForPlan } from "@/lib/monetization";
 import crypto from "crypto";
 import { clientIpKey, enforceGlobalApiRateLimit } from "@/lib/securityTelemetry";
 import { appendImmutableAudit } from "@/lib/immutableAudit";
@@ -73,10 +73,9 @@ const plan = await getPlanForUser(auth.ownerId);
 
   const maxViewsRaw = body?.max_views ?? body?.maxViews;
   const maxViewsNum = maxViewsRaw === null || maxViewsRaw === undefined ? null : Number(maxViewsRaw);
-  let maxViews: number | null = null;
-  if (maxViewsNum !== null && Number.isFinite(maxViewsNum)) {
-    maxViews = Math.max(0, Math.floor(maxViewsNum));
-  }
+  const requestedMaxViews =
+    maxViewsNum !== null && Number.isFinite(maxViewsNum) ? Math.max(0, Math.floor(maxViewsNum)) : null;
+  const maxViews = normalizeMaxViewsForPlan({ plan, requestedMaxViews });
 
   const passwordRaw = String(body?.password || "").trim();
   const passwordHash = passwordRaw ? await bcrypt.hash(passwordRaw, 12) : null;
@@ -126,7 +125,7 @@ const base = (process.env.BASE_URL || process.env.NEXTAUTH_URL || (process.env.V
     token,
     doc_id: docId,
     to_email: toEmail,
-    expires_at: expiresAt,
+    expires_at: normalizedExpiresAt,
     max_views: maxViews,
     has_password: !!passwordHash,
     created_via: "api",

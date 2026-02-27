@@ -32,7 +32,7 @@ where created_at > now() - interval '24 hours';
 
 -- 5) Cron freshness by expected job (6h)
 with expected(job) as (
-  values ('webhooks'), ('scan'), ('key-rotation'), ('aggregate'), ('nightly'), ('retention')
+  values ('webhooks'), ('scan'), ('key-rotation'), ('aggregate'), ('nightly'), ('retention'), ('billing-sync')
 ),
 recent as (
   select coalesce(meta->>'job','')::text as job, max(created_at) as last_ok

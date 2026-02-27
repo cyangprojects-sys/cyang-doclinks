@@ -81,6 +81,9 @@ Viewer-facing users get reduced dashboard scope and least-privilege actions.
 - Scheduled operations: Cloudflare cron workers + app cron routes
 - Monitoring hooks: structured security/operational telemetry
 
+Detailed architecture reference:
+- `ARCHITECTURE.md` (trust boundaries, enforcement order, encryption/retention lifecycle, tenant isolation)
+
 ## Local Development
 
 ### Prerequisites
@@ -107,6 +110,12 @@ npm run build
 Runs WCAG-focused checks on rendered pages:
 ```bash
 npm run test:a11y:ci
+```
+
+### Attack simulation (Playwright)
+Runs negative-path security checks (capability abuse, direct-route access, brute-force style probing):
+```bash
+npm run test:attack:ci
 ```
 
 ### Local browser audit
@@ -137,6 +146,22 @@ This repo is actively hardened for secure beta operation:
 - monetization/usage enforcement hooks
 - org membership/invite foundation
 - cloud cron-backed maintenance operations
+
+## Stripe Billing
+
+Owner billing controls now include Stripe Checkout + Customer Portal flows, with signed webhook ingestion and idempotent event processing.
+
+See:
+- `scripts/sql/stripe_billing.sql`
+- `docs/stripe-billing-runbook.md`
+
+## Incident Response
+
+Operational incident handling now has a dedicated runbook for severity levels, kill-switches, tenant/share freeze flows, and emergency revoke testing.
+
+See:
+- `docs/incident-response-runbook.md`
+- `docs/backup-recovery-runbook.md`
 
 ## License
 

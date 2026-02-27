@@ -66,6 +66,7 @@ export type ShareMeta =
         scanStatus?: string;
         riskLevel?: string;
         riskFlags?: any;
+        isActive?: boolean;
     }
     | { ok: false };
 
@@ -137,22 +138,7 @@ async function getDocPointer(
     if (!id) return { ok: false };
     const defaultBucket = getR2Bucket();
 
-    const rows = (await sql`
-    select
-      d.id::text as id,
-      coalesce(d.r2_bucket::text, ${defaultBucket}) as bucket,
-      d.r2_key::text as r2_key,
-      d.title::text as title,
-      d.original_filename::text as original_filename,
-      d.content_type::text as content_type,
-      d.size_bytes::bigint as size_bytes,
-      coalesce(d.status::text, '') as status,
-      coalesce(d.moderation_status::text, 'active') as moderation_status,
-      coalesce(d.scan_status::text, 'unscanned') as scan_status
-    from public.docs d
-    where d.id = ${id}::uuid
-    limit 1
-  `) as unknown as Array<{
+    let rows: Array<{
         id: string;
         bucket: string | null;
         r2_key: string | null;
@@ -163,7 +149,48 @@ async function getDocPointer(
         status: string;
         moderation_status: string;
         scan_status: string;
-    }>;
+        org_disabled?: boolean;
+        org_active?: boolean;
+    }> = [];
+
+    try {
+      rows = (await sql`
+        select
+          d.id::text as id,
+          coalesce(d.r2_bucket::text, ${defaultBucket}) as bucket,
+          d.r2_key::text as r2_key,
+          d.title::text as title,
+          d.original_filename::text as original_filename,
+          d.content_type::text as content_type,
+          d.size_bytes::bigint as size_bytes,
+          coalesce(d.status::text, '') as status,
+          coalesce(d.moderation_status::text, 'active') as moderation_status,
+          coalesce(d.scan_status::text, 'unscanned') as scan_status,
+          coalesce(o.disabled, false) as org_disabled,
+          coalesce(o.is_active, true) as org_active
+        from public.docs d
+        left join public.organizations o on o.id = d.org_id
+        where d.id = ${id}::uuid
+        limit 1
+      `) as unknown as typeof rows;
+    } catch {
+      rows = (await sql`
+        select
+          d.id::text as id,
+          coalesce(d.r2_bucket::text, ${defaultBucket}) as bucket,
+          d.r2_key::text as r2_key,
+          d.title::text as title,
+          d.original_filename::text as original_filename,
+          d.content_type::text as content_type,
+          d.size_bytes::bigint as size_bytes,
+          coalesce(d.status::text, '') as status,
+          coalesce(d.moderation_status::text, 'active') as moderation_status,
+          coalesce(d.scan_status::text, 'unscanned') as scan_status
+        from public.docs d
+        where d.id = ${id}::uuid
+        limit 1
+      `) as unknown as typeof rows;
+    }
 
     const r = rows?.[0];
     if (!r?.id) return { ok: false };
@@ -171,9 +198,18 @@ async function getDocPointer(
     const lifecycle = (r.status || "").toLowerCase();
     const moderation = (r.moderation_status || "active").toLowerCase();
     const scanStatus = (r.scan_status || "unscanned").toLowerCase();
-    const blockedScanStates = new Set(["failed", "error", "infected", "quarantined"]);
+    const blockedScanStates = new Set([
+      "unscanned",
+      "queued",
+      "running",
+      "failed",
+      "error",
+      "infected",
+      "quarantined",
+    ]);
 
     if (lifecycle === "deleted") return { ok: false };
+    if (r.org_disabled === true || r.org_active === false) return { ok: false };
     if (moderation === "deleted" || moderation === "disabled") return { ok: false };
     if (moderation === "quarantined") {
       const override = await hasActiveQuarantineOverride(r.id);
@@ -339,7 +375,8 @@ export async function resolveShareMeta(tokenInput: string): Promise<ShareMeta> {
         coalesce(d.moderation_status::text, 'active') as doc_moderation_status,
         coalesce(d.scan_status::text, 'unscanned') as scan_status,
         coalesce(d.risk_level::text, 'low') as risk_level,
-        d.risk_flags as risk_flags
+        d.risk_flags as risk_flags,
+        coalesce(st.is_active, true) as is_active
       from public.share_tokens st
       left join public.docs d on d.id = st.doc_id
       where st.token = ${token}
@@ -361,10 +398,12 @@ export async function resolveShareMeta(tokenInput: string): Promise<ShareMeta> {
             scan_status: string;
             risk_level: string;
             risk_flags: any;
+            is_active: boolean;
         }>;
 
         const r = rows?.[0];
         if (!r?.token) return { ok: false };
+        if (!r.is_active) return { ok: false };
 
         return {
             ok: true,
@@ -382,6 +421,7 @@ export async function resolveShareMeta(tokenInput: string): Promise<ShareMeta> {
             passwordHash: r.password_hash ?? null,
             watermarkEnabled: Boolean(r.watermark_enabled),
             watermarkText: r.watermark_text ?? null,
+            isActive: Boolean(r.is_active),
         };
     } catch {
         // Fall back to older schema without watermark columns.
@@ -398,8 +438,8 @@ export async function resolveShareMeta(tokenInput: string): Promise<ShareMeta> {
           revoked_at::text as revoked_at,
           password_hash
         from public.share_tokens
-        where st.token = ${token}
-          ${dashed ? sql`or st.token = ${dashed}` : sql``}
+        where token = ${token}
+          ${dashed ? sql`or token = ${dashed}` : sql``}
         limit 1
       `) as unknown as Array<{
                 token: string;
@@ -432,6 +472,7 @@ export async function resolveShareMeta(tokenInput: string): Promise<ShareMeta> {
                 passwordHash: r.password_hash ?? null,
                 watermarkEnabled: false,
                 watermarkText: null,
+                isActive: true,
             };
         } catch {
             return { ok: false };

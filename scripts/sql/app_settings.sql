@@ -44,3 +44,16 @@ values (
   )
 )
 on conflict (key) do nothing;
+
+-- Seed default security freeze settings (idempotent)
+insert into public.app_settings (key, value)
+values (
+  'security_freeze',
+  jsonb_build_object(
+    'globalServeDisabled', false,
+    'shareServeDisabled', false,
+    'aliasServeDisabled', false,
+    'ticketServeDisabled', false
+  )
+)
+on conflict (key) do nothing;

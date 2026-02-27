@@ -13,6 +13,7 @@ import { revokeExpiredSharesBatch } from "@/lib/shareLifecycle";
 import { runUsageMaintenance } from "@/lib/usageMaintenance";
 import { logSecurityEvent } from "@/lib/securityTelemetry";
 import { logCronRun } from "@/lib/cronTelemetry";
+import { runBillingMaintenance } from "@/lib/billingSubscription";
 
 import { isCronAuthorized } from "@/lib/cronAuth";
 
@@ -69,6 +70,11 @@ export async function GET(req: NextRequest) {
   // 8) Optional backup + recovery checks
   const backup_recovery = await runBackupRecoveryCheck();
 
+  // 9) Billing entitlement maintenance (grace expiry / plan sync)
+  const billing_sync = await runBillingMaintenance({
+    maxUsers: Math.max(1, Math.min(5000, Number(process.env.BILLING_MAINTENANCE_MAX_USERS || 500))),
+  });
+
   if (expiredSharesRevoked.revoked > 0) {
     await logSecurityEvent({
       type: "expired_shares_auto_revoked",
@@ -90,6 +96,7 @@ export async function GET(req: NextRequest) {
       keyRotationProcessed: (key_rotation_jobs as any)?.processed ?? null,
       revokedExpiredShares: expiredSharesRevoked.revoked,
       backupStatus: (backup_recovery as any)?.backupStatus ?? null,
+      billingUsersScanned: (billing_sync as any)?.usersScanned ?? null,
     },
   });
   return NextResponse.json({
@@ -105,6 +112,7 @@ export async function GET(req: NextRequest) {
     expired_shares_revoked: expiredSharesRevoked,
     usage_maintenance,
     backup_recovery,
+    billing_sync,
   });
   } catch (e: unknown) {
     const duration = Date.now() - startedAt;

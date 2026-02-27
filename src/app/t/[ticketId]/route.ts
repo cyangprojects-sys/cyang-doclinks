@@ -9,7 +9,7 @@ import { getMasterKeyByIdOrThrow } from "@/lib/masterKeys";
 import { hashUserAgent, hashIpForTicket } from "@/lib/accessTicket";
 import { Readable } from "node:stream";
 import { appendImmutableAudit } from "@/lib/immutableAudit";
-import { allowUnencryptedServing } from "@/lib/securityPolicy";
+import { allowUnencryptedServing, isSecurityTestNoDbMode, isTicketServingDisabled } from "@/lib/securityPolicy";
 import { hasActiveQuarantineOverride } from "@/lib/quarantineOverride";
 
 export const runtime = "nodejs";
@@ -68,6 +68,17 @@ export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ ticketId: string }> }
 ) {
+  if (isSecurityTestNoDbMode()) {
+    return new NextResponse("Direct open is disabled for this protected document.", {
+      status: 403,
+      headers: secureDocHeaders(),
+    });
+  }
+
+  if (await isTicketServingDisabled()) {
+    return new NextResponse("Unavailable", { status: 503, headers: secureDocHeaders() });
+  }
+
   const { ticketId } = await params;
 
   if (isBlockedTopLevelTicketOpen(req)) {
@@ -109,7 +120,15 @@ export async function GET(
   }
 
   const t = consumed.ticket;
-  const blockedScanStates = new Set(["failed", "error", "infected", "quarantined"]);
+  const blockedScanStates = new Set([
+    "unscanned",
+    "queued",
+    "running",
+    "failed",
+    "error",
+    "infected",
+    "quarantined",
+  ]);
 
   if (t.doc_id) {
     try {

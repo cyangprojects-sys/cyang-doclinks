@@ -5,6 +5,7 @@ export const dynamic = "force-dynamic";
 import { NextRequest } from "next/server";
 import { sql } from "@/lib/db";
 import { requirePermission } from "@/lib/rbac";
+import { getPlanForUser } from "@/lib/monetization";
 
 type ExportType = "audit" | "access" | "views";
 
@@ -30,10 +31,19 @@ function parseIntParam(raw: string | null, fallback: number, min: number, max: n
 // We keep it static so the query stays fully typed and parameterized.
 
 export async function GET(req: NextRequest) {
+  let userId: string | null = null;
   try {
-    await requirePermission("audit.export");
+    const u = await requirePermission("audit.export");
+    userId = u.id;
   } catch {
     return new Response("Forbidden", { status: 403 });
+  }
+
+  if (userId) {
+    const plan = await getPlanForUser(userId);
+    if (!plan.allowAuditExport) {
+      return new Response("Audit export requires a plan with export entitlement.", { status: 403 });
+    }
   }
 
   const url = new URL(req.url);

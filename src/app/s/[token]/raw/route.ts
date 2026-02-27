@@ -12,6 +12,7 @@ import { geoDecisionForRequest, getCountryFromHeaders } from "@/lib/geo";
 import { hasActiveQuarantineOverride } from "@/lib/quarantineOverride";
 import { appendImmutableAudit } from "@/lib/immutableAudit";
 import { getR2Bucket } from "@/lib/r2";
+import { isSecurityTestNoDbMode, isShareServingDisabled } from "@/lib/securityPolicy";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -84,6 +85,7 @@ type ShareLookupRow = {
   moderation_status: string;
   scan_status: string;
   risk_level: string;
+  share_active: boolean;
 };
 
 function isExpired(expires_at: string | null) {
@@ -114,6 +116,14 @@ export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ token: string }> }
 ) {
+  if (isSecurityTestNoDbMode()) {
+    return new NextResponse("Not found", { status: 404 });
+  }
+
+  if (await isShareServingDisabled()) {
+    return new NextResponse("Unavailable", { status: 503 });
+  }
+
   const r2Bucket = getR2Bucket();
   const { token } = await params;
 
@@ -158,34 +168,67 @@ export async function GET(
     });
   }
 
-  const rows = (await sql`
-    select
-      s.token::text as token,
-      s.doc_id::text as doc_id,
-      s.expires_at::text as expires_at,
-      s.max_views,
-      s.views_count,
-      s.revoked_at::text as revoked_at,
-      s.password_hash::text as password_hash,
-      d.r2_key::text as r2_key,
-      coalesce(d.moderation_status::text, 'active') as moderation_status,
-      coalesce(d.scan_status::text, 'unscanned') as scan_status,
-      coalesce(d.risk_level::text, 'low') as risk_level
-    from public.share_tokens s
-    join public.docs d on d.id = s.doc_id
-    where s.token = ${token}
-    limit 1
-  `) as unknown as ShareLookupRow[];
+  let rows: ShareLookupRow[] = [];
+  try {
+    rows = (await sql`
+      select
+        s.token::text as token,
+        s.doc_id::text as doc_id,
+        s.expires_at::text as expires_at,
+        s.max_views,
+        s.views_count,
+        s.revoked_at::text as revoked_at,
+        s.password_hash::text as password_hash,
+        d.r2_key::text as r2_key,
+        coalesce(d.moderation_status::text, 'active') as moderation_status,
+        coalesce(d.scan_status::text, 'unscanned') as scan_status,
+        coalesce(d.risk_level::text, 'low') as risk_level,
+        coalesce(s.is_active, true) as share_active
+      from public.share_tokens s
+      join public.docs d on d.id = s.doc_id
+      where s.token = ${token}
+      limit 1
+    `) as unknown as ShareLookupRow[];
+  } catch {
+    rows = (await sql`
+      select
+        s.token::text as token,
+        s.doc_id::text as doc_id,
+        s.expires_at::text as expires_at,
+        s.max_views,
+        s.views_count,
+        s.revoked_at::text as revoked_at,
+        s.password_hash::text as password_hash,
+        d.r2_key::text as r2_key,
+        coalesce(d.moderation_status::text, 'active') as moderation_status,
+        coalesce(d.scan_status::text, 'unscanned') as scan_status,
+        coalesce(d.risk_level::text, 'low') as risk_level,
+        true as share_active
+      from public.share_tokens s
+      join public.docs d on d.id = s.doc_id
+      where s.token = ${token}
+      limit 1
+    `) as unknown as ShareLookupRow[];
+  }
 
   const share = rows[0];
   if (!share) return new NextResponse("Not found", { status: 404 });
+  if (!share.share_active) return new NextResponse("Unavailable", { status: 404 });
   const moderation = (share.moderation_status || "active").toLowerCase();
   if (moderation !== "active") {
     if (moderation !== "quarantined") return new NextResponse("Unavailable", { status: 404 });
     const override = await hasActiveQuarantineOverride(share.doc_id);
     if (!override) return new NextResponse("Unavailable", { status: 404 });
   }
-  const blockedScanStates = new Set(["failed", "error", "infected", "quarantined"]);
+  const blockedScanStates = new Set([
+    "unscanned",
+    "queued",
+    "running",
+    "failed",
+    "error",
+    "infected",
+    "quarantined",
+  ]);
   if (blockedScanStates.has((share.scan_status || "unscanned").toLowerCase())) {
     return new NextResponse("Unavailable", { status: 404 });
   }

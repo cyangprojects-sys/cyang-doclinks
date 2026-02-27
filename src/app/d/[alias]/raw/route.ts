@@ -11,6 +11,7 @@ import { mintAccessTicket } from "@/lib/accessTicket";
 import { assertCanServeView, incrementMonthlyViews } from "@/lib/monetization";
 import { enforcePlanLimitsEnabled } from "@/lib/billingFlags";
 import crypto from "crypto";
+import { isAliasServingDisabled, isSecurityTestNoDbMode } from "@/lib/securityPolicy";
 
 function normAlias(alias: string): string {
   return decodeURIComponent(String(alias || "")).trim().toLowerCase();
@@ -127,6 +128,14 @@ export async function GET(
   ctx: { params: Promise<{ alias: string }> }
 ): Promise<Response> {
   try {
+    if (isSecurityTestNoDbMode()) {
+      return new Response("Not found", { status: 404 });
+    }
+
+    if (await isAliasServingDisabled()) {
+      return new Response("Unavailable", { status: 503 });
+    }
+
     const { alias: rawAlias } = await ctx.params;
     const alias = normAlias(rawAlias || "");
 

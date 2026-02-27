@@ -14,6 +14,43 @@ export type Plan = {
   allowAuditExport: boolean;
 };
 
+let billingSubscriptionsTableExistsCache: boolean | null = null;
+
+async function billingSubscriptionsTableExists(): Promise<boolean> {
+  if (billingSubscriptionsTableExistsCache != null) return billingSubscriptionsTableExistsCache;
+  try {
+    const rows = (await sql`select to_regclass('public.billing_subscriptions')::text as reg`) as unknown as Array<{ reg: string | null }>;
+    billingSubscriptionsTableExistsCache = Boolean(rows?.[0]?.reg);
+  } catch {
+    billingSubscriptionsTableExistsCache = false;
+  }
+  return billingSubscriptionsTableExistsCache;
+}
+
+async function userHasActiveProEntitlement(userId: string): Promise<boolean> {
+  if (!(await billingSubscriptionsTableExists())) return false;
+  try {
+    const rows = (await sql`
+      select 1
+      from public.billing_subscriptions bs
+      where bs.user_id = ${userId}::uuid
+        and bs.plan_id = 'pro'
+        and (
+          lower(coalesce(bs.status, '')) in ('active', 'trialing')
+          or (
+            lower(coalesce(bs.status, '')) in ('past_due', 'grace')
+            and bs.grace_until is not null
+            and bs.grace_until > now()
+          )
+        )
+      limit 1
+    `) as unknown as Array<{ "?column?": number }>;
+    return rows.length > 0;
+  } catch {
+    return false;
+  }
+}
+
 export async function getPlanForUser(userId: string): Promise<Plan> {
   const billingRes = await getBillingFlags();
   const billing = billingRes.flags;
@@ -64,6 +101,28 @@ export async function getPlanForUser(userId: string): Promise<Plan> {
       allowCustomExpiration: false,
       allowAuditExport: false,
     };
+  }
+
+  // Optional Stripe entitlement hardening:
+  // when enabled, users marked "pro" without active paid entitlement are treated as Free.
+  if (String(r.id) === "pro") {
+    const enforceStripeEntitlement = String(process.env.STRIPE_ENFORCE_ENTITLEMENT || "1").trim() !== "0";
+    if (enforceStripeEntitlement) {
+      const entitled = await userHasActiveProEntitlement(userId);
+      if (!entitled) {
+        return {
+          id: "free",
+          name: "Free",
+          maxViewsPerMonth: 100,
+          maxActiveShares: 3,
+          maxStorageBytes: 524288000,
+          maxUploadsPerDay: 10,
+          maxFileSizeBytes: 26214400,
+          allowCustomExpiration: false,
+          allowAuditExport: false,
+        };
+      }
+    }
   }
 
   return {
@@ -240,14 +299,34 @@ export function normalizeExpiresAtForPlan(args: {
   defaultDaysIfNotAllowed?: number;
 }): string | null {
   const req = args.requestedExpiresAtIso;
-  if (!req) return null;
+  if (!req && args.plan.allowCustomExpiration) return null;
 
-  const t = Date.parse(req);
-  if (Number.isNaN(t)) return null;
+  if (args.plan.allowCustomExpiration) {
+    const t = Date.parse(String(req || ""));
+    if (Number.isNaN(t)) return null;
+    return new Date(t).toISOString();
+  }
 
-  if (args.plan.allowCustomExpiration) return new Date(t).toISOString();
+  // Plan disallows custom expiration (e.g. Free tier):
+  // always enforce a fixed TTL from now, ignoring caller-provided timestamps.
+  const days = Math.max(1, Math.floor(args.defaultDaysIfNotAllowed ?? Number(process.env.FREE_SHARE_TTL_DAYS || 14)));
+  const fixedT = Date.now() + days * 24 * 60 * 60 * 1000;
+  return new Date(fixedT).toISOString();
+}
 
-  const days = args.defaultDaysIfNotAllowed ?? 14;
-  const maxT = Date.now() + days * 24 * 60 * 60 * 1000;
-  return new Date(Math.min(t, maxT)).toISOString();
+export function normalizeMaxViewsForPlan(args: {
+  plan: Plan;
+  requestedMaxViews: number | null;
+}): number | null {
+  const requested = args.requestedMaxViews;
+  // Pro/unlimited plans can keep unlimited semantics.
+  if (args.plan.maxViewsPerMonth == null) {
+    return requested == null ? null : Math.max(0, Math.floor(requested));
+  }
+
+  // Finite plans (Free): disallow unlimited share view links.
+  const freeDefault = Math.max(1, Number(process.env.FREE_DEFAULT_SHARE_MAX_VIEWS || 25));
+  const normalized = requested == null ? freeDefault : Math.max(0, Math.floor(requested));
+  if (normalized <= 0) return freeDefault;
+  return Math.min(normalized, args.plan.maxViewsPerMonth);
 }

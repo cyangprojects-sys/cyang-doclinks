@@ -135,14 +135,22 @@ async function getDocAvailabilityHint(docId: string): Promise<string | null> {
     if (!r) return null;
 
     if (!r.encryption_enabled && !allowUnencryptedServing()) {
-      return "This is a legacy unencrypted upload. Serving is blocked by policy (ALLOW_UNENCRYPTED_SERVE=false). Re-upload or migrate this document to encrypted storage.";
+      return "This is a legacy unencrypted upload. Serving is blocked by policy. Re-upload or migrate this document to encrypted storage.";
     }
 
     const moderation = String(r.moderation_status || "active").toLowerCase();
     if (moderation === "quarantined") return "This document is quarantined and cannot be served without an active override.";
     if (moderation === "disabled" || moderation === "deleted") return `This document is ${moderation} and unavailable.`;
 
-    const blockedScanStates = new Set(["failed", "error", "infected", "quarantined"]);
+    const blockedScanStates = new Set([
+      "unscanned",
+      "queued",
+      "running",
+      "failed",
+      "error",
+      "infected",
+      "quarantined",
+    ]);
     if (blockedScanStates.has(String(r.scan_status || "unscanned").toLowerCase())) {
       return `Serving is blocked due to scan status: ${r.scan_status}.`;
     }

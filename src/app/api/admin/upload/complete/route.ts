@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { HeadObjectCommand } from "@aws-sdk/client-s3";
 import { GetObjectCommand } from "@aws-sdk/client-s3";
 import { DeleteObjectCommand } from "@aws-sdk/client-s3";
-import { validatePdfBuffer, validatePdfInR2 } from "@/lib/pdfSafety";
+import { validatePdfBuffer } from "@/lib/pdfSafety";
 import { sql } from "@/lib/db";
 import { slugify } from "@/lib/slug";
 import { requireDocWrite } from "@/lib/authz";
@@ -208,6 +208,19 @@ export async function POST(req: NextRequest) {
     const expectedPlain = Number(verifyRows?.[0]?.size_bytes ?? 0);
     const encryptionEnabled = Boolean(verifyRows?.[0]?.encryption_enabled);
 
+    if (!encryptionEnabled) {
+      await logSecurityEvent({
+        type: "upload_complete_encryption_required",
+        severity: "high",
+        ip: ipInfo.ip,
+        docId,
+        scope: "upload_complete",
+        message: "Upload completion blocked because encryption is not enabled for this doc",
+      });
+      await cleanupRejectedObject("encryption_required");
+      return NextResponse.json({ ok: false, error: "encryption_required" }, { status: 409 });
+    }
+
     let head;
     try {
       head = await r2Client.send(
@@ -251,12 +264,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: "object_too_large" }, { status: 413 });
     }
 
-    // If encryption is enabled, the uploaded ciphertext includes a 16-byte GCM tag appended.
-    // Some clients may also send unencrypted bytes in the future; accept exact match as well.
+    // Encrypted uploads store ciphertext with a 16-byte GCM tag appended.
     if (Number.isFinite(expectedPlain) && expectedPlain > 0) {
-      const allowedSizes = encryptionEnabled
-        ? new Set<number>([expectedPlain + 16])
-        : new Set<number>([expectedPlain]);
+      const allowedSizes = new Set<number>([expectedPlain + 16]);
       if (!allowedSizes.has(contentLength)) {
         await logSecurityEvent({
           type: "upload_complete_size_mismatch",
@@ -318,150 +328,104 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: "not_pdf" }, { status: 409 });
     }
 
-    if (encryptionEnabled) {
-      if (ct && ct !== "application/octet-stream") {
-        await logSecurityEvent({
-          type: "upload_complete_ciphertext_ct_mismatch",
-          severity: "high",
-          ip: ipInfo.ip,
-          docId,
-          scope: "upload_complete",
-          message: "Encrypted object content-type must be application/octet-stream",
-          meta: { contentType: ct },
-        });
-        await cleanupRejectedObject("invalid_content_type", { encryptionEnabled: true, contentType: ct });
-        return NextResponse.json({ ok: false, error: "invalid_content_type" }, { status: 409 });
-      }
-    } else if (ct && ct !== "application/pdf") {
+    if (ct && ct !== "application/octet-stream") {
       await logSecurityEvent({
-        type: "upload_complete_plaintext_ct_mismatch",
+        type: "upload_complete_ciphertext_ct_mismatch",
         severity: "high",
         ip: ipInfo.ip,
         docId,
         scope: "upload_complete",
-        message: "Unencrypted object content-type must be application/pdf",
+        message: "Encrypted object content-type must be application/octet-stream",
         meta: { contentType: ct },
       });
-      await cleanupRejectedObject("invalid_content_type", { encryptionEnabled: false, contentType: ct });
+      await cleanupRejectedObject("invalid_content_type", { encryptionEnabled: true, contentType: ct });
       return NextResponse.json({ ok: false, error: "invalid_content_type" }, { status: 409 });
     }
 
-    
-    // 4) Lightweight PDF safety validation (unencrypted only).
-    // If encryption is enabled, server cannot cheaply validate magic bytes without downloading & decrypting the full object.
-    // In that case, we mark scan_status as skipped_encrypted.
+    // 4) Validate encrypted PDF by decrypting server-side and running PDF safety checks.
     let scanStatus: string = "unscanned";
     let riskLevel: string = "low";
     let riskFlags: any = null;
 
-    if (!encryptionEnabled) {
-      const safety = await validatePdfInR2({
-        bucket: docBucket,
-        key: docKey,
-        sampleBytes: Number(process.env.PDF_SAFETY_SAMPLE_BYTES || 262144),
-        absMaxBytes: absMax,
-        maxPdfPages: Number(process.env.PDF_MAX_PAGES || 2000),
-        pageCountCheckMaxBytes: Number(process.env.PDF_PAGECOUNT_MAX_BYTES || 25 * 1024 * 1024),
+    const encMeta = verifyRows?.[0];
+    if (
+      !encMeta?.enc_alg ||
+      !encMeta?.enc_iv ||
+      !encMeta?.enc_key_version ||
+      !encMeta?.enc_wrapped_key ||
+      !encMeta?.enc_wrap_iv ||
+      !encMeta?.enc_wrap_tag
+    ) {
+      await logSecurityEvent({
+        type: "upload_complete_encryption_meta_missing",
+        severity: "high",
+        ip: ipInfo.ip,
+        docId,
+        scope: "upload_complete",
+        message: "Encrypted upload missing key metadata",
       });
-
-      if (!safety.ok) {
-        await logSecurityEvent({
-          type: "upload_complete_pdf_validation_failed",
-          severity: "high",
-          ip: ipInfo.ip,
-          docId,
-          scope: "upload_complete",
-          message: "PDF validation failed",
-          meta: { error: safety.error, message: safety.message, details: safety.details ?? null },
-        });
-        await cleanupRejectedObject("pdf_validation_failed", { error: safety.error });
-        return NextResponse.json({ ok: false, error: safety.error, message: safety.message }, { status: 409 });
-      }
-
-      scanStatus = safety.riskLevel === "low" ? "clean" : "risky";
-      riskLevel = safety.riskLevel;
-      riskFlags = { flags: safety.flags, details: safety.details };
-    } else {
-      const encMeta = verifyRows?.[0];
-      if (
-        !encMeta?.enc_alg ||
-        !encMeta?.enc_iv ||
-        !encMeta?.enc_key_version ||
-        !encMeta?.enc_wrapped_key ||
-        !encMeta?.enc_wrap_iv ||
-        !encMeta?.enc_wrap_tag
-      ) {
-        await logSecurityEvent({
-          type: "upload_complete_encryption_meta_missing",
-          severity: "high",
-          ip: ipInfo.ip,
-          docId,
-          scope: "upload_complete",
-          message: "Encrypted upload missing key metadata",
-        });
-        await cleanupRejectedObject("encryption_metadata_missing");
-        return NextResponse.json({ ok: false, error: "encryption_metadata_missing" }, { status: 409 });
-      }
-
-      let decrypted: Buffer;
-      try {
-        const mk = await getMasterKeyByIdOrThrow(encMeta.enc_key_version);
-        const dataKey = unwrapDataKey({
-          wrapped: encMeta.enc_wrapped_key,
-          wrapIv: encMeta.enc_wrap_iv,
-          wrapTag: encMeta.enc_wrap_tag,
-          masterKey: mk.key,
-        });
-
-        const encryptedObj = await r2Client.send(
-          new GetObjectCommand({
-            Bucket: docBucket,
-            Key: docKey,
-          })
-        );
-        const ciphertext = await streamToBuffer((encryptedObj as any).Body);
-        decrypted = decryptAes256Gcm({
-          ciphertext,
-          iv: encMeta.enc_iv,
-          key: dataKey,
-        });
-      } catch (e: any) {
-        await logSecurityEvent({
-          type: "upload_complete_decrypt_failed",
-          severity: "high",
-          ip: ipInfo.ip,
-          docId,
-          scope: "upload_complete",
-          message: "Encrypted upload could not be decrypted for validation",
-          meta: { error: String(e?.message || e) },
-        });
-        await cleanupRejectedObject("decrypt_failed", { error: String(e?.message || e) });
-        return NextResponse.json({ ok: false, error: "decrypt_failed" }, { status: 409 });
-      }
-
-      const safety = validatePdfBuffer({
-        bytes: decrypted,
-        absMaxBytes: absMax,
-        maxPdfPages: Number(process.env.PDF_MAX_PAGES || 2000),
-      });
-      if (!safety.ok) {
-        await logSecurityEvent({
-          type: "upload_complete_pdf_validation_failed",
-          severity: "high",
-          ip: ipInfo.ip,
-          docId,
-          scope: "upload_complete",
-          message: "PDF validation failed after decrypt",
-          meta: { error: safety.error, message: safety.message, details: safety.details ?? null },
-        });
-        await cleanupRejectedObject("pdf_validation_failed_after_decrypt", { error: safety.error });
-        return NextResponse.json({ ok: false, error: safety.error, message: safety.message }, { status: 409 });
-      }
-
-      scanStatus = safety.riskLevel === "low" ? "clean" : "risky";
-      riskLevel = safety.riskLevel;
-      riskFlags = { flags: safety.flags, details: safety.details, mode: "decrypted_validation" };
+      await cleanupRejectedObject("encryption_metadata_missing");
+      return NextResponse.json({ ok: false, error: "encryption_metadata_missing" }, { status: 409 });
     }
+
+    let decrypted: Buffer;
+    try {
+      const mk = await getMasterKeyByIdOrThrow(encMeta.enc_key_version);
+      const dataKey = unwrapDataKey({
+        wrapped: encMeta.enc_wrapped_key,
+        wrapIv: encMeta.enc_wrap_iv,
+        wrapTag: encMeta.enc_wrap_tag,
+        masterKey: mk.key,
+      });
+
+      const encryptedObj = await r2Client.send(
+        new GetObjectCommand({
+          Bucket: docBucket,
+          Key: docKey,
+        })
+      );
+      const ciphertext = await streamToBuffer((encryptedObj as any).Body);
+      decrypted = decryptAes256Gcm({
+        ciphertext,
+        iv: encMeta.enc_iv,
+        key: dataKey,
+      });
+    } catch (e: any) {
+      await logSecurityEvent({
+        type: "upload_complete_decrypt_failed",
+        severity: "high",
+        ip: ipInfo.ip,
+        docId,
+        scope: "upload_complete",
+        message: "Encrypted upload could not be decrypted for validation",
+        meta: { error: String(e?.message || e) },
+      });
+      await cleanupRejectedObject("decrypt_failed", { error: String(e?.message || e) });
+      return NextResponse.json({ ok: false, error: "decrypt_failed" }, { status: 409 });
+    }
+
+    const safety = validatePdfBuffer({
+      bytes: decrypted,
+      absMaxBytes: absMax,
+      maxPdfPages: Number(process.env.PDF_MAX_PAGES || 2000),
+    });
+    if (!safety.ok) {
+      await logSecurityEvent({
+        type: "upload_complete_pdf_validation_failed",
+        severity: "high",
+        ip: ipInfo.ip,
+        docId,
+        scope: "upload_complete",
+        message: "PDF validation failed after decrypt",
+        meta: { error: safety.error, message: safety.message, details: safety.details ?? null },
+      });
+      await cleanupRejectedObject("pdf_validation_failed_after_decrypt", { error: safety.error });
+      return NextResponse.json({ ok: false, error: safety.error, message: safety.message }, { status: 409 });
+    }
+
+    scanStatus = safety.riskLevel === "low" ? "clean" : "risky";
+    riskLevel = safety.riskLevel;
+    riskFlags = { flags: safety.flags, details: safety.details, mode: "decrypted_validation" };
 
 // 4) Mark doc ready + update metadata (best-effort)
     await sql`

@@ -4,6 +4,7 @@ import { RBAC_PERMISSIONS, listRolePermissionOverrides, permissionsTableExists }
 import type { Role } from "@/lib/authz";
 import { requireRole } from "@/lib/authz";
 import { listOrgMemberships, listPendingOrgInvites, orgMembershipTablesReady } from "@/lib/orgMembership";
+import { getSecurityFreezeSettings } from "@/lib/settings";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -24,6 +25,8 @@ export default async function SecurityTelemetryPage(props: {
   const error = (Array.isArray(sp.error) ? sp.error[0] : sp.error) || "";
   const inviteUrl = (Array.isArray(sp.invite_url) ? sp.invite_url[0] : sp.invite_url) || "";
   const currentUser = await requireRole("owner");
+  const freezeSettingsRes = await getSecurityFreezeSettings();
+  const freeze = freezeSettingsRes.settings;
 
   // Recent security events
   const events = (await sql`
@@ -194,6 +197,48 @@ export default async function SecurityTelemetryPage(props: {
           Invite created: <span className="font-mono break-all">{inviteUrl}</span>
         </div>
       ) : null}
+      {saved === "freeze" ? (
+        <div className="mt-4 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-200">
+          Emergency freeze controls updated.
+        </div>
+      ) : null}
+
+      <div className="mt-4 rounded-xl border border-red-500/30 bg-red-500/10 p-4">
+        <h2 className="text-sm font-semibold text-red-100">Incident kill-switch controls</h2>
+        <p className="mt-1 text-xs text-red-200/80">
+          Immediate runtime freeze controls for serve paths. Use minimum scope first (share or alias) before global freeze.
+        </p>
+        <p className="mt-1 text-xs text-red-200/70">
+          Runbook: <span className="font-mono">docs/incident-response-runbook.md</span>
+        </p>
+
+        <form action="/api/admin/security/freeze" method="post" className="mt-3 grid gap-2 sm:grid-cols-2">
+          <label className="flex items-center justify-between gap-3 rounded-lg border border-red-500/30 bg-black/30 px-3 py-2 text-xs text-red-100">
+            <span>Global serve freeze</span>
+            <input type="checkbox" name="globalServeDisabled" value="1" defaultChecked={freeze.globalServeDisabled} />
+          </label>
+          <label className="flex items-center justify-between gap-3 rounded-lg border border-red-500/30 bg-black/30 px-3 py-2 text-xs text-red-100">
+            <span>Share route freeze</span>
+            <input type="checkbox" name="shareServeDisabled" value="1" defaultChecked={freeze.shareServeDisabled} />
+          </label>
+          <label className="flex items-center justify-between gap-3 rounded-lg border border-red-500/30 bg-black/30 px-3 py-2 text-xs text-red-100">
+            <span>Alias route freeze</span>
+            <input type="checkbox" name="aliasServeDisabled" value="1" defaultChecked={freeze.aliasServeDisabled} />
+          </label>
+          <label className="flex items-center justify-between gap-3 rounded-lg border border-red-500/30 bg-black/30 px-3 py-2 text-xs text-red-100">
+            <span>Ticket route freeze</span>
+            <input type="checkbox" name="ticketServeDisabled" value="1" defaultChecked={freeze.ticketServeDisabled} />
+          </label>
+          <div className="sm:col-span-2">
+            <button
+              type="submit"
+              className="rounded border border-red-400/40 bg-red-500/20 px-3 py-1.5 text-xs text-red-100 hover:bg-red-500/30"
+            >
+              Save kill-switch state
+            </button>
+          </div>
+        </form>
+      </div>
 
       <div className="mt-6 grid gap-4 lg:grid-cols-3">
         <section className="rounded-xl border border-white/10 bg-white/5 p-4 lg:col-span-1">

@@ -261,3 +261,82 @@ export async function setBillingFlags(next: Partial<BillingFlags>): Promise<
     return { ok: false, error: msg };
   }
 }
+
+// --- Security emergency freeze flags ---
+
+export type SecurityFreezeSettings = {
+  globalServeDisabled: boolean;
+  shareServeDisabled: boolean;
+  aliasServeDisabled: boolean;
+  ticketServeDisabled: boolean;
+};
+
+const DEFAULT_SECURITY_FREEZE: SecurityFreezeSettings = {
+  globalServeDisabled: false,
+  shareServeDisabled: false,
+  aliasServeDisabled: false,
+  ticketServeDisabled: false,
+};
+
+export async function getSecurityFreezeSettings(): Promise<
+  | { ok: true; settings: SecurityFreezeSettings }
+  | { ok: false; error: string; settings: SecurityFreezeSettings }
+> {
+  try {
+    const rows = (await sql`
+      select value
+      from public.app_settings
+      where key = 'security_freeze'
+      limit 1
+    `) as unknown as Array<{ value: any }>;
+
+    const value = rows?.[0]?.value ?? null;
+    if (!value || typeof value !== "object") {
+      return { ok: true, settings: { ...DEFAULT_SECURITY_FREEZE } };
+    }
+
+    return {
+      ok: true,
+      settings: {
+        globalServeDisabled: asBool(value.globalServeDisabled, DEFAULT_SECURITY_FREEZE.globalServeDisabled),
+        shareServeDisabled: asBool(value.shareServeDisabled, DEFAULT_SECURITY_FREEZE.shareServeDisabled),
+        aliasServeDisabled: asBool(value.aliasServeDisabled, DEFAULT_SECURITY_FREEZE.aliasServeDisabled),
+        ticketServeDisabled: asBool(value.ticketServeDisabled, DEFAULT_SECURITY_FREEZE.ticketServeDisabled),
+      },
+    };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return { ok: false, error: msg, settings: { ...DEFAULT_SECURITY_FREEZE } };
+  }
+}
+
+export async function setSecurityFreezeSettings(next: Partial<SecurityFreezeSettings>): Promise<
+  | { ok: true; settings: SecurityFreezeSettings }
+  | { ok: false; error: string }
+> {
+  const currentRes = await getSecurityFreezeSettings();
+  const current = currentRes.settings;
+
+  const merged: SecurityFreezeSettings = {
+    globalServeDisabled:
+      typeof next.globalServeDisabled === "boolean" ? next.globalServeDisabled : current.globalServeDisabled,
+    shareServeDisabled:
+      typeof next.shareServeDisabled === "boolean" ? next.shareServeDisabled : current.shareServeDisabled,
+    aliasServeDisabled:
+      typeof next.aliasServeDisabled === "boolean" ? next.aliasServeDisabled : current.aliasServeDisabled,
+    ticketServeDisabled:
+      typeof next.ticketServeDisabled === "boolean" ? next.ticketServeDisabled : current.ticketServeDisabled,
+  };
+
+  try {
+    await sql`
+      insert into public.app_settings (key, value)
+      values ('security_freeze', ${merged as any}::jsonb)
+      on conflict (key) do update set value = excluded.value
+    `;
+    return { ok: true, settings: merged };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return { ok: false, error: msg };
+  }
+}
