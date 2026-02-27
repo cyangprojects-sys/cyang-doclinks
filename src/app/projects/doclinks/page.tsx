@@ -8,7 +8,7 @@ import { DEMO_DOC_URL } from "@/lib/demo";
 export const metadata: Metadata = {
   title: "Doclinks — cyang.io",
   description:
-    "Doclinks is a security-first document sharing platform with encryption by default, immutable audit logging, strict share gating, and owner/admin operations.",
+    "Doclinks is a security-first file sharing platform with encryption by default, immutable audit logging, strict share gating, MIME/signature validation, and owner/admin operations.",
 };
 
 export default function DoclinksPage() {
@@ -32,13 +32,15 @@ export default function DoclinksPage() {
           </h1>
 
           <p className="mt-5 max-w-2xl text-base leading-relaxed text-white/70">
-            Doclinks uploads PDFs and serves them behind strict, server-side access checks.
+            Doclinks uploads supported business file types and serves them behind strict, server-side access checks.
             Links are friendly; rules are enforced. The goal is polished UX with a
             smaller, safer surface area.
           </p>
 
           <div className="mt-6 flex flex-wrap gap-2 text-xs text-white/60">
             <Pill>Encryption default</Pill>
+            <Pill>MIME + signature checks</Pill>
+            <Pill>Executable/macro blocking</Pill>
             <Pill>Immutable audit log</Pill>
             <Pill>Quarantine enforcement</Pill>
             <Pill>Expires shares</Pill>
@@ -52,7 +54,7 @@ export default function DoclinksPage() {
               href="/admin"
               className="rounded-2xl bg-white px-6 py-3 text-sm font-medium text-black hover:bg-white/90"
             >
-              Upload a PDF
+              Upload files
             </Link>
 
             <DemoDocButton
@@ -237,6 +239,20 @@ export default function DoclinksPage() {
       </section>
 
       <section className="mt-16">
+        <h2 className="text-2xl font-semibold tracking-tight">Supported Upload Types</h2>
+        <div className="mt-6 rounded-3xl bg-white/5 p-6 ring-1 ring-white/10">
+          <p className="text-sm leading-relaxed text-white/70">
+            Allowed: Documents (.pdf, .doc, .docx, .txt, .rtf, .odt), Spreadsheets (.xls, .xlsx, .csv),
+            Presentations (.ppt, .pptx), Images (.jpg, .jpeg, .png, .gif, .bmp, .heic), Archives (.zip, .rar),
+            Audio/Video (.mp3, .wav, .mp4, .mov, .avi).
+          </p>
+          <p className="mt-3 text-sm leading-relaxed text-amber-200/80">
+            Blocked: executable, script, shortcut, and macro-enabled types (including .exe, .js, .ps1, .lnk, .docm, .xlsm, .pptm), and anything not explicitly allowlisted.
+          </p>
+        </div>
+      </section>
+
+      <section className="mt-16">
         <h2 className="text-2xl font-semibold tracking-tight">Current build status</h2>
         <div className="mt-6 grid gap-4 md:grid-cols-12">
           <div className="md:col-span-7">
@@ -299,7 +315,7 @@ export default function DoclinksPage() {
         <div className="mt-6 grid gap-4 md:grid-cols-2">
           <Callout
             title="Admin upload"
-            desc="Upload PDFs and generate a shareable link."
+            desc="Upload supported file types and generate a shareable link."
             href="/admin"
             cta="Open Admin Upload →"
           />
@@ -461,6 +477,7 @@ function ListItem({ children }: { children: React.ReactNode }) {
     </li>
   );
 }
+
 
 
 

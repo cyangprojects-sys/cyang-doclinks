@@ -156,6 +156,8 @@ export default function UploadPanel({
   const queuedCount = useMemo(() => items.filter((i) => i.status === "queued").length, [items]);
   const doneCount = useMemo(() => items.filter((i) => i.status === "done").length, [items]);
   const errorCount = useMemo(() => items.filter((i) => i.status === "error").length, [items]);
+  const allowedTypeSummary =
+    "Documents: .pdf, .doc, .docx, .txt, .rtf, .odt | Spreadsheets: .xls, .xlsx, .csv | Presentations: .ppt, .pptx | Images: .jpg, .jpeg, .png, .gif, .bmp, .heic | Archives: .zip, .rar | Audio/Video: .mp3, .wav, .mp4, .mov, .avi";
 
   useEffect(() => {
     if (!canCheckEncryptionStatus) {
@@ -324,6 +326,12 @@ export default function UploadPanel({
           <h2 className="text-lg font-semibold">Upload documents</h2>
           <p className="mt-1 text-sm text-white/60">
             Drag and drop one or many supported files. Document title is automatically set from filename.
+          </p>
+          <p className="mt-2 text-xs leading-relaxed text-white/60">
+            Allowed types: {allowedTypeSummary}
+          </p>
+          <p className="mt-1 text-xs leading-relaxed text-amber-200/80">
+            Blocked: executable, script, shortcut, and macro-enabled file types (for example .exe, .js, .ps1, .lnk, .docm).
           </p>
         </div>
 

@@ -50,10 +50,12 @@ export default function HomePage() {
             <div className="text-xs uppercase tracking-[0.12em] text-white/55">Featured product</div>
             <h2 className="mt-2 text-2xl font-semibold tracking-tight text-white">Doclinks</h2>
             <p className="mt-2 text-sm leading-relaxed text-white/70">
-              Share PDFs with policy-driven controls, immutable audit logging, and safer viewer paths.
+              Share business files with policy-driven controls, immutable audit logging, stricter MIME validation, and safer viewer paths.
             </p>
             <div className="mt-4 flex flex-wrap gap-2">
               <Pill>Encrypted uploads</Pill>
+              <Pill>MIME + signature checks</Pill>
+              <Pill>Executable/macro blocking</Pill>
               <Pill>Alias + token controls</Pill>
               <Pill>Owner moderation</Pill>
               <Pill>Cloudflare cron jobs</Pill>
@@ -104,7 +106,7 @@ export default function HomePage() {
         <div className="glass-card rounded-2xl p-5 lg:col-span-5">
           <h3 className="text-xl font-semibold tracking-tight text-white">Start quickly</h3>
           <div className="mt-4 space-y-3">
-            <Step title="Upload a PDF" desc="Use admin upload with validation, scanning, and policy checks." href="/admin/upload" />
+            <Step title="Upload supported files" desc="Docs, sheets, presentations, media, and archives with strict type enforcement." href="/admin/upload" />
             <Step title="Create a share" desc="Issue an alias or share token with expiration and limits." href="/admin/dashboard#shares" />
             <Step title="Test viewer flow" desc="Open a protected link and verify access gate behavior." href="/projects/doclinks" />
           </div>
@@ -159,4 +161,3 @@ function Step(props: { title: string; desc: string; href: string }) {
     </Link>
   );
 }
-

@@ -54,7 +54,7 @@ export default function AboutPage() {
               <div className="mt-3 space-y-3">
                 <FocusRow
                   title="Doclinks"
-                  desc="Security-first doc sharing with short links + audit logging."
+                  desc="Security-first file sharing with short links, immutable logs, and strict upload validation."
                   href="/projects/doclinks"
                 />
                 <FocusRow
@@ -64,7 +64,7 @@ export default function AboutPage() {
                 />
                 <FocusRow
                   title="Hardening"
-                  desc="Smaller surface area, stronger defaults, fewer foot-guns."
+                  desc="MIME/signature checks, executable/macro blocking, and scan-first serving."
                   href="/projects/doclinks"
                 />
               </div>
@@ -127,7 +127,7 @@ export default function AboutPage() {
               <h2 className="text-lg font-semibold">Where to start</h2>
               <div className="mt-4 grid gap-3">
                 <StartCard title="Doclinks product page" desc="Controls, security model, roadmap." href="/projects/doclinks" />
-                <StartCard title="Upload a PDF" desc="Create a doc and generate a share link." href="/admin" />
+                <StartCard title="Upload files" desc="Create a doc and generate a share link." href="/admin" />
                 <StartCard title="Project list" desc="Everything else that’s maintained." href="/projects" />
               </div>
             </div>
@@ -148,6 +148,8 @@ export default function AboutPage() {
             <Tag>Postgres</Tag>
             <Tag>Magic Links</Tag>
             <Tag>Audit Logs</Tag>
+            <Tag>MIME Validation</Tag>
+            <Tag>Scan-first Serve</Tag>
           </div>
 
           <div className="mt-6 flex flex-col gap-3 sm:flex-row">

@@ -24,10 +24,10 @@ const PROJECTS: Project[] = [
   {
     title: "Doclinks",
     label: "Primary",
-    desc: "Secure document sharing via short links, backed by R2 + DB gating + audit logs.",
+    desc: "Secure file sharing via short links, backed by R2 + DB gating + immutable audit logs + strict type validation.",
     href: "/projects/doclinks",
     status: "Live",
-    tags: ["Security-first", "R2", "Postgres"],
+    tags: ["Security-first", "MIME validation", "Postgres"],
   },
   {
     title: "Admin & Analytics",
@@ -78,7 +78,7 @@ export default function ProjectsPage() {
                   <div className="text-xs text-white/60">Flagship</div>
                   <div className="mt-1 text-2xl font-semibold">Doclinks</div>
                   <p className="mt-2 text-sm leading-relaxed text-white/70">
-                    Secure document sharing with short links — built for
+                    Secure file sharing with short links — built for
                     enterprise-grade polish, with a smaller attack surface and server-side
                     enforcement.
                   </p>
@@ -89,7 +89,7 @@ export default function ProjectsPage() {
               <div className="mt-6 grid gap-3 sm:grid-cols-2">
                 <Micro title="Controls" desc="Expiration, max views, revocation." />
                 <Micro title="Observability" desc="Audit trail, analytics rollups." />
-                <Micro title="Security" desc="R2 private objects, server checks." />
+                <Micro title="Security" desc="R2 private objects, MIME/signature checks, executable/macro blocking." />
                 <Micro title="UX" desc="Fast pages, minimal UI, predictable flows." />
               </div>
 
@@ -104,7 +104,7 @@ export default function ProjectsPage() {
                   href="/admin"
                   className="rounded-2xl bg-white/10 px-6 py-3 text-sm font-medium text-white ring-1 ring-white/10 hover:bg-white/15"
                 >
-                  Upload a PDF
+                  Upload files
                 </Link>
               </div>
             </div>
@@ -114,9 +114,9 @@ export default function ProjectsPage() {
             <div className="rounded-3xl bg-white/5 p-6 ring-1 ring-white/10">
               <h2 className="text-sm font-medium text-white/90">Now shipping</h2>
               <div className="mt-4 space-y-3">
-                <NowRow title="Magic links" desc="Friendly aliases, strict server checks." />
+                <NowRow title="Magic links" desc="Friendly aliases, strict server checks, and deterministic share resolution." />
                 <NowRow title="Audit logs" desc="Operational clarity: who/when/how." />
-                <NowRow title="Guardrails" desc="Rate limiting and safer defaults." />
+                <NowRow title="Guardrails" desc="Rate limiting, scan-first serving, and upload type enforcement." />
               </div>
 
               <div className="mt-6 rounded-2xl bg-black/40 p-4 ring-1 ring-white/10">
@@ -309,4 +309,5 @@ function QuickLink(props: { name: string; desc: string; href: string }) {
     </Link>
   );
 }
+
 
