@@ -15,6 +15,7 @@ import crypto from "crypto";
 import { isAliasServingDisabled, isSecurityTestNoDbMode } from "@/lib/securityPolicy";
 import { getRouteTimeoutMs, isRouteTimeoutError, withRouteTimeout } from "@/lib/routeTimeout";
 import { assertRuntimeEnv, isRuntimeEnvError } from "@/lib/runtimeEnv";
+import { detectFileFamily } from "@/lib/fileFamily";
 
 function normAlias(alias: string): string {
   return decodeURIComponent(String(alias || "")).trim().toLowerCase();
@@ -251,7 +252,9 @@ export async function GET(
 
     const filename = pickFilename(resolved.title, resolved.originalFilename, alias);
     const contentType = resolved.contentType || "application/octet-stream";
-    const disposition = parseDisposition(req);
+    const requestedDisposition = parseDisposition(req);
+    const family = detectFileFamily({ contentType, filename: resolved.originalFilename || filename });
+    const disposition: "inline" | "attachment" = family === "archive" ? "attachment" : requestedDisposition;
 // --- Monetization / plan limits (hidden) ---
 // Enforce the document owner's monthly view quota.
 if (shouldCountView(req)) {

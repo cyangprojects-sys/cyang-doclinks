@@ -388,8 +388,10 @@ function DocumentViewer({
   availabilityHint?: string | null;
 }) {
   const viewerUrl = `/d/${encodeURIComponent(alias)}/raw`;
+  const downloadUrl = `/d/${encodeURIComponent(alias)}/raw?disposition=attachment`;
   const family = detectFileFamily({ contentType, filename });
   const typeLabel = fileFamilyLabel(family);
+  const isArchive = family === "archive";
 
   return (
     <div className="mt-4">
@@ -410,7 +412,26 @@ function DocumentViewer({
       ) : null}
       {!availabilityHint ? (
         <div className="overflow-hidden rounded-xl border border-white/10 bg-white/5">
-          <SecurePdfCanvasViewer rawUrl={viewerUrl} mimeType={contentType} filename={filename} className="h-[78vh]" />
+          {isArchive ? (
+            <div className="m-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-100">
+              <div className="font-semibold">Archive files are download-only.</div>
+              <div className="mt-1 text-amber-100/85">Inline viewing is disabled for archive content.</div>
+              <a
+                href={downloadUrl}
+                className="mt-3 inline-flex items-center rounded-lg border border-amber-200/40 bg-amber-100/10 px-3 py-2 text-sm text-amber-50 hover:bg-amber-100/20"
+              >
+                Download archive
+              </a>
+            </div>
+          ) : (
+            <SecurePdfCanvasViewer
+              rawUrl={viewerUrl}
+              downloadUrl={downloadUrl}
+              mimeType={contentType}
+              filename={filename}
+              className="h-[78vh]"
+            />
+          )}
         </div>
       ) : null}
 

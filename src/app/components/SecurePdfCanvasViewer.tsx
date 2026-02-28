@@ -50,6 +50,7 @@ function PdfPageCanvas({
 
 export default function SecurePdfCanvasViewer(props: {
   rawUrl: string;
+  downloadUrl?: string;
   mimeType?: string | null;
   filename?: string | null;
   watermarkEnabled?: boolean;
@@ -151,7 +152,7 @@ export default function SecurePdfCanvasViewer(props: {
   }, [mode, pdfjs, props.rawUrl]);
 
   useEffect(() => {
-    if (mode === "image" || mode === "audio" || mode === "video" || mode === "office" || mode === "file") {
+    if (mode === "image" || mode === "audio" || mode === "video" || mode === "office" || mode === "archive" || mode === "file") {
       setLoading(false);
       setError(null);
     }
@@ -365,6 +366,23 @@ export default function SecurePdfCanvasViewer(props: {
                 />
                 <div className="mt-2 text-xs text-white/60">
                   Rendering depends on browser support for this file type.
+                </div>
+              </div>
+            ) : null}
+
+            {mode === "archive" ? (
+              <div className="w-[min(760px,92vw)] rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-amber-100">
+                <div className="text-sm font-semibold">Preview not available for archive files.</div>
+                <div className="mt-1 text-xs text-amber-100/85">
+                  Archive content is download-only and cannot be opened inline.
+                </div>
+                <div className="mt-3">
+                  <a
+                    href={props.downloadUrl || props.rawUrl}
+                    className="inline-flex items-center rounded-lg border border-amber-200/40 bg-amber-100/10 px-3 py-2 text-sm text-amber-50 hover:bg-amber-100/20"
+                  >
+                    Download archive
+                  </a>
                 </div>
               </div>
             ) : null}

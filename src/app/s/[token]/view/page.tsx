@@ -98,6 +98,7 @@ export default async function ShareTokenViewPage(props: {
   const filename = String(contentTypeRows?.[0]?.original_filename || "").trim() || null;
   const family = detectFileFamily({ contentType, filename });
   const typeLabel = fileFamilyLabel(family);
+  const isArchive = family === "archive";
 
   return (
     <ShareShell token={t} title="Secure Document" subtitle="View-only document delivery with policy controls.">
@@ -116,7 +117,7 @@ export default async function ShareTokenViewPage(props: {
           <Link href="/" className="btn-base btn-secondary rounded-xl px-4 py-2 text-sm">
             Go to Doclinks
           </Link>
-          {meta.allowDownload !== false ? (
+          {meta.allowDownload !== false || isArchive ? (
             <Link href={`/s/${encodeURIComponent(t)}/download`} className="btn-base btn-secondary rounded-xl px-4 py-2 text-sm">
               Download
             </Link>
@@ -127,10 +128,15 @@ export default async function ShareTokenViewPage(props: {
           <div className="rounded-2xl border border-amber-500/25 bg-amber-500/10 p-4 text-sm text-amber-100">
             This file has characteristics commonly used for phishing or malware delivery. Inline view is disabled.
           </div>
+        ) : isArchive ? (
+          <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-100">
+            Archive files are download-only for security. Inline preview is disabled.
+          </div>
         ) : (
           <div className="overflow-hidden rounded-2xl border border-white/15 bg-black/20">
             <SecurePdfCanvasViewer
               rawUrl={rawUrl}
+              downloadUrl={`/s/${encodeURIComponent(t)}/download`}
               mimeType={contentType}
               filename={filename}
               watermarkEnabled={enabled}

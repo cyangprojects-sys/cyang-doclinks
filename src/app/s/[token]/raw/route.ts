@@ -20,6 +20,7 @@ import {
   maybeBlockIpOnAbuse,
 } from "@/lib/securityTelemetry";
 import { assertRuntimeEnv, isRuntimeEnvError } from "@/lib/runtimeEnv";
+import { detectFileFamily } from "@/lib/fileFamily";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -88,6 +89,7 @@ type ShareLookupRow = {
   password_hash: string | null;
   r2_key: string;
   content_type: string | null;
+  original_filename: string | null;
 
   // Moderation/scan
   moderation_status: string;
@@ -147,7 +149,7 @@ export async function GET(
 
   const r2Bucket = getR2Bucket();
   const { token } = await params;
-  const disposition = parseDisposition(req.nextUrl.searchParams.get("disposition"));
+  const requestedDisposition = parseDisposition(req.nextUrl.searchParams.get("disposition"));
   const ip = getClientIpFromHeaders(req.headers) || "";
   const abuseBlock = await enforceIpAbuseBlock({ req, scope: "share_raw" });
   if (!abuseBlock.ok) {
@@ -185,10 +187,6 @@ export async function GET(
     }
     return new NextResponse(body ?? (status === 429 ? "Too Many Requests" : "Not found"), { status });
   };
-
-  if (disposition === "inline" && isBlockedTopLevelOpen(req)) {
-    return await deny("top_level_blocked", 403, "Direct open is disabled for this shared document.");
-  }
 
   // --- Rate limiting (best-effort) ---
   const ipKey = stableHash(ip, "VIEW_SALT");
@@ -257,6 +255,7 @@ export async function GET(
         s.password_hash::text as password_hash,
         d.r2_key::text as r2_key,
         d.content_type::text as content_type,
+        d.original_filename::text as original_filename,
         coalesce(d.moderation_status::text, 'active') as moderation_status,
         coalesce(d.scan_status::text, 'unscanned') as scan_status,
         coalesce(d.risk_level::text, 'low') as risk_level,
@@ -279,6 +278,7 @@ export async function GET(
         s.password_hash::text as password_hash,
         d.r2_key::text as r2_key,
         d.content_type::text as content_type,
+        d.original_filename::text as original_filename,
         coalesce(d.moderation_status::text, 'active') as moderation_status,
         coalesce(d.scan_status::text, 'unscanned') as scan_status,
         coalesce(d.risk_level::text, 'low') as risk_level,
@@ -304,8 +304,17 @@ export async function GET(
   }
 
   const risk = (share.risk_level || "low").toLowerCase();
+  const family = detectFileFamily({
+    contentType: share.content_type,
+    filename: share.original_filename,
+  });
+  const isArchive = family === "archive";
+  const disposition: "inline" | "attachment" = isArchive ? "attachment" : requestedDisposition;
   const riskyInline = risk === "high" || (share.scan_status || "").toLowerCase() === "risky";
-  if (disposition === "attachment" && !share.allow_download) {
+  if (disposition === "inline" && isBlockedTopLevelOpen(req)) {
+    return await deny("top_level_blocked", 403, "Direct open is disabled for this shared document.");
+  }
+  if (disposition === "attachment" && !isArchive && !share.allow_download) {
     return await deny("download_disabled", 403, "Download disabled");
   }
   if (disposition === "inline" && riskyInline) {

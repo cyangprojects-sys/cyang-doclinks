@@ -1,4 +1,4 @@
-export type FileFamily = "pdf" | "image" | "video" | "audio" | "office" | "file";
+export type FileFamily = "pdf" | "image" | "video" | "audio" | "office" | "archive" | "file";
 
 type DetectArgs = {
   contentType?: string | null;
@@ -17,6 +17,8 @@ const OFFICE_EXTENSIONS = new Set([
   "odp",
 ]);
 
+const ARCHIVE_EXTENSIONS = new Set(["zip", "rar"]);
+
 function extensionOf(filename?: string | null): string {
   const name = String(filename || "").trim().toLowerCase();
   if (!name) return "";
@@ -33,6 +35,15 @@ export function detectFileFamily(args: DetectArgs): FileFamily {
   if (m.startsWith("image/")) return "image";
   if (m.startsWith("video/")) return "video";
   if (m.startsWith("audio/")) return "audio";
+  if (
+    m === "application/zip" ||
+    m === "application/x-zip-compressed" ||
+    m === "application/vnd.rar" ||
+    m === "application/x-rar-compressed" ||
+    ARCHIVE_EXTENSIONS.has(ext)
+  ) {
+    return "archive";
+  }
 
   if (
     m === "application/msword" ||
@@ -64,8 +75,9 @@ export function fileFamilyLabel(family: FileFamily): string {
       return "AUDIO";
     case "office":
       return "OFFICE";
+    case "archive":
+      return "ARCHIVE";
     default:
       return "FILE";
   }
 }
-
