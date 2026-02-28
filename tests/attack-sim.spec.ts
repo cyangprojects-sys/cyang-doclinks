@@ -2,6 +2,8 @@ import { expect, test } from "@playwright/test";
 import crypto from "node:crypto";
 import { neon } from "@neondatabase/serverless";
 
+type Sql = ReturnType<typeof neon<false, false>>;
+
 function isBlockedStatus(status: number): boolean {
   return (
     status === 401 ||
@@ -68,7 +70,7 @@ async function presignUpload(
   return json;
 }
 
-async function pickDocId(sql: ReturnType<typeof neon>): Promise<string | null> {
+async function pickDocId(sql: Sql): Promise<string | null> {
   try {
     const rows = (await sql`
       select d.id::text as id
@@ -139,6 +141,7 @@ test.describe("attack simulation", () => {
 
     const docId = await pickDocId(sql);
     test.skip(!docId, "No doc available for fixture setup");
+    if (!docId) return;
 
     const token = `tok_attack_prescan_${randSuffix()}`.slice(0, 64);
     await sql`
@@ -197,6 +200,7 @@ test.describe("attack simulation", () => {
 
     const docId = await pickDocId(sql);
     test.skip(!docId, "No doc available for fixture setup");
+    if (!docId) return;
 
     const token = `tok_attack_redirect_${randSuffix()}`.slice(0, 64);
     await sql`
@@ -222,6 +226,7 @@ test.describe("attack simulation", () => {
   test("upload presign rejects absolute oversize payloads (>25MB)", async ({ request }) => {
     const auth = authHeadersFromEnv();
     test.skip(!auth, "ATTACK_TEST_AUTH_COOKIE not configured");
+    if (!auth) return;
 
     const absMax = Number(process.env.UPLOAD_ABSOLUTE_MAX_BYTES || 26_214_400);
     const tooLarge = absMax + 1;
@@ -245,6 +250,7 @@ test.describe("attack simulation", () => {
   test("upload complete rejects malformed PDF after decrypt", async ({ request }) => {
     const auth = authHeadersFromEnv();
     test.skip(!auth, "ATTACK_TEST_AUTH_COOKIE not configured");
+    if (!auth) return;
 
     const fakePdfName = `malformed-${randSuffix()}.pdf`;
     const badPlain = Buffer.from("this is not a real pdf");
@@ -296,6 +302,7 @@ test.describe("attack simulation", () => {
   test("upload complete rejects PDFs that exceed max page policy", async ({ request }) => {
     const auth = authHeadersFromEnv();
     test.skip(!auth, "ATTACK_TEST_AUTH_COOKIE not configured");
+    if (!auth) return;
 
     const maxPages = Number(process.env.PDF_MAX_PAGES || 2000);
     const overPages = maxPages + 25;
@@ -346,6 +353,7 @@ test.describe("attack simulation", () => {
   test("upload presign route throttles high-frequency abuse", async ({ request }) => {
     const auth = authHeadersFromEnv();
     test.skip(!auth, "ATTACK_TEST_AUTH_COOKIE not configured");
+    if (!auth) return;
 
     const statuses: number[] = [];
     for (let i = 0; i < 45; i += 1) {

@@ -1,6 +1,8 @@
 import { expect, test } from "@playwright/test";
 import { neon } from "@neondatabase/serverless";
 
+type Sql = ReturnType<typeof neon<false, false>>;
+
 function randSuffix(): string {
   return `${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
 }
@@ -19,7 +21,7 @@ const DEFAULT_FREEZE: FreezeSettings = {
   ticketServeDisabled: false,
 };
 
-async function tableExists(sql: ReturnType<typeof neon>, tableName: string): Promise<boolean> {
+async function tableExists(sql: Sql, tableName: string): Promise<boolean> {
   try {
     const rows = (await sql`
       select 1
@@ -34,7 +36,7 @@ async function tableExists(sql: ReturnType<typeof neon>, tableName: string): Pro
   }
 }
 
-async function pickDocId(sql: ReturnType<typeof neon>): Promise<string | null> {
+async function pickDocId(sql: Sql): Promise<string | null> {
   try {
     const rows = (await sql`
       select d.id::text as id
@@ -49,7 +51,7 @@ async function pickDocId(sql: ReturnType<typeof neon>): Promise<string | null> {
   }
 }
 
-async function readFreeze(sql: ReturnType<typeof neon>): Promise<FreezeSettings> {
+async function readFreeze(sql: Sql): Promise<FreezeSettings> {
   try {
     const rows = (await sql`
       select value
@@ -69,7 +71,7 @@ async function readFreeze(sql: ReturnType<typeof neon>): Promise<FreezeSettings>
   }
 }
 
-async function writeFreeze(sql: ReturnType<typeof neon>, next: Partial<FreezeSettings>): Promise<void> {
+async function writeFreeze(sql: Sql, next: Partial<FreezeSettings>): Promise<void> {
   const current = await readFreeze(sql);
   const merged: FreezeSettings = {
     globalServeDisabled:
@@ -95,6 +97,7 @@ test.describe("security freeze controls", () => {
 
     const docId = await pickDocId(sql);
     test.skip(!docId, "No docs available for fixture setup");
+    if (!docId) return;
 
     const token = `tok_freeze_${randSuffix()}`.slice(0, 64);
     const original = await readFreeze(sql);
@@ -128,6 +131,7 @@ test.describe("security freeze controls", () => {
 
     const docId = await pickDocId(sql);
     test.skip(!docId, "No docs available for fixture setup");
+    if (!docId) return;
 
     const alias = `freeze-a-${randSuffix()}`.toLowerCase();
     const original = await readFreeze(sql);

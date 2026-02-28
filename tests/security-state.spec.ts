@@ -1,6 +1,8 @@
 import { expect, test } from "@playwright/test";
 import { neon } from "@neondatabase/serverless";
 
+type Sql = ReturnType<typeof neon<false, false>>;
+
 function randSuffix(): string {
   return `${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
 }
@@ -12,7 +14,7 @@ type DocRow = {
   risk_level: string | null;
 };
 
-async function pickDoc(sql: ReturnType<typeof neon>): Promise<DocRow | null> {
+async function pickDoc(sql: Sql): Promise<DocRow | null> {
   try {
     const rows = (await sql`
       select
@@ -31,7 +33,7 @@ async function pickDoc(sql: ReturnType<typeof neon>): Promise<DocRow | null> {
   }
 }
 
-async function pickServableDoc(sql: ReturnType<typeof neon>): Promise<DocRow | null> {
+async function pickServableDoc(sql: Sql): Promise<DocRow | null> {
   try {
     const rows = (await sql`
       select
@@ -53,7 +55,7 @@ async function pickServableDoc(sql: ReturnType<typeof neon>): Promise<DocRow | n
 }
 
 async function columnExists(
-  sql: ReturnType<typeof neon>,
+  sql: Sql,
   tableName: string,
   columnName: string
 ): Promise<boolean> {
@@ -72,7 +74,7 @@ async function columnExists(
   }
 }
 
-async function tableExists(sql: ReturnType<typeof neon>, tableName: string): Promise<boolean> {
+async function tableExists(sql: Sql, tableName: string): Promise<boolean> {
   try {
     const rows = (await sql`
       select 1
@@ -95,6 +97,7 @@ test.describe("security state enforcement", () => {
 
     const doc = await pickDoc(sql);
     test.skip(!doc, "No docs available for fixture setup");
+    if (!doc) return;
 
     const expiredToken = `tok_expired_${randSuffix()}`.slice(0, 64);
     const revokedToken = `tok_revoked_${randSuffix()}`.slice(0, 64);
@@ -124,6 +127,7 @@ test.describe("security state enforcement", () => {
 
     const doc = await pickDoc(sql);
     test.skip(!doc, "No docs available for fixture setup");
+    if (!doc) return;
 
     const token = `tok_block_${randSuffix()}`.slice(0, 64);
 
@@ -187,6 +191,7 @@ test.describe("security state enforcement", () => {
 
     const doc = await pickDoc(sql);
     test.skip(!doc, "No docs available for fixture setup");
+    if (!doc) return;
 
     const token = `tok_inactive_${randSuffix()}`.slice(0, 64);
     await sql`
@@ -221,6 +226,7 @@ test.describe("security state enforcement", () => {
     `) as unknown as Array<{ id: string; org_id: string | null }>;
     const doc = rows?.[0];
     test.skip(!doc?.id || !doc?.org_id, "No doc/org fixture found");
+    if (!doc?.id || !doc?.org_id) return;
 
     const token = `tok_org_block_${randSuffix()}`.slice(0, 64);
     await sql`
@@ -258,6 +264,7 @@ test.describe("security state enforcement", () => {
 
     const doc = await pickDoc(sql);
     test.skip(!doc, "No docs available for fixture setup");
+    if (!doc) return;
 
     const aliasInactive = `a-inactive-${randSuffix()}`.toLowerCase();
     const aliasRevoked = `a-revoked-${randSuffix()}`.toLowerCase();
@@ -304,6 +311,7 @@ test.describe("security state enforcement", () => {
 
     const doc = await pickServableDoc(sql);
     test.skip(!doc, "No servable docs available for fixture setup");
+    if (!doc) return;
 
     const token = `tok_live_revoke_${randSuffix()}`.slice(0, 64);
     await sql`
@@ -341,6 +349,7 @@ test.describe("security state enforcement", () => {
 
     const doc = await pickServableDoc(sql);
     test.skip(!doc, "No servable docs available for fixture setup");
+    if (!doc) return;
 
     const alias = `a-live-revoke-${randSuffix()}`.toLowerCase();
     const hasRevokedAt = await columnExists(sql, "doc_aliases", "revoked_at");

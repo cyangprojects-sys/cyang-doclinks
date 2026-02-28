@@ -2,6 +2,8 @@ import { expect, test } from "@playwright/test";
 import crypto from "node:crypto";
 import { neon } from "@neondatabase/serverless";
 
+type Sql = ReturnType<typeof neon<false, false>>;
+
 function stripeSignature(payload: unknown, secret: string, timestamp?: number): string {
   const ts = Number.isFinite(timestamp) ? Number(timestamp) : Math.floor(Date.now() / 1000);
   const raw = JSON.stringify(payload);
@@ -13,7 +15,7 @@ function randSuffix(): string {
   return `${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
 }
 
-async function canUseBillingTables(sql: ReturnType<typeof neon>): Promise<boolean> {
+async function canUseBillingTables(sql: Sql): Promise<boolean> {
   try {
     const rows = (await sql`select to_regclass('public.billing_subscriptions')::text as reg`) as unknown as Array<{
       reg: string | null;
