@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { cookies } from "next/headers";
 import { consumeShareTokenView } from "@/lib/resolveDoc";
-import { assertCanServeView, incrementMonthlyViews } from "@/lib/monetization";
-import { enforcePlanLimitsEnabled } from "@/lib/billingFlags";
+import { incrementMonthlyViews } from "@/lib/monetization";
 import { getClientIpFromHeaders, getUserAgentFromHeaders, logDocAccess } from "@/lib/audit";
 import crypto from "crypto";
 import { rateLimit, rateLimitHeaders, stableHash } from "@/lib/rateLimit";
@@ -344,8 +343,8 @@ export async function GET(
   // We only count once per initial range request to avoid burning views on chunked fetches.
   if (shouldCountView(req)) {
     const eventType = disposition === "attachment" ? "file_download" : "preview_view";
-    // --- Monetization / plan limits (hidden) ---
-    // Enforce the *document owner's* monthly view cap before consuming a share view.
+    // --- Monetization (best-effort usage attribution) ---
+    // Shared link access should not hard-fail due to owner billing counters.
     let ownerIdForLimit: string | null = null;
     try {
       const ownerRows = (await sql`
@@ -356,17 +355,7 @@ export async function GET(
         limit 1
       `) as unknown as Array<{ owner_id: string | null }>;
       ownerIdForLimit = ownerRows?.[0]?.owner_id ?? null;
-
-      if (ownerIdForLimit) {
-        const allowed = await assertCanServeView(ownerIdForLimit);
-        if (!allowed.ok) {
-          return await deny("owner_view_limit_reached", 429, "Temporarily unavailable");
-        }
-      }
     } catch {
-      if (enforcePlanLimitsEnabled()) {
-        return new NextResponse("Temporarily unavailable", { status: 503 });
-      }
       ownerIdForLimit = null;
     }
 
@@ -389,9 +378,7 @@ export async function GET(
       try {
         await incrementMonthlyViews(ownerIdForLimit, 1);
       } catch {
-        if (enforcePlanLimitsEnabled()) {
-          return new NextResponse("Temporarily unavailable", { status: 503 });
-        }
+        // ignore usage counter failures
       }
     }
 
