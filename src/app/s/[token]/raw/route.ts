@@ -187,7 +187,7 @@ export async function GET(
     return new NextResponse(body ?? (status === 429 ? "Too Many Requests" : "Not found"), { status });
   };
 
-  if (isBlockedTopLevelOpen(req)) {
+  if (disposition === "inline" && isBlockedTopLevelOpen(req)) {
     return await deny("top_level_blocked", 403, "Direct open is disabled for this shared document.");
   }
 
