@@ -113,7 +113,7 @@ export default async function BillingSettingsPage({
         </div>
         {plan.id === "free" ? (
           <div className="mt-1 text-xs text-amber-300">
-            Free tier requires share expiration (7 days max), disallows custom expiration, and does not allow permanent shares.
+            Free tier requires share expiration (7 days max), disallows custom expiration/permanent shares, enforces encryption + virus-scan gates, applies strict abuse throttling, disables audit export, and limits analytics to basic view counts.
           </div>
         ) : null}
         <div className="mt-2 text-xs text-neutral-400">
@@ -298,7 +298,7 @@ export default async function BillingSettingsPage({
           <ToggleRow
             name="enforcePlanLimits"
             title="Enforce plan limits"
-            description="Hard-enforce Free plan: 100MB storage, 10MB max file, 3 active shares, 100 views/month, required share expiration (7 days max), no custom expiration, no permanent shares. Turn OFF only for testing." 
+            description="Hard-enforce Free plan: 100MB storage, 10MB max file, 3 active shares, 100 views/month, required share expiration (7 days max), no custom expiration/permanent shares, encryption + scan gates, strict abuse throttling, no audit export, and basic analytics only. Turn OFF only for testing." 
             defaultChecked={flags.enforcePlanLimits}
           />
 

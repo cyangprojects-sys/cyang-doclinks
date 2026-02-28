@@ -67,6 +67,11 @@ export default async function ViewerUpgradePage(props: {
             <li>Share expiration required (7 days max)</li>
             <li>No custom expiration rules</li>
             <li>No permanent shares</li>
+            <li>Encryption required</li>
+            <li>Virus scan required</li>
+            <li>Strict abuse throttling</li>
+            <li>No audit export</li>
+            <li>Basic analytics only (view count)</li>
           </ul>
         </article>
 

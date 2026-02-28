@@ -10,7 +10,7 @@ import { validatePdfBuffer } from "@/lib/pdfSafety";
 import { sql } from "@/lib/db";
 import { slugify } from "@/lib/slug";
 import { requireDocWrite, requireUser } from "@/lib/authz";
-import { incrementUploads } from "@/lib/monetization";
+import { getPlanForUser, incrementUploads } from "@/lib/monetization";
 import { enforceGlobalApiRateLimit, clientIpKey, logDbErrorEvent, logSecurityEvent, detectStorageSpike } from "@/lib/securityTelemetry";
 import { getR2Bucket, r2Client } from "@/lib/r2";
 import { enqueueDocScan } from "@/lib/scanQueue";
@@ -48,7 +48,8 @@ export async function POST(req: NextRequest) {
         assertRuntimeEnv("upload_complete");
 
         const r2Bucket = getR2Bucket();
-        await requireUser();
+        const user = await requireUser();
+        const plan = await getPlanForUser(user.id);
         // Global API throttle (best-effort)
         const globalRl = await enforceGlobalApiRateLimit({
           req,
@@ -66,10 +67,16 @@ export async function POST(req: NextRequest) {
 
         // Upload complete throttle per-IP
         const ipInfo = clientIpKey(req);
+        const baseCompleteLimit = Number(process.env.RATE_LIMIT_UPLOAD_COMPLETE_IP_PER_MIN || 30);
+        const freeCompleteLimit = Number(process.env.RATE_LIMIT_UPLOAD_COMPLETE_FREE_IP_PER_MIN || 12);
+        const effectiveCompleteLimit =
+          plan.id === "free"
+            ? Math.max(1, Math.min(baseCompleteLimit, Number.isFinite(freeCompleteLimit) ? freeCompleteLimit : 12))
+            : baseCompleteLimit;
         const completeRl = await enforceGlobalApiRateLimit({
           req,
           scope: "ip:upload_complete",
-          limit: Number(process.env.RATE_LIMIT_UPLOAD_COMPLETE_IP_PER_MIN || 30),
+          limit: effectiveCompleteLimit,
           windowSeconds: 60,
           strict: true,
         });

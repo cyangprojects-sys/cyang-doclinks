@@ -12,6 +12,7 @@ export type Plan = {
   maxFileSizeBytes: number | null;
   allowCustomExpiration: boolean;
   allowAuditExport: boolean;
+  allowAdvancedAnalytics: boolean;
 };
 
 const FREE_PLAN: Plan = {
@@ -24,6 +25,7 @@ const FREE_PLAN: Plan = {
   maxFileSizeBytes: 10485760, // 10 MB
   allowCustomExpiration: false,
   allowAuditExport: false,
+  allowAdvancedAnalytics: false,
 };
 
 const OWNER_UNLIMITED_PLAN: Plan = {
@@ -36,6 +38,7 @@ const OWNER_UNLIMITED_PLAN: Plan = {
   maxFileSizeBytes: null,
   allowCustomExpiration: true,
   allowAuditExport: true,
+  allowAdvancedAnalytics: true,
 };
 
 let billingSubscriptionsTableExistsCache: boolean | null = null;
@@ -138,6 +141,7 @@ export async function getPlanForUser(userId: string): Promise<Plan> {
     maxFileSizeBytes: r.max_file_size_bytes ?? null,
     allowCustomExpiration: Boolean(r.allow_custom_expiration),
     allowAuditExport: Boolean(r.allow_audit_export),
+    allowAdvancedAnalytics: String(r.id) !== "free",
   };
 }
 

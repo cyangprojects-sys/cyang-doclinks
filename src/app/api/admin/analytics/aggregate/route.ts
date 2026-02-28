@@ -4,9 +4,17 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/authz";
 import { aggregateDocViewDaily, envInt } from "@/lib/analytics";
+import { getPlanForUser } from "@/lib/monetization";
 
 export async function GET() {
-  await requireRole("admin");
+  const user = await requireRole("admin");
+  const plan = await getPlanForUser(user.id);
+  if (!plan.allowAdvancedAnalytics) {
+    return NextResponse.json(
+      { ok: false, error: "PLAN_RESTRICTED", message: "Free tier allows basic analytics only (view count)." },
+      { status: 403 }
+    );
+  }
 
   // How far back we recompute daily aggregates.
   // Keep this relatively small; re-running daily is cheap.

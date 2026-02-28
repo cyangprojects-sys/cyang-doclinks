@@ -7,7 +7,7 @@ import crypto from "node:crypto";
 import { sql } from "@/lib/db";
 import { getR2Bucket, r2Client } from "@/lib/r2";
 import { requireUser } from "@/lib/authz";
-import { assertCanUpload } from "@/lib/monetization";
+import { assertCanUpload, getPlanForUser } from "@/lib/monetization";
 import { enforcePlanLimitsEnabled } from "@/lib/billingFlags";
 import {
   enforceGlobalApiRateLimit,
@@ -57,6 +57,7 @@ export async function POST(req: Request) {
     }
     const r2Bucket = getR2Bucket();
     const user = await requireUser();
+    const plan = await getPlanForUser(user.id);
 
     // Global API throttle (best-effort)
     const globalRl = await enforceGlobalApiRateLimit({
@@ -76,10 +77,16 @@ export async function POST(req: Request) {
     }
 
     // Upload presign throttle per-IP (stronger)
+    const basePresignLimit = Number(process.env.RATE_LIMIT_UPLOAD_PRESIGN_IP_PER_MIN || 30);
+    const freePresignLimit = Number(process.env.RATE_LIMIT_UPLOAD_PRESIGN_FREE_IP_PER_MIN || 12);
+    const effectivePresignLimit =
+      plan.id === "free"
+        ? Math.max(1, Math.min(basePresignLimit, Number.isFinite(freePresignLimit) ? freePresignLimit : 12))
+        : basePresignLimit;
     const presignRl = await enforceGlobalApiRateLimit({
       req,
       scope: "ip:upload_presign",
-      limit: Number(process.env.RATE_LIMIT_UPLOAD_PRESIGN_IP_PER_MIN || 30),
+      limit: effectivePresignLimit,
       windowSeconds: 60,
       actorUserId: user.id,
       orgId: user.orgId ?? null,
