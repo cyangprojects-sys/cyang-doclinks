@@ -409,6 +409,10 @@ export async function resolveShareMeta(tokenInput: string): Promise<ShareMeta> {
             passwordHash: r.password_hash ?? null,
             watermarkEnabled: Boolean(r.watermark_enabled),
             watermarkText: r.watermark_text ?? null,
+            docModerationStatus: r.doc_moderation_status ?? "active",
+            scanStatus: r.scan_status ?? "unscanned",
+            riskLevel: r.risk_level ?? "low",
+            riskFlags: r.risk_flags ?? null,
             isActive: Boolean(r.is_active),
         };
     } catch {
@@ -416,18 +420,23 @@ export async function resolveShareMeta(tokenInput: string): Promise<ShareMeta> {
         try {
             const rows = (await sql`
         select
-          token::text as token,
-          doc_id::text as doc_id,
-          to_email,
-          created_at::text as created_at,
-          expires_at::text as expires_at,
-          max_views,
-          views_count,
-          revoked_at::text as revoked_at,
-          password_hash
-        from public.share_tokens
-        where token = ${token}
-          ${dashed ? sql`or token = ${dashed}` : sql``}
+          st.token::text as token,
+          st.doc_id::text as doc_id,
+          st.to_email,
+          st.created_at::text as created_at,
+          st.expires_at::text as expires_at,
+          st.max_views,
+          st.views_count,
+          st.revoked_at::text as revoked_at,
+          st.password_hash,
+          coalesce(d.moderation_status::text, 'active') as doc_moderation_status,
+          coalesce(d.scan_status::text, 'unscanned') as scan_status,
+          coalesce(d.risk_level::text, 'low') as risk_level,
+          d.risk_flags as risk_flags
+        from public.share_tokens st
+        left join public.docs d on d.id = st.doc_id
+        where st.token = ${token}
+          ${dashed ? sql`or st.token = ${dashed}` : sql``}
         limit 1
       `) as unknown as Array<{
                 token: string;
@@ -439,6 +448,10 @@ export async function resolveShareMeta(tokenInput: string): Promise<ShareMeta> {
                 views_count: number | null;
                 revoked_at: string | null;
                 password_hash: string | null;
+                doc_moderation_status: string;
+                scan_status: string;
+                risk_level: string;
+                risk_flags: any;
             }>;
 
             const r = rows?.[0];
@@ -460,6 +473,10 @@ export async function resolveShareMeta(tokenInput: string): Promise<ShareMeta> {
                 passwordHash: r.password_hash ?? null,
                 watermarkEnabled: false,
                 watermarkText: null,
+                docModerationStatus: r.doc_moderation_status ?? "active",
+                scanStatus: r.scan_status ?? "unscanned",
+                riskLevel: r.risk_level ?? "low",
+                riskFlags: r.risk_flags ?? null,
                 isActive: true,
             };
         } catch {
