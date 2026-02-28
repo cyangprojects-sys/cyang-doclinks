@@ -386,4 +386,65 @@ test.describe("security state enforcement", () => {
       await sql`delete from public.doc_aliases where alias = ${alias}`;
     }
   });
+
+  test("download ticket allows top-level navigation and brief replay", async ({ request }) => {
+    const databaseUrl = String(process.env.DATABASE_URL || "").trim();
+    test.skip(!databaseUrl, "DATABASE_URL not available");
+    const sql = neon(databaseUrl);
+
+    const doc = await pickServableDoc(sql);
+    test.skip(!doc, "No servable docs available for fixture setup");
+    if (!doc) return;
+
+    const token = `tok_dl_replay_${randSuffix()}`.slice(0, 64);
+    await sql`
+      insert into public.share_tokens (token, doc_id, max_views, views_count)
+      values (${token}, ${doc.id}::uuid, null, 0)
+    `;
+
+    try {
+      const downloadResp = await request.get(`/s/${token}/download`);
+      expect([302, 429]).toContain(downloadResp.status());
+      if (downloadResp.status() === 429) {
+        test.skip(true, "Rate-limited in environment; cannot validate download ticket flow");
+      }
+      const rawLocation = downloadResp.headers()["location"] || "";
+      expect(rawLocation).toContain(`/s/${token}/raw`);
+      expect(rawLocation).toContain("disposition=attachment");
+
+      const rawUrl = new URL(rawLocation, process.env.PLAYWRIGHT_BASE_URL || "http://127.0.0.1:3000");
+      const rawResp = await request.get(`${rawUrl.pathname}${rawUrl.search}`);
+      expect([302, 429]).toContain(rawResp.status());
+      if (rawResp.status() === 429) {
+        test.skip(true, "Rate-limited in environment; cannot validate download ticket minting");
+      }
+
+      const ticketLocation = rawResp.headers()["location"] || "";
+      expect(ticketLocation).toContain("/t/");
+      const ticketUrl = new URL(ticketLocation, process.env.PLAYWRIGHT_BASE_URL || "http://127.0.0.1:3000");
+      const ticketPath = `${ticketUrl.pathname}${ticketUrl.search}`;
+
+      const navHeaders = {
+        "sec-fetch-dest": "document",
+        "sec-fetch-mode": "navigate",
+        "sec-fetch-user": "?1",
+      };
+
+      const firstTicket = await request.get(ticketPath, { headers: navHeaders });
+      expect(firstTicket.status()).not.toBe(404);
+      if (firstTicket.status() === 403) {
+        const body = await firstTicket.text();
+        expect(body).not.toContain("Direct open is disabled for this protected document.");
+      }
+
+      const secondTicket = await request.get(ticketPath, { headers: navHeaders });
+      expect(secondTicket.status()).not.toBe(404);
+      if (secondTicket.status() === 403) {
+        const body = await secondTicket.text();
+        expect(body).not.toContain("Direct open is disabled for this protected document.");
+      }
+    } finally {
+      await sql`delete from public.share_tokens where token = ${token}`;
+    }
+  });
 });
