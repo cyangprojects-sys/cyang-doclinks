@@ -47,7 +47,8 @@ async function resolveAliasDocIdBypass(alias: string): Promise<
       select
         a.doc_id::text as doc_id,
         a.revoked_at::text as revoked_at,
-        a.expires_at::text as expires_at
+        a.expires_at::text as expires_at,
+        coalesce(a.is_active, true) as is_active
       from public.doc_aliases a
       where lower(a.alias) = ${alias}
       limit 1
@@ -55,9 +56,11 @@ async function resolveAliasDocIdBypass(alias: string): Promise<
       doc_id: string;
       revoked_at: string | null;
       expires_at: string | null;
+      is_active: boolean;
     }>;
 
     if (rows?.length) {
+      if (!rows[0].is_active) return { ok: false };
       return {
         ok: true,
         docId: rows[0].doc_id,
@@ -75,7 +78,8 @@ async function resolveAliasDocIdBypass(alias: string): Promise<
       select
         a.doc_id::text as doc_id,
         null::text as revoked_at,
-        a.expires_at::text as expires_at
+        a.expires_at::text as expires_at,
+        true as is_active
       from public.document_aliases a
       where lower(a.alias) = ${alias}
       limit 1
@@ -83,9 +87,11 @@ async function resolveAliasDocIdBypass(alias: string): Promise<
       doc_id: string;
       revoked_at: string | null;
       expires_at: string | null;
+      is_active: boolean;
     }>;
 
     if (rows?.length) {
+      if (!rows[0].is_active) return { ok: false };
       return {
         ok: true,
         docId: rows[0].doc_id,
@@ -122,18 +128,37 @@ async function getDocAvailabilityHint(docId: string): Promise<string | null> {
       select
         coalesce(encryption_enabled, false) as encryption_enabled,
         coalesce(moderation_status::text, 'active') as moderation_status,
-        coalesce(scan_status::text, 'unscanned') as scan_status
+        coalesce(scan_status::text, 'unscanned') as scan_status,
+        coalesce(status::text, 'ready') as status,
+        nullif(coalesce(r2_key::text, ''), '') as r2_key,
+        coalesce(o.disabled, false) as org_disabled,
+        coalesce(o.is_active, true) as org_active
       from public.docs
+      left join public.organizations o on o.id = public.docs.org_id
       where id = ${docId}::uuid
       limit 1
     `) as unknown as Array<{
       encryption_enabled: boolean;
       moderation_status: string;
       scan_status: string;
+      status: string;
+      r2_key: string | null;
+      org_disabled: boolean;
+      org_active: boolean;
     }>;
 
     const r = rows?.[0];
     if (!r) return null;
+
+    if ((r.status || "").toLowerCase() === "deleted") {
+      return "This document is deleted and unavailable.";
+    }
+    if (r.org_disabled === true || r.org_active === false) {
+      return "This organization is disabled, so document serving is unavailable.";
+    }
+    if (!r.r2_key) {
+      return "Document storage pointer is missing. Re-upload this document.";
+    }
 
     if (!r.encryption_enabled && !allowUnencryptedServing()) {
       return "This is a legacy unencrypted upload. Serving is blocked by policy. Re-upload or migrate this document to encrypted storage.";
@@ -333,9 +358,11 @@ function DocumentViewer({
           {availabilityHint}
         </div>
       ) : null}
-      <div className="overflow-hidden rounded-xl border border-white/10 bg-white/5">
-        <SecurePdfCanvasViewer rawUrl={viewerUrl} mimeType={contentType} className="h-[78vh]" />
-      </div>
+      {!availabilityHint ? (
+        <div className="overflow-hidden rounded-xl border border-white/10 bg-white/5">
+          <SecurePdfCanvasViewer rawUrl={viewerUrl} mimeType={contentType} className="h-[78vh]" />
+        </div>
+      ) : null}
 
       <div className="mt-3 text-xs text-neutral-400">
         <a href={`/report?alias=${encodeURIComponent(alias)}`} className="text-neutral-200 underline">
