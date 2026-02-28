@@ -26,6 +26,18 @@ const FREE_PLAN: Plan = {
   allowAuditExport: false,
 };
 
+const OWNER_UNLIMITED_PLAN: Plan = {
+  id: "owner",
+  name: "Owner",
+  maxViewsPerMonth: null,
+  maxActiveShares: null,
+  maxStorageBytes: null,
+  maxUploadsPerDay: null,
+  maxFileSizeBytes: null,
+  allowCustomExpiration: true,
+  allowAuditExport: true,
+};
+
 let billingSubscriptionsTableExistsCache: boolean | null = null;
 
 async function billingSubscriptionsTableExists(): Promise<boolean> {
@@ -69,6 +81,7 @@ export async function getPlanForUser(userId: string): Promise<Plan> {
 
   const rows = (await sql`
     select
+      u.role::text as role,
       p.id::text as id,
       p.name::text as name,
       p.max_views_per_month::int as max_views_per_month,
@@ -88,6 +101,11 @@ export async function getPlanForUser(userId: string): Promise<Plan> {
   if (!r) {
     // Fail closed to Free if user row exists but plan missing.
     return FREE_PLAN;
+  }
+
+  // Product invariant: owner accounts are never constrained by plan limits.
+  if (String(r.role || "").toLowerCase() === "owner") {
+    return OWNER_UNLIMITED_PLAN;
   }
 
   // Free policy is a product invariant; enforce canonical values even if DB row is stale.
