@@ -19,7 +19,7 @@ type Job = {
   attempts: number;
 };
 
-const SCANNER_VERSION = "v1-vt-hash-lookup";
+const SCANNER_VERSION = "v2-external-clam-or-vt";
 
 export async function GET(req: NextRequest) {
   if (!isCronAuthorized(req)) {
@@ -108,6 +108,7 @@ export async function GET(req: NextRequest) {
         set
           status = ${verdict.verdict === "infected" ? "infected" : verdict.verdict === "clean" ? "clean" : "skipped"}::text,
           finished_at = now(),
+          scanner_version = ${String(verdict.meta?.scannerVersion || verdict.meta?.source || SCANNER_VERSION)},
           sha256 = ${verdict.sha256},
           result = ${JSON.stringify(verdict)}::jsonb,
           last_error = null

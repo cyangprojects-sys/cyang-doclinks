@@ -23,6 +23,8 @@ export default async function SecurityTelemetryPage(props: {
   const sp = (await props.searchParams) || {};
   const saved = (Array.isArray(sp.saved) ? sp.saved[0] : sp.saved) || "";
   const error = (Array.isArray(sp.error) ? sp.error[0] : sp.error) || "";
+  const requeuedRaw = (Array.isArray(sp.requeued) ? sp.requeued[0] : sp.requeued) || "0";
+  const requeuedCount = Number.isFinite(Number(requeuedRaw)) ? Number(requeuedRaw) : 0;
   const inviteUrl = (Array.isArray(sp.invite_url) ? sp.invite_url[0] : sp.invite_url) || "";
   const currentUser = await requireRole("owner");
   const freezeSettingsRes = await getSecurityFreezeSettings();
@@ -258,6 +260,11 @@ export default async function SecurityTelemetryPage(props: {
           Tenant emergency freeze disabled.
         </div>
       ) : null}
+      {saved === "scan_requeued" ? (
+        <div className="mt-4 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-200">
+          Requeued {fmt(requeuedCount)} pending scan job(s).
+        </div>
+      ) : null}
 
       <div className="mt-4 rounded-xl border border-red-500/30 bg-red-500/10 p-4">
         <h2 className="text-sm font-semibold text-red-100">Incident kill-switch controls</h2>
@@ -406,7 +413,17 @@ export default async function SecurityTelemetryPage(props: {
       </div>
 
       <div className="mt-4 rounded-xl border border-white/10 bg-white/5 p-4">
-        <h2 className="text-sm font-semibold">Scan dead-letter queue</h2>
+        <div className="flex items-start justify-between gap-3">
+          <h2 className="text-sm font-semibold">Scan dead-letter queue</h2>
+          <form action="/api/admin/security/requeue-scans" method="post">
+            <button
+              type="submit"
+              className="rounded border border-amber-400/40 bg-amber-500/20 px-3 py-1.5 text-xs text-amber-100 hover:bg-amber-500/30"
+            >
+              Requeue pending scans
+            </button>
+          </form>
+        </div>
         <p className="mt-1 text-xs text-white/50">
           Jobs here exceeded retry limits and require manual investigation or requeue.
         </p>
