@@ -3,14 +3,15 @@
 
 import Link from "next/link";
 import DeleteDocForm from "../DeleteDocForm";
-import { deleteDocAction } from "../actions";
-import { useMemo } from "react";
+import { bulkDeleteDocsAction, deleteDocAction } from "../actions";
+import { useMemo, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 export type UnifiedDocRow = {
   doc_id: string;
   doc_title: string | null;
   alias: string | null;
+  scan_status: string | null;
   total_views: number;
   last_view: string | null;
   active_shares: number;
@@ -104,6 +105,8 @@ export default function UnifiedDocsTableClient(props: {
   const router = useRouter();
   const pathname = usePathname();
   const showDelete = !!props.showDelete;
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [isPending, startTransition] = useTransition();
 
   const q = (sp.get("docQ") || "").trim();
   const pageRaw = Number(sp.get("docPage") || "1");
@@ -181,6 +184,34 @@ export default function UnifiedDocsTableClient(props: {
     return sorted.slice(start, start + pageSize);
   }, [sorted, safePage, pageSize]);
 
+  const pageDocIds = pageRows.map((r) => r.doc_id);
+  const allPageSelected = pageDocIds.length > 0 && pageDocIds.every((id) => selectedIds.includes(id));
+  const anySelected = selectedIds.length > 0;
+
+  function toggleRow(id: string, checked: boolean) {
+    setSelectedIds((prev) => (checked ? Array.from(new Set([...prev, id])) : prev.filter((x) => x !== id)));
+  }
+
+  function toggleSelectAllOnPage(checked: boolean) {
+    setSelectedIds((prev) => {
+      if (!checked) return prev.filter((id) => !pageDocIds.includes(id));
+      return Array.from(new Set([...prev, ...pageDocIds]));
+    });
+  }
+
+  function scanBadge(scanStatus: string | null) {
+    const s = String(scanStatus || "unscanned").toLowerCase();
+    const cls =
+      s === "clean"
+        ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-100"
+        : s === "pending" || s === "queued" || s === "running"
+        ? "border-amber-500/25 bg-amber-500/10 text-amber-100"
+        : s === "infected" || s === "failed" || s === "quarantined"
+        ? "border-rose-500/25 bg-rose-500/10 text-rose-100"
+        : "ui-badge";
+    return <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] ${cls}`}>{s}</span>;
+  }
+
   function toggleSort(k: SortKey) {
     if (k === sortKey) {
       const nextDir: SortDir = sortDir === "asc" ? "desc" : "asc";
@@ -207,6 +238,24 @@ export default function UnifiedDocsTableClient(props: {
         </div>
         <div className="flex flex-wrap items-center gap-3 text-xs text-white/60">
           <div>Rows: <span className="text-white">{total}</span></div>
+          {showDelete ? (
+            <button
+              type="button"
+              disabled={!anySelected || isPending}
+              className="btn-base btn-danger rounded-lg px-3 py-1.5 text-xs disabled:opacity-40"
+              onClick={() => {
+                if (!anySelected) return;
+                const confirmText = window.prompt(`Type DELETE ${selectedIds.length} to confirm bulk deletion.`);
+                if (confirmText !== `DELETE ${selectedIds.length}`) return;
+                const fd = new FormData();
+                fd.set("docIds", JSON.stringify(selectedIds));
+                startTransition(() => bulkDeleteDocsAction(fd));
+                setSelectedIds([]);
+              }}
+            >
+              {isPending ? "Deleting..." : `Delete selected (${selectedIds.length})`}
+            </button>
+          ) : null}
           <label className="flex items-center gap-2">
             <span>Page size</span>
             <select
@@ -229,7 +278,18 @@ export default function UnifiedDocsTableClient(props: {
         <table className="w-full text-sm">
           <thead className="sticky top-0 bg-[#10192b]/95 backdrop-blur">
             <tr>
+              {showDelete ? (
+                <th className="px-3 py-3 text-left">
+                  <input
+                    type="checkbox"
+                    aria-label="Select all documents on page"
+                    checked={allPageSelected}
+                    onChange={(e) => toggleSelectAllOnPage(e.target.checked)}
+                  />
+                </th>
+              ) : null}
               <th className="px-4 py-3 text-left"><SortButton label="Doc name" active={sortKey === "doc_title"} dir={sortDir} onClick={() => toggleSort("doc_title")} /></th>
+              <th className="px-4 py-3 text-left text-xs text-white/70">Scan</th>
               <th className="px-4 py-3 text-right"><SortButton label="Total views" active={sortKey === "total_views"} dir={sortDir} onClick={() => toggleSort("total_views")} /></th>
               <th className="px-4 py-3 text-left"><SortButton label="Last viewed" active={sortKey === "last_view"} dir={sortDir} onClick={() => toggleSort("last_view")} /></th>
               <th className="px-4 py-3 text-right"><SortButton label="Active shares" active={sortKey === "active_shares"} dir={sortDir} onClick={() => toggleSort("active_shares")} /></th>
@@ -240,12 +300,22 @@ export default function UnifiedDocsTableClient(props: {
           </thead>
           <tbody>
             {pageRows.length === 0 ? (
-              <tr><td colSpan={showDelete ? 7 : 6} className="px-4 py-10 text-white/60">No documents found.</td></tr>
+              <tr><td colSpan={showDelete ? 9 : 7} className="px-4 py-10 text-white/60">No documents found.</td></tr>
             ) : (
               pageRows.map((r) => {
                 const st = statusFor(r);
                 return (
                   <tr key={r.doc_id} className="border-t border-white/10 hover:bg-white/[0.03]">
+                    {showDelete ? (
+                      <td className="px-3 py-3">
+                        <input
+                          type="checkbox"
+                          aria-label={`Select ${r.doc_title || r.doc_id}`}
+                          checked={selectedIds.includes(r.doc_id)}
+                          onChange={(e) => toggleRow(r.doc_id, e.target.checked)}
+                        />
+                      </td>
+                    ) : null}
                     <td className="px-4 py-3">
                       <div className="flex flex-col gap-1">
                         <Link href={`/admin/docs/${r.doc_id}`} className="text-white hover:underline" title="Open per-document detail">
@@ -259,6 +329,7 @@ export default function UnifiedDocsTableClient(props: {
                         </div>
                       </div>
                     </td>
+                    <td className="px-4 py-3">{scanBadge(r.scan_status)}</td>
                     <td className="px-4 py-3 text-right text-white/90">{r.total_views ?? 0}</td>
                     <td className="px-4 py-3 text-white/80">{fmtDate(r.last_view)}</td>
                     <td className="px-4 py-3 text-right text-white/90">{r.active_shares ?? 0}</td>

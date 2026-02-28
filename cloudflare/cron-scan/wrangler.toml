@@ -3,7 +3,22 @@ main = "src/index.ts"
 compatibility_date = "2025-01-01"
 
 [triggers]
-crons = ["* * * * *", "*/5 * * * *", "*/15 * * * *", "*/30 * * * *", "5 * * * *", "25 * * * *", "17 2 * * *"]
+crons = ["* * * * *"]
+
+[observability]
+enabled = true
+head_sampling_rate = 1
+
+[observability.logs]
+enabled = true
+head_sampling_rate = 1
+persist = true
+invocation_logs = true
+
+[observability.traces]
+enabled = true
+persist = true
+head_sampling_rate = 1
 
 [vars]
 # Update if your route paths differ.

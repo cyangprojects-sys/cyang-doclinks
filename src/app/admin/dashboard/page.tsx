@@ -87,6 +87,7 @@ const docFilter = sql`${orgFilter} ${ownerFilter}`;
           d.id::text as doc_id,
           d.title::text as doc_title,
           a.alias::text as alias,
+          coalesce(d.scan_status::text, 'unscanned') as scan_status,
           coalesce(v.total_views, 0)::int as total_views,
           v.last_view::text as last_view,
           coalesce(s.active_shares, 0)::int as active_shares,

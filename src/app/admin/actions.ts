@@ -701,7 +701,7 @@ export async function bulkDisableAliasesForDocsAction(formData: FormData): Promi
 }
 
 export async function bulkDeleteDocsAction(formData: FormData): Promise<void> {
-  await requireRole("owner");
+  await requireUser();
   const raw = String(formData.get("docIds") || "").trim();
   const reason = String(formData.get("reason") || "").trim() || null;
   if (!raw) throw new Error("Missing docIds.");
@@ -713,6 +713,8 @@ export async function bulkDeleteDocsAction(formData: FormData): Promise<void> {
     if (!id) continue;
 
     try {
+      await requireDocWrite(id);
+
       const drows = (await sql`
         select title::text as title
         from public.docs
