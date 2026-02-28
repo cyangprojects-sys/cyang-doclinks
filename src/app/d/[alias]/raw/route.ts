@@ -209,7 +209,9 @@ export async function GET(
       });
     }
 
-    const resolved = await resolveDoc({ alias });
+    // Password-protected aliases are already validated above via device-trust cookie.
+    // Resolve by docId here so resolveDoc does not re-impose alias password gating.
+    const resolved = await resolveDoc({ docId: row.docId });
     if (!resolved.ok) return await deny(`resolve_${resolved.error}`);
 
     if (!resolved.bucket || !resolved.r2Key) {

@@ -330,7 +330,9 @@ export default async function SharePage({
     }
   }
 
-  const resolved = await resolveDoc({ alias });
+  // Password gating (if any) has already been enforced above.
+  // Resolve by docId so password-protected aliases can render after unlock.
+  const resolved = await resolveDoc({ docId: row.docId });
   if (!resolved.ok) notFound();
 
   return (
