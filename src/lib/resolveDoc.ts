@@ -59,6 +59,7 @@ export type ShareMeta =
 
         watermarkEnabled?: boolean;
         watermarkText?: string | null;
+        allowDownload?: boolean;
 
         // Doc moderation / safety snapshot
         docModerationStatus?: string;
@@ -360,6 +361,7 @@ export async function resolveShareMeta(tokenInput: string): Promise<ShareMeta> {
         st.password_hash,
         coalesce(st.watermark_enabled, false) as watermark_enabled,
         st.watermark_text,
+        coalesce(st.allow_download, true) as allow_download,
         coalesce(d.moderation_status::text, 'active') as doc_moderation_status,
         coalesce(d.scan_status::text, 'unscanned') as scan_status,
         coalesce(d.risk_level::text, 'low') as risk_level,
@@ -382,6 +384,7 @@ export async function resolveShareMeta(tokenInput: string): Promise<ShareMeta> {
             password_hash: string | null;
             watermark_enabled: boolean;
             watermark_text: string | null;
+            allow_download: boolean;
             doc_moderation_status: string;
             scan_status: string;
             risk_level: string;
@@ -409,6 +412,7 @@ export async function resolveShareMeta(tokenInput: string): Promise<ShareMeta> {
             passwordHash: r.password_hash ?? null,
             watermarkEnabled: Boolean(r.watermark_enabled),
             watermarkText: r.watermark_text ?? null,
+            allowDownload: Boolean(r.allow_download),
             docModerationStatus: r.doc_moderation_status ?? "active",
             scanStatus: r.scan_status ?? "unscanned",
             riskLevel: r.risk_level ?? "low",
@@ -473,6 +477,7 @@ export async function resolveShareMeta(tokenInput: string): Promise<ShareMeta> {
                 passwordHash: r.password_hash ?? null,
                 watermarkEnabled: false,
                 watermarkText: null,
+                allowDownload: true,
                 docModerationStatus: r.doc_moderation_status ?? "active",
                 scanStatus: r.scan_status ?? "unscanned",
                 riskLevel: r.risk_level ?? "low",

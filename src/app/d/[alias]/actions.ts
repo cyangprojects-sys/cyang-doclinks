@@ -109,6 +109,7 @@ export async function createAndEmailShareToken(
     const expiresAtRaw = String(form.get("expiresAt") || "").trim();
     const maxViewsRaw = String(form.get("maxViews") || "").trim();
     const passwordRaw = String(form.get("password") || "");
+    const allowDownloadRaw = String(form.get("allowDownload") || "").trim().toLowerCase();
 
     if (!docId)
       return { ok: false, error: "bad_request", message: "Missing docId" };
@@ -136,6 +137,7 @@ export async function createAndEmailShareToken(
 
     const password = passwordRaw.trim();
     const passwordHash = password ? await bcrypt.hash(password, 10) : null;
+    const allowDownload = !["0", "false", "off", "no"].includes(allowDownloadRaw);
 
     const docRows = (await sql`
       select id::text as id, title::text as title, owner_id::text as owner_id
@@ -168,10 +170,18 @@ if (ownerId) {
 
     const token = newToken();
 
-    await sql`
-      insert into public.share_tokens (token, doc_id, to_email, expires_at, max_views, password_hash)
-      values (${token}, ${docId}::uuid, ${toEmail}, ${expiresAt}, ${maxViews}, ${passwordHash})
-    `;
+    try {
+      await sql`
+        insert into public.share_tokens (token, doc_id, to_email, expires_at, max_views, password_hash, allow_download)
+        values (${token}, ${docId}::uuid, ${toEmail}, ${expiresAt}, ${maxViews}, ${passwordHash}, ${allowDownload})
+      `;
+    } catch {
+      // Backward compatibility for environments where allow_download has not been migrated yet.
+      await sql`
+        insert into public.share_tokens (token, doc_id, to_email, expires_at, max_views, password_hash)
+        values (${token}, ${docId}::uuid, ${toEmail}, ${expiresAt}, ${maxViews}, ${passwordHash})
+      `;
+    }
 
     // Webhook (best-effort)
     emitWebhook("share.created", {
@@ -182,6 +192,7 @@ if (ownerId) {
       expires_at: expiresAt,
       max_views: maxViews,
       has_password: !!passwordHash,
+      allow_download: allowDownload,
     });
 
     const url = buildShareUrl(token);

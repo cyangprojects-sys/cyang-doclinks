@@ -95,6 +95,7 @@ type ShareLookupRow = {
   scan_status: string;
   risk_level: string;
   share_active: boolean;
+  allow_download: boolean;
 };
 
 function isExpired(expires_at: string | null) {
@@ -121,6 +122,12 @@ function shouldCountView(req: NextRequest): boolean {
   return range.includes("bytes=0-");
 }
 
+function parseDisposition(input: string | null): "inline" | "attachment" {
+  const v = String(input || "").trim().toLowerCase();
+  if (v === "1" || v === "true" || v === "download" || v === "attachment") return "attachment";
+  return "inline";
+}
+
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ token: string }> }
@@ -141,6 +148,7 @@ export async function GET(
 
   const r2Bucket = getR2Bucket();
   const { token } = await params;
+  const disposition = parseDisposition(req.nextUrl.searchParams.get("disposition"));
   const ip = getClientIpFromHeaders(req.headers) || "";
   const abuseBlock = await enforceIpAbuseBlock({ req, scope: "share_raw" });
   if (!abuseBlock.ok) {
@@ -253,7 +261,8 @@ export async function GET(
         coalesce(d.moderation_status::text, 'active') as moderation_status,
         coalesce(d.scan_status::text, 'unscanned') as scan_status,
         coalesce(d.risk_level::text, 'low') as risk_level,
-        coalesce(s.is_active, true) as share_active
+        coalesce(s.is_active, true) as share_active,
+        coalesce(s.allow_download, true) as allow_download
       from public.share_tokens s
       join public.docs d on d.id = s.doc_id
       where s.token = ${token}
@@ -274,7 +283,8 @@ export async function GET(
         coalesce(d.moderation_status::text, 'active') as moderation_status,
         coalesce(d.scan_status::text, 'unscanned') as scan_status,
         coalesce(d.risk_level::text, 'low') as risk_level,
-        true as share_active
+        true as share_active,
+        true as allow_download
       from public.share_tokens s
       join public.docs d on d.id = s.doc_id
       where s.token = ${token}
@@ -296,7 +306,10 @@ export async function GET(
 
   const risk = (share.risk_level || "low").toLowerCase();
   const riskyInline = risk === "high" || (share.scan_status || "").toLowerCase() === "risky";
-  if (riskyInline) {
+  if (disposition === "attachment" && !share.allow_download) {
+    return await deny("download_disabled", 403, "Download disabled");
+  }
+  if (disposition === "inline" && riskyInline) {
     // Inline viewing is disabled for high-risk docs; download route can still serve as attachment.
     return await deny("risky_inline_blocked", 403, "Inline viewing disabled");
   }
@@ -330,6 +343,7 @@ export async function GET(
   // Enforce + increment max views here too (raw link is often what the PDF viewer hits).
   // We only count once per initial range request to avoid burning views on chunked fetches.
   if (shouldCountView(req)) {
+    const eventType = disposition === "attachment" ? "file_download" : "preview_view";
     // --- Monetization / plan limits (hidden) ---
     // Enforce the *document owner's* monthly view cap before consuming a share view.
     let ownerIdForLimit: string | null = null;
@@ -405,7 +419,7 @@ export async function GET(
         ipHash: hashIp(getClientIpFromHeaders(req.headers)),
         payload: {
           route: "s_token_raw",
-          eventType: "preview_view",
+          eventType,
           riskLevel: share.risk_level || "low",
           scanStatus: share.scan_status || "unscanned",
         },
@@ -426,7 +440,7 @@ export async function GET(
           insert into public.doc_views
             (doc_id, alias, path, kind, user_agent, referer, ip_hash, share_token, event_type)
           values
-            (${share.doc_id}::uuid, null, ${new URL(req.url).pathname}, 'share', ${ua}, ${ref}, ${ipHash}, ${token}, 'preview_view')
+            (${share.doc_id}::uuid, null, ${new URL(req.url).pathname}, 'share', ${ua}, ${ref}, ${ipHash}, ${token}, ${eventType})
         `;
       } catch {
         await sql`
@@ -446,11 +460,11 @@ export async function GET(
     docId: share.doc_id,
     shareToken: token,
     alias: null,
-    purpose: "preview_view",
+    purpose: disposition === "attachment" ? "file_download" : "preview_view",
     r2Bucket,
     r2Key: share.r2_key,
     responseContentType: share.content_type || "application/octet-stream",
-    responseContentDisposition: "inline",
+    responseContentDisposition: disposition,
   });
 
   if (!ticketId) {

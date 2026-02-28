@@ -27,6 +27,7 @@ export default function ShareForm({ docId, alias }: { docId: string; alias?: str
   const [shareTitle, setShareTitle] = useState("");
   const [toEmail, setToEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [allowDownload, setAllowDownload] = useState(true);
   const [maxViews, setMaxViews] = useState<string>("");
   const [expiresLocal, setExpiresLocal] = useState<string>(""); // datetime-local
 
@@ -46,6 +47,7 @@ export default function ShareForm({ docId, alias }: { docId: string; alias?: str
       fd.set("shareTitle", shareTitle.trim() ? shareTitle.trim() : "");
       fd.set("toEmail", toEmail.trim() ? toEmail.trim() : "");
       fd.set("password", password); // may be blank
+      fd.set("allowDownload", allowDownload ? "1" : "0");
       fd.set("expiresAt", toIsoFromDatetimeLocal(expiresLocal));
       fd.set("maxViews", maxViews.trim() ? maxViews.trim() : "");
 
@@ -128,6 +130,21 @@ export default function ShareForm({ docId, alias }: { docId: string; alias?: str
             className="mt-2 w-full rounded-lg border border-neutral-800 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 placeholder:text-neutral-500 focus:border-neutral-600 focus:outline-none focus:ring-2 focus:ring-neutral-700 transition"
           />
         </div>
+
+        <label className="flex items-start gap-3 rounded-lg border border-neutral-800 bg-neutral-900 px-3 py-2 text-sm text-neutral-200">
+          <input
+            type="checkbox"
+            checked={allowDownload}
+            onChange={(e) => setAllowDownload(e.target.checked)}
+            className="mt-0.5 h-4 w-4 rounded border-neutral-700 bg-neutral-950 text-cyan-400 focus:ring-cyan-500"
+          />
+          <span>
+            <span className="font-medium text-neutral-200">Allow recipient download</span>
+            <span className="mt-1 block text-xs text-neutral-500">
+              If disabled, recipients can view but cannot download.
+            </span>
+          </span>
+        </label>
 
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
           <div>

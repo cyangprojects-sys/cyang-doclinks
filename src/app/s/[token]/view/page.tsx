@@ -38,7 +38,7 @@ function FailState({
     <ShareShell token={token} title={title} subtitle={body}>
       <div className="text-sm text-white/70">
         <Link href="/" className="text-white underline decoration-white/45 underline-offset-4 hover:text-cyan-100">
-          Go home
+          Go to Doclinks
         </Link>
       </div>
     </ShareShell>
@@ -111,8 +111,13 @@ export default async function ShareTokenViewPage(props: {
 
         <div className="flex flex-wrap items-center gap-2">
           <Link href="/" className="btn-base btn-secondary rounded-xl px-4 py-2 text-sm">
-            Home
+            Go to Doclinks
           </Link>
+          {meta.allowDownload !== false ? (
+            <Link href={`/s/${encodeURIComponent(t)}/download`} className="btn-base btn-secondary rounded-xl px-4 py-2 text-sm">
+              Download
+            </Link>
+          ) : null}
         </div>
 
         {risky ? (

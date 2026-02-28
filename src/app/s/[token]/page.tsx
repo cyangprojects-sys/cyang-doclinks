@@ -47,7 +47,7 @@ function FailState({
     <ShareShell token={token} title={title} subtitle={body}>
       <div className="text-sm text-white/70">
         <Link href="/" className="text-white underline decoration-white/45 underline-offset-4 hover:text-cyan-100">
-          Go home
+          Go to Doclinks
         </Link>
       </div>
     </ShareShell>
@@ -120,4 +120,3 @@ export default async function ShareTokenPage(props: {
     </ShareShell>
   );
 }
-
