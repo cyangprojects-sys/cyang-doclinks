@@ -92,7 +92,9 @@ export async function consumeAccessTicket(args: { req: Request; ticketId: string
   // Replays are purpose-sensitive: previews can tolerate a short retry window;
   // downloads should be effectively one-time by default.
   const replayGracePreview = Math.max(0, Number(process.env.ACCESS_TICKET_REPLAY_GRACE_SECONDS_PREVIEW || 45));
-  const replayGraceDownload = Math.max(0, Number(process.env.ACCESS_TICKET_REPLAY_GRACE_SECONDS_DOWNLOAD || 0));
+  // Browsers may issue near-simultaneous duplicate navigations for attachment downloads.
+  // Keep a short replay window to avoid false "Not found" on legitimate download clicks.
+  const replayGraceDownload = Math.max(0, Number(process.env.ACCESS_TICKET_REPLAY_GRACE_SECONDS_DOWNLOAD || 20));
   const replayGraceWatermarked = Math.max(
     0,
     Number(process.env.ACCESS_TICKET_REPLAY_GRACE_SECONDS_WATERMARKED_DOWNLOAD || replayGraceDownload)
