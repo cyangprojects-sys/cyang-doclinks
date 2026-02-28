@@ -23,8 +23,8 @@ async function runScheduled(event: ScheduledEvent, env: Env) {
   if (cron === "*/5 * * * *") {
     jobs.push({ name: "webhooks", url: env.TARGET_WEBHOOKS_URL, method: "GET" });
   }
-  // every minute
-  if (cron === "* * * * *") {
+  // every 5 minutes
+  if (cron === "*/5 * * * *") {
     jobs.push({ name: "scan", url: env.TARGET_SCAN_URL, method: "GET" });
   }
   // every 30 minutes

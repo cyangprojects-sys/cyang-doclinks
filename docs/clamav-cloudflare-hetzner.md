@@ -120,7 +120,7 @@ Your existing worker already calls:
 
 Recommended trigger for release:
 
-- every minute (`* * * * *`) for `/api/cron/scan`
+- every 5 minutes (`*/5 * * * *`) for `/api/cron/scan`
 
 No worker code changes required for ClamAV integration.
 

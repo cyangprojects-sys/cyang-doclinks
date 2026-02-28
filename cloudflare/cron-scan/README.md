@@ -4,7 +4,7 @@ This Worker runs on Cloudflare Cron Triggers and calls your Next.js cron endpoin
 
 Current schedules:
 - `*/5 * * * *` -> `/api/cron/webhooks`
-- `* * * * *` -> `/api/cron/scan`
+- `*/5 * * * *` -> `/api/cron/scan`
 - `*/15 * * * *` -> `/api/cron/key-rotation`
 - `*/30 * * * *` -> `/api/cron/aggregate`
 - `5 * * * *` -> `/api/cron/nightly`
