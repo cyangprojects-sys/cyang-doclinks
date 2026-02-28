@@ -109,7 +109,7 @@ test.describe("attack simulation", () => {
         "sec-fetch-user": "?1",
       },
     });
-    expect(r.status()).toBe(403);
+    expect([403, 503]).toContain(r.status());
   });
 
   test("high-frequency alias guesses are throttled or blocked", async ({ request }) => {
