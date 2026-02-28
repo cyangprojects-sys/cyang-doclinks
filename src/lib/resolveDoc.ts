@@ -60,6 +60,7 @@ export type ShareMeta =
         watermarkEnabled?: boolean;
         watermarkText?: string | null;
         allowDownload?: boolean;
+        sharedByEmail?: string | null;
 
         // Doc moderation / safety snapshot
         docModerationStatus?: string;
@@ -362,6 +363,7 @@ export async function resolveShareMeta(tokenInput: string): Promise<ShareMeta> {
         coalesce(st.watermark_enabled, false) as watermark_enabled,
         st.watermark_text,
         coalesce(st.allow_download, true) as allow_download,
+        u.email::text as shared_by_email,
         coalesce(d.moderation_status::text, 'active') as doc_moderation_status,
         coalesce(d.scan_status::text, 'unscanned') as scan_status,
         coalesce(d.risk_level::text, 'low') as risk_level,
@@ -369,6 +371,7 @@ export async function resolveShareMeta(tokenInput: string): Promise<ShareMeta> {
         coalesce(st.is_active, true) as is_active
       from public.share_tokens st
       left join public.docs d on d.id = st.doc_id
+      left join public.users u on u.id = d.owner_id
       where st.token = ${token}
         ${dashed ? sql`or st.token = ${dashed}` : sql``}
       limit 1
@@ -385,6 +388,7 @@ export async function resolveShareMeta(tokenInput: string): Promise<ShareMeta> {
             watermark_enabled: boolean;
             watermark_text: string | null;
             allow_download: boolean;
+            shared_by_email: string | null;
             doc_moderation_status: string;
             scan_status: string;
             risk_level: string;
@@ -413,6 +417,7 @@ export async function resolveShareMeta(tokenInput: string): Promise<ShareMeta> {
             watermarkEnabled: Boolean(r.watermark_enabled),
             watermarkText: r.watermark_text ?? null,
             allowDownload: Boolean(r.allow_download),
+            sharedByEmail: r.shared_by_email ?? null,
             docModerationStatus: r.doc_moderation_status ?? "active",
             scanStatus: r.scan_status ?? "unscanned",
             riskLevel: r.risk_level ?? "low",
@@ -433,12 +438,14 @@ export async function resolveShareMeta(tokenInput: string): Promise<ShareMeta> {
           st.views_count,
           st.revoked_at::text as revoked_at,
           st.password_hash,
+          u.email::text as shared_by_email,
           coalesce(d.moderation_status::text, 'active') as doc_moderation_status,
           coalesce(d.scan_status::text, 'unscanned') as scan_status,
           coalesce(d.risk_level::text, 'low') as risk_level,
           d.risk_flags as risk_flags
         from public.share_tokens st
         left join public.docs d on d.id = st.doc_id
+        left join public.users u on u.id = d.owner_id
         where st.token = ${token}
           ${dashed ? sql`or st.token = ${dashed}` : sql``}
         limit 1
@@ -452,6 +459,7 @@ export async function resolveShareMeta(tokenInput: string): Promise<ShareMeta> {
                 views_count: number | null;
                 revoked_at: string | null;
                 password_hash: string | null;
+                shared_by_email: string | null;
                 doc_moderation_status: string;
                 scan_status: string;
                 risk_level: string;
@@ -478,6 +486,7 @@ export async function resolveShareMeta(tokenInput: string): Promise<ShareMeta> {
                 watermarkEnabled: false,
                 watermarkText: null,
                 allowDownload: true,
+                sharedByEmail: r.shared_by_email ?? null,
                 docModerationStatus: r.doc_moderation_status ?? "active",
                 scanStatus: r.scan_status ?? "unscanned",
                 riskLevel: r.risk_level ?? "low",

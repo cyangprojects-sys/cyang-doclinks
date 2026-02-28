@@ -26,6 +26,18 @@ function defaultWatermarkText(token: string) {
   return `${base}\nShare: ${short}... ${ts}`;
 }
 
+function buildForensicTag(args: {
+  token: string;
+  sharedByEmail?: string | null;
+  openedBy?: string | null;
+}) {
+  const share = args.token.slice(0, 8);
+  const sharedBy = String(args.sharedByEmail || "unknown").trim() || "unknown";
+  const openedBy = String(args.openedBy || "anonymous").trim() || "anonymous";
+  const ts = new Date().toISOString().replace("T", " ").slice(0, 19) + "Z";
+  return `shared:${sharedBy} | opened:${openedBy} | share:${share} | ${ts}`;
+}
+
 function FailState({
   token,
   title,
@@ -99,6 +111,11 @@ export default async function ShareTokenViewPage(props: {
   const family = detectFileFamily({ contentType, filename });
   const typeLabel = fileFamilyLabel(family);
   const isArchive = family === "archive";
+  const forensicTag = buildForensicTag({
+    token: t,
+    sharedByEmail: meta.sharedByEmail ?? null,
+    openedBy: meta.toEmail ?? null,
+  });
 
   return (
     <ShareShell token={t} title="Secure Document" subtitle="View-only document delivery with policy controls.">
@@ -141,6 +158,8 @@ export default async function ShareTokenViewPage(props: {
               filename={filename}
               watermarkEnabled={enabled}
               watermarkText={text}
+              watermarkAssetUrl="/branding/cyang_watermark.svg"
+              forensicTag={forensicTag}
               className="h-[calc(100vh-220px)]"
             />
           </div>

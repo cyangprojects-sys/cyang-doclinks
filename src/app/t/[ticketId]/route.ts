@@ -12,6 +12,7 @@ import { appendImmutableAudit } from "@/lib/immutableAudit";
 import { allowUnencryptedServing, isSecurityTestNoDbMode, isTicketServingDisabled } from "@/lib/securityPolicy";
 import { getRouteTimeoutMs, isRouteTimeoutError, withRouteTimeout } from "@/lib/routeTimeout";
 import { assertRuntimeEnv, isRuntimeEnvError } from "@/lib/runtimeEnv";
+import { stampPdfWithWatermark } from "@/lib/pdfWatermark";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -34,6 +35,56 @@ function isDownloadTicket(
     purpose === "watermarked_file_download" ||
     disposition === "attachment"
   );
+}
+
+function looksLikePdf(contentType: string | null | undefined, key: string | null | undefined) {
+  const ct = String(contentType || "").toLowerCase();
+  if (ct.includes("application/pdf")) return true;
+  return String(key || "").toLowerCase().endsWith(".pdf");
+}
+
+async function loadWatermarkIdentity(args: { docId: string | null; shareToken: string | null; alias: string | null }) {
+  const defaults = {
+    sharedBy: "unknown",
+    openedBy: "anonymous",
+  };
+  if (!args.docId) return defaults;
+
+  try {
+    if (args.shareToken) {
+      const rows = (await sql`
+        select
+          coalesce(u.email::text, '') as shared_by_email,
+          coalesce(st.to_email::text, '') as opened_by_email
+        from public.docs d
+        left join public.users u on u.id = d.owner_id
+        left join public.share_tokens st on st.doc_id = d.id and st.token = ${args.shareToken}
+        where d.id = ${args.docId}::uuid
+        limit 1
+      `) as unknown as Array<{ shared_by_email: string; opened_by_email: string }>;
+      const r = rows?.[0];
+      return {
+        sharedBy: String(r?.shared_by_email || defaults.sharedBy).trim() || defaults.sharedBy,
+        openedBy: String(r?.opened_by_email || defaults.openedBy).trim() || defaults.openedBy,
+      };
+    }
+
+    const rows = (await sql`
+      select
+        coalesce(u.email::text, '') as shared_by_email
+      from public.docs d
+      left join public.users u on u.id = d.owner_id
+      where d.id = ${args.docId}::uuid
+      limit 1
+    `) as unknown as Array<{ shared_by_email: string }>;
+    const r = rows?.[0];
+    return {
+      sharedBy: String(r?.shared_by_email || defaults.sharedBy).trim() || defaults.sharedBy,
+      openedBy: args.alias ? `alias:${String(args.alias).slice(0, 24)}` : defaults.openedBy,
+    };
+  } catch {
+    return defaults;
+  }
 }
 
 function secureDocHeaders(extra?: Record<string, string>): Record<string, string> {
@@ -132,7 +183,11 @@ export async function GET(
   }
 
   const t = consumed.ticket;
-  if (isBlockedTopLevelTicketOpen(req) && !isDownloadTicket(t)) {
+  const downloadTicket = isDownloadTicket(t);
+  const shouldPdfWatermarkDownload = downloadTicket && looksLikePdf(t.response_content_type, t.r2_key);
+  const requestIpHash = hashIpForTicket(clientIpKey(req).ip)?.slice(0, 10) || null;
+  const requestUaHash = hashUserAgent(req.headers.get("user-agent"))?.slice(0, 10) || null;
+  if (isBlockedTopLevelTicketOpen(req) && !downloadTicket) {
     return new NextResponse("Direct open is disabled for this protected document.", {
       status: 403,
       headers: secureDocHeaders(),
@@ -272,7 +327,26 @@ export async function GET(
         ? await body.transformToByteArray()
         : Buffer.from(await new Response(body).arrayBuffer());
 
-      const decrypted = decryptAes256Gcm({ ciphertext: Buffer.from(ab), iv: enc.iv, key: dataKey });
+      let decrypted = decryptAes256Gcm({ ciphertext: Buffer.from(ab), iv: enc.iv, key: dataKey });
+
+      if (shouldPdfWatermarkDownload) {
+        const identity = await loadWatermarkIdentity({
+          docId: t.doc_id || null,
+          shareToken: t.share_token || null,
+          alias: t.alias || null,
+        });
+        decrypted = await stampPdfWithWatermark(Buffer.from(decrypted), {
+          identity: { kind: "known", label: `${identity.sharedBy} -> ${identity.openedBy}` },
+          timestampIso: new Date().toISOString(),
+          shareIdShort: (t.share_token || t.alias || "direct").slice(0, 12),
+          docIdShort: String(t.doc_id || "unknown").slice(0, 12),
+          sharedBy: identity.sharedBy,
+          openedBy: identity.openedBy,
+          ipHashShort: requestIpHash,
+          uaHashShort: requestUaHash,
+          customText: "cyang.io",
+        });
+      }
 
       // Audit decrypt event (best-effort)
       const ip = clientIpKey(req).ip;
@@ -371,6 +445,37 @@ export async function GET(
   const contentLength = (obj as any)?.ContentLength as number | undefined;
   if (contentRange) headers["Content-Range"] = contentRange;
   if (typeof contentLength === "number") headers["Content-Length"] = String(contentLength);
+
+  if (shouldPdfWatermarkDownload) {
+    const body = (obj as any).Body as any;
+    const ab = body?.transformToByteArray
+      ? await body.transformToByteArray()
+      : Buffer.from(await new Response(body).arrayBuffer());
+    const identity = await loadWatermarkIdentity({
+      docId: t.doc_id || null,
+      shareToken: t.share_token || null,
+      alias: t.alias || null,
+    });
+    const stamped = await stampPdfWithWatermark(Buffer.from(ab), {
+      identity: { kind: "known", label: `${identity.sharedBy} -> ${identity.openedBy}` },
+      timestampIso: new Date().toISOString(),
+      shareIdShort: (t.share_token || t.alias || "direct").slice(0, 12),
+      docIdShort: String(t.doc_id || "unknown").slice(0, 12),
+      sharedBy: identity.sharedBy,
+      openedBy: identity.openedBy,
+      ipHashShort: requestIpHash,
+      uaHashShort: requestUaHash,
+      customText: "cyang.io",
+    });
+
+    return new NextResponse(new Blob([new Uint8Array(stamped)]), {
+      status: 200,
+      headers: secureDocHeaders({
+        "Content-Type": t.response_content_type || "application/pdf",
+        "Content-Disposition": t.response_content_disposition || "attachment",
+      }),
+    });
+  }
 
         return new NextResponse(toWebStream((obj as any).Body), {
           status: contentRange ? 206 : 200,

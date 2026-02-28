@@ -6,8 +6,8 @@ export function SiteHeader() {
     <header className="glass-card-strong sticky top-2 z-40 rounded-2xl px-3 py-3 sm:px-5">
       <div className="flex items-center justify-between gap-3">
         <Link href="/" className="flex items-center gap-3">
-          <div className="grid h-9 w-9 place-items-center rounded-xl border border-white/20 bg-white/10">
-            <span className="text-sm font-semibold tracking-tight text-white">CY</span>
+          <div className="grid h-9 w-9 place-items-center rounded-xl border border-white/20 bg-white/10 p-1">
+            <img src="/branding/cyang_primary.svg" alt="cyang.io" className="h-full w-full object-contain" />
           </div>
           <div>
             <div className="text-sm font-semibold tracking-tight text-white">cyang.io</div>

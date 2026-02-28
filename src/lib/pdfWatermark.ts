@@ -18,7 +18,10 @@ export type WatermarkSpec = {
   timestampIso: string;
   shareIdShort: string;
   docIdShort: string;
+  sharedBy: string;
+  openedBy: string;
   ipHashShort?: string | null;
+  uaHashShort?: string | null;
   // Optional custom text provided by share/doc policy (e.g. "Confidential – RFP Response")
   customText?: string | null;
 };
@@ -32,14 +35,17 @@ function buildLines(spec: WatermarkSpec) {
   const t = safeLine(spec.timestampIso);
   const share = safeLine(spec.shareIdShort);
   const doc = safeLine(spec.docIdShort);
+  const sharedBy = safeLine(spec.sharedBy);
+  const openedBy = safeLine(spec.openedBy);
 
   const metaParts: string[] = [];
   if (spec.ipHashShort) metaParts.push(`ip:${safeLine(spec.ipHashShort)}`);
+  if (spec.uaHashShort) metaParts.push(`ua:${safeLine(spec.uaHashShort)}`);
 
-  const header = spec.customText ? safeLine(spec.customText) : "Confidential";
+  const header = spec.customText ? safeLine(spec.customText) : "cyang.io";
   const line1 = `${header}`;
-  const line2 = `${id} • ${t}`;
-  const line3 = `share:${share} • doc:${doc}${metaParts.length ? " • " + metaParts.join(" • ") : ""}`;
+  const line2 = `shared:${sharedBy} • opened:${openedBy}`;
+  const line3 = `${id} • ${t} • share:${share} • doc:${doc}${metaParts.length ? " • " + metaParts.join(" • ") : ""}`;
 
   return { line1, line2, line3 };
 }

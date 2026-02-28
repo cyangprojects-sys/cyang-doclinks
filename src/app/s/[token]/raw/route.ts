@@ -129,6 +129,17 @@ function parseDisposition(input: string | null): "inline" | "attachment" {
   return "inline";
 }
 
+function trackedAttachmentDisposition(filename: string | null, traceId: string) {
+  const fallback = "document";
+  const raw = String(filename || fallback).trim() || fallback;
+  const cleaned = raw.replace(/[^\w.\- ]+/g, "_");
+  const dot = cleaned.lastIndexOf(".");
+  const base = dot > 0 ? cleaned.slice(0, dot) : cleaned;
+  const ext = dot > 0 ? cleaned.slice(dot) : "";
+  const traced = `${base}__s-${traceId}${ext}`;
+  return `attachment; filename="${traced}"`;
+}
+
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ token: string }> }
@@ -460,7 +471,10 @@ export async function GET(
     r2Bucket,
     r2Key: share.r2_key,
     responseContentType: share.content_type || "application/octet-stream",
-    responseContentDisposition: disposition,
+    responseContentDisposition:
+      disposition === "attachment"
+        ? trackedAttachmentDisposition(share.original_filename, token.slice(0, 8))
+        : disposition,
   });
 
   if (!ticketId) {

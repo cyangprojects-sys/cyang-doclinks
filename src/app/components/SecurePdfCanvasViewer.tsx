@@ -55,6 +55,8 @@ export default function SecurePdfCanvasViewer(props: {
   filename?: string | null;
   watermarkEnabled?: boolean;
   watermarkText?: string;
+  watermarkAssetUrl?: string;
+  forensicTag?: string;
   className?: string;
 }) {
   const mimeType = String(props.mimeType || "").trim().toLowerCase();
@@ -181,18 +183,17 @@ export default function SecurePdfCanvasViewer(props: {
   const watermark = useMemo(() => {
     if (!props.watermarkEnabled) return null;
     const text = (props.watermarkText || "Confidential").trim() || "Confidential";
+    const forensic = (props.forensicTag || "").trim();
+    const watermarkAsset = String(props.watermarkAssetUrl || "/branding/cyang_watermark.svg").trim();
     return (
       <div
         aria-hidden="true"
         className="pointer-events-none absolute inset-0 z-10"
         style={{
-          backgroundImage: `repeating-linear-gradient(
-            -35deg,
-            rgba(255,255,255,0.08) 0px,
-            rgba(255,255,255,0.08) 2px,
-            rgba(0,0,0,0) 2px,
-            rgba(0,0,0,0) 140px
-          )`,
+          backgroundImage: `url("${watermarkAsset}")`,
+          backgroundRepeat: "repeat",
+          backgroundSize: "220px 220px",
+          opacity: 0.16,
         }}
       >
         <div className="absolute inset-0 flex items-center justify-center">
@@ -200,9 +201,14 @@ export default function SecurePdfCanvasViewer(props: {
             {text}
           </div>
         </div>
+        {forensic ? (
+          <div className="absolute bottom-2 right-2 rounded border border-white/20 bg-black/55 px-2 py-1 text-[10px] leading-tight text-white/80">
+            {forensic}
+          </div>
+        ) : null}
       </div>
     );
-  }, [props.watermarkEnabled, props.watermarkText]);
+  }, [props.watermarkEnabled, props.watermarkText, props.forensicTag, props.watermarkAssetUrl]);
 
   const zoomAllowed = mode === "pdf" || mode === "image" || mode === "video";
   const modeLabel = fileFamilyLabel(mode);

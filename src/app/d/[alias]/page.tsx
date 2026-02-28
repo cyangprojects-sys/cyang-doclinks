@@ -392,6 +392,7 @@ function DocumentViewer({
   const family = detectFileFamily({ contentType, filename });
   const typeLabel = fileFamilyLabel(family);
   const isArchive = family === "archive";
+  const forensicTag = `alias:${alias.slice(0, 12)} | ${new Date().toISOString().replace("T", " ").slice(0, 19)}Z`;
 
   return (
     <div className="mt-4">
@@ -429,6 +430,10 @@ function DocumentViewer({
               downloadUrl={downloadUrl}
               mimeType={contentType}
               filename={filename}
+              watermarkEnabled
+              watermarkText="cyang.io"
+              watermarkAssetUrl="/branding/cyang_watermark.svg"
+              forensicTag={forensicTag}
               className="h-[78vh]"
             />
           )}

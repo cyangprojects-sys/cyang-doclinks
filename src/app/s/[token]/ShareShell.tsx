@@ -39,7 +39,10 @@ export function ShareShell({
       <div className="mx-auto w-full max-w-5xl">
         <div className="mb-5 flex items-center justify-between gap-3">
           <div>
-            <div className="text-xs uppercase tracking-[0.14em] text-white/55">cyang.io</div>
+            <div className="flex items-center gap-2">
+              <img src="/branding/cyang_primary.svg" alt="cyang.io" className="h-5 w-5 object-contain opacity-90" />
+              <div className="text-xs uppercase tracking-[0.14em] text-white/55">cyang.io</div>
+            </div>
             <h1 className="mt-1 text-xl font-semibold tracking-tight text-white sm:text-2xl">{title}</h1>
             {subtitle ? <div className="mt-1 text-sm text-white/65">{subtitle}</div> : null}
           </div>
@@ -58,4 +61,3 @@ export function ShareShell({
     </main>
   );
 }
-

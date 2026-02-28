@@ -66,7 +66,10 @@ export default function AdminShell({ email, isOwner, showPricingUi, children }: 
       <div className="mx-auto flex w-full max-w-[1320px] gap-6 px-3 py-3 md:px-5 md:py-5">
         <aside className="glass-card-strong hidden w-72 shrink-0 overflow-hidden rounded-2xl md:flex md:flex-col">
           <div className="border-b border-white/10 px-5 py-4">
-            <div className="text-sm font-semibold tracking-tight text-white">cyang.io/doclinks</div>
+            <div className="flex items-center gap-2">
+              <img src="/branding/cyang_primary.svg" alt="cyang.io" className="h-6 w-6 object-contain" />
+              <div className="text-sm font-semibold tracking-tight text-white">cyang.io/doclinks</div>
+            </div>
             <div className="mt-1 text-xs uppercase tracking-[0.12em] text-white/55">Admin</div>
           </div>
           <nav className="flex-1 space-y-1 px-3 py-3">
@@ -149,7 +152,10 @@ export default function AdminShell({ email, isOwner, showPricingUi, children }: 
           <div className="glass-card-strong absolute left-2 top-2 h-[calc(100%-1rem)] w-[82%] max-w-xs rounded-2xl p-3">
             <div className="mb-2 flex items-center justify-between border-b border-white/10 pb-2">
               <div>
-                <div className="text-sm font-semibold text-white">cyang.io/doclinks</div>
+                <div className="flex items-center gap-2">
+                  <img src="/branding/cyang_primary.svg" alt="cyang.io" className="h-5 w-5 object-contain" />
+                  <div className="text-sm font-semibold text-white">cyang.io/doclinks</div>
+                </div>
                 <div className="text-xs uppercase tracking-[0.12em] text-white/55">Admin</div>
               </div>
               <button

@@ -151,6 +151,14 @@ function pickFilename(title: string | null, original: string | null, fallback: s
   return base.replace(/[^\w.\- ]+/g, "_");
 }
 
+function tracedAliasFilename(filename: string, alias: string) {
+  const cleaned = String(filename || "document").replace(/[^\w.\- ]+/g, "_");
+  const dot = cleaned.lastIndexOf(".");
+  const base = dot > 0 ? cleaned.slice(0, dot) : cleaned;
+  const ext = dot > 0 ? cleaned.slice(dot) : "";
+  return `${base}__a-${alias.slice(0, 8)}${ext}`;
+}
+
 function parseDisposition(req: NextRequest): "inline" | "attachment" {
   const url = new URL(req.url);
   const d = (url.searchParams.get("disposition") || url.searchParams.get("dl") || "").toLowerCase();
@@ -327,7 +335,10 @@ if (shouldCountView(req)) {
       r2Bucket: resolved.bucket,
       r2Key: resolved.r2Key,
       responseContentType: contentType,
-      responseContentDisposition: `${disposition}; filename="${filename}"`,
+      responseContentDisposition:
+        disposition === "attachment"
+          ? `attachment; filename="${tracedAliasFilename(filename, alias)}"`
+          : `${disposition}; filename="${filename}"`,
     });
 
     if (!ticketId) {
