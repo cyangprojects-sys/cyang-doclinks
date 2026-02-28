@@ -16,6 +16,14 @@ function statusClass(status: string): string {
   return "border-white/20 bg-white/10 text-white/80";
 }
 
+function invoiceStatusClass(status: string): string {
+  const s = String(status || "").toLowerCase();
+  if (s === "paid") return "border-emerald-500/40 bg-emerald-500/15 text-emerald-100";
+  if (s === "open" || s === "draft") return "border-amber-500/40 bg-amber-500/15 text-amber-100";
+  if (s === "void" || s === "uncollectible") return "border-red-500/40 bg-red-500/15 text-red-100";
+  return "border-white/20 bg-white/10 text-white/80";
+}
+
 function entitlementGuidance(entitlement: string): { title: string; body: string; tone: string } {
   const e = String(entitlement || "").toLowerCase();
   if (e === "active") {
@@ -130,50 +138,106 @@ export default async function StripeBillingPage(props: {
   const snapshot = await getBillingSnapshotForUser(u.id);
   const entitlement = classifyBillingEntitlement(snapshot.subscription);
   const guidance = entitlementGuidance(entitlement);
+  const paidInvoices = invoices.filter((inv) => String(inv?.status || "").toLowerCase() === "paid").length;
+  const failedInvoices = invoices.filter((inv) => {
+    const s = String(inv?.status || "").toLowerCase();
+    return s === "void" || s === "uncollectible";
+  }).length;
 
   return (
-    <div className="mx-auto max-w-5xl p-6 text-white">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold">Stripe Billing</h1>
-          <p className="mt-1 text-sm text-neutral-400">Subscription state, invoice history, and Stripe-managed actions.</p>
+    <div className="mx-auto max-w-6xl p-6 text-white">
+      <div className="overflow-hidden rounded-2xl border border-white/10 bg-[radial-gradient(120%_140%_at_0%_0%,rgba(14,165,233,0.20),rgba(10,10,10,0.90)_45%,rgba(10,10,10,1)_100%)] p-6 shadow-[0_20px_60px_rgba(0,0,0,0.35)]">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <div className="inline-flex items-center rounded-full border border-sky-400/30 bg-sky-500/15 px-2.5 py-1 text-xs font-medium tracking-wide text-sky-100">
+              Stripe Control Center
+            </div>
+            <h1 className="mt-3 text-3xl font-semibold tracking-tight">Billing</h1>
+            <p className="mt-2 max-w-2xl text-sm text-neutral-300">
+              Track entitlement health, launch checkout and portal sessions, and review invoice outcomes from one screen.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Link
+              href="/admin/billing"
+              className="rounded-md border border-white/20 bg-white/10 px-3 py-2 text-sm font-medium text-white/90 transition hover:bg-white/15"
+            >
+              Billing Settings
+            </Link>
+            <form action="/api/admin/billing/sync" method="post">
+              <button
+                type="submit"
+                disabled={!customerId}
+                className="rounded-md border border-sky-400/40 bg-sky-500/25 px-3 py-2 text-sm font-medium text-sky-100 transition hover:bg-sky-500/35 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Run Sync
+              </button>
+            </form>
+          </div>
         </div>
-        <Link href="/admin/billing" className="rounded-md border border-white/15 bg-white/5 px-3 py-2 text-sm hover:bg-white/10">
-          Back to Billing Settings
-        </Link>
+
+        <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="rounded-xl border border-white/15 bg-black/35 p-4">
+            <div className="text-xs uppercase tracking-wide text-neutral-400">Entitlement</div>
+            <div className="mt-2">
+              <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold uppercase tracking-wide ${statusClass(entitlement)}`}>
+                {entitlement}
+              </span>
+            </div>
+          </div>
+          <div className="rounded-xl border border-white/15 bg-black/35 p-4">
+            <div className="text-xs uppercase tracking-wide text-neutral-400">Invoices Loaded</div>
+            <div className="mt-2 text-2xl font-semibold text-white">{invoices.length}</div>
+            <div className="mt-1 text-xs text-neutral-400">Last 25 records from Stripe</div>
+          </div>
+          <div className="rounded-xl border border-white/15 bg-black/35 p-4">
+            <div className="text-xs uppercase tracking-wide text-neutral-400">Paid</div>
+            <div className="mt-2 text-2xl font-semibold text-emerald-200">{paidInvoices}</div>
+            <div className="mt-1 text-xs text-neutral-400">Successful invoices</div>
+          </div>
+          <div className="rounded-xl border border-white/15 bg-black/35 p-4">
+            <div className="text-xs uppercase tracking-wide text-neutral-400">Needs Review</div>
+            <div className="mt-2 text-2xl font-semibold text-amber-200">{failedInvoices}</div>
+            <div className="mt-1 text-xs text-neutral-400">Void or uncollectible</div>
+          </div>
+        </div>
       </div>
 
-      {sync === "ok" ? (
-        <div className="mt-3 rounded-lg border border-emerald-900/60 bg-emerald-950/30 px-3 py-2 text-sm text-emerald-200">
-          Billing sync completed.
+      <div className="mt-4 space-y-3">
+        {sync === "ok" ? (
+          <div className="rounded-lg border border-emerald-900/60 bg-emerald-950/30 px-3 py-2 text-sm text-emerald-200">
+            Billing sync completed.
+          </div>
+        ) : null}
+        {error ? (
+          <div className="rounded-lg border border-red-900/60 bg-red-950/30 px-3 py-2 text-sm text-red-200">
+            {decodeURIComponent(String(error))}
+          </div>
+        ) : null}
+        {stripeConfigError ? (
+          <div className="rounded-lg border border-red-900/60 bg-red-950/30 px-3 py-2 text-sm text-red-200">
+            Stripe is not configured for this environment: {stripeConfigError}
+          </div>
+        ) : null}
+        <div className={`rounded-lg border px-3 py-2 text-sm ${guidance.tone}`}>
+          <div className="font-medium">{guidance.title}</div>
+          <div className="mt-1 text-xs opacity-90">{guidance.body}</div>
         </div>
-      ) : null}
-      {error ? (
-        <div className="mt-3 rounded-lg border border-red-900/60 bg-red-950/30 px-3 py-2 text-sm text-red-200">
-          {decodeURIComponent(String(error))}
-        </div>
-      ) : null}
-      {stripeConfigError ? (
-        <div className="mt-3 rounded-lg border border-red-900/60 bg-red-950/30 px-3 py-2 text-sm text-red-200">
-          Stripe is not configured for this environment: {stripeConfigError}
-        </div>
-      ) : null}
-      <div className={`mt-3 rounded-lg border px-3 py-2 text-sm ${guidance.tone}`}>
-        <div className="font-medium">{guidance.title}</div>
-        <div className="mt-1 text-xs opacity-90">{guidance.body}</div>
       </div>
 
-      <div className="mt-4 grid gap-4 md:grid-cols-2">
-        <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-4">
-          <div className="text-sm font-medium">Customer</div>
+      <div className="mt-4 grid gap-4 lg:grid-cols-5">
+        <div className="rounded-2xl border border-neutral-800 bg-neutral-950 p-5 lg:col-span-2">
+          <div className="text-sm font-medium text-white">Customer & Actions</div>
           <div className="mt-2 text-xs text-neutral-400">Stripe customer id</div>
-          <div className="mt-1 font-mono text-sm text-neutral-200">{customerId || "-"}</div>
-          <div className="mt-3 flex gap-2">
+          <div className="mt-1 rounded-md border border-neutral-800 bg-black/30 px-2 py-2 font-mono text-xs text-neutral-200">
+            {customerId || "-"}
+          </div>
+          <div className="mt-4 grid gap-2 sm:grid-cols-2">
             <form action="/api/admin/billing/checkout" method="post">
               <button
                 type="submit"
                 disabled={!customerId}
-                className="rounded-md border border-sky-500/40 bg-sky-500/20 px-3 py-2 text-sm text-sky-100 hover:bg-sky-500/30 disabled:cursor-not-allowed disabled:opacity-60"
+                className="w-full rounded-md border border-sky-500/40 bg-sky-500/20 px-3 py-2 text-sm font-medium text-sky-100 transition hover:bg-sky-500/30 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 Start Checkout
               </button>
@@ -182,16 +246,16 @@ export default async function StripeBillingPage(props: {
               <button
                 type="submit"
                 disabled={!customerId}
-                className="rounded-md border border-white/15 bg-white/5 px-3 py-2 text-sm hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+                className="w-full rounded-md border border-white/15 bg-white/5 px-3 py-2 text-sm font-medium transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 Open Portal
               </button>
             </form>
-            <form action="/api/admin/billing/sync" method="post">
+            <form action="/api/admin/billing/sync" method="post" className="sm:col-span-2">
               <button
                 type="submit"
                 disabled={!customerId}
-                className="rounded-md border border-white/15 bg-white/5 px-3 py-2 text-sm hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+                className="w-full rounded-md border border-white/15 bg-white/5 px-3 py-2 text-sm font-medium transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 Run Sync Now
               </button>
@@ -199,38 +263,48 @@ export default async function StripeBillingPage(props: {
           </div>
         </div>
 
-        <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-4">
-          <div className="text-sm font-medium">Subscription</div>
-          <div className="mt-2">
-            <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold uppercase tracking-wide ${statusClass(entitlement)}`}>
-              {entitlement}
-            </span>
-          </div>
+        <div className="rounded-2xl border border-neutral-800 bg-neutral-950 p-5 lg:col-span-3">
+          <div className="text-sm font-medium text-white">Subscription Snapshot</div>
           {snapshot.subscription ? (
-            <div className="mt-2 space-y-1 text-sm text-neutral-200">
-              <div>Status: <span className="font-semibold">{snapshot.subscription.status}</span></div>
-              <div>Plan: <span className="font-mono">{snapshot.subscription.planId}</span></div>
-              <div>
-                Current period end:{" "}
-                {snapshot.subscription.currentPeriodEnd
-                  ? new Date(snapshot.subscription.currentPeriodEnd).toLocaleString()
-                  : "-"}
+            <div className="mt-3 grid gap-2 text-sm text-neutral-200 sm:grid-cols-2">
+              <div className="rounded-lg border border-neutral-800 bg-black/30 p-3">
+                <div className="text-xs text-neutral-400">Status</div>
+                <div className="mt-1 font-semibold capitalize">{snapshot.subscription.status}</div>
               </div>
-              <div>
-                Grace until:{" "}
-                {snapshot.subscription.graceUntil
-                  ? new Date(snapshot.subscription.graceUntil).toLocaleString()
-                  : "-"}
+              <div className="rounded-lg border border-neutral-800 bg-black/30 p-3">
+                <div className="text-xs text-neutral-400">Plan</div>
+                <div className="mt-1 font-mono">{snapshot.subscription.planId}</div>
+              </div>
+              <div className="rounded-lg border border-neutral-800 bg-black/30 p-3">
+                <div className="text-xs text-neutral-400">Current period end</div>
+                <div className="mt-1">
+                  {snapshot.subscription.currentPeriodEnd
+                    ? new Date(snapshot.subscription.currentPeriodEnd).toLocaleString()
+                    : "-"}
+                </div>
+              </div>
+              <div className="rounded-lg border border-neutral-800 bg-black/30 p-3">
+                <div className="text-xs text-neutral-400">Grace until</div>
+                <div className="mt-1">
+                  {snapshot.subscription.graceUntil
+                    ? new Date(snapshot.subscription.graceUntil).toLocaleString()
+                    : "-"}
+                </div>
               </div>
             </div>
           ) : (
-            <div className="mt-2 text-sm text-neutral-400">No subscription record yet.</div>
+            <div className="mt-3 text-sm text-neutral-400">No subscription record yet.</div>
           )}
         </div>
       </div>
 
-      <div className="mt-4 rounded-xl border border-neutral-800 bg-neutral-950 p-4">
-        <div className="text-sm font-medium">Invoices</div>
+      <div className="mt-4 rounded-2xl border border-neutral-800 bg-neutral-950 p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <div className="text-sm font-medium text-white">Invoices</div>
+            <div className="mt-1 text-xs text-neutral-400">Recent Stripe invoices for this customer.</div>
+          </div>
+        </div>
         {invoicesError ? (
           <div className="mt-2 rounded-md border border-red-900/50 bg-red-950/30 px-3 py-2 text-sm text-red-200">
             {invoicesError}
@@ -255,7 +329,11 @@ export default async function StripeBillingPage(props: {
                       {inv?.created ? new Date(Number(inv.created) * 1000).toLocaleString() : "-"}
                     </td>
                     <td className="px-3 py-2 font-mono text-neutral-200">{String(inv?.number || inv?.id || "-")}</td>
-                    <td className="px-3 py-2 text-neutral-200">{String(inv?.status || "-")}</td>
+                    <td className="px-3 py-2 text-neutral-200">
+                      <span className={`inline-flex rounded-full border px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide ${invoiceStatusClass(String(inv?.status || "-"))}`}>
+                        {String(inv?.status || "-")}
+                      </span>
+                    </td>
                     <td className="px-3 py-2 text-neutral-200">{fmtMoney(Number(inv?.amount_due || 0), String(inv?.currency || "USD"))}</td>
                     <td className="px-3 py-2 text-neutral-200">{fmtMoney(Number(inv?.amount_paid || 0), String(inv?.currency || "USD"))}</td>
                     <td className="px-3 py-2">
