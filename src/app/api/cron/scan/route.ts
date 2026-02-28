@@ -19,7 +19,7 @@ type Job = {
   attempts: number;
 };
 
-const SCANNER_VERSION = "v2-external-clam-or-vt";
+const SCANNER_VERSION = "v3-external-clam-only";
 
 export async function GET(req: NextRequest) {
   if (!isCronAuthorized(req)) {
