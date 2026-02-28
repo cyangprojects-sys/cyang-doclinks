@@ -238,6 +238,36 @@ async function resolveAliasRow(alias: string): Promise<
     // ignore; fall through to legacy
   }
 
+  // Compatibility fallback when doc_aliases.password_hash is absent.
+  try {
+    const rows = (await sql`
+      select
+        a.doc_id::text as doc_id,
+        a.revoked_at::text as revoked_at,
+        a.expires_at::text as expires_at
+      from public.doc_aliases a
+      where lower(a.alias) = ${alias}
+        and coalesce(a.is_active, true) = true
+      limit 1
+    `) as unknown as Array<{
+      doc_id: string;
+      revoked_at: string | null;
+      expires_at: string | null;
+    }>;
+
+    if (rows?.length) {
+      return {
+        ok: true,
+        docId: rows[0].doc_id,
+        revokedAt: rows[0].revoked_at ?? null,
+        expiresAt: rows[0].expires_at ?? null,
+        passwordHash: null,
+      };
+    }
+  } catch {
+    // ignore; fall through to legacy
+  }
+
   // Legacy table: document_aliases
   try {
     const rows = (await sql`

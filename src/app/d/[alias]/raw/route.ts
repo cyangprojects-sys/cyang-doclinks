@@ -79,6 +79,37 @@ async function getAliasRow(aliasInput: string): Promise<
     // fall through
   }
 
+  // Some environments may not have password_hash on doc_aliases yet.
+  try {
+    const rows = (await sql`
+      select
+        a.doc_id::text as doc_id,
+        a.revoked_at::text as revoked_at,
+        a.expires_at::text as expires_at
+      from public.doc_aliases a
+      where lower(a.alias) = ${alias}
+        and coalesce(a.is_active, true) = true
+      limit 1
+    `) as unknown as Array<{
+      doc_id: string;
+      revoked_at: string | null;
+      expires_at: string | null;
+    }>;
+
+    if (rows?.length) {
+      const r = rows[0];
+      return {
+        ok: true,
+        docId: r.doc_id,
+        revokedAt: r.revoked_at ?? null,
+        expiresAt: r.expires_at ?? null,
+        passwordHash: null,
+      };
+    }
+  } catch {
+    // fall through
+  }
+
   // Legacy: document_aliases
   try {
     const rows = (await sql`
