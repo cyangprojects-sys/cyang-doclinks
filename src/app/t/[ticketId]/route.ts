@@ -24,6 +24,18 @@ function isBlockedTopLevelTicketOpen(req: NextRequest): boolean {
   return dest === "document" && mode === "navigate" && user === "?1";
 }
 
+function isDownloadTicket(
+  ticket: { purpose?: string | null; response_content_disposition?: string | null } | null | undefined
+): boolean {
+  const purpose = String(ticket?.purpose || "").toLowerCase();
+  const disposition = String(ticket?.response_content_disposition || "").toLowerCase();
+  return (
+    purpose === "file_download" ||
+    purpose === "watermarked_file_download" ||
+    disposition === "attachment"
+  );
+}
+
 function secureDocHeaders(extra?: Record<string, string>): Record<string, string> {
   return {
     "Cache-Control": "private, no-store, max-age=0",
@@ -88,13 +100,6 @@ export async function GET(
 
   const { ticketId } = await params;
 
-  if (isBlockedTopLevelTicketOpen(req)) {
-    return new NextResponse("Direct open is disabled for this protected document.", {
-      status: 403,
-      headers: secureDocHeaders(),
-    });
-  }
-
   // Throttle ticket exchange (prevents hotlink storms)
   const ticketRl = await enforceGlobalApiRateLimit({
     req,
@@ -127,6 +132,12 @@ export async function GET(
   }
 
   const t = consumed.ticket;
+  if (isBlockedTopLevelTicketOpen(req) && !isDownloadTicket(t)) {
+    return new NextResponse("Direct open is disabled for this protected document.", {
+      status: 403,
+      headers: secureDocHeaders(),
+    });
+  }
   if (t.doc_id) {
     try {
       const rows = (await sql`
