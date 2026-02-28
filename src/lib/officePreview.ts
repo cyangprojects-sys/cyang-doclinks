@@ -1,6 +1,6 @@
 import mammoth from "mammoth";
 import JSZip from "jszip";
-import * as XLSX from "xlsx";
+import ExcelJS from "exceljs";
 
 export type OfficePreviewResult =
   | { ok: true; html: string }
@@ -82,17 +82,49 @@ async function convertDocxLike(bytes: Buffer): Promise<OfficePreviewResult> {
   }
 }
 
-function convertSpreadsheet(bytes: Buffer): OfficePreviewResult {
+function convertCsv(csvText: string): string {
+  const lines = csvText.split(/\r?\n/).slice(0, 1000);
+  const rows = lines.map((line) => line.split(",").slice(0, 30));
+  const body = rows
+    .map((cols) => `<tr>${cols.map((c) => `<td>${esc(c)}</td>`).join("")}</tr>`)
+    .join("");
+  return `<table><tbody>${body}</tbody></table>`;
+}
+
+async function convertSpreadsheet(bytes: Buffer, mimeType: string): Promise<OfficePreviewResult> {
   try {
-    const wb = XLSX.read(bytes, { type: "buffer" });
-    const names = wb.SheetNames || [];
-    if (!names.length) return { ok: false, error: "EMPTY_WORKBOOK", message: "Workbook has no sheets." };
+    const mime = String(mimeType || "").toLowerCase();
+    if (mime === "text/csv") {
+      const table = convertCsv(bytes.toString("utf8"));
+      return { ok: true, html: shellHtml(`<h2>Sheet 1</h2>${table}`) };
+    }
+    if (mime === "application/vnd.ms-excel") {
+      return {
+        ok: false,
+        error: "XLS_PREVIEW_UNSUPPORTED",
+        message: "Legacy .xls preview is not supported. Use .xlsx or .csv for inline preview.",
+      };
+    }
+    const workbook = new ExcelJS.Workbook();
+    const loadInput = bytes as unknown as Parameters<typeof workbook.xlsx.load>[0];
+    await workbook.xlsx.load(loadInput);
+    const worksheets = workbook.worksheets || [];
+    if (!worksheets.length) return { ok: false, error: "EMPTY_WORKBOOK", message: "Workbook has no sheets." };
     const parts: string[] = [];
-    for (const name of names.slice(0, 5)) {
-      const ws = wb.Sheets[name];
-      if (!ws) continue;
-      const table = XLSX.utils.sheet_to_html(ws, { editable: false });
-      parts.push(`<h2>${esc(name)}</h2>${sanitizeHtml(table)}`);
+    for (const ws of worksheets.slice(0, 5)) {
+      let rowCount = 0;
+      const rowParts: string[] = [];
+      ws.eachRow({ includeEmpty: false }, (row) => {
+        if (rowCount >= 500) return;
+        const rowValues = Array.isArray(row.values) ? row.values : [];
+        const cells = rowValues
+          .slice(1)
+          .map((value) => `<td>${esc(typeof value === "object" ? JSON.stringify(value) : value)}</td>`)
+          .join("");
+        rowParts.push(`<tr>${cells}</tr>`);
+        rowCount += 1;
+      });
+      parts.push(`<h2>${esc(ws.name)}</h2><table><tbody>${rowParts.join("")}</tbody></table>`);
     }
     const html = parts.join("<hr/>");
     if (!html.trim()) return { ok: false, error: "EMPTY_CONVERSION", message: "No previewable sheet data found." };
@@ -136,8 +168,7 @@ export async function convertOfficeBytes(args: {
 }): Promise<OfficePreviewResult> {
   const kind = mimeKind(args.mimeType);
   if (kind === "docx") return convertDocxLike(args.bytes);
-  if (kind === "sheet") return convertSpreadsheet(args.bytes);
+  if (kind === "sheet") return convertSpreadsheet(args.bytes, args.mimeType);
   if (kind === "pptx") return convertPptxLike(args.bytes);
   return { ok: false, error: "UNSUPPORTED_MIME", message: "Unsupported office type for conversion." };
 }
-
