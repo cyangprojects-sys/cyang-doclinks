@@ -146,8 +146,8 @@ async function deleteOlderThan(args: {
       // Try the next column candidate.
       const msg = e instanceof Error ? e.message : String(e);
       // If table doesn't exist, surface it immediately.
-      const pgErr = e as { code?: string };
-      if (pgErr?.code === "42P01") {
+      const anyErr = e as any;
+      if (anyErr?.code === "42P01") {
         return { table, ok: false, error: "Table not found (SQLSTATE 42P01)." };
       }
       // Continue to next column candidate.
@@ -343,13 +343,6 @@ export async function runRetention(): Promise<RetentionRun> {
     await deleteOlderThan({
       table: "public.doc_daily_analytics",
       columnCandidates: ["day"],
-      days: dailyDays,
-    })
-  );
-  results.push(
-    await deleteOlderThan({
-      table: "public.doc_view_daily",
-      columnCandidates: ["date"],
       days: dailyDays,
     })
   );
