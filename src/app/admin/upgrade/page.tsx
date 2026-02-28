@@ -61,7 +61,7 @@ export default async function ViewerUpgradePage(props: {
           <h2 className="text-lg font-semibold">Free - $0</h2>
           <ul className="mt-3 space-y-2 text-sm text-white/75">
             <li>100 MB storage</li>
-            <li>10 MB max per file</li>
+            <li>25 MB max per file</li>
             <li>3 active shares</li>
             <li>100 views/month</li>
             <li>Share expiration required (7 days max)</li>

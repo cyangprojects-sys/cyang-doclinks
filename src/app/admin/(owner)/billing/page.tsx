@@ -298,7 +298,7 @@ export default async function BillingSettingsPage({
           <ToggleRow
             name="enforcePlanLimits"
             title="Enforce plan limits"
-            description="Hard-enforce Free plan: 100MB storage, 10MB max file, 3 active shares, 100 views/month, required share expiration (7 days max), no custom expiration/permanent shares, encryption + scan gates, strict abuse throttling, no audit export, and basic analytics only. Turn OFF only for testing." 
+            description="Hard-enforce Free plan: 100MB storage, 25MB max file, 3 active shares, 100 views/month, required share expiration (7 days max), no custom expiration/permanent shares, encryption + scan gates, strict abuse throttling, no audit export, and basic analytics only. Turn OFF only for testing." 
             defaultChecked={flags.enforcePlanLimits}
           />
 

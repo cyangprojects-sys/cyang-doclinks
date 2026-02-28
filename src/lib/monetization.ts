@@ -22,7 +22,7 @@ const FREE_PLAN: Plan = {
   maxActiveShares: 3,
   maxStorageBytes: 104857600, // 100 MB
   maxUploadsPerDay: 10,
-  maxFileSizeBytes: 10485760, // 10 MB
+  maxFileSizeBytes: 26214400, // 25 MB
   allowCustomExpiration: false,
   allowAuditExport: false,
   allowAdvancedAnalytics: false,
