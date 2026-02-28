@@ -28,11 +28,13 @@ export async function GET(req: NextRequest) {
 
   const startedAt = Date.now();
   try {
-  const maxJobs = Math.max(1, Math.min(25, Number(process.env.SCAN_CRON_BATCH || 10)));
+  const maxJobs = Math.max(1, Math.min(100, Number(process.env.SCAN_CRON_BATCH || 25)));
   const absMaxBytes = Math.max(1024 * 1024, Number(process.env.SCAN_ABS_MAX_BYTES || 25_000_000)); // default 25MB
   const maxAttempts = Math.max(1, Number(process.env.SCAN_MAX_ATTEMPTS || 5));
   const retryBase = Math.max(1, Number(process.env.SCAN_RETRY_BASE_MINUTES || 5));
   const retryMax = Math.max(retryBase, Number(process.env.SCAN_RETRY_MAX_MINUTES || 720));
+  const staleMinutes = Math.max(1, Number(process.env.SCAN_QUEUE_STALE_ALERT_MINUTES || 5));
+  const staleCountThreshold = Math.max(1, Number(process.env.SCAN_QUEUE_STALE_ALERT_COUNT || 1));
   const queueHealth = await healScanQueue();
 
   if (queueHealth.staleDeadLettered > 0) {
@@ -52,6 +54,32 @@ export async function GET(req: NextRequest) {
       scope: "scanner",
       message: "Scan jobs reached max attempts and require manual review",
       meta: { count: queueHealth.maxAttemptJobs, maxAttempts },
+    });
+  }
+
+  const staleQueued = (await sql`
+    select
+      count(*)::int as queued_stale_count,
+      coalesce(extract(epoch from (now() - min(created_at))), 0)::int as oldest_queued_age_seconds
+    from public.malware_scan_jobs
+    where status = 'queued'
+      and created_at < now() - (${staleMinutes}::text || ' minutes')::interval
+  `) as unknown as Array<{ queued_stale_count: number; oldest_queued_age_seconds: number }>;
+
+  const queuedStaleCount = Number(staleQueued?.[0]?.queued_stale_count ?? 0);
+  const oldestQueuedAgeSeconds = Number(staleQueued?.[0]?.oldest_queued_age_seconds ?? 0);
+  if (queuedStaleCount >= staleCountThreshold) {
+    await logSecurityEvent({
+      type: "malware_scan_queue_stale",
+      severity: "high",
+      scope: "scanner",
+      message: "Queued scan jobs are older than stale threshold",
+      meta: {
+        queuedStaleCount,
+        oldestQueuedAgeSeconds,
+        staleMinutes,
+        staleCountThreshold,
+      },
     });
   }
 
@@ -206,6 +234,8 @@ export async function GET(req: NextRequest) {
       claimed: jobs.length,
       failed: results.filter((r) => r.ok === false).length,
       deadLetterBacklog: queueHealth.maxAttemptJobs,
+      queuedStaleCount,
+      oldestQueuedAgeSeconds,
     },
   });
   return NextResponse.json({ ok: true, duration_ms: duration, claimed: jobs.length, queue_health: queueHealth, results });

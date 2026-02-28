@@ -106,11 +106,21 @@ Keep existing:
 - `CRON_SECRET` (Cloudflare cron -> Next auth)
 - `R2_*` vars
 
+Recommended scan queue tuning:
+
+- `SCAN_CRON_BATCH=25` (increase toward 100 as scanner capacity grows)
+- `SCAN_QUEUE_STALE_ALERT_MINUTES=5`
+- `SCAN_QUEUE_STALE_ALERT_COUNT=1`
+
 ## 5) Cloudflare cron worker (manual verify)
 
 Your existing worker already calls:
 
 - `https://www.cyang.io/api/cron/scan`
+
+Recommended trigger for release:
+
+- every minute (`* * * * *`) for `/api/cron/scan`
 
 No worker code changes required for ClamAV integration.
 

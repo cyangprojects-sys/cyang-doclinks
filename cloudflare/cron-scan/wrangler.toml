@@ -3,7 +3,7 @@ main = "src/index.ts"
 compatibility_date = "2025-01-01"
 
 [triggers]
-crons = ["*/5 * * * *", "*/10 * * * *", "*/15 * * * *", "*/30 * * * *", "5 * * * *", "25 * * * *", "17 2 * * *"]
+crons = ["* * * * *", "*/5 * * * *", "*/15 * * * *", "*/30 * * * *", "5 * * * *", "25 * * * *", "17 2 * * *"]
 
 [vars]
 # Update if your route paths differ.
