@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import SecurePdfCanvasViewer from "@/app/components/SecurePdfCanvasViewer";
 import { resolveShareMeta } from "@/lib/resolveDoc";
+import { detectFileFamily, fileFamilyLabel } from "@/lib/fileFamily";
 import { ShareBadge, ShareShell } from "../ShareShell";
 import { sql } from "@/lib/db";
 
@@ -86,15 +87,17 @@ export default async function ShareTokenViewPage(props: {
   const text = (meta.watermarkText || "").trim() || defaultWatermarkText(t);
   const rawUrl = `/s/${encodeURIComponent(t)}/raw`;
   const contentTypeRows = (await sql`
-    select coalesce(content_type::text, '') as content_type
+    select
+      coalesce(content_type::text, '') as content_type,
+      coalesce(original_filename::text, '') as original_filename
     from public.docs
     where id = ${meta.docId}::uuid
     limit 1
-  `) as unknown as Array<{ content_type: string }>;
+  `) as unknown as Array<{ content_type: string; original_filename: string }>;
   const contentType = String(contentTypeRows?.[0]?.content_type || "").trim() || "application/pdf";
-  const typeLabel = contentType.includes("/")
-    ? contentType.split("/")[1]?.toUpperCase() || "FILE"
-    : "FILE";
+  const filename = String(contentTypeRows?.[0]?.original_filename || "").trim() || null;
+  const family = detectFileFamily({ contentType, filename });
+  const typeLabel = fileFamilyLabel(family);
 
   return (
     <ShareShell token={t} title="Secure Document" subtitle="View-only document delivery with policy controls.">
@@ -122,13 +125,14 @@ export default async function ShareTokenViewPage(props: {
 
         {risky ? (
           <div className="rounded-2xl border border-amber-500/25 bg-amber-500/10 p-4 text-sm text-amber-100">
-            This PDF has characteristics commonly used for phishing or malware delivery. Inline view is disabled.
+            This file has characteristics commonly used for phishing or malware delivery. Inline view is disabled.
           </div>
         ) : (
           <div className="overflow-hidden rounded-2xl border border-white/15 bg-black/20">
             <SecurePdfCanvasViewer
               rawUrl={rawUrl}
               mimeType={contentType}
+              filename={filename}
               watermarkEnabled={enabled}
               watermarkText={text}
               className="h-[calc(100vh-220px)]"

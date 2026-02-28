@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { detectFileFamily, fileFamilyLabel, type FileFamily } from "@/lib/fileFamily";
 
 type PdfJsModule = {
   GlobalWorkerOptions: { workerSrc: string };
@@ -8,31 +9,6 @@ type PdfJsModule = {
 };
 
 type PageDims = { width: number; height: number };
-
-function isOfficeMime(mimeType: string): boolean {
-  const m = String(mimeType || "").toLowerCase();
-  return (
-    m === "application/msword" ||
-    m === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
-    m === "application/vnd.ms-excel" ||
-    m === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
-    m === "application/vnd.ms-powerpoint" ||
-    m === "application/vnd.openxmlformats-officedocument.presentationml.presentation" ||
-    m === "application/vnd.oasis.opendocument.text"
-  );
-}
-
-function viewerTypeOf(mimeType: string): "pdf" | "image" | "video" | "audio" | "text" | "office" | "binary" {
-  const m = String(mimeType || "").toLowerCase();
-  if (!m) return "binary";
-  if (m === "application/pdf") return "pdf";
-  if (m.startsWith("image/")) return "image";
-  if (m.startsWith("video/")) return "video";
-  if (m.startsWith("audio/")) return "audio";
-  if (isOfficeMime(m)) return "office";
-  if (m.startsWith("text/") || m === "application/json" || m === "application/xml" || m === "application/rtf") return "text";
-  return "binary";
-}
 
 function PdfPageCanvas({
   doc,
@@ -75,12 +51,16 @@ function PdfPageCanvas({
 export default function SecurePdfCanvasViewer(props: {
   rawUrl: string;
   mimeType?: string | null;
+  filename?: string | null;
   watermarkEnabled?: boolean;
   watermarkText?: string;
   className?: string;
 }) {
   const mimeType = String(props.mimeType || "").trim().toLowerCase();
-  const mode = useMemo(() => viewerTypeOf(mimeType), [mimeType]);
+  const mode = useMemo<FileFamily>(
+    () => detectFileFamily({ contentType: mimeType, filename: props.filename }),
+    [mimeType, props.filename]
+  );
   const [notice, setNotice] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -92,9 +72,6 @@ export default function SecurePdfCanvasViewer(props: {
   const [pageDims, setPageDims] = useState<Record<number, PageDims>>({});
   const [visibleRange, setVisibleRange] = useState<{ start: number; end: number }>({ start: 1, end: 3 });
   const scrollRef = useRef<HTMLDivElement | null>(null);
-
-  const [textContent, setTextContent] = useState("");
-  const [officeHtml, setOfficeHtml] = useState("");
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [videoReady, setVideoReady] = useState(false);
@@ -130,8 +107,6 @@ export default function SecurePdfCanvasViewer(props: {
   useEffect(() => {
     setLoading(true);
     setError(null);
-    setTextContent("");
-    setOfficeHtml("");
     setPdfDoc(null);
     setNumPages(0);
     setPageDims({});
@@ -176,59 +151,7 @@ export default function SecurePdfCanvasViewer(props: {
   }, [mode, pdfjs, props.rawUrl]);
 
   useEffect(() => {
-    if (mode !== "text") return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch(props.rawUrl, {
-          method: "GET",
-          credentials: "include",
-          cache: "no-store",
-          headers: { accept: `${mimeType || "text/plain"},*/*` },
-        });
-        if (!res.ok) throw new Error(`Document unavailable (${res.status})`);
-        const data = await res.arrayBuffer();
-        const decoded = new TextDecoder("utf-8", { fatal: false }).decode(data);
-        if (!cancelled) setTextContent(decoded);
-      } catch (e: any) {
-        if (!cancelled) setError(e?.message || "Unable to load text preview.");
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [mode, props.rawUrl, mimeType]);
-
-  useEffect(() => {
-    if (mode !== "office") return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const r = await fetch("/api/viewer/office", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ rawPath: props.rawUrl, mimeType }),
-        });
-        const j = (await r.json().catch(() => null)) as { ok?: boolean; html?: string; message?: string } | null;
-        if (!r.ok || !j?.ok || !j?.html) {
-          throw new Error(j?.message || `Conversion failed (${r.status})`);
-        }
-        if (!cancelled) setOfficeHtml(j.html);
-      } catch (e: any) {
-        if (!cancelled) setError(e?.message || "Unable to render office preview.");
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [mode, props.rawUrl, mimeType]);
-
-  useEffect(() => {
-    if (mode === "image" || mode === "audio" || mode === "video" || mode === "binary") {
+    if (mode === "image" || mode === "audio" || mode === "video" || mode === "office" || mode === "file") {
       setLoading(false);
       setError(null);
     }
@@ -280,8 +203,8 @@ export default function SecurePdfCanvasViewer(props: {
     );
   }, [props.watermarkEnabled, props.watermarkText]);
 
-  const zoomAllowed = mode === "pdf" || mode === "image" || mode === "video" || mode === "text" || mode === "office";
-  const modeLabel = mode.toUpperCase();
+  const zoomAllowed = mode === "pdf" || mode === "image" || mode === "video";
+  const modeLabel = fileFamilyLabel(mode);
 
   return (
     <div
@@ -431,29 +354,18 @@ export default function SecurePdfCanvasViewer(props: {
               <audio src={props.rawUrl} className="block w-full min-w-[340px]" controls controlsList="nodownload noplaybackrate" />
             ) : null}
 
-            {mode === "text" ? (
-              <pre
-                className="max-w-[90vw] overflow-auto rounded border border-white/10 bg-black/30 p-3 text-white/90"
-                style={{ fontSize: `${Math.max(10, Math.floor(14 * scale))}px`, lineHeight: 1.5 }}
-              >
-                {textContent}
-              </pre>
-            ) : null}
-
-            {mode === "office" ? (
-              <iframe
-                title="Office preview"
-                srcDoc={officeHtml}
-                className="h-[80vh] w-[min(1000px,90vw)] rounded border border-white/10 bg-black"
-                sandbox="allow-same-origin"
-                referrerPolicy="no-referrer"
-                style={{ transform: `scale(${scale})`, transformOrigin: "top left" }}
-              />
-            ) : null}
-
-            {mode === "binary" ? (
-              <div className="rounded border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-100">
-                Preview is not available for this file type in the secure inline viewer yet.
+            {mode === "office" || mode === "file" ? (
+              <div className="w-[min(1100px,92vw)] rounded-xl border border-white/10 bg-black/30 p-3">
+                <iframe
+                  title={`${modeLabel} preview`}
+                  src={props.rawUrl}
+                  className="h-[78vh] w-full rounded border border-white/10 bg-black"
+                  referrerPolicy="no-referrer"
+                  sandbox="allow-same-origin allow-scripts"
+                />
+                <div className="mt-2 text-xs text-white/60">
+                  Rendering depends on browser support for this file type.
+                </div>
               </div>
             ) : null}
 
@@ -470,4 +382,3 @@ export default function SecurePdfCanvasViewer(props: {
     </div>
   );
 }
-

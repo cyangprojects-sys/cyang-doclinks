@@ -12,6 +12,7 @@ import { isAliasUnlockedAction } from "./unlockActions";
 import { getAuthedUser, roleAtLeast } from "@/lib/authz";
 import { allowUnencryptedServing } from "@/lib/securityPolicy";
 import SecurePdfCanvasViewer from "@/app/components/SecurePdfCanvasViewer";
+import { detectFileFamily, fileFamilyLabel } from "@/lib/fileFamily";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -178,18 +179,21 @@ async function getDocAvailabilityHint(docId: string): Promise<string | null> {
   return null;
 }
 
-async function getDocContentType(docId: string): Promise<string | null> {
+async function getDocViewMeta(docId: string): Promise<{ contentType: string | null; filename: string | null }> {
   try {
     const rows = (await sql`
-      select coalesce(content_type::text, '') as content_type
+      select
+        coalesce(content_type::text, '') as content_type,
+        coalesce(original_filename::text, '') as original_filename
       from public.docs
       where id = ${docId}::uuid
       limit 1
-    `) as unknown as Array<{ content_type: string }>;
+    `) as unknown as Array<{ content_type: string; original_filename: string }>;
     const ct = String(rows?.[0]?.content_type || "").trim();
-    return ct || null;
+    const name = String(rows?.[0]?.original_filename || "").trim();
+    return { contentType: ct || null, filename: name || null };
   } catch {
-    return null;
+    return { contentType: null, filename: null };
   }
 }
 
@@ -329,11 +333,11 @@ export default async function SharePage({
 
   if (isPrivileged) {
     const availabilityHint = await getDocAvailabilityHint(bypass.docId);
-    const contentType = await getDocContentType(bypass.docId);
+    const viewMeta = await getDocViewMeta(bypass.docId);
     return (
       <main className="mx-auto max-w-5xl px-4 py-10">
         <ShareForm docId={bypass.docId} />
-        <DocumentViewer alias={alias} contentType={contentType} availabilityHint={availabilityHint} />
+        <DocumentViewer alias={alias} contentType={viewMeta.contentType} filename={viewMeta.filename} availabilityHint={availabilityHint} />
       </main>
     );
   }
@@ -367,7 +371,7 @@ export default async function SharePage({
 
   return (
     <main className="mx-auto max-w-5xl px-4 py-10">
-      <DocumentViewer alias={alias} contentType={resolved.contentType} />
+      <DocumentViewer alias={alias} contentType={resolved.contentType} filename={null} />
     </main>
   );
 }
@@ -375,16 +379,30 @@ export default async function SharePage({
 function DocumentViewer({
   alias,
   contentType,
+  filename,
   availabilityHint,
 }: {
   alias: string;
   contentType?: string | null;
+  filename?: string | null;
   availabilityHint?: string | null;
 }) {
   const viewerUrl = `/d/${encodeURIComponent(alias)}/raw`;
+  const family = detectFileFamily({ contentType, filename });
+  const typeLabel = fileFamilyLabel(family);
 
   return (
     <div className="mt-4">
+      <div className="mb-3 flex flex-wrap items-center gap-2 text-xs text-white/80">
+        <span className="rounded-full border border-white/20 bg-white/10 px-2.5 py-1 font-semibold tracking-wide">
+          {typeLabel}
+        </span>
+        {contentType ? (
+          <span className="rounded-full border border-white/10 bg-black/30 px-2.5 py-1 font-mono text-[11px] text-white/70">
+            {contentType}
+          </span>
+        ) : null}
+      </div>
       {availabilityHint ? (
         <div className="mb-3 rounded-lg border border-amber-700/40 bg-amber-950/30 px-3 py-2 text-sm text-amber-100">
           {availabilityHint}
@@ -392,7 +410,7 @@ function DocumentViewer({
       ) : null}
       {!availabilityHint ? (
         <div className="overflow-hidden rounded-xl border border-white/10 bg-white/5">
-          <SecurePdfCanvasViewer rawUrl={viewerUrl} mimeType={contentType} className="h-[78vh]" />
+          <SecurePdfCanvasViewer rawUrl={viewerUrl} mimeType={contentType} filename={filename} className="h-[78vh]" />
         </div>
       ) : null}
 
