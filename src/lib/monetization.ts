@@ -312,7 +312,10 @@ export function normalizeExpiresAtForPlan(args: {
 
   // Plan disallows custom expiration (e.g. Free tier):
   // always enforce a fixed TTL from now, ignoring caller-provided timestamps.
-  const days = Math.max(1, Math.floor(args.defaultDaysIfNotAllowed ?? Number(process.env.FREE_SHARE_TTL_DAYS || 30)));
+  // Product policy: Free-tier links must expire and cannot exceed 7 days.
+  const configured = Number(process.env.FREE_SHARE_TTL_DAYS || 7);
+  const requested = Number(args.defaultDaysIfNotAllowed ?? configured);
+  const days = Math.max(1, Math.min(7, Math.floor(Number.isFinite(requested) ? requested : 7)));
   const fixedT = Date.now() + days * 24 * 60 * 60 * 1000;
   return new Date(fixedT).toISOString();
 }

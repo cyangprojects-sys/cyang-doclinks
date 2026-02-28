@@ -160,10 +160,10 @@ if (ownerId) {
 }
 
 // --- Monetization: custom expiration is currently hidden ---
-// If plan disallows, clamp to <= 30 days.
+// If plan disallows, clamp to <= 7 days.
 if (ownerId) {
   const plan = await getPlanForUser(ownerId);
-  const normalized = normalizeExpiresAtForPlan({ plan, requestedExpiresAtIso: expiresAt, defaultDaysIfNotAllowed: 30 });
+  const normalized = normalizeExpiresAtForPlan({ plan, requestedExpiresAtIso: expiresAt, defaultDaysIfNotAllowed: 7 });
       expiresAt = normalized;
       maxViews = normalizeMaxViewsForPlan({ plan, requestedMaxViews });
 }
