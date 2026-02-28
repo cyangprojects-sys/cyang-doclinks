@@ -25,12 +25,14 @@ export async function GET() {
       version() as version
   `;
 
-  const info = (infoRows as any[])?.[0] ?? null;
+  const info = (infoRows as Array<Record<string, unknown>>)?.[0] ?? null;
 
   const tables = {
     "public.doc_audit": await regclass("public.doc_audit"),
     "public.doc_access_log": await regclass("public.doc_access_log"),
     "public.doc_views": await regclass("public.doc_views"),
+    "public.doc_view_daily": await regclass("public.doc_view_daily"),
+    "public.doc_daily_analytics": await regclass("public.doc_daily_analytics"),
     "public.docs": await regclass("public.docs"),
     "public.documents": await regclass("public.documents"),
   };

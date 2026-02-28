@@ -15,6 +15,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
+<<<<<<< ours
 async function tableExists(fqTable: string): Promise<boolean> {
   try {
     const rows = (await sql`select to_regclass(${fqTable})::text as reg`) as unknown as Array<{ reg: string | null }>;
@@ -22,6 +23,61 @@ async function tableExists(fqTable: string): Promise<boolean> {
   } catch {
     return false;
   }
+=======
+type DocRow = {
+    id: string;
+    title: string | null;
+    created_at: string;
+    alias: string | null;
+};
+
+type ShareRow = {
+    token: string; // uuid text
+    doc_id: string;
+    to_email: string | null;
+    created_at: string;
+    expires_at: string | null;
+    max_views: number | null;
+    views_count: number | null;
+    revoked_at: string | null;
+    doc_title: string | null;
+    alias: string | null;
+    has_password: boolean;
+};
+
+type AccessRow = {
+    accessed_at: string;
+    doc_id: string;
+    doc_title: string | null;
+    alias: string | null;
+    share_id: string | null;
+    email_used: string | null;
+    ip: string | null;
+    device_hash: string | null;
+    user_agent: string | null;
+};
+
+type ViewsByDocRow = {
+    doc_id: string;
+    doc_title: string | null;
+    alias: string | null;
+    views: number;
+    unique_ips: number;
+    last_view: string | null;
+};
+
+type DailyAggRow = {
+    date: string;
+    view_count: number;
+    unique_ip_count: number;
+};
+
+function fmtDate(s: string | null) {
+    if (!s) return "—";
+    const d = new Date(s);
+    if (Number.isNaN(d.getTime())) return s;
+    return d.toLocaleString();
+>>>>>>> theirs
 }
 
 async function columnExists(table: string, column: string): Promise<boolean> {
@@ -164,6 +220,7 @@ const docFilter = sql`${orgFilter} ${ownerFilter}`;
         order by views desc, last_view desc nulls last
       `) as unknown as ViewsByDocRow[];
     }
+<<<<<<< ours
   } catch {
     viewsRows = [];
   }
@@ -274,4 +331,350 @@ const docFilter = sql`${orgFilter} ${ownerFilter}`;
       </section>
     </div>
   );
+=======
+
+    // Daily aggregation summary (best-effort; table may not exist)
+    let dailyAgg: DailyAggRow[] = [];
+    try {
+        dailyAgg = (await sql`
+      select
+        date::text as date,
+        sum(view_count)::int as view_count,
+        sum(unique_ip_count)::int as unique_ip_count
+      from public.doc_view_daily
+      where date >= (current_date - interval '14 days')
+      group by date
+      order by date desc
+    `) as unknown as DailyAggRow[];
+    } catch {
+        dailyAgg = [];
+    }
+
+    const sharesClient: ShareRowClient[] = shares.map((s) => ({
+        token: s.token,
+        doc_id: s.doc_id,
+        to_email: s.to_email,
+        created_at: s.created_at,
+        expires_at: s.expires_at,
+        max_views: s.max_views,
+        view_count: Number(s.views_count ?? 0),
+        revoked_at: s.revoked_at,
+        doc_title: s.doc_title,
+        alias: s.alias,
+        has_password: Boolean(s.has_password),
+    }));
+
+    return (
+        <main className="mx-auto max-w-6xl px-4 py-12">
+            <div className="flex items-center justify-between gap-3">
+                <div>
+                    <h1 className="text-xl font-semibold tracking-tight">Admin dashboard</h1>
+                    <p className="mt-1 text-sm text-neutral-400">Owner-only tools.</p>
+                </div>
+
+                <Link
+                    href="/admin"
+                    className="text-sm text-neutral-400 hover:text-neutral-200 underline underline-offset-4"
+                >
+                    Back to Admin
+                </Link>
+
+                <Link
+                    href="/admin/audit"
+                    className="text-sm text-neutral-400 hover:text-neutral-200 underline underline-offset-4"
+                >
+                    Audit logs
+                </Link>
+            </div>
+
+            {/* ✅ UPLOAD */}
+            <UploadPanel />
+
+            {/* DOCS */}
+            <div className="mt-8 overflow-hidden rounded-lg border border-neutral-800">
+                <div className="max-h-[560px] overflow-auto">
+                    <table className="w-full text-sm">
+                        <thead className="sticky top-0 bg-neutral-900 text-neutral-300">
+                        <tr>
+                            <th className="px-4 py-3 text-left">Title</th>
+                            <th className="px-4 py-3 text-left">Alias</th>
+                            <th className="px-4 py-3 text-left">Created</th>
+                            <th className="px-4 py-3 text-right">Actions</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {docs.length === 0 ? (
+                            <tr>
+                                <td colSpan={4} className="px-4 py-6 text-neutral-400">
+                                    No documents found.
+                                </td>
+                            </tr>
+                        ) : (
+                            docs.map((doc) => (
+                                <tr key={doc.id} className="border-t border-neutral-800">
+                                    <td className="px-4 py-3">
+                                        {doc.title || "Untitled"}
+                                        <div className="text-xs text-neutral-500 font-mono">{doc.id}</div>
+                                    </td>
+
+                                    <td className="px-4 py-3">
+                                        {doc.alias ? (
+                                            <Link
+                                                href={`/d/${doc.alias}`}
+                                                className="text-blue-400 hover:underline"
+                                                target="_blank"
+                                            >
+                                                {doc.alias}
+                                            </Link>
+                                        ) : (
+                                            <span className="text-neutral-500">—</span>
+                                        )}
+                                    </td>
+
+                                    <td className="px-4 py-3 text-neutral-400">
+                                        {new Date(doc.created_at).toLocaleString()}
+                                    </td>
+
+                                    <td className="px-4 py-3 text-right">
+                                        <DeleteDocForm
+                                            docId={doc.id}
+                                            title={doc.title || "Untitled"}
+                                            action={deleteDocAction}
+                                        />
+                                    </td>
+                                </tr>
+                            ))
+                        )}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            {/* SHARES */}
+            <div className="mt-10">
+                <div className="flex items-end justify-between gap-3">
+                    <div>
+                        <h2 className="text-lg font-semibold tracking-tight">Shares</h2>
+                        <p className="mt-1 text-sm text-neutral-400">
+                            Token, recipient, expiration, max views, views, password, revoke.
+                        </p>
+                    </div>
+                    <div className="text-xs text-neutral-500">
+                        Showing latest {Math.min(sharesClient.length, 500)}
+                    </div>
+                </div>
+
+                <SharesTableClient
+                    shares={sharesClient}
+                    revokeAction={revokeDocShareAction}
+                    setPasswordAction={setSharePasswordAction}
+                    clearPasswordAction={clearSharePasswordAction}
+                />
+            </div>
+
+            {/* VIEWS / AUDIT */}
+            <div className="mt-12">
+                <div className="flex items-end justify-between gap-3">
+                    <div>
+                        <h2 className="text-lg font-semibold tracking-tight">Views / audit</h2>
+                        <p className="mt-1 text-sm text-neutral-400">
+                            Latest access logs (best-effort). This is what makes the product feel “in control”.
+                        </p>
+                    </div>
+                    <div className="text-xs text-neutral-500">
+                        Total: {accessSummary.total} · Unique devices: {accessSummary.uniques}
+                        {accessSummary.last ? (
+                            <> · Last: {new Date(accessSummary.last).toLocaleString()}</>
+                        ) : null}
+                    </div>
+                </div>
+
+                <div className="mt-4 overflow-hidden rounded-lg border border-neutral-800">
+                    <div className="max-h-[560px] overflow-auto">
+                        <table className="w-full text-sm">
+                            <thead className="sticky top-0 bg-neutral-900 text-neutral-300">
+                            <tr>
+                                <th className="px-4 py-3 text-left">When</th>
+                                <th className="px-4 py-3 text-left">Doc</th>
+                                <th className="px-4 py-3 text-left">Alias</th>
+                                <th className="px-4 py-3 text-left">Share</th>
+                                <th className="px-4 py-3 text-left">Email used</th>
+                                <th className="px-4 py-3 text-left">IP</th>
+                                <th className="px-4 py-3 text-left">Device</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            {access.length === 0 ? (
+                                <tr>
+                                    <td colSpan={7} className="px-4 py-6 text-neutral-400">
+                                        No access logs found (or table not available).
+                                    </td>
+                                </tr>
+                            ) : (
+                                access.map((r, idx) => (
+                                    <tr key={`${r.doc_id}-${r.accessed_at}-${idx}`} className="border-t border-neutral-800">
+                                        <td className="px-4 py-3 text-neutral-400 whitespace-nowrap">
+                                            {fmtDate(r.accessed_at)}
+                                        </td>
+                                        <td className="px-4 py-3">
+                                            {r.doc_title || "Untitled"}
+                                            <div className="text-xs text-neutral-500 font-mono">{r.doc_id}</div>
+                                        </td>
+                                        <td className="px-4 py-3">
+                                            {r.alias ? (
+                                                <Link href={`/d/${r.alias}`} target="_blank" className="text-blue-400 hover:underline">
+                                                    {r.alias}
+                                                </Link>
+                                            ) : (
+                                                <span className="text-neutral-500">—</span>
+                                            )}
+                                        </td>
+                                        <td className="px-4 py-3">
+                                            {r.share_id ? (
+                                                <Link href={`/s/${r.share_id}`} target="_blank" className="text-blue-400 hover:underline">
+                                                    {r.share_id}
+                                                </Link>
+                                            ) : (
+                                                <span className="text-neutral-500">—</span>
+                                            )}
+                                        </td>
+                                        <td className="px-4 py-3 text-neutral-300">
+                                            {r.email_used || <span className="text-neutral-500">—</span>}
+                                        </td>
+                                        <td className="px-4 py-3 text-neutral-300 font-mono text-xs">
+                                            {r.ip || <span className="text-neutral-500">—</span>}
+                                        </td>
+                                        <td className="px-4 py-3 text-neutral-300 font-mono text-xs">
+                                            {r.device_hash || <span className="text-neutral-500">—</span>}
+                                        </td>
+                                    </tr>
+                                ))
+                            )}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            {/* VIEW COUNTS */}
+            <div className="mt-12">
+                <div className="flex items-end justify-between gap-3">
+                    <div>
+                        <h2 className="text-lg font-semibold tracking-tight">View counts per doc</h2>
+                        <p className="mt-1 text-sm text-neutral-400">
+                            Top documents by total views (best-effort; uses <span className="font-mono">doc_views</span>).
+                        </p>
+                    </div>
+                    <div className="text-xs text-neutral-500">
+                        {viewsByDoc.length ? `Top ${Math.min(viewsByDoc.length, 50)}` : "—"}
+                    </div>
+                </div>
+
+                <div className="mt-4 overflow-hidden rounded-lg border border-neutral-800">
+                    <div className="max-h-[560px] overflow-auto">
+                        <table className="w-full text-sm">
+                            <thead className="sticky top-0 bg-neutral-900 text-neutral-300">
+                                <tr>
+                                    <th className="px-4 py-3 text-left">Doc</th>
+                                    <th className="px-4 py-3 text-left">Alias</th>
+                                    <th className="px-4 py-3 text-right">Views</th>
+                                    <th className="px-4 py-3 text-right">Unique IPs</th>
+                                    <th className="px-4 py-3 text-right">Last view</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {viewsByDoc.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={5} className="px-4 py-6 text-neutral-400">
+                                            No view data found (or table not available).
+                                        </td>
+                                    </tr>
+                                ) : (
+                                    viewsByDoc.map((r) => (
+                                        <tr key={r.doc_id} className="border-t border-neutral-800">
+                                            <td className="px-4 py-3">
+                                                <div className="text-neutral-200">{r.doc_title || "Untitled"}</div>
+                                                <div className="text-xs text-neutral-500 font-mono">{r.doc_id}</div>
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                {r.alias ? (
+                                                    <Link href={`/d/${r.alias}`} target="_blank" className="text-blue-400 hover:underline">
+                                                        /d/{r.alias}
+                                                    </Link>
+                                                ) : (
+                                                    <span className="text-neutral-500">—</span>
+                                                )}
+                                            </td>
+                                            <td className="px-4 py-3 text-right text-neutral-200">{r.views}</td>
+                                            <td className="px-4 py-3 text-right text-neutral-200">{r.unique_ips}</td>
+                                            <td className="px-4 py-3 text-right text-neutral-400 whitespace-nowrap">
+                                                {fmtDate(r.last_view)}
+                                            </td>
+                                        </tr>
+                                    ))
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            {/* DAILY ANALYTICS */}
+            <div className="mt-12">
+                <div className="flex items-end justify-between gap-3">
+                    <div>
+                        <h2 className="text-lg font-semibold tracking-tight">Daily analytics (last 14 days)</h2>
+                        <p className="mt-1 text-sm text-neutral-400">
+                            Reads from <span className="font-mono">doc_view_daily</span>. Generate/refresh via{" "}
+                            <Link className="text-blue-400 hover:underline" href="/api/admin/analytics/aggregate" target="_blank">
+                                /api/admin/analytics/aggregate
+                            </Link>
+                            .
+                        </p>
+                    </div>
+                    <div className="text-xs text-neutral-500">
+                        <Link
+                            className="text-neutral-400 hover:text-neutral-200 underline underline-offset-4"
+                            href="/api/admin/retention/run"
+                            target="_blank"
+                        >
+                            Run retention
+                        </Link>
+                    </div>
+                </div>
+
+                <div className="mt-4 overflow-hidden rounded-lg border border-neutral-800">
+                    <div className="max-h-[560px] overflow-auto">
+                        <table className="w-full text-sm">
+                            <thead className="sticky top-0 bg-neutral-900 text-neutral-300">
+                                <tr>
+                                    <th className="px-4 py-3 text-left">Day</th>
+                                    <th className="px-4 py-3 text-right">Views</th>
+                                    <th className="px-4 py-3 text-right">Unique IPs</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {dailyAgg.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={3} className="px-4 py-6 text-neutral-400">
+                                            No daily analytics found (or table not available).
+                                        </td>
+                                    </tr>
+                                ) : (
+                                    dailyAgg.map((r) => (
+                                        <tr key={r.date} className="border-t border-neutral-800">
+                                            <td className="px-4 py-3 text-neutral-200 font-mono text-xs">{r.date}</td>
+                                            <td className="px-4 py-3 text-right text-neutral-200">{r.view_count}</td>
+                                            <td className="px-4 py-3 text-right text-neutral-200">{r.unique_ip_count}</td>
+                                        </tr>
+                                    ))
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+    );
+>>>>>>> theirs
 }
