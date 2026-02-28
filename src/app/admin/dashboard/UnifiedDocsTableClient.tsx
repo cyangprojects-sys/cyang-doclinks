@@ -4,7 +4,7 @@
 import Link from "next/link";
 import DeleteDocForm from "../DeleteDocForm";
 import { bulkDeleteDocsAction, deleteDocAction } from "../actions";
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 export type UnifiedDocRow = {
@@ -132,6 +132,21 @@ export default function UnifiedDocsTableClient(props: {
   }
 
   const normalizedQ = q.trim().toLowerCase();
+
+  const hasPendingScans = useMemo(() => {
+    return props.rows.some((r) => {
+      const s = String(r.scan_status || "unscanned").toLowerCase();
+      return s === "pending" || s === "queued" || s === "running" || s === "unscanned";
+    });
+  }, [props.rows]);
+
+  useEffect(() => {
+    if (!hasPendingScans) return;
+    const id = window.setInterval(() => {
+      router.refresh();
+    }, 10_000);
+    return () => window.clearInterval(id);
+  }, [hasPendingScans, router]);
 
   const filtered = useMemo(() => {
     if (!normalizedQ) return props.rows;
