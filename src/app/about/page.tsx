@@ -29,24 +29,25 @@ export default function AboutPage() {
 
         <p className="mt-6 max-w-3xl text-base leading-relaxed text-white/70">
           cyang.io is a small product portfolio built around secure document operations. The
-          direction is simple: enforce controls on the server, keep policy deterministic, and make
+          direction is simple: enforce controls in code, keep policy deterministic, and make
           operations reviewable through immutable logs.
         </p>
         <p className="mt-4 max-w-3xl text-sm leading-relaxed text-white/65">
-          Doclinks was built out of frustration with how casually sensitive documents are shared.
-          Security should not depend on user behavior alone. Policies should be built in, not bolted on.
+          Doclinks was built after seeing sensitive and private documents distributed without
+          enforced safeguards. Security should not depend on perfect user behavior. It should be
+          part of the system design.
         </p>
 
         <div className="mt-10 grid gap-4 md:grid-cols-12">
           <div className="md:col-span-7">
             <Card
               title="How I build"
-              desc="Principles that keep features shippable and difficult to misuse."
+              desc="Principles that guide every production build:"
               items={[
                 "Server-side enforcement over client trust",
-                "Encryption enabled by default and no plaintext serving",
-                "Scan and quarantine gates before any public serve",
-                "Clear limits, clear errors, clear audit trail",
+                "Encryption enabled by default and not optional",
+                "Scan and quarantine gates before public delivery",
+                "Clear limits, clear states, clear audit trail",
               ]}
             />
           </div>
@@ -83,22 +84,22 @@ export default function AboutPage() {
         <div className="mt-10 grid gap-4 md:grid-cols-2">
           <Card
             title="What this platform enforces"
-            desc="Core controls now active in production builds."
+            desc="Core controls active in production:"
             items={[
               "No decryption toggle and no unencrypted serve path",
-              "Blocked serve for failed, infected, or quarantined scan states",
-              "Rate limits on upload, token access, serve, and abuse-sensitive routes",
+              "Blocked delivery for failed, infected, or quarantined files",
+              "Rate limits across upload, token access, serve, and abuse routes",
               "Plan limits enforced server-side for storage, shares, and monthly views",
             ]}
           />
           <Card
             title="What I optimize for"
-            desc="Priorities that drive product and architecture choices."
+            desc="Priorities that guide architecture decisions:"
             items={[
               "Reliable access control boundaries",
               "Operational visibility without sensitive leakage",
               "Fast, predictable UX with meaningful error states",
-              "Simple systems that are easy to audit and recover",
+              "Systems that are easy to audit and recover",
             ]}
           />
         </div>
@@ -106,9 +107,12 @@ export default function AboutPage() {
         <div className="mt-10 rounded-3xl bg-white/5 p-6 ring-1 ring-white/10">
           <h2 className="text-lg font-semibold">What is on this site</h2>
           <p className="mt-2 text-sm leading-relaxed text-white/70">
-            Public pages explain the security model, legal policy, and reporting process. Admin pages
-            run document operations with upload validation, scan enforcement, audit logging, and plan
-            controls.
+            Public pages describe security model, legal policy, and reporting processes. Admin pages
+            run document operations with upload validation, scan enforcement, audit logging, and plan controls.
+          </p>
+          <p className="mt-3 text-sm leading-relaxed text-white/70">
+            Core components include encrypted uploads, file validation, immutable audit logs, scan
+            enforcement, rate limits, billing controls, and origin role boundaries.
           </p>
 
           <div className="mt-5 flex flex-wrap gap-3">
@@ -119,7 +123,7 @@ export default function AboutPage() {
             <Tag>Quarantine Enforcement</Tag>
             <Tag>Rate Limits</Tag>
             <Tag>Stripe Billing Controls</Tag>
-            <Tag>Org and Role Boundaries</Tag>
+            <Tag>Origin Role Boundaries</Tag>
           </div>
 
           <div className="mt-6 flex flex-col gap-3 sm:flex-row">
@@ -136,6 +140,15 @@ export default function AboutPage() {
               See Doclinks {"->"}
             </Link>
           </div>
+        </div>
+
+        <div className="mt-8 rounded-3xl bg-white/5 p-6 ring-1 ring-white/10">
+          <h2 className="text-lg font-semibold">Why this exists</h2>
+          <p className="mt-2 text-sm leading-relaxed text-white/70">
+            Sensitive documents deserve enforced protection and professional delivery. Doclinks is
+            built deliberately, with security controls implemented at the architecture level rather
+            than layered on later.
+          </p>
         </div>
       </section>
     </SiteShell>
