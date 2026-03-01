@@ -361,7 +361,7 @@ export default function DoclinksPage() {
             title="Admin upload"
             desc="Upload supported file types and generate a shareable link."
             href="/admin"
-            cta="Open Admin Upload →"
+            cta="Start Free"
           />
           <Callout
             title="Open a demo document"
