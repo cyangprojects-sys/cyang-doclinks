@@ -257,9 +257,12 @@ export default function DoclinksPage() {
               Start Free
             </Link>
           </div>
-          <div className="rounded-3xl border border-amber-300/35 bg-white/5 p-6 ring-1 ring-white/10">
-            <div className="ui-premium inline-flex rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em]">Pro</div>
-            <div className="mt-3 text-lg font-semibold text-white">$12/month</div>
+          <div className="rounded-3xl border border-amber-300/40 bg-white/5 p-6 ring-1 ring-amber-200/15">
+            <div className="inline-flex items-center gap-2 rounded-full border border-amber-300/55 bg-amber-300/12 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-amber-100">
+              <span className="h-1.5 w-1.5 rounded-full bg-amber-300" />
+              Pro
+            </div>
+            <div className="mt-3 text-lg font-semibold text-white">Pro - $12/month</div>
             <ul className="mt-4 space-y-2 text-sm text-white/85">
               <li>100 MB max upload</li>
               <li>5 GB total storage</li>
@@ -267,8 +270,8 @@ export default function DoclinksPage() {
               <li>Audit export</li>
               <li>Advanced access controls</li>
             </ul>
-            <Link href="/admin/upgrade" className="mt-5 inline-flex rounded-xl bg-white px-4 py-2 text-sm font-medium text-black hover:bg-white/90">
-              View Pro Plan
+            <Link href="/admin/upgrade" className="btn-base ui-premium mt-5 inline-flex rounded-xl px-4 py-2 text-sm font-semibold">
+              Upgrade to Pro
             </Link>
           </div>
         </div>
