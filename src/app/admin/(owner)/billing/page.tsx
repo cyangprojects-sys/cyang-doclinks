@@ -304,8 +304,8 @@ export default async function BillingSettingsPage({
 
           <ToggleRow
             name="proPlanEnabled"
-            title="Enable Pro unlimited"
-            description="When OFF, users with plan_id='pro' are treated as Free for limits. Flip ON only when you’re ready to sell/enable Pro." 
+            title="Enable Pro plan"
+            description="When OFF, users with plan_id='pro' are treated as Free. When ON, Pro enforces 5GB storage, 100MB/file, unlimited shares/views, custom expiration, and audit export." 
             defaultChecked={flags.proPlanEnabled}
           />
 

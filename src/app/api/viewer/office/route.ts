@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
 
     const ab = await upstream.arrayBuffer();
     const bytes = Buffer.from(ab);
-    const absMax = Number(process.env.UPLOAD_ABSOLUTE_MAX_BYTES || 26_214_400);
+    const absMax = Number(process.env.UPLOAD_ABSOLUTE_MAX_BYTES || 104_857_600);
     if (Number.isFinite(absMax) && absMax > 0 && bytes.length > absMax) {
       return NextResponse.json(
         { ok: false, error: "TOO_LARGE", message: "File too large for inline conversion." },
@@ -66,4 +66,3 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "SERVER_ERROR" }, { status: 500 });
   }
 }
-

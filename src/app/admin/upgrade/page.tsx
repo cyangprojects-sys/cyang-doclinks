@@ -78,14 +78,14 @@ export default async function ViewerUpgradePage(props: {
         <article className="glass-card-strong rounded-2xl border border-cyan-400/30 p-4">
           <h2 className="text-lg font-semibold">Pro</h2>
           <ul className="mt-3 space-y-2 text-sm text-white/85">
-            <li>Unlimited storage</li>
-            <li>Unlimited active shares</li>
-            <li>Unlimited monthly views</li>
-            <li>No per-file size cap</li>
-            <li>No daily upload cap</li>
-            <li>Custom share expiration controls</li>
-            <li>Audit export enabled</li>
-            <li>No forced 30-day auto-delete</li>
+            <li>5 GB total storage</li>
+            <li>100 MB max per file</li>
+            <li>Unlimited shares</li>
+            <li>Unlimited views (soft monitored)</li>
+            <li>Custom expiration</li>
+            <li>Audit export</li>
+            <li>API + webhooks</li>
+            <li>Standard abuse throttling</li>
             <li>Stripe Customer Portal access</li>
             <li>Grace-state protection on payment failures</li>
           </ul>

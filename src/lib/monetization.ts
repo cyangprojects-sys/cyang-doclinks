@@ -28,6 +28,19 @@ const FREE_PLAN: Plan = {
   allowAdvancedAnalytics: false,
 };
 
+const PRO_PLAN: Plan = {
+  id: "pro",
+  name: "Pro",
+  maxViewsPerMonth: null, // soft monitored
+  maxActiveShares: null,
+  maxStorageBytes: 5 * 1024 * 1024 * 1024, // 5 GB
+  maxUploadsPerDay: null,
+  maxFileSizeBytes: 104857600, // 100 MB
+  allowCustomExpiration: true,
+  allowAuditExport: true,
+  allowAdvancedAnalytics: true,
+};
+
 const OWNER_UNLIMITED_PLAN: Plan = {
   id: "owner",
   name: "Owner",
@@ -129,6 +142,8 @@ export async function getPlanForUser(userId: string): Promise<Plan> {
         return FREE_PLAN;
       }
     }
+    // Pro policy invariant: enforce canonical product limits/features.
+    return PRO_PLAN;
   }
 
   return {

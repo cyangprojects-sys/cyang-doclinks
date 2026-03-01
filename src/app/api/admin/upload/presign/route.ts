@@ -146,7 +146,7 @@ export async function POST(req: Request) {
     }
     const contentType = declaredType.canonicalMime;
     const sizeBytes = parsed.data.sizeBytes ?? null;
-    const absMax = Number(process.env.UPLOAD_ABSOLUTE_MAX_BYTES || 26_214_400); // 25 MB default
+    const absMax = Number(process.env.UPLOAD_ABSOLUTE_MAX_BYTES || 104_857_600); // 100 MB default
 
     // Hard enforcement needs an explicit sizeBytes to prevent bypassing storage/file-size caps.
     if (enforcePlanLimitsEnabled() && (sizeBytes == null || !Number.isFinite(sizeBytes) || sizeBytes <= 0)) {

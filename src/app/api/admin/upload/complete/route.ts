@@ -196,7 +196,7 @@ export async function POST(req: NextRequest) {
 
     // 3) Verify the object exists in R2 and matches expected constraints.
     // This closes the bypass where a client can lie about size/type during presign.
-    const absMax = Number(process.env.UPLOAD_ABSOLUTE_MAX_BYTES || 26_214_400); // 25 MB default
+    const absMax = Number(process.env.UPLOAD_ABSOLUTE_MAX_BYTES || 104_857_600); // 100 MB default
 
     // Pull expected size and encryption flag from DB.
     const verifyRows = (await sql`
