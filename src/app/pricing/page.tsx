@@ -1,6 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import { SiteShell } from "../components/SiteShell";
+import { getBillingFlags } from "@/lib/settings";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export const metadata: Metadata = {
   title: "Pricing - Doclinks",
@@ -24,7 +30,12 @@ const COMPARISON_ROWS: Array<{ feature: string; free: string; pro: string }> = [
   { feature: "Virus scanning", free: "Required before delivery", pro: "Required before delivery" },
 ];
 
-export default function PricingPage() {
+export default async function PricingPage() {
+  const flagsRes = await getBillingFlags();
+  if (!flagsRes.flags.pricingUiEnabled) {
+    notFound();
+  }
+
   return (
     <SiteShell maxWidth="full">
       <section className="relative mt-16">
