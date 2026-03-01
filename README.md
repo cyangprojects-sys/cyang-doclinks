@@ -147,13 +147,22 @@ This repo is actively hardened for secure beta operation:
 - org membership/invite foundation
 - cloud cron-backed maintenance operations
 
+Recent shipped updates (March 2026):
+- Alias lifecycle management UI: create, rename, expire, and disable alias controls.
+- Stripe enforcement hardening: webhook signature validation, dedupe/idempotency tracking, out-of-order protection, and admin billing debug visibility.
+- Abuse operations expansion: blocked IP rollups, active blocked IP viewer, and block-hit telemetry.
+- Retention/integrity hardening: weekly orphan sweep route, safer orphan-deletion defaults, and serve-path missing-object checks.
+- Legal center rollout: `/legal` section with Terms, Privacy, AUP, DMCA, DPA, SLA, Security Policy, and Subprocessors sourced from repo docs.
+
 ## Stripe Billing
 
 Owner billing controls now include Stripe Checkout + Customer Portal flows, with signed webhook ingestion and idempotent event processing.
 
 See:
 - `scripts/sql/stripe_billing.sql`
+- `scripts/sql/stripe_event_log.sql`
 - `docs/stripe-billing-runbook.md`
+- `docs/next-steps-rollout.md`
 
 ## Incident Response
 
@@ -165,4 +174,5 @@ See:
 
 ## License
 
-Private/internal use unless explicitly licensed otherwise.
+Licensed under the Cyang.io Proprietary License.
+See `LICENSE`.

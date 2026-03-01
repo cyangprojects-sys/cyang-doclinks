@@ -91,6 +91,12 @@ export default async function HomePage() {
           href="/projects/doclinks#security-model"
           cta="Review controls"
         />
+        <FeatureCard
+          title="Legal Center"
+          description="Terms, privacy, DMCA, AUP, DPA, SLA, security policy, and subprocessors synced from repo docs."
+          href="/legal"
+          cta="Read legal docs"
+        />
         {showPricingUi ? (
           <FeatureCard
             title="Pricing"

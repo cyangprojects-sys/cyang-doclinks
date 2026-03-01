@@ -274,6 +274,12 @@ export default async function DoclinksPage() {
                 <ListItem>
                   <b className="text-white/85">Plan guardrails are active.</b> View, storage, and active-share limits are enforced by plan.
                 </ListItem>
+                <ListItem>
+                  <b className="text-white/85">Billing enforcement is hardened.</b> Stripe signatures are validated, duplicate/out-of-order events are handled, and inactive subscriptions are downgraded automatically.
+                </ListItem>
+                <ListItem>
+                  <b className="text-white/85">Alias lifecycle is shipped.</b> Admin can create, rename, expire, and disable aliases with safer default TTL behavior.
+                </ListItem>
               </ul>
             </div>
           </div>
@@ -283,7 +289,8 @@ export default async function DoclinksPage() {
               <div className="mt-4 grid gap-3">
                 <Control title="Immutable audit trail" desc="Upload/view/share/admin actions append to tamper-evident logs." />
                 <Control title="Org access model" desc="Membership and invite flows back enterprise RBAC." />
-                <Control title="Cron automation" desc="Cloudflare cron handles scan, retention, and rotation operational jobs." />
+                <Control title="Cron automation" desc="Cloudflare cron handles scan, retention, billing sync, and key-rotation operational jobs." />
+                <Control title="Abuse visibility" desc="Admin abuse dashboard includes active blocked IPs and block-hit counters." />
                 <Control title="Build hygiene" desc="Runtime-only env loading avoids build-time module crashes." />
               </div>
             </div>
@@ -309,7 +316,7 @@ export default async function DoclinksPage() {
           />
           <Faq
             q="What’s next?"
-            a="Hardening the share model (one-time tickets, stronger viewer controls) and making analytics/retention fully automated."
+            a="Enterprise governance controls, expanded reporting exports, and additional operational automation around cleanup and alerting."
           />
         </div>
       </section>
@@ -386,20 +393,24 @@ export default async function DoclinksPage() {
       ) : null}
 
       <section className="mt-16">
-        <h2 className="text-2xl font-semibold tracking-tight">Roadmap (near-term)</h2>
+        <h2 className="text-2xl font-semibold tracking-tight">Recent releases</h2>
         <div className="mt-6 rounded-3xl bg-white/5 p-6 ring-1 ring-white/10">
           <ul className="space-y-3 text-sm text-white/70">
             <li className="flex gap-2">
-              <span className="mt-2 h-1.5 w-1.5 flex-none rounded-full bg-white/30" />
-              <span>Alias management UI (create/rename/expire) with safer defaults</span>
+              <span className="mt-2 h-1.5 w-1.5 flex-none rounded-full bg-emerald-300/60" />
+              <span>Alias lifecycle UI shipped (create, rename, expiration update, disable) with safer defaults.</span>
             </li>
             <li className="flex gap-2">
-              <span className="mt-2 h-1.5 w-1.5 flex-none rounded-full bg-white/30" />
-              <span>Access policies (allowlists, one-time tickets, stronger viewer controls)</span>
+              <span className="mt-2 h-1.5 w-1.5 flex-none rounded-full bg-emerald-300/60" />
+              <span>Stripe enforcement upgraded with event logging, explicit idempotency keys, and admin billing diagnostics.</span>
             </li>
             <li className="flex gap-2">
-              <span className="mt-2 h-1.5 w-1.5 flex-none rounded-full bg-white/30" />
-              <span>Analytics rollups (daily views, top docs, retention cleanup)</span>
+              <span className="mt-2 h-1.5 w-1.5 flex-none rounded-full bg-emerald-300/60" />
+              <span>Rate-limit and abuse protections expanded with blocked-IP visibility and block-hit telemetry.</span>
+            </li>
+            <li className="flex gap-2">
+              <span className="mt-2 h-1.5 w-1.5 flex-none rounded-full bg-emerald-300/60" />
+              <span>Retention and integrity automation extended with weekly orphan sweep and stricter serve-path checks.</span>
             </li>
           </ul>
         </div>
