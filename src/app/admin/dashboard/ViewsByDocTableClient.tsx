@@ -2,7 +2,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   revokeAllSharesForDocAction,
@@ -33,17 +33,14 @@ export default function ViewsByDocTableClient(props: { rows: ViewsByDocRow[] }) 
   const router = useRouter();
   const pathname = usePathname();
 
-  const [q, setQ] = useState("");
-  const [limit, setLimit] = useState<number | null>(null);
-  const [selected, setSelected] = useState<Record<string, boolean>>({});
+  const qFromUrl = (sp.get("viewQ") || "").trim();
+  const limRaw = (sp.get("viewLimit") || "").trim();
+  const limParsed = limRaw ? Number(limRaw) : null;
+  const limitFromUrl = Number.isFinite(limParsed as number) && (limParsed as number) > 0 ? (limParsed as number) : null;
 
-  useEffect(() => {
-    const nextQ = (sp.get("viewQ") || "").trim();
-    const limRaw = (sp.get("viewLimit") || "").trim();
-    const lim = limRaw ? Number(limRaw) : null;
-    setQ(nextQ);
-    setLimit(Number.isFinite(lim as number) && (lim as number) > 0 ? (lim as number) : null);
-  }, [sp]);
+  const [q, setQ] = useState(qFromUrl);
+  const [limit, setLimit] = useState<number | null>(limitFromUrl);
+  const [selected, setSelected] = useState<Record<string, boolean>>({});
 
   const normalizedQ = q.trim().toLowerCase();
   const filtered = useMemo(() => {
@@ -107,8 +104,9 @@ export default function ViewsByDocTableClient(props: { rows: ViewsByDocRow[] }) 
       <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div className="flex flex-col gap-2 md:flex-row md:items-center">
           <div>
-            <label className="block text-xs text-white/60">Search</label>
+            <label htmlFor="view-doc-search" className="block text-xs text-white/60">Search</label>
             <input
+              id="view-doc-search"
               value={q}
               onChange={(e) => {
                 const v = e.target.value;
@@ -121,8 +119,9 @@ export default function ViewsByDocTableClient(props: { rows: ViewsByDocRow[] }) 
           </div>
 
           <div>
-            <label className="block text-xs text-white/60">Show</label>
+            <label htmlFor="view-doc-limit" className="block text-xs text-white/60">Show</label>
             <select
+              id="view-doc-limit"
               value={limit == null ? "all" : String(limit)}
               onChange={(e) => {
                 const v = e.target.value;
@@ -270,4 +269,3 @@ export default function ViewsByDocTableClient(props: { rows: ViewsByDocRow[] }) 
     </div>
   );
 }
-

@@ -17,6 +17,7 @@ export async function SiteFooter() {
             <Link href="/projects/doclinks" className="transition-colors hover:text-white">Doclinks</Link>
             {showPricingUi ? <Link href="/pricing" className="transition-colors hover:text-white">Pricing</Link> : null}
             <Link href="/about" className="transition-colors hover:text-white">About</Link>
+            <Link href="/legal" className="transition-colors hover:text-white">Legal</Link>
             <Link href="/terms" className="transition-colors hover:text-white">Terms</Link>
             <Link href="/acceptable-use" className="transition-colors hover:text-white">Acceptable Use</Link>
             <Link href="/privacy" className="transition-colors hover:text-white">Privacy</Link>

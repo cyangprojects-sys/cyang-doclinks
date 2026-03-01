@@ -43,7 +43,11 @@ export default function AbuseActionsClient({ reportId, token, docId }: Props) {
 
   return (
     <div className="min-w-[260px]">
+      <label htmlFor={`abuse-reason-${reportId}`} className="sr-only">
+        Optional moderation reason
+      </label>
       <input
+        id={`abuse-reason-${reportId}`}
         value={reason}
         onChange={(e) => setReason(e.target.value)}
         placeholder="Reason (optional)"

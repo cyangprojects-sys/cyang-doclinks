@@ -63,8 +63,9 @@ export default function ReportForm({ token, alias }: Props) {
       <div className="text-sm font-medium text-white">Report abuse</div>
       <div className="mt-1 text-xs text-white/60">{targetLabel}</div>
 
-      <label className="mt-4 block text-xs font-medium text-white/70">Your email (optional)</label>
+      <label htmlFor="abuse-report-email" className="mt-4 block text-xs font-medium text-white/70">Your email (optional)</label>
       <input
+        id="abuse-report-email"
         value={email}
         onChange={(e) => setEmail(e.target.value)}
         className="mt-1 w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder:text-white/30 outline-none focus:border-white/20"
@@ -73,8 +74,9 @@ export default function ReportForm({ token, alias }: Props) {
         autoComplete="email"
       />
 
-      <label className="mt-4 block text-xs font-medium text-white/70">What’s going on?</label>
+      <label htmlFor="abuse-report-message" className="mt-4 block text-xs font-medium text-white/70">What’s going on?</label>
       <textarea
+        id="abuse-report-message"
         value={message}
         onChange={(e) => setMessage(e.target.value)}
         className="mt-1 min-h-[120px] w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white placeholder:text-white/30 outline-none focus:border-white/20"
