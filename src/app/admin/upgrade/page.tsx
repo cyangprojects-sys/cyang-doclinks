@@ -87,11 +87,9 @@ export default async function ViewerUpgradePage(props: {
         </article>
 
         <article className="glass-card-strong rounded-2xl border border-amber-300/35 p-6 shadow-[0_16px_50px_rgba(222,176,82,0.16)]">
-          <div className="inline-flex items-center gap-2 rounded-full border border-amber-300/55 bg-amber-300/12 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-amber-100">
-            <span className="h-1.5 w-1.5 rounded-full bg-amber-300" />
-            Pro
+          <div className="inline-flex items-center rounded-lg border border-amber-200/70 bg-gradient-to-r from-amber-300 to-amber-200 px-3 py-1.5 text-sm font-semibold text-black shadow-[0_8px_24px_rgba(232,194,122,0.32)]">
+            Pro - $12/month
           </div>
-          <h2 className="mt-3 text-xl font-semibold tracking-tight text-white">Pro - $12/month</h2>
           <ul className="mt-4 space-y-2.5 text-sm text-white/85">
             <li>5 GB total storage</li>
             <li>100 MB max per file</li>
