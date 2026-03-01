@@ -75,14 +75,20 @@ export default async function ViewerUpgradePage(props: {
             <li>Basic analytics only (view count)</li>
           </ul>
           <div className="mt-5">
-            <Link href="/signin" className="btn-base btn-secondary rounded-lg px-4 py-2.5 text-sm font-medium">
+            <Link
+              href="/signin"
+              className="btn-base inline-flex rounded-lg border border-white/25 bg-white/10 px-4 py-2.5 text-sm font-semibold text-white hover:bg-white/20"
+            >
               Start Free
             </Link>
           </div>
         </article>
 
         <article className="glass-card-strong rounded-2xl border border-amber-300/35 p-6 shadow-[0_16px_50px_rgba(222,176,82,0.16)]">
-          <div className="ui-premium inline-flex rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em]">Pro</div>
+          <div className="inline-flex items-center gap-2 rounded-full border border-amber-300/55 bg-amber-300/12 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-amber-100">
+            <span className="h-1.5 w-1.5 rounded-full bg-amber-300" />
+            Pro
+          </div>
           <h2 className="mt-3 text-xl font-semibold tracking-tight text-white">Pro - $12/month</h2>
           <ul className="mt-4 space-y-2.5 text-sm text-white/85">
             <li>5 GB total storage</li>
@@ -98,9 +104,9 @@ export default async function ViewerUpgradePage(props: {
           <form action="/api/billing/checkout" method="post" className="mt-5">
             <button
               type="submit"
-              className="btn-base ui-premium rounded-lg px-4 py-2.5 text-sm font-semibold"
+              className="btn-base rounded-lg border border-amber-200/70 bg-gradient-to-r from-amber-300 to-amber-200 px-4 py-2.5 text-sm font-semibold text-black shadow-[0_8px_24px_rgba(232,194,122,0.32)] hover:brightness-105"
             >
-              Start Stripe Checkout
+              Upgrade to Pro
             </button>
           </form>
         </article>
