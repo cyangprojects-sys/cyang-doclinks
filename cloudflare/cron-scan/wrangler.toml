@@ -3,7 +3,13 @@ main = "src/index.ts"
 compatibility_date = "2025-01-01"
 
 [triggers]
-crons = ["*/5 * * * *"]
+crons = [
+  "*/5 * * * *",
+  "*/15 * * * *",
+  "*/30 * * * *",
+  "5 * * * *",
+  "17 2 * * *",
+]
 
 [observability]
 enabled = true

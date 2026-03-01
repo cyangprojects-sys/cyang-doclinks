@@ -280,16 +280,83 @@ export async function syncUserPlanFromSubscription(userId: string | null): Promi
 
 export async function beginWebhookEvent(eventId: string, eventType: string, payload: any): Promise<"new" | "duplicate"> {
   if (!(await billingTableExists())) return "new";
+  const idempotencyKey = `stripe:${eventId}`;
+  const eventCreatedUnix = Number.isFinite(Number(payload?.created))
+    ? Math.max(0, Math.floor(Number(payload.created)))
+    : null;
   try {
     const rows = (await sql`
-      insert into public.billing_webhook_events (event_id, event_type, payload, status, received_at)
-      values (${eventId}, ${eventType}, ${payload as any}::jsonb, 'processing', now())
+      insert into public.billing_webhook_events (
+        event_id,
+        idempotency_key,
+        event_type,
+        event_created_unix,
+        payload,
+        status,
+        received_at
+      )
+      values (
+        ${eventId},
+        ${idempotencyKey},
+        ${eventType},
+        ${eventCreatedUnix}::bigint,
+        ${payload as any}::jsonb,
+        'processing',
+        now()
+      )
       on conflict (event_id) do nothing
       returning event_id
     `) as unknown as Array<{ event_id: string }>;
-    return rows?.length ? "new" : "duplicate";
-  } catch {
+    if (!rows?.length) {
+      return "duplicate";
+    }
+    try {
+      await sql`
+        insert into public.stripe_event_log (
+          event_id,
+          idempotency_key,
+          event_type,
+          event_created_unix,
+          payload,
+          status,
+          received_at
+        )
+        values (
+          ${eventId},
+          ${idempotencyKey},
+          ${eventType},
+          ${eventCreatedUnix}::bigint,
+          ${payload as any}::jsonb,
+          'processing',
+          now()
+        )
+        on conflict (event_id)
+        do update set
+          idempotency_key = excluded.idempotency_key,
+          event_type = excluded.event_type,
+          event_created_unix = excluded.event_created_unix,
+          payload = excluded.payload,
+          status = excluded.status,
+          received_at = excluded.received_at
+      `;
+    } catch {
+      // optional table
+    }
     return "new";
+  } catch {
+    // Backward compatibility for older schemas without idempotency_key/event_created_unix.
+    try {
+      const rows = (await sql`
+        insert into public.billing_webhook_events (event_id, event_type, payload, status, received_at)
+        values (${eventId}, ${eventType}, ${payload as any}::jsonb, 'processing', now())
+        on conflict (event_id) do nothing
+        returning event_id
+      `) as unknown as Array<{ event_id: string }>;
+      if (!rows?.length) return "duplicate";
+      return "new";
+    } catch {
+      return "new";
+    }
   }
 }
 
@@ -303,6 +370,46 @@ export async function completeWebhookEvent(eventId: string, status: "processed" 
     `;
   } catch {
     // ignore
+  }
+  try {
+    await sql`
+      update public.stripe_event_log
+      set
+        status = ${status},
+        message = ${message},
+        processed_at = now()
+      where event_id = ${eventId}
+    `;
+  } catch {
+    // optional table
+  }
+}
+
+export async function markWebhookEventDuplicate(eventId: string): Promise<void> {
+  if (!(await billingTableExists())) return;
+  try {
+    await sql`
+      update public.billing_webhook_events
+      set
+        status = 'ignored',
+        message = coalesce(message, 'duplicate_event_id'),
+        processed_at = coalesce(processed_at, now())
+      where event_id = ${eventId}
+    `;
+  } catch {
+    // ignore
+  }
+  try {
+    await sql`
+      update public.stripe_event_log
+      set
+        status = 'duplicate',
+        message = coalesce(message, 'duplicate_event_id'),
+        processed_at = coalesce(processed_at, now())
+      where event_id = ${eventId}
+    `;
+  } catch {
+    // optional table
   }
 }
 
@@ -421,6 +528,102 @@ export async function getBillingSnapshotForUser(userId: string): Promise<{
   }));
 
   return { subscription: sub, events };
+}
+
+export async function getBillingWebhookDebugSummary(): Promise<{
+  billingWebhookEventsTable: boolean;
+  stripeEventLogTable: boolean;
+  totalEvents: number;
+  duplicateLikeEvents: number;
+  failedEvents: number;
+  lastEventAt: string | null;
+}> {
+  let billingWebhookEventsTable = false;
+  let stripeEventLogTable = false;
+  try {
+    const rows = (await sql`
+      select to_regclass('public.billing_webhook_events')::text as reg
+    `) as unknown as Array<{ reg: string | null }>;
+    billingWebhookEventsTable = Boolean(rows?.[0]?.reg);
+  } catch {
+    billingWebhookEventsTable = false;
+  }
+  try {
+    const rows = (await sql`
+      select to_regclass('public.stripe_event_log')::text as reg
+    `) as unknown as Array<{ reg: string | null }>;
+    stripeEventLogTable = Boolean(rows?.[0]?.reg);
+  } catch {
+    stripeEventLogTable = false;
+  }
+
+  if (!stripeEventLogTable && !billingWebhookEventsTable) {
+    return {
+      billingWebhookEventsTable,
+      stripeEventLogTable,
+      totalEvents: 0,
+      duplicateLikeEvents: 0,
+      failedEvents: 0,
+      lastEventAt: null,
+    };
+  }
+
+  try {
+    if (stripeEventLogTable) {
+      const rows = (await sql`
+        select
+          count(*)::int as total_events,
+          count(*) filter (where lower(coalesce(status, '')) in ('duplicate'))::int as duplicate_like_events,
+          count(*) filter (where lower(coalesce(status, '')) = 'failed')::int as failed_events,
+          max(received_at)::text as last_event_at
+        from public.stripe_event_log
+      `) as unknown as Array<{
+        total_events: number;
+        duplicate_like_events: number;
+        failed_events: number;
+        last_event_at: string | null;
+      }>;
+      const r = rows?.[0];
+      return {
+        billingWebhookEventsTable,
+        stripeEventLogTable,
+        totalEvents: Number(r?.total_events ?? 0),
+        duplicateLikeEvents: Number(r?.duplicate_like_events ?? 0),
+        failedEvents: Number(r?.failed_events ?? 0),
+        lastEventAt: r?.last_event_at ?? null,
+      };
+    }
+
+    const rows = (await sql`
+      select
+        count(*)::int as total_events,
+        count(*) filter (where lower(coalesce(status, '')) = 'failed')::int as failed_events,
+        max(received_at)::text as last_event_at
+      from public.billing_webhook_events
+    `) as unknown as Array<{
+      total_events: number;
+      failed_events: number;
+      last_event_at: string | null;
+    }>;
+    const r = rows?.[0];
+    return {
+      billingWebhookEventsTable,
+      stripeEventLogTable,
+      totalEvents: Number(r?.total_events ?? 0),
+      duplicateLikeEvents: 0,
+      failedEvents: Number(r?.failed_events ?? 0),
+      lastEventAt: r?.last_event_at ?? null,
+    };
+  } catch {
+    return {
+      billingWebhookEventsTable,
+      stripeEventLogTable,
+      totalEvents: 0,
+      duplicateLikeEvents: 0,
+      failedEvents: 0,
+      lastEventAt: null,
+    };
+  }
 }
 
 export async function runBillingMaintenance(args?: { maxUsers?: number }): Promise<{

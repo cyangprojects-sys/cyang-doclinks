@@ -91,10 +91,13 @@ export async function consumeAccessTicket(args: { req: Request; ticketId: string
   // NOTE: Browsers can legitimately hit the same ticket more than once (preload, retry, iframe reload).
   // Replays are purpose-sensitive: previews can tolerate a short retry window;
   // downloads should be effectively one-time by default.
-  const replayGracePreview = Math.max(0, Number(process.env.ACCESS_TICKET_REPLAY_GRACE_SECONDS_PREVIEW || 45));
+  const replayEnabled = !["0", "false", "no", "off"].includes(
+    String(process.env.ACCESS_TICKET_REPLAY_ENABLED || "true").trim().toLowerCase()
+  );
+  const replayGracePreview = Math.max(0, Number(process.env.ACCESS_TICKET_REPLAY_GRACE_SECONDS_PREVIEW || 20));
   // Browsers may issue near-simultaneous duplicate navigations for attachment downloads.
   // Keep a short replay window to avoid false "Not found" on legitimate download clicks.
-  const replayGraceDownload = Math.max(0, Number(process.env.ACCESS_TICKET_REPLAY_GRACE_SECONDS_DOWNLOAD || 20));
+  const replayGraceDownload = Math.max(0, Number(process.env.ACCESS_TICKET_REPLAY_GRACE_SECONDS_DOWNLOAD || 0));
   const replayGraceWatermarked = Math.max(
     0,
     Number(process.env.ACCESS_TICKET_REPLAY_GRACE_SECONDS_WATERMARKED_DOWNLOAD || replayGraceDownload)
@@ -132,6 +135,7 @@ export async function consumeAccessTicket(args: { req: Request; ticketId: string
 
   const consumed = consumeRows[0];
   if (consumed) return { ok: true as const, ticket: consumed };
+  if (!replayEnabled) return { ok: false as const };
 
   // Replay path: ticket was already used; allow a short re-read if still within TTL and within grace.
   const replayRows = (await sql`

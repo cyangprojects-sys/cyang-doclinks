@@ -110,6 +110,8 @@ export async function createAndEmailShareToken(
     const maxViewsRaw = String(form.get("maxViews") || "").trim();
     const passwordRaw = String(form.get("password") || "");
     const allowDownloadRaw = String(form.get("allowDownload") || "").trim().toLowerCase();
+    const allowedCountriesRaw = String(form.get("allowedCountries") || form.get("allowed_countries") || "").trim();
+    const blockedCountriesRaw = String(form.get("blockedCountries") || form.get("blocked_countries") || "").trim();
 
     if (!docId)
       return { ok: false, error: "bad_request", message: "Missing docId" };
@@ -129,7 +131,17 @@ export async function createAndEmailShareToken(
 
     const password = passwordRaw.trim();
     const passwordHash = password ? await bcrypt.hash(password, 10) : null;
-    const allowDownload = !["0", "false", "off", "no"].includes(allowDownloadRaw);
+    const allowDownload = ["1", "true", "on", "yes"].includes(allowDownloadRaw);
+    const parseCountries = (raw: string): string[] | null => {
+      if (!raw) return null;
+      const out = raw
+        .split(/[,\s]+/g)
+        .map((x) => x.trim().toUpperCase())
+        .filter((x) => /^[A-Z]{2}$/.test(x));
+      return out.length ? out : [];
+    };
+    const allowedCountries = parseCountries(allowedCountriesRaw);
+    const blockedCountries = parseCountries(blockedCountriesRaw);
 
     const docRows = (await sql`
       select id::text as id, title::text as title, owner_id::text as owner_id
@@ -174,8 +186,10 @@ export async function createAndEmailShareToken(
 
     try {
       await sql`
-        insert into public.share_tokens (token, doc_id, to_email, expires_at, max_views, password_hash, allow_download)
-        values (${token}, ${docId}::uuid, ${toEmail}, ${expiresAt}, ${maxViews}, ${passwordHash}, ${allowDownload})
+        insert into public.share_tokens
+          (token, doc_id, to_email, expires_at, max_views, password_hash, allow_download, allowed_countries, blocked_countries)
+        values
+          (${token}, ${docId}::uuid, ${toEmail}, ${expiresAt}, ${maxViews}, ${passwordHash}, ${allowDownload}, ${allowedCountries}, ${blockedCountries})
       `;
     } catch {
       // Backward compatibility for environments where allow_download has not been migrated yet.

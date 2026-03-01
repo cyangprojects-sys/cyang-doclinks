@@ -44,6 +44,42 @@ export default async function AbuseReportsPage() {
     limit 100
   `) as unknown as Row[];
 
+  const blockStats = (await sql`
+    select
+      count(*) filter (where expires_at is null or expires_at > now())::int as active_blocks,
+      count(*) filter (where expires_at is not null and expires_at <= now())::int as expired_blocks
+    from public.abuse_ip_blocks
+  `).catch(() => [{ active_blocks: 0, expired_blocks: 0 }]) as unknown as Array<{
+    active_blocks: number;
+    expired_blocks: number;
+  }>;
+
+  const activeBlocks = (await sql`
+    select
+      ip_hash::text as ip_hash,
+      reason::text as reason,
+      source::text as source,
+      created_at::text as created_at,
+      expires_at::text as expires_at
+    from public.abuse_ip_blocks
+    where expires_at is null or expires_at > now()
+    order by coalesce(expires_at, now() + interval '100 years') asc, created_at desc
+    limit 100
+  `).catch(() => []) as unknown as Array<{
+    ip_hash: string;
+    reason: string;
+    source: string | null;
+    created_at: string;
+    expires_at: string | null;
+  }>;
+
+  const hitRows = (await sql`
+    select count(*)::int as hits_24h
+    from public.security_events
+    where type = 'abuse_ip_block_hit'
+      and created_at > now() - interval '24 hours'
+  `).catch(() => [{ hits_24h: 0 }]) as unknown as Array<{ hits_24h: number }>;
+
   return (
     <main className="mx-auto max-w-6xl px-4 py-8">
       <div className="flex items-center justify-between gap-3">
@@ -53,6 +89,58 @@ export default async function AbuseReportsPage() {
           <div className="mt-1 text-sm text-white/60">
             Review viewer-submitted reports and take quick moderation actions (disable/quarantine docs, revoke shares).
           </div>
+        </div>
+      </div>
+
+      <div className="mt-6 grid gap-3 md:grid-cols-3">
+        <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+          <div className="text-xs text-white/60">Active blocked IPs</div>
+          <div className="mt-1 text-2xl font-semibold text-white">{Number(blockStats?.[0]?.active_blocks ?? 0)}</div>
+        </div>
+        <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+          <div className="text-xs text-white/60">Expired blocks</div>
+          <div className="mt-1 text-2xl font-semibold text-white">{Number(blockStats?.[0]?.expired_blocks ?? 0)}</div>
+        </div>
+        <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+          <div className="text-xs text-white/60">Block hits (24h)</div>
+          <div className="mt-1 text-2xl font-semibold text-white">{Number(hitRows?.[0]?.hits_24h ?? 0)}</div>
+        </div>
+      </div>
+
+      <div className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-4">
+        <div className="text-sm font-medium text-white">Active blocked IPs</div>
+        <div className="mt-1 text-xs text-white/60">Hashed IP only. Expires automatically when TTL passes.</div>
+        <div className="mt-3 overflow-x-auto">
+          <table className="min-w-full text-left text-xs">
+            <thead className="text-white/50">
+              <tr>
+                <th className="py-2 pr-4">IP hash</th>
+                <th className="py-2 pr-4">Reason</th>
+                <th className="py-2 pr-4">Source</th>
+                <th className="py-2 pr-4">Created</th>
+                <th className="py-2 pr-4">Expires</th>
+              </tr>
+            </thead>
+            <tbody className="text-white/80">
+              {activeBlocks.length ? (
+                activeBlocks.map((b) => (
+                  <tr key={`${b.ip_hash}:${b.created_at}`} className="border-t border-white/10">
+                    <td className="py-2 pr-4 font-mono">{b.ip_hash.slice(0, 18)}…</td>
+                    <td className="py-2 pr-4">{b.reason}</td>
+                    <td className="py-2 pr-4">{b.source || "—"}</td>
+                    <td className="py-2 pr-4">{new Date(b.created_at).toLocaleString()}</td>
+                    <td className="py-2 pr-4">{b.expires_at ? new Date(b.expires_at).toLocaleString() : "never"}</td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td className="py-3 text-white/60" colSpan={5}>
+                    No active blocked IPs.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
 

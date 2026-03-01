@@ -7,8 +7,7 @@ Current schedules:
 - `*/5 * * * *` -> `/api/cron/scan`
 - `*/15 * * * *` -> `/api/cron/key-rotation`
 - `*/30 * * * *` -> `/api/cron/aggregate`
-- `5 * * * *` -> `/api/cron/nightly`
-- `25 * * * *` -> `/api/cron/billing-sync`
+- `5 * * * *` -> `/api/cron/nightly` and `/api/cron/billing-sync`
 - `17 2 * * *` -> `/api/cron/retention`
 
 ## What you need to do in the app (cyang-doclinks)

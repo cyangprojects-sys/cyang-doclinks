@@ -4,6 +4,7 @@ export const dynamic = "force-dynamic";
 import { NextResponse, type NextRequest } from "next/server";
 import { aggregateDocViewDaily } from "@/lib/analytics";
 import { runRetention } from "@/lib/retention";
+import { runR2OrphanSweep } from "@/lib/retention";
 import { sendExpirationAlerts } from "@/lib/expirationAlerts";
 import { runAutomatedKeyRotation } from "@/lib/keyRotation";
 import { migrateLegacyEncryptionBatch } from "@/lib/encryptionMigration";
@@ -46,6 +47,18 @@ export async function GET(req: NextRequest) {
 
   // 2) Retention cleanup for raw/high-volume tables
   const retention = await runRetention();
+  const weeklyOrphanSweepDayRaw = Number(process.env.ORPHAN_SWEEP_WEEKDAY_UTC || 0); // 0=Sun..6=Sat
+  const weeklyOrphanSweepDay = Number.isFinite(weeklyOrphanSweepDayRaw)
+    ? Math.max(0, Math.min(6, Math.floor(weeklyOrphanSweepDayRaw)))
+    : 0;
+  const nowUtcDay = new Date().getUTCDay();
+  const orphan_sweep =
+    nowUtcDay === weeklyOrphanSweepDay
+      ? await runR2OrphanSweep({
+          deleteOrphans: ["1", "true", "yes", "on"].includes(String(process.env.ORPHAN_SWEEP_DELETE || "true").toLowerCase()),
+          maxObjects: Math.max(1, Math.min(50_000, Number(process.env.ORPHAN_SWEEP_MAX_OBJECTS || 10_000))),
+        })
+      : { ok: true, table: "r2.orphaned_objects", note: "Skipped (not scheduled weekday)." };
 
   // 3) Expiration alert emails + in-app notifications
   const expiration_alerts = await sendExpirationAlerts();
@@ -109,6 +122,7 @@ export async function GET(req: NextRequest) {
     meta: {
       aggregateOk: Boolean((aggregate as any)?.ok),
       retentionOk: Boolean((retention as any)?.ok),
+      orphanSweepOk: Boolean((orphan_sweep as any)?.ok),
       keyRotationProcessed: (key_rotation_jobs as any)?.processed ?? null,
       revokedExpiredShares: expiredSharesRevoked.revoked,
       backupStatus: (backup_recovery as any)?.backupStatus ?? null,
@@ -121,6 +135,7 @@ export async function GET(req: NextRequest) {
     duration_ms: duration,
     aggregate,
     retention,
+    orphan_sweep,
     expiration_alerts,
     key_rotation,
     key_rotation_jobs,

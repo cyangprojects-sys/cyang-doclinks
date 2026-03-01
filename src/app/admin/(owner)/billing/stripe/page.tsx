@@ -2,7 +2,13 @@ import Link from "next/link";
 import { requirePermission } from "@/lib/rbac";
 import { sql } from "@/lib/db";
 import { ensureStripeCustomer, stripeApi } from "@/lib/stripeClient";
-import { classifyBillingEntitlement, getBillingSnapshotForUser } from "@/lib/billingSubscription";
+import {
+  billingTablesReady,
+  classifyBillingEntitlement,
+  getBillingSnapshotForUser,
+  getBillingWebhookDebugSummary,
+} from "@/lib/billingSubscription";
+import { getBillingFlags } from "@/lib/settings";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -138,6 +144,10 @@ export default async function StripeBillingPage(props: {
   const snapshot = await getBillingSnapshotForUser(u.id);
   const entitlement = classifyBillingEntitlement(snapshot.subscription);
   const guidance = entitlementGuidance(entitlement);
+  const billingFlags = await getBillingFlags();
+  const billingTables = await billingTablesReady();
+  const webhookDebug = await getBillingWebhookDebugSummary();
+  const stripeEntitlementEnforced = String(process.env.STRIPE_ENFORCE_ENTITLEMENT || "1").trim() !== "0";
   const paidInvoices = invoices.filter((inv) => String(inv?.status || "").toLowerCase() === "paid").length;
   const failedInvoices = invoices.filter((inv) => {
     const s = String(inv?.status || "").toLowerCase();
@@ -295,6 +305,50 @@ export default async function StripeBillingPage(props: {
           ) : (
             <div className="mt-3 text-sm text-neutral-400">No subscription record yet.</div>
           )}
+        </div>
+      </div>
+
+      <div className="mt-4 rounded-2xl border border-neutral-800 bg-neutral-950 p-5">
+        <div className="text-sm font-medium text-white">Billing debug status</div>
+        <div className="mt-3 grid gap-2 text-xs text-neutral-300 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="rounded-lg border border-neutral-800 bg-black/30 p-3">
+            <div className="text-neutral-400">Billing tables ready</div>
+            <div className="mt-1 font-semibold">{billingTables ? "yes" : "no"}</div>
+          </div>
+          <div className="rounded-lg border border-neutral-800 bg-black/30 p-3">
+            <div className="text-neutral-400">Plan limit enforcement</div>
+            <div className="mt-1 font-semibold">{billingFlags.flags.enforcePlanLimits ? "enabled" : "disabled"}</div>
+          </div>
+          <div className="rounded-lg border border-neutral-800 bg-black/30 p-3">
+            <div className="text-neutral-400">Stripe entitlement enforcement</div>
+            <div className="mt-1 font-semibold">{stripeEntitlementEnforced ? "enabled" : "disabled"}</div>
+          </div>
+          <div className="rounded-lg border border-neutral-800 bg-black/30 p-3">
+            <div className="text-neutral-400">`billing_webhook_events` table</div>
+            <div className="mt-1 font-semibold">{webhookDebug.billingWebhookEventsTable ? "present" : "missing"}</div>
+          </div>
+          <div className="rounded-lg border border-neutral-800 bg-black/30 p-3">
+            <div className="text-neutral-400">`stripe_event_log` table</div>
+            <div className="mt-1 font-semibold">{webhookDebug.stripeEventLogTable ? "present" : "missing"}</div>
+          </div>
+          <div className="rounded-lg border border-neutral-800 bg-black/30 p-3">
+            <div className="text-neutral-400">Last webhook event</div>
+            <div className="mt-1 font-semibold">{webhookDebug.lastEventAt ? new Date(webhookDebug.lastEventAt).toLocaleString() : "-"}</div>
+          </div>
+        </div>
+        <div className="mt-3 grid gap-2 text-xs text-neutral-300 sm:grid-cols-3">
+          <div className="rounded-lg border border-neutral-800 bg-black/30 p-3">
+            <div className="text-neutral-400">Total logged events</div>
+            <div className="mt-1 font-semibold">{webhookDebug.totalEvents}</div>
+          </div>
+          <div className="rounded-lg border border-neutral-800 bg-black/30 p-3">
+            <div className="text-neutral-400">Duplicate-like events</div>
+            <div className="mt-1 font-semibold">{webhookDebug.duplicateLikeEvents}</div>
+          </div>
+          <div className="rounded-lg border border-neutral-800 bg-black/30 p-3">
+            <div className="text-neutral-400">Failed events</div>
+            <div className="mt-1 font-semibold">{webhookDebug.failedEvents}</div>
+          </div>
         </div>
       </div>
 

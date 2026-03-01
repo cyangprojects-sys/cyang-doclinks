@@ -9,6 +9,8 @@ Run:
 ```sql
 scripts/sql/monetization.sql
 scripts/sql/stripe_billing.sql
+scripts/sql/stripe_billing_event_order.sql
+scripts/sql/stripe_event_log.sql
 ```
 
 ## Required Environment Variables
@@ -20,6 +22,7 @@ Optional:
 1. `STRIPE_GRACE_DAYS` (default `7`)
 2. `STRIPE_WEBHOOK_TOLERANCE_SECONDS` (default `300`)
 3. `STRIPE_ENFORCE_ENTITLEMENT` (`1` default, set `0` only for controlled testing)
+4. `RATE_LIMIT_STRIPE_WEBHOOK_IP_PER_MIN` (default `300`)
 
 ## Endpoints
 1. Owner checkout: `POST /api/admin/billing/checkout`
@@ -51,3 +54,13 @@ Optional:
 4. Simulate `invoice.payment_failed`; confirm `past_due` + `grace_until`.
 5. Simulate cancellation or grace expiry; confirm downgrade to `free`.
 6. Trigger `/api/cron/billing-sync` (via Cloudflare cron) and verify stale past-due users are downgraded.
+7. Open `/admin/billing/stripe` and verify debug card reports:
+   - `billing_webhook_events` present
+   - `stripe_event_log` present
+   - processed/duplicate counts are non-zero after test replay
+
+## Webhook Hardening Expectations
+1. Signature must validate for every webhook request.
+2. Duplicate event IDs must be ignored without double-applying plan changes.
+3. Out-of-order events must not regress subscription state.
+4. Inactive subscriptions must be downgraded on maintenance runs.

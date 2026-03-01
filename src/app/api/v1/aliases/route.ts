@@ -37,6 +37,8 @@ export async function POST(req: NextRequest) {
 
   const docId = String(body?.doc_id || body?.docId || "").trim();
   const alias = String(body?.alias || "").trim();
+  const expiresDaysRaw = Number(body?.expires_days ?? body?.expiresDays ?? process.env.ALIAS_DEFAULT_TTL_DAYS ?? 30);
+  const expiresDays = Number.isFinite(expiresDaysRaw) ? Math.max(1, Math.min(365, Math.floor(expiresDaysRaw))) : 30;
   if (!docId) return NextResponse.json({ ok: false, error: "MISSING_DOC_ID" }, { status: 400 });
   if (!alias) return NextResponse.json({ ok: false, error: "MISSING_ALIAS" }, { status: 400 });
   if (!/^[a-zA-Z0-9_-]{3,80}$/.test(alias)) {
@@ -52,12 +54,34 @@ export async function POST(req: NextRequest) {
   `) as unknown as Array<{ "?column?": number }>;
   if (!owns.length) return NextResponse.json({ ok: false, error: "FORBIDDEN" }, { status: 403 });
 
-  const created = (await sql`
-    insert into public.doc_aliases (alias, doc_id)
-    values (${alias}, ${docId}::uuid)
-    on conflict (alias) do nothing
-    returning alias::text as alias
-  `) as unknown as Array<{ alias: string }>;
+  let created: Array<{ alias: string }> = [];
+  try {
+    created = (await sql`
+      insert into public.doc_aliases (alias, doc_id, is_active, expires_at, revoked_at)
+      values (${alias}, ${docId}::uuid, true, now() + (${expiresDays}::int * interval '1 day'), null)
+      returning alias::text as alias
+    `) as unknown as Array<{ alias: string }>;
+  } catch (e: any) {
+    const msg = String(e?.message || "");
+    const missingCol =
+      msg.includes("column") &&
+      (msg.includes("expires_at") || msg.includes("revoked_at") || msg.includes("is_active"));
+    if (missingCol) {
+      created = (await sql`
+        insert into public.doc_aliases (alias, doc_id)
+        values (${alias}, ${docId}::uuid)
+        returning alias::text as alias
+      `) as unknown as Array<{ alias: string }>;
+      if (!created.length) {
+        return NextResponse.json({ ok: false, error: "ALIAS_TAKEN" }, { status: 409 });
+      }
+      return NextResponse.json({ ok: true, alias: created[0].alias, doc_id: docId });
+    }
+    if (String(e?.code || "") === "23505") {
+      return NextResponse.json({ ok: false, error: "ALIAS_TAKEN" }, { status: 409 });
+    }
+    throw e;
+  }
   if (!created.length) {
     return NextResponse.json({ ok: false, error: "ALIAS_TAKEN" }, { status: 409 });
   }

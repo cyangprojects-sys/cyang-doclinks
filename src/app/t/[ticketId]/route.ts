@@ -98,6 +98,14 @@ function secureDocHeaders(extra?: Record<string, string>): Record<string, string
   };
 }
 
+function isR2MissingObjectError(err: unknown): boolean {
+  const e = err as any;
+  const code = String(e?.Code || e?.code || e?.name || "").toLowerCase();
+  const status = Number(e?.$metadata?.httpStatusCode || e?.statusCode || 0);
+  if (status === 404) return true;
+  return code.includes("nosuchkey") || code.includes("notfound") || code.includes("not_found");
+}
+
 function toWebStream(body: any): ReadableStream<Uint8Array> {
   // AWS SDK v3 in Node returns a Node.js Readable stream.
   // NextResponse expects a web stream (or a Blob/Buffer).
@@ -315,14 +323,31 @@ export async function GET(
         masterKey: mk.key,
       });
 
-      const obj = await r2Client.send(
-        new GetObjectCommand({
-          Bucket: t.r2_bucket,
-          Key: t.r2_key,
-        })
-      );
+      let obj: any;
+      try {
+        obj = await r2Client.send(
+          new GetObjectCommand({
+            Bucket: t.r2_bucket,
+            Key: t.r2_key,
+          })
+        );
+      } catch (e: unknown) {
+        if (isR2MissingObjectError(e)) {
+          void logSecurityEvent({
+            type: "serve_r2_object_missing",
+            severity: "high",
+            ip: clientIpKey(req).ip,
+            docId: t.doc_id,
+            scope: "ticket_serve",
+            message: "Referenced R2 object is missing",
+            meta: { bucket: t.r2_bucket, key: t.r2_key },
+          });
+          return new NextResponse("Not found", { status: 404, headers: secureDocHeaders() });
+        }
+        throw e;
+      }
 
-      const body = obj.Body as any;
+      const body = obj?.Body as any;
       const ab = body?.transformToByteArray
         ? await body.transformToByteArray()
         : Buffer.from(await new Response(body).arrayBuffer());
@@ -424,15 +449,32 @@ export async function GET(
   // Also prevents leaking presigned URLs into client-side logs/telemetry.
   const range = req.headers.get("range") || undefined;
 
-  const obj = await r2Client.send(
-    new GetObjectCommand({
-      Bucket: t.r2_bucket,
-      Key: t.r2_key,
-      Range: range,
-      ResponseContentType: t.response_content_type || undefined,
-      ResponseContentDisposition: t.response_content_disposition || undefined,
-    })
-  );
+  let obj: any;
+  try {
+    obj = await r2Client.send(
+      new GetObjectCommand({
+        Bucket: t.r2_bucket,
+        Key: t.r2_key,
+        Range: range,
+        ResponseContentType: t.response_content_type || undefined,
+        ResponseContentDisposition: t.response_content_disposition || undefined,
+      })
+    );
+  } catch (e: unknown) {
+    if (isR2MissingObjectError(e)) {
+      void logSecurityEvent({
+        type: "serve_r2_object_missing",
+        severity: "high",
+        ip: clientIpKey(req).ip,
+        docId: t.doc_id,
+        scope: "ticket_serve",
+        message: "Referenced R2 object is missing",
+        meta: { bucket: t.r2_bucket, key: t.r2_key },
+      });
+      return new NextResponse("Not found", { status: 404, headers: secureDocHeaders() });
+    }
+    throw e;
+  }
 
   const headers = secureDocHeaders({
     "Content-Type": t.response_content_type || "application/pdf",
@@ -447,7 +489,7 @@ export async function GET(
   if (typeof contentLength === "number") headers["Content-Length"] = String(contentLength);
 
   if (shouldPdfWatermarkDownload) {
-    const body = (obj as any).Body as any;
+    const body = obj?.Body as any;
     const ab = body?.transformToByteArray
       ? await body.transformToByteArray()
       : Buffer.from(await new Response(body).arrayBuffer());

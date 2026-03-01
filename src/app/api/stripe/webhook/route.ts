@@ -8,6 +8,7 @@ import {
   billingTablesReady,
   completeWebhookEvent,
   getUserIdByStripeCustomerId,
+  markWebhookEventDuplicate,
   markPaymentFailure,
   markPaymentSucceeded,
   syncUserPlanFromSubscription,
@@ -116,6 +117,7 @@ export async function POST(req: NextRequest) {
 
         const dedupe = await beginWebhookEvent(verified.eventId, verified.eventType, verified.payload);
         if (dedupe === "duplicate") {
+          await markWebhookEventDuplicate(verified.eventId);
           return NextResponse.json({ ok: true, duplicate: true });
         }
 

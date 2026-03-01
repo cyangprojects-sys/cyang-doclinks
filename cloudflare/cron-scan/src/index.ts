@@ -31,9 +31,6 @@ async function runScheduled(event: ScheduledEvent, env: Env) {
   // hourly at minute 5
   if (cron === "5 * * * *") {
     jobs.push({ name: "nightly", url: env.TARGET_NIGHTLY_URL, method: "GET" });
-  }
-  // hourly at minute 25
-  if (cron === "25 * * * *") {
     jobs.push({ name: "billing-sync", url: env.TARGET_BILLING_SYNC_URL, method: "GET" });
   }
   // daily at 02:17 UTC

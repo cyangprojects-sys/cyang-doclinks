@@ -525,18 +525,39 @@ try {
     // 5) Create alias with collision handling
     let finalAlias: string | null = null;
 
+    const aliasTtlDaysRaw = Number(process.env.ALIAS_DEFAULT_TTL_DAYS || 30);
+    const aliasTtlDays = Number.isFinite(aliasTtlDaysRaw)
+      ? Math.max(1, Math.min(365, Math.floor(aliasTtlDaysRaw)))
+      : 30;
+
     for (let i = 0; i < 50; i++) {
       const candidateAlias = i === 0 ? base : `${base}-${i + 1}`;
 
       try {
         await sql`
-          insert into public.doc_aliases (alias, doc_id)
-          values (${candidateAlias}, ${docId}::uuid)
+          insert into public.doc_aliases (alias, doc_id, is_active, expires_at, revoked_at)
+          values (${candidateAlias}, ${docId}::uuid, true, now() + (${aliasTtlDays}::int * interval '1 day'), null)
         `;
         finalAlias = candidateAlias;
         break;
-      } catch {
-        // alias collision, try next
+      } catch (e: any) {
+        const msg = String(e?.message || "");
+        const missingCol =
+          msg.includes("column") &&
+          (msg.includes("expires_at") || msg.includes("revoked_at") || msg.includes("is_active"));
+        if (missingCol) {
+          try {
+            await sql`
+              insert into public.doc_aliases (alias, doc_id)
+              values (${candidateAlias}, ${docId}::uuid)
+            `;
+            finalAlias = candidateAlias;
+            break;
+          } catch {
+            // alias collision on legacy schema; continue suffix loop
+          }
+        }
+        // alias collision or transient issue, try next
       }
     }
 

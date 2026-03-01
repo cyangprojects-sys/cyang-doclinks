@@ -4,6 +4,12 @@ import { redirect, notFound } from "next/navigation";
 import { sql } from "@/lib/db";
 import { requireUser, roleAtLeast } from "@/lib/authz";
 import Sparkline from "@/components/Sparkline";
+import {
+  createOrAssignAliasAction,
+  disableAliasForDocAction,
+  renameDocAliasAction,
+  setAliasExpirationAction,
+} from "../../actions";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -295,6 +301,75 @@ export default async function AdminDocDetailPage({
           <div className="mt-1 text-sm font-medium text-neutral-200">{alias || "—"}</div>
           <div className="mt-2 text-xs text-neutral-400">
             Expires: {fmtDate(aliasExpires)} • Active: {String(aliasActive ?? true)} • Revoked: {fmtDate(aliasRevokedAt)}
+          </div>
+          <div className="mt-3 space-y-2">
+            <form action={createOrAssignAliasAction} className="flex flex-wrap items-end gap-2">
+              <input type="hidden" name="docId" value={docId} />
+              <label className="text-xs text-neutral-400">
+                Create alias
+                <input
+                  name="alias"
+                  placeholder="new-alias"
+                  className="mt-1 w-40 rounded-md border border-neutral-700 bg-black/40 px-2 py-1 text-xs text-neutral-100"
+                />
+              </label>
+              <label className="text-xs text-neutral-400">
+                TTL days
+                <input
+                  type="number"
+                  name="expiresDays"
+                  min={1}
+                  max={365}
+                  defaultValue={30}
+                  className="mt-1 w-20 rounded-md border border-neutral-700 bg-black/40 px-2 py-1 text-xs text-neutral-100"
+                />
+              </label>
+              <button type="submit" className="rounded-md border border-neutral-700 bg-neutral-900 px-2 py-1 text-xs text-neutral-100">
+                Create
+              </button>
+            </form>
+
+            {alias ? (
+              <form action={renameDocAliasAction} className="flex flex-wrap items-end gap-2">
+                <input type="hidden" name="docId" value={docId} />
+                <label className="text-xs text-neutral-400">
+                  Rename alias
+                  <input
+                    name="newAlias"
+                    defaultValue={alias}
+                    className="mt-1 w-44 rounded-md border border-neutral-700 bg-black/40 px-2 py-1 text-xs text-neutral-100"
+                  />
+                </label>
+                <button type="submit" className="rounded-md border border-neutral-700 bg-neutral-900 px-2 py-1 text-xs text-neutral-100">
+                  Rename
+                </button>
+              </form>
+            ) : null}
+
+            <form action={setAliasExpirationAction} className="flex flex-wrap items-end gap-2">
+              <input type="hidden" name="docId" value={docId} />
+              <label className="text-xs text-neutral-400">
+                Set expiration (days)
+                <input
+                  type="number"
+                  name="days"
+                  min={1}
+                  max={365}
+                  defaultValue={30}
+                  className="mt-1 w-20 rounded-md border border-neutral-700 bg-black/40 px-2 py-1 text-xs text-neutral-100"
+                />
+              </label>
+              <button type="submit" className="rounded-md border border-neutral-700 bg-neutral-900 px-2 py-1 text-xs text-neutral-100">
+                Apply
+              </button>
+            </form>
+
+            <form action={disableAliasForDocAction}>
+              <input type="hidden" name="docId" value={docId} />
+              <button type="submit" className="rounded-md border border-red-900 bg-red-950/40 px-2 py-1 text-xs text-red-200">
+                Disable alias
+              </button>
+            </form>
           </div>
         </div>
 

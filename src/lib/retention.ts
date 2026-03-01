@@ -287,6 +287,18 @@ async function auditR2OrphanedObjects(args: {
   }
 }
 
+export async function runR2OrphanSweep(args?: {
+  maxObjects?: number;
+  deleteOrphans?: boolean;
+}): Promise<RetentionResult> {
+  const maxObjects = Math.max(1, Math.min(50_000, Math.floor(Number(args?.maxObjects || envInt("RETENTION_R2_AUDIT_MAX_OBJECTS", 5000)))));
+  const deleteOrphans =
+    typeof args?.deleteOrphans === "boolean"
+      ? args.deleteOrphans
+      : envBool("RETENTION_DELETE_R2_ORPHANS", false);
+  return auditR2OrphanedObjects({ maxObjects, deleteOrphans });
+}
+
 export async function runRetention(): Promise<RetentionRun> {
   const rawDays = envInt("RETENTION_DAYS", 90);
   const dailyDays = envInt("RETENTION_DAYS_DAILY", 365);
@@ -301,7 +313,7 @@ export async function runRetention(): Promise<RetentionRun> {
     : envBool("RETENTION_DELETE_EXPIRED_SHARES", true);
   const shareGraceDays = dbSettings.ok ? dbSettings.settings.shareGraceDays : envInt("RETENTION_SHARE_GRACE_DAYS", 0);
   const auditR2Orphans = envBool("RETENTION_AUDIT_R2_ORPHANS", true);
-  const deleteR2Orphans = envBool("RETENTION_DELETE_R2_ORPHANS", true);
+  const deleteR2Orphans = envBool("RETENTION_DELETE_R2_ORPHANS", false);
   const r2AuditMaxObjects = envInt("RETENTION_R2_AUDIT_MAX_OBJECTS", 5000);
 
   const results: RetentionResult[] = [];

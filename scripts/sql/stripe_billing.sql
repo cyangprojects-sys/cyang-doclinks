@@ -32,7 +32,9 @@ create index if not exists billing_subscriptions_status_idx
 
 create table if not exists public.billing_webhook_events (
   event_id text primary key,
+  idempotency_key text null,
   event_type text not null,
+  event_created_unix bigint null,
   payload jsonb not null,
   status text not null default 'processing', -- processing|processed|ignored|failed
   message text null,
@@ -40,6 +42,15 @@ create table if not exists public.billing_webhook_events (
   processed_at timestamptz null
 );
 
+alter table public.billing_webhook_events
+  add column if not exists idempotency_key text null;
+
+alter table public.billing_webhook_events
+  add column if not exists event_created_unix bigint null;
+
+create unique index if not exists billing_webhook_events_idempotency_key_idx
+  on public.billing_webhook_events (idempotency_key)
+  where idempotency_key is not null;
+
 create index if not exists billing_webhook_events_status_received_idx
   on public.billing_webhook_events (status, received_at desc);
-

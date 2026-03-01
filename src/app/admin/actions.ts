@@ -110,6 +110,22 @@ async function tableExists(name: string): Promise<boolean> {
   }
 }
 
+function normalizeAliasInput(input: string): string {
+  return String(input || "").trim().toLowerCase();
+}
+
+function parseAliasTtlDays(raw: unknown): number {
+  const n = Number(raw);
+  if (Number.isFinite(n) && n > 0) {
+    return Math.max(1, Math.min(365, Math.floor(n)));
+  }
+  const envDefault = Number(process.env.ALIAS_DEFAULT_TTL_DAYS || 30);
+  if (Number.isFinite(envDefault) && envDefault > 0) {
+    return Math.max(1, Math.min(365, Math.floor(envDefault)));
+  }
+  return 30;
+}
+
 async function purgeDocGraphRows(docId: string): Promise<boolean> {
   const shareTokensExists = await tableExists("public.share_tokens");
   const shareUnlocksExists = await tableExists("public.share_unlocks");
@@ -154,8 +170,9 @@ export async function uploadPdfAction(): Promise<void> {
 
 // Used as <form action={createOrAssignAliasAction}> — must return void
 export async function createOrAssignAliasAction(formData: FormData): Promise<void> {
-  const alias = String(formData.get("alias") || "").trim();
+  const alias = normalizeAliasInput(String(formData.get("alias") || ""));
   const docId = String(formData.get("docId") || formData.get("doc_id") || "").trim();
+  const expiresDays = parseAliasTtlDays(formData.get("expiresDays"));
 
   if (!alias) throw new Error("Missing alias.");
   if (!docId) throw new Error("Missing docId.");
@@ -165,26 +182,167 @@ export async function createOrAssignAliasAction(formData: FormData): Promise<voi
     throw new Error("Alias must be 3-80 chars: letters, numbers, underscore, dash.");
   }
 
-  const created = (await sql`
-    insert into doc_aliases (alias, doc_id)
-    values (${alias}, ${docId}::uuid)
-    on conflict (alias) do nothing
-    returning alias::text as alias
-  `) as unknown as Array<{ alias: string }>;
-  if (!created.length) {
-    throw new Error("Alias is already in use.");
+  let createdAlias: string | null = null;
+  try {
+    const created = (await sql`
+      insert into doc_aliases (alias, doc_id, is_active, expires_at, revoked_at)
+      values (${alias}, ${docId}::uuid, true, now() + (${expiresDays}::int * interval '1 day'), null)
+      returning alias::text as alias
+    `) as unknown as Array<{ alias: string }>;
+    if (!created.length) {
+      throw new Error("Alias is already in use.");
+    }
+    createdAlias = created[0].alias;
+  } catch (e: any) {
+    const msg = String(e?.message || "");
+    const missingCol =
+      msg.includes("column") &&
+      (msg.includes("expires_at") || msg.includes("revoked_at") || msg.includes("is_active"));
+    if (missingCol) {
+      const created = (await sql`
+        insert into doc_aliases (alias, doc_id)
+        values (${alias}, ${docId}::uuid)
+        returning alias::text as alias
+      `) as unknown as Array<{ alias: string }>;
+      if (!created.length) throw new Error("Alias is already in use.");
+      createdAlias = created[0].alias;
+    } else if (String(e?.code || "") === "23505") {
+      throw new Error("Alias is already in use.");
+    } else {
+      throw e;
+    }
   }
 
-  emitWebhook("alias.created", { alias, doc_id: docId });
+  emitWebhook("alias.created", { alias: createdAlias || alias, doc_id: docId });
   await appendAdminAudit({
     action: "doc.alias_upserted",
     docId,
-    subjectId: alias,
-    payload: { alias },
+    subjectId: createdAlias || alias,
+    payload: { alias: createdAlias || alias },
   });
 
   revalidatePath("/admin");
   revalidatePath("/admin/dashboard");
+}
+
+export async function renameDocAliasAction(formData: FormData): Promise<void> {
+  const docId = String(formData.get("docId") || "").trim();
+  const newAlias = normalizeAliasInput(String(formData.get("newAlias") || ""));
+  if (!docId) throw new Error("Missing docId.");
+  if (!newAlias) throw new Error("Missing new alias.");
+  if (!/^[a-z0-9_-]{3,80}$/.test(newAlias)) {
+    throw new Error("Alias must be 3-80 chars: letters, numbers, underscore, dash.");
+  }
+
+  await requireDocWrite(docId);
+
+  let updatedAlias: string = newAlias;
+  try {
+    const updated = (await sql`
+      with target as (
+        select id
+        from public.doc_aliases
+        where doc_id = ${docId}::uuid
+        order by created_at desc nulls last
+        limit 1
+      )
+      update public.doc_aliases a
+      set
+        alias = ${newAlias},
+        revoked_at = null,
+        is_active = true
+      from target t
+      where a.id = t.id
+      returning a.alias::text as alias
+    `) as unknown as Array<{ alias: string }>;
+
+    if (!updated.length) {
+      await sql`
+        insert into public.doc_aliases (alias, doc_id, is_active)
+        values (${newAlias}, ${docId}::uuid, true)
+      `;
+      updatedAlias = newAlias;
+    } else {
+      updatedAlias = updated[0].alias;
+    }
+  } catch (e: any) {
+    const msg = String(e?.message || "");
+    const missingCol =
+      msg.includes("column") &&
+      (msg.includes("revoked_at") || msg.includes("is_active"));
+    if (missingCol) {
+      const updated = (await sql`
+        with target as (
+          select id
+          from public.doc_aliases
+          where doc_id = ${docId}::uuid
+          order by created_at desc nulls last
+          limit 1
+        )
+        update public.doc_aliases a
+        set alias = ${newAlias}
+        from target t
+        where a.id = t.id
+        returning a.alias::text as alias
+      `) as unknown as Array<{ alias: string }>;
+      if (!updated.length) {
+        await sql`
+          insert into public.doc_aliases (alias, doc_id)
+          values (${newAlias}, ${docId}::uuid)
+        `;
+        updatedAlias = newAlias;
+      } else {
+        updatedAlias = updated[0].alias;
+      }
+    } else if (String(e?.code || "") === "23505") {
+      throw new Error("Alias is already in use.");
+    } else {
+      throw e;
+    }
+  }
+
+  emitWebhook("alias.created", { alias: updatedAlias, doc_id: docId, renamed: true });
+  await appendAdminAudit({
+    action: "doc.alias_renamed",
+    docId,
+    subjectId: updatedAlias,
+    payload: { alias: updatedAlias, via: "admin_action" },
+  });
+
+  revalidatePath("/admin/dashboard");
+  revalidatePath("/admin");
+  revalidatePath(`/admin/docs/${docId}`);
+}
+
+export async function setAliasExpirationAction(formData: FormData): Promise<void> {
+  const docId = String(formData.get("docId") || "").trim();
+  const days = parseAliasTtlDays(formData.get("days"));
+  if (!docId) throw new Error("Missing docId.");
+
+  await requireDocWrite(docId);
+
+  try {
+    await sql`
+      update public.doc_aliases
+      set
+        expires_at = now() + (${days}::int * interval '1 day'),
+        is_active = true,
+        revoked_at = null
+      where doc_id = ${docId}::uuid
+    `;
+  } catch {
+    // Older schemas may not have expires_at/is_active/revoked_at.
+  }
+
+  await appendAdminAudit({
+    action: "doc.alias_expiration_set",
+    docId,
+    payload: { days, via: "admin_action" },
+  });
+
+  revalidatePath("/admin/dashboard");
+  revalidatePath("/admin");
+  revalidatePath(`/admin/docs/${docId}`);
 }
 
 // Used as <form action={emailMagicLinkAction}> — must return void
