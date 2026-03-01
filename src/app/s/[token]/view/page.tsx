@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import SecurePdfCanvasViewer from "@/app/components/SecurePdfCanvasViewer";
 import { resolveShareMeta } from "@/lib/resolveDoc";
-import { detectFileFamily, fileFamilyLabel } from "@/lib/fileFamily";
+import { detectFileFamily, fileFamilyLabel, isMicrosoftOfficeDocument } from "@/lib/fileFamily";
 import { ShareBadge, ShareShell } from "../ShareShell";
 import { sql } from "@/lib/db";
 
@@ -111,6 +111,7 @@ export default async function ShareTokenViewPage(props: {
   const family = detectFileFamily({ contentType, filename });
   const typeLabel = fileFamilyLabel(family);
   const isArchive = family === "archive";
+  const isMicrosoftOffice = isMicrosoftOfficeDocument({ contentType, filename });
   const forensicTag = buildForensicTag({
     token: t,
     sharedByEmail: meta.sharedByEmail ?? null,
@@ -134,7 +135,7 @@ export default async function ShareTokenViewPage(props: {
           <Link href="/" className="btn-base btn-secondary rounded-xl px-4 py-2 text-sm">
             Go to Doclinks
           </Link>
-          {meta.allowDownload !== false || isArchive ? (
+          {meta.allowDownload !== false || isArchive || isMicrosoftOffice ? (
             <Link href={`/s/${encodeURIComponent(t)}/download`} className="btn-base btn-secondary rounded-xl px-4 py-2 text-sm">
               Download
             </Link>
@@ -148,6 +149,10 @@ export default async function ShareTokenViewPage(props: {
         ) : isArchive ? (
           <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-100">
             Archive files are download-only for security. Inline preview is disabled.
+          </div>
+        ) : isMicrosoftOffice ? (
+          <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-100">
+            Microsoft Office files are download-only. Inline preview is disabled.
           </div>
         ) : (
           <div className="overflow-hidden rounded-2xl border border-white/15 bg-black/20">

@@ -20,7 +20,7 @@ import {
   maybeBlockIpOnAbuse,
 } from "@/lib/securityTelemetry";
 import { assertRuntimeEnv, isRuntimeEnvError } from "@/lib/runtimeEnv";
-import { detectFileFamily } from "@/lib/fileFamily";
+import { detectFileFamily, isMicrosoftOfficeDocument } from "@/lib/fileFamily";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -320,12 +320,17 @@ export async function GET(
     filename: share.original_filename,
   });
   const isArchive = family === "archive";
-  const disposition: "inline" | "attachment" = isArchive ? "attachment" : requestedDisposition;
+  const isMicrosoftOffice = isMicrosoftOfficeDocument({
+    contentType: share.content_type,
+    filename: share.original_filename,
+  });
+  const forcedDownloadOnly = isArchive || isMicrosoftOffice;
+  const disposition: "inline" | "attachment" = forcedDownloadOnly ? "attachment" : requestedDisposition;
   const riskyInline = risk === "high" || (share.scan_status || "").toLowerCase() === "risky";
   if (disposition === "inline" && isBlockedTopLevelOpen(req)) {
     return await deny("top_level_blocked", 403, "Direct open is disabled for this shared document.");
   }
-  if (disposition === "attachment" && !isArchive && !share.allow_download) {
+  if (disposition === "attachment" && !forcedDownloadOnly && !share.allow_download) {
     return await deny("download_disabled", 403, "Download disabled");
   }
   if (disposition === "inline" && riskyInline) {

@@ -15,7 +15,7 @@ import crypto from "crypto";
 import { isAliasServingDisabled, isSecurityTestNoDbMode } from "@/lib/securityPolicy";
 import { getRouteTimeoutMs, isRouteTimeoutError, withRouteTimeout } from "@/lib/routeTimeout";
 import { assertRuntimeEnv, isRuntimeEnvError } from "@/lib/runtimeEnv";
-import { detectFileFamily } from "@/lib/fileFamily";
+import { detectFileFamily, isMicrosoftOfficeDocument } from "@/lib/fileFamily";
 
 function normAlias(alias: string): string {
   return decodeURIComponent(String(alias || "")).trim().toLowerCase();
@@ -262,7 +262,12 @@ export async function GET(
     const contentType = resolved.contentType || "application/octet-stream";
     const requestedDisposition = parseDisposition(req);
     const family = detectFileFamily({ contentType, filename: resolved.originalFilename || filename });
-    const disposition: "inline" | "attachment" = family === "archive" ? "attachment" : requestedDisposition;
+    const isMicrosoftOffice = isMicrosoftOfficeDocument({
+      contentType,
+      filename: resolved.originalFilename || filename,
+    });
+    const disposition: "inline" | "attachment" =
+      family === "archive" || isMicrosoftOffice ? "attachment" : requestedDisposition;
 // --- Monetization / plan limits (hidden) ---
 // Enforce the document owner's monthly view quota.
 if (shouldCountView(req)) {

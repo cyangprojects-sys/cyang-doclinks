@@ -19,6 +19,16 @@ const OFFICE_EXTENSIONS = new Set([
 
 const ARCHIVE_EXTENSIONS = new Set(["zip", "rar"]);
 
+const MICROSOFT_OFFICE_EXTENSIONS = new Set(["doc", "docx", "xls", "xlsx", "ppt", "pptx"]);
+const MICROSOFT_OFFICE_MIME_TYPES = new Set([
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.ms-powerpoint",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+]);
+
 function extensionOf(filename?: string | null): string {
   const name = String(filename || "").trim().toLowerCase();
   if (!name) return "";
@@ -61,6 +71,12 @@ export function detectFileFamily(args: DetectArgs): FileFamily {
   }
 
   return "file";
+}
+
+export function isMicrosoftOfficeDocument(args: DetectArgs): boolean {
+  const m = String(args.contentType || "").trim().toLowerCase();
+  const ext = extensionOf(args.filename);
+  return MICROSOFT_OFFICE_MIME_TYPES.has(m) || MICROSOFT_OFFICE_EXTENSIONS.has(ext);
 }
 
 export function fileFamilyLabel(family: FileFamily): string {

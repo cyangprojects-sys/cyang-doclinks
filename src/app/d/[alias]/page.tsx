@@ -12,7 +12,7 @@ import { isAliasUnlockedAction } from "./unlockActions";
 import { getAuthedUser, roleAtLeast } from "@/lib/authz";
 import { allowUnencryptedServing } from "@/lib/securityPolicy";
 import SecurePdfCanvasViewer from "@/app/components/SecurePdfCanvasViewer";
-import { detectFileFamily, fileFamilyLabel } from "@/lib/fileFamily";
+import { detectFileFamily, fileFamilyLabel, isMicrosoftOfficeDocument } from "@/lib/fileFamily";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -392,6 +392,7 @@ function DocumentViewer({
   const family = detectFileFamily({ contentType, filename });
   const typeLabel = fileFamilyLabel(family);
   const isArchive = family === "archive";
+  const isMicrosoftOffice = isMicrosoftOfficeDocument({ contentType, filename });
   const forensicTag = `alias:${alias.slice(0, 12)} | ${new Date().toISOString().replace("T", " ").slice(0, 19)}Z`;
 
   return (
@@ -422,6 +423,17 @@ function DocumentViewer({
                 className="mt-3 inline-flex items-center rounded-lg border border-amber-200/40 bg-amber-100/10 px-3 py-2 text-sm text-amber-50 hover:bg-amber-100/20"
               >
                 Download archive
+              </a>
+            </div>
+          ) : isMicrosoftOffice ? (
+            <div className="m-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-100">
+              <div className="font-semibold">Microsoft Office files are download-only.</div>
+              <div className="mt-1 text-amber-100/85">Inline viewing is disabled for Microsoft Office content.</div>
+              <a
+                href={downloadUrl}
+                className="mt-3 inline-flex items-center rounded-lg border border-amber-200/40 bg-amber-100/10 px-3 py-2 text-sm text-amber-50 hover:bg-amber-100/20"
+              >
+                Download file
               </a>
             </div>
           ) : (
