@@ -25,10 +25,10 @@ export default async function ViewerUpgradePage(props: {
   const error = Array.isArray(params.error) ? params.error[0] : params.error;
 
   return (
-    <div className="mx-auto max-w-4xl space-y-4 text-white">
+    <div className="mx-auto max-w-5xl space-y-5 text-white">
       <div>
-        <h1 className="text-2xl font-semibold">Upgrade to Pro</h1>
-        <p className="mt-1 text-sm text-white/70">
+        <h1 className="text-3xl font-semibold tracking-tight">Upgrade to Pro</h1>
+        <p className="mt-2 text-sm text-white/70">
           Unlock higher limits and billing-backed entitlement with Stripe checkout.
         </p>
       </div>
@@ -49,17 +49,17 @@ export default async function ViewerUpgradePage(props: {
         </div>
       ) : null}
 
-      <section className="glass-card-strong rounded-2xl p-4">
-        <div className="text-sm text-white/70">
+      <section className="glass-card-strong rounded-2xl p-5">
+        <div className="text-sm text-white/75">
           Current plan: <span className="font-semibold text-white">{plan.name}</span> - Entitlement:{" "}
           <span className="font-semibold text-white">{entitlement}</span>
         </div>
       </section>
 
       <section className="grid gap-4 md:grid-cols-2">
-        <article className="glass-card rounded-2xl p-4">
-          <h2 className="text-lg font-semibold">Free - $0</h2>
-          <ul className="mt-3 space-y-2 text-sm text-white/75">
+        <article className="glass-card rounded-2xl p-6">
+          <h2 className="text-xl font-semibold tracking-tight">Free - $0</h2>
+          <ul className="mt-4 space-y-2.5 text-sm text-white/75">
             <li>100 MB storage</li>
             <li>25 MB max per file</li>
             <li>3 active shares</li>
@@ -75,9 +75,10 @@ export default async function ViewerUpgradePage(props: {
           </ul>
         </article>
 
-        <article className="glass-card-strong rounded-2xl border border-cyan-400/30 p-4">
-          <h2 className="text-lg font-semibold">Pro</h2>
-          <ul className="mt-3 space-y-2 text-sm text-white/85">
+        <article className="glass-card-strong rounded-2xl border border-amber-300/35 p-6 shadow-[0_16px_50px_rgba(222,176,82,0.16)]">
+          <div className="ui-premium inline-flex rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em]">Pro</div>
+          <h2 className="mt-3 text-xl font-semibold tracking-tight text-white">Pro Plan</h2>
+          <ul className="mt-4 space-y-2.5 text-sm text-white/85">
             <li>5 GB total storage</li>
             <li>100 MB max per file</li>
             <li>Unlimited shares</li>
@@ -89,10 +90,10 @@ export default async function ViewerUpgradePage(props: {
             <li>Stripe Customer Portal access</li>
             <li>Grace-state protection on payment failures</li>
           </ul>
-          <form action="/api/billing/checkout" method="post" className="mt-4">
+          <form action="/api/billing/checkout" method="post" className="mt-5">
             <button
               type="submit"
-              className="btn-base rounded-lg border border-cyan-400/45 bg-cyan-400/20 px-4 py-2 text-sm font-medium text-cyan-50 hover:bg-cyan-400/30"
+              className="btn-base ui-premium rounded-lg px-4 py-2.5 text-sm font-semibold"
             >
               Start Stripe Checkout
             </button>

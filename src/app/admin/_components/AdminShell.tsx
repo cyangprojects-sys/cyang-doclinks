@@ -63,16 +63,16 @@ export default function AdminShell({ email, isOwner, showPricingUi, children }: 
 
   return (
     <div className="app-shell min-h-screen">
-      <div className="mx-auto flex w-full max-w-[1320px] gap-6 px-3 py-3 md:px-5 md:py-5">
+      <div className="mx-auto flex w-full max-w-[1360px] gap-6 px-4 py-4 md:px-6 md:py-6">
         <aside className="glass-card-strong hidden w-72 shrink-0 overflow-hidden rounded-2xl md:flex md:flex-col">
-          <div className="border-b border-white/10 px-5 py-4">
+          <div className="border-b border-white/10 px-5 py-5">
             <div className="flex items-center gap-2">
-              <img src="/branding/cyang_primary.svg" alt="cyang.io" className="h-6 w-6 object-contain" />
-              <div className="text-sm font-semibold tracking-tight text-white">cyang.io/doclinks</div>
+              <img src="/branding/cyang_primary.svg" alt="cyang.io" className="h-7 w-7 object-contain" />
+              <div className="text-base font-semibold tracking-tight text-white">cyang.io/doclinks</div>
             </div>
-            <div className="mt-1 text-xs uppercase tracking-[0.12em] text-white/55">Admin</div>
+            <div className="mt-1 text-xs uppercase tracking-[0.16em] text-white/55">Admin Console</div>
           </div>
-          <nav className="flex-1 space-y-1 px-3 py-3">
+          <nav className="flex-1 space-y-1.5 px-3 py-4">
             {visibleItems.map((item) => {
               const active = isActive(pathname, item.href);
               return (
@@ -80,9 +80,9 @@ export default function AdminShell({ email, isOwner, showPricingUi, children }: 
                   key={item.label}
                   href={item.href}
                   className={[
-                    "btn-base relative flex items-center rounded-xl px-3 py-2.5 text-sm",
+                    "btn-base relative flex items-center rounded-xl px-3.5 py-2.5 text-sm",
                     active
-                      ? "border border-white/20 bg-gradient-to-r from-blue-400/20 to-cyan-300/15 text-white"
+                      ? "border border-white/20 bg-gradient-to-r from-blue-400/20 to-cyan-300/15 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]"
                       : "border border-transparent text-white/75 hover:border-white/15 hover:bg-white/5 hover:text-white",
                   ].join(" ")}
                 >
@@ -92,7 +92,7 @@ export default function AdminShell({ email, isOwner, showPricingUi, children }: 
               );
             })}
           </nav>
-          <div className="border-t border-white/10 px-4 py-3 text-xs text-white/60">
+          <div className="border-t border-white/10 px-4 py-4 text-xs text-white/60">
             <div className="truncate">Signed in as {email || "unknown"}</div>
             <div className="mt-2 flex items-center gap-2">
               <button
@@ -109,7 +109,7 @@ export default function AdminShell({ email, isOwner, showPricingUi, children }: 
         </aside>
 
         <div className="min-w-0 flex-1">
-          <header className="glass-card-strong sticky top-2 z-30 rounded-2xl px-3 py-3 md:px-5">
+          <header className="glass-card-strong ui-sheen sticky top-2 z-30 rounded-2xl px-4 py-3.5 md:px-6">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <button
@@ -119,9 +119,9 @@ export default function AdminShell({ email, isOwner, showPricingUi, children }: 
                 >
                   Menu
                 </button>
-                <div>
+                <div className="space-y-0.5">
                   <h1 className="text-sm font-semibold tracking-tight text-white md:text-base">{currentTitle}</h1>
-                  <p className="hidden text-xs text-white/60 md:block">Secure document operations console</p>
+                  <p className="hidden text-xs uppercase tracking-[0.12em] text-white/60 md:block">Minimal Enterprise Console</p>
                 </div>
               </div>
               <div className="hidden items-center gap-2 md:flex">
@@ -138,7 +138,7 @@ export default function AdminShell({ email, isOwner, showPricingUi, children }: 
             </div>
           </header>
 
-          <main className="pt-4">{children}</main>
+          <main className="pt-5">{children}</main>
         </div>
       </div>
 

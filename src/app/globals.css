@@ -1,16 +1,18 @@
 @import "tailwindcss";
 
 :root {
-  --background: #070b14;
-  --foreground: #e7edf8;
-  --muted: #9aa7be;
-  --card: rgba(16, 24, 43, 0.74);
-  --card-strong: rgba(16, 24, 43, 0.88);
-  --line: rgba(151, 170, 204, 0.2);
-  --line-strong: rgba(164, 183, 218, 0.32);
-  --shadow-soft: 0 10px 32px rgba(1, 4, 12, 0.45);
-  --accent: #8fb4ff;
-  --accent-2: #63e2ff;
+  --background: #06080f;
+  --foreground: #edf2ff;
+  --muted: #95a1b8;
+  --card: rgba(13, 18, 31, 0.78);
+  --card-strong: rgba(13, 18, 31, 0.9);
+  --line: rgba(159, 175, 208, 0.19);
+  --line-strong: rgba(168, 186, 223, 0.35);
+  --shadow-soft: 0 20px 54px rgba(0, 0, 0, 0.46);
+  --accent: #6fa7ff;
+  --accent-2: #4fd5cb;
+  --premium: #e8c27a;
+  --premium-2: #f3d7a1;
 }
 
 @theme inline {
@@ -28,10 +30,9 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   background-image:
-    radial-gradient(42rem 34rem at 6% -8%, rgba(84, 138, 255, 0.18), transparent 58%),
-    radial-gradient(38rem 26rem at 96% 2%, rgba(45, 187, 214, 0.14), transparent 56%),
-    radial-gradient(28rem 18rem at 52% 110%, rgba(120, 108, 255, 0.1), transparent 65%),
-    linear-gradient(180deg, #091024 0%, #060a15 44%, #050810 100%);
+    radial-gradient(72rem 36rem at -2% -6%, rgba(84, 132, 220, 0.14), transparent 62%),
+    radial-gradient(68rem 34rem at 104% -10%, rgba(90, 210, 198, 0.11), transparent 64%),
+    linear-gradient(180deg, #090d18 0%, #060910 38%, #05070c 100%);
   background-attachment: fixed;
 }
 
@@ -51,27 +52,51 @@ samp {
   position: fixed;
   inset: 0;
   pointer-events: none;
-  background: radial-gradient(80rem 28rem at 50% -16%, rgba(113, 145, 238, 0.1), transparent 72%);
+  background: radial-gradient(70rem 22rem at 50% -6%, rgba(112, 152, 238, 0.08), transparent 72%);
+}
+
+.marketing-shell {
+  position: relative;
+}
+
+.marketing-shell::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    radial-gradient(50rem 20rem at 10% 0%, rgba(122, 158, 225, 0.1), transparent 72%),
+    radial-gradient(56rem 22rem at 95% 8%, rgba(86, 205, 189, 0.1), transparent 72%);
 }
 
 .glass-card {
   border: 1px solid var(--line);
   background: var(--card);
-  box-shadow: var(--shadow-soft);
-  backdrop-filter: blur(10px);
+  box-shadow: var(--shadow-soft), inset 0 1px 0 rgba(230, 237, 255, 0.05);
+  backdrop-filter: blur(8px);
 }
 
 .glass-card-strong {
   border: 1px solid var(--line-strong);
   background: var(--card-strong);
-  box-shadow: var(--shadow-soft);
-  backdrop-filter: blur(12px);
+  box-shadow: var(--shadow-soft), inset 0 1px 0 rgba(230, 237, 255, 0.06);
+  backdrop-filter: blur(10px);
 }
 
 .ui-badge {
   border: 1px solid var(--line);
-  background: rgba(112, 131, 166, 0.12);
-  color: #c8d5ed;
+  background: rgba(120, 142, 176, 0.12);
+  color: #d4def2;
+}
+
+.ui-premium {
+  border: 1px solid color-mix(in oklab, var(--premium), #fff 22%);
+  background: linear-gradient(130deg, color-mix(in oklab, var(--premium), #000 78%), color-mix(in oklab, var(--premium-2), #000 86%));
+  color: #1d1405;
+}
+
+.font-editorial {
+  font-family: var(--font-editorial), "Times New Roman", serif;
 }
 
 .btn-base {
@@ -83,25 +108,25 @@ samp {
 }
 
 .btn-primary {
-  border: 1px solid rgba(150, 189, 255, 0.5);
-  background: linear-gradient(135deg, rgba(110, 154, 255, 0.95), rgba(86, 204, 238, 0.9));
-  color: #081024;
-  box-shadow: 0 8px 22px rgba(48, 109, 224, 0.35);
+  border: 1px solid rgba(145, 186, 250, 0.45);
+  background: linear-gradient(138deg, rgba(96, 141, 240, 0.94), rgba(78, 197, 189, 0.9));
+  color: #061120;
+  box-shadow: 0 10px 30px rgba(39, 98, 194, 0.35);
 }
 
 .btn-primary:hover {
-  box-shadow: 0 12px 26px rgba(47, 117, 226, 0.42);
+  box-shadow: 0 14px 34px rgba(37, 106, 201, 0.42);
 }
 
 .btn-secondary {
   border: 1px solid var(--line);
-  background: rgba(117, 143, 190, 0.1);
-  color: #e3ecff;
+  background: rgba(123, 145, 189, 0.1);
+  color: #e8efff;
 }
 
 .btn-secondary:hover {
   border-color: var(--line-strong);
-  background: rgba(117, 143, 190, 0.18);
+  background: rgba(127, 149, 190, 0.18);
 }
 
 .btn-danger {
@@ -113,4 +138,32 @@ samp {
 .btn-danger:hover {
   border-color: rgba(252, 165, 165, 0.5);
   background: rgba(153, 27, 27, 0.5);
+}
+
+.ui-enterprise-grid {
+  background-image:
+    linear-gradient(to right, rgba(171, 192, 233, 0.08) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(171, 192, 233, 0.07) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+.ui-sheen {
+  position: relative;
+  overflow: hidden;
+}
+
+.ui-sheen::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(108deg, transparent 36%, rgba(233, 243, 255, 0.08) 50%, transparent 66%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn-base,
+  .ui-sheen::after {
+    transition: none !important;
+    animation: none !important;
+  }
 }

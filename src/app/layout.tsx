@@ -1,40 +1,48 @@
 // app/layout.tsx
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Manrope, JetBrains_Mono, Cormorant_Garamond } from "next/font/google";
 import "./globals.css";
 import Providers from "./providers";
 
-const geistSans = Geist({
+const geistSans = Manrope({
   variable: "--font-geist-sans",
   subsets: ["latin"],
+  weight: ["400", "500", "600", "700", "800"],
 });
 
-const geistMono = Geist_Mono({
+const geistMono = JetBrains_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+  weight: ["400", "500", "600"],
+});
+
+const editorial = Cormorant_Garamond({
+  variable: "--font-editorial",
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
 });
 
 export const metadata: Metadata = {
   title: {
-    default: "Chang Yang — Personal Hub",
-    template: "%s · Chang Yang",
+    default: "cyang.io",
+    template: "%s · cyang.io",
   },
   description:
-    "Chang Yang’s personal hub for projects, tools, and experiments. Clean, minimal, and built to be useful.",
+    "Security-first document delivery and practical software systems by cyang.io.",
   metadataBase: new URL("https://cyang.io"),
   openGraph: {
-    title: "Chang Yang — Personal Hub",
+    title: "cyang.io",
     description:
-      "Projects, tools, and experiments by Chang Yang. Secure doc sharing, automation, and practical builds.",
+      "Security-first document sharing infrastructure and practical systems design.",
     url: "https://cyang.io",
     siteName: "cyang.io",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Chang Yang — Personal Hub",
+    title: "cyang.io",
     description:
-      "Projects, tools, and experiments by Chang Yang.",
+      "Security-first document sharing infrastructure by cyang.io.",
   },
 };
 
@@ -45,7 +53,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+      <body className={`${geistSans.variable} ${geistMono.variable} ${editorial.variable} antialiased`}>
         <Providers>{children}</Providers>
       </body>
     </html>
