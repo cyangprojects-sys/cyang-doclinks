@@ -58,17 +58,14 @@ export default function AboutPage() {
                 <FocusRow
                   title="Doclinks"
                   desc="Short-link sharing with immutable audit logging and strict serve-time checks."
-                  href="/projects/doclinks"
                 />
                 <FocusRow
                   title="Upload hardening"
                   desc="Extension + MIME + file-signature allowlist with executable and macro blocking."
-                  href="/projects/doclinks"
                 />
                 <FocusRow
                   title="Operations"
                   desc="Cron-backed scan queue, abuse controls, billing limits, and dashboard observability."
-                  href="/admin"
                 />
               </div>
 
@@ -178,18 +175,14 @@ function Tag({ children }: { children: React.ReactNode }) {
   );
 }
 
-function FocusRow(props: { title: string; desc: string; href: string }) {
+function FocusRow(props: { title: string; desc: string }) {
   return (
-    <Link
-      href={props.href}
-      className="flex items-start justify-between gap-6 rounded-2xl bg-white/5 p-4 ring-1 ring-white/10 hover:bg-white/10"
-    >
+    <div className="flex items-start justify-between gap-6 rounded-2xl bg-white/5 p-4 ring-1 ring-white/10">
       <div>
         <div className="text-sm font-medium text-white/90">{props.title}</div>
         <div className="mt-1 text-xs leading-relaxed text-white/60">{props.desc}</div>
       </div>
-      <span className="mt-0.5 text-white/50">{"->"}</span>
-    </Link>
+    </div>
   );
 }
 
