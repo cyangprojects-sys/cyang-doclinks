@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { SiteShell } from "./components/SiteShell";
 import { DemoDocButton } from "@/components/DemoDocButton";
+import { getBillingFlags } from "@/lib/settings";
 
 export const metadata: Metadata = {
   title: "Doclinks - Secure Document Delivery Infrastructure",
@@ -10,7 +11,10 @@ export const metadata: Metadata = {
     "Deliver sensitive documents without losing control. Access-controlled delivery, enforced policies, and audit visibility.",
 };
 
-export default function HomePage() {
+export default async function HomePage() {
+  const flagsRes = await getBillingFlags();
+  const showPricingUi = flagsRes.flags.pricingUiEnabled;
+
   return (
     <SiteShell maxWidth="full">
       <section className="mt-12 grid gap-6 lg:grid-cols-12 lg:items-end">
@@ -64,15 +68,17 @@ export default function HomePage() {
               <Link href="/signin" className="btn-base btn-primary rounded-xl px-4 py-2.5 text-sm font-semibold">
                 Start Free
               </Link>
-              <Link href="/projects/doclinks#pricing" className="btn-base btn-secondary rounded-xl px-4 py-2.5 text-sm">
-                View Pricing
-              </Link>
+              {showPricingUi ? (
+                <Link href="/projects/doclinks#pricing" className="btn-base btn-secondary rounded-xl px-4 py-2.5 text-sm">
+                  View Pricing
+                </Link>
+              ) : null}
             </div>
           </div>
         </div>
       </section>
 
-      <section className="mt-11 grid gap-4 md:grid-cols-3">
+      <section className={`mt-11 grid gap-4 ${showPricingUi ? "md:grid-cols-3" : "md:grid-cols-2"}`}>
         <FeatureCard
           title="How It Works"
           description="Upload securely, set access policy, and deliver with control in three clear steps."
@@ -85,12 +91,14 @@ export default function HomePage() {
           href="/projects/doclinks#security-model"
           cta="Review controls"
         />
-        <FeatureCard
-          title="Pricing"
-          description="Transparent Free vs Pro limits with no hidden capability math."
-          href="/projects/doclinks#pricing"
-          cta="Compare plans"
-        />
+        {showPricingUi ? (
+          <FeatureCard
+            title="Pricing"
+            description="Transparent Free vs Pro limits with no hidden capability math."
+            href="/projects/doclinks#pricing"
+            cta="Compare plans"
+          />
+        ) : null}
       </section>
 
       <section className="mt-11 grid gap-4 lg:grid-cols-12">

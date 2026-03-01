@@ -4,6 +4,7 @@ import Link from "next/link";
 import { SiteShell } from "../../components/SiteShell";
 import { DemoDocButton } from "@/components/DemoDocButton";
 import { DEMO_DOC_URL } from "@/lib/demo";
+import { getBillingFlags } from "@/lib/settings";
 
 export const metadata: Metadata = {
   title: "Doclinks — cyang.io",
@@ -11,7 +12,10 @@ export const metadata: Metadata = {
     "Doclinks is secure document delivery infrastructure with policy-enforced access, scan-gated delivery, and audit visibility.",
 };
 
-export default function DoclinksPage() {
+export default async function DoclinksPage() {
+  const flagsRes = await getBillingFlags();
+  const showPricingUi = flagsRes.flags.pricingUiEnabled;
+
   return (
     <SiteShell maxWidth="full">
       <section className="relative mt-16 grid gap-10 md:grid-cols-12 md:items-end">
@@ -371,12 +375,14 @@ export default function DoclinksPage() {
             </Link>
           </div>
         </div>
-        <Link
-          href="/pricing"
-          className="mt-4 inline-flex text-sm text-white/80 underline underline-offset-4 hover:text-white"
-        >
-          View full plan comparison
-        </Link>
+        {showPricingUi ? (
+          <Link
+            href="/pricing"
+            className="mt-4 inline-flex text-sm text-white/80 underline underline-offset-4 hover:text-white"
+          >
+            View full plan comparison
+          </Link>
+        ) : null}
       </section>
 
       <section className="mt-16">

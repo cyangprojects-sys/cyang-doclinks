@@ -1,7 +1,11 @@
 // app/components/SiteFooter.tsx
 import Link from "next/link";
+import { getBillingFlags } from "@/lib/settings";
 
-export function SiteFooter() {
+export async function SiteFooter() {
+  const flagsRes = await getBillingFlags();
+  const showPricingUi = flagsRes.flags.pricingUiEnabled;
+
   return (
     <footer className="mt-18 sm:mt-24">
       <div className="glass-card rounded-2xl px-5 py-6 text-sm text-white/65 sm:px-6">
@@ -11,7 +15,7 @@ export function SiteFooter() {
             <Link href="/" className="transition-colors hover:text-white">Home</Link>
             <Link href="/projects" className="transition-colors hover:text-white">Projects</Link>
             <Link href="/projects/doclinks" className="transition-colors hover:text-white">Doclinks</Link>
-            <Link href="/pricing" className="transition-colors hover:text-white">Pricing</Link>
+            {showPricingUi ? <Link href="/pricing" className="transition-colors hover:text-white">Pricing</Link> : null}
             <Link href="/about" className="transition-colors hover:text-white">About</Link>
             <Link href="/terms" className="transition-colors hover:text-white">Terms</Link>
             <Link href="/acceptable-use" className="transition-colors hover:text-white">Acceptable Use</Link>

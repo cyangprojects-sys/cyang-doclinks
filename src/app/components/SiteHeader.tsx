@@ -1,7 +1,11 @@
 // app/components/SiteHeader.tsx
 import Link from "next/link";
+import { getBillingFlags } from "@/lib/settings";
 
-export function SiteHeader() {
+export async function SiteHeader() {
+  const flagsRes = await getBillingFlags();
+  const showPricingUi = flagsRes.flags.pricingUiEnabled;
+
   return (
     <header className="glass-card-strong ui-sheen sticky top-2 z-40 rounded-2xl px-4 py-3 sm:px-6">
       <div className="flex items-center justify-between gap-4">
@@ -22,9 +26,11 @@ export function SiteHeader() {
           <Link href="/projects/doclinks" className="btn-base btn-secondary rounded-lg px-3.5 py-2">
             Doclinks
           </Link>
-          <Link href="/pricing" className="btn-base btn-secondary rounded-lg px-3.5 py-2">
-            Pricing
-          </Link>
+          {showPricingUi ? (
+            <Link href="/pricing" className="btn-base btn-secondary rounded-lg px-3.5 py-2">
+              Pricing
+            </Link>
+          ) : null}
           <Link href="/about" className="btn-base btn-secondary rounded-lg px-3.5 py-2">
             About
           </Link>
