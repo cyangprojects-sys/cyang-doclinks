@@ -21,11 +21,8 @@ async function runScheduled(event: ScheduledEvent, env: Env) {
 
   // every 5 minutes
   if (cron === "*/5 * * * *") {
-    jobs.push({ name: "webhooks", url: env.TARGET_WEBHOOKS_URL, method: "GET" });
-  }
-  // every 5 minutes
-  if (cron === "*/5 * * * *") {
     jobs.push({ name: "scan", url: env.TARGET_SCAN_URL, method: "GET" });
+    jobs.push({ name: "webhooks", url: env.TARGET_WEBHOOKS_URL, method: "GET" });
   }
   // every 30 minutes
   if (cron === "*/30 * * * *") {
@@ -48,8 +45,23 @@ async function runScheduled(event: ScheduledEvent, env: Env) {
     jobs.push({ name: "key-rotation", url: env.TARGET_KEY_ROTATION_URL, method: "GET" });
   }
 
+  const failures: Array<{ name: string; status: number; body: string }> = [];
   for (const job of jobs) {
-    await trigger(job.name, job.url, job.method, env);
+    const result = await trigger(job.name, job.url, job.method, env);
+    if (!result.ok) failures.push({ name: job.name, status: result.status, body: result.body });
+  }
+
+  if (failures.length) {
+    console.log(
+      "Cron run completed with failures:",
+      JSON.stringify(
+        failures.map((f) => ({
+          name: f.name,
+          status: f.status,
+          body: f.body.slice(0, 160),
+        }))
+      )
+    );
   }
 }
 
@@ -70,7 +82,8 @@ async function trigger(name: string, url: string, method: "GET" | "POST", env: E
   const text = await res.text().catch(() => "");
   if (!res.ok) {
     console.log(`Cron trigger failed (${name}):`, res.status, text.slice(0, 800));
-    throw new Error(`Cron trigger failed (${name}): ${res.status}`);
+    return { ok: false as const, status: res.status, body: text };
   }
   console.log(`Cron trigger ok (${name}):`, res.status, text.slice(0, 800));
+  return { ok: true as const, status: res.status, body: text };
 }
