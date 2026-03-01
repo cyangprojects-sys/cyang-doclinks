@@ -44,41 +44,62 @@ export default async function AbuseReportsPage() {
     limit 100
   `) as unknown as Row[];
 
-  const blockStats = (await sql`
-    select
-      count(*) filter (where expires_at is null or expires_at > now())::int as active_blocks,
-      count(*) filter (where expires_at is not null and expires_at <= now())::int as expired_blocks
-    from public.abuse_ip_blocks
-  `).catch(() => [{ active_blocks: 0, expired_blocks: 0 }]) as unknown as Array<{
+  let blockStats = [{ active_blocks: 0, expired_blocks: 0 }] as Array<{
     active_blocks: number;
     expired_blocks: number;
   }>;
+  try {
+    blockStats = (await sql`
+      select
+        count(*) filter (where expires_at is null or expires_at > now())::int as active_blocks,
+        count(*) filter (where expires_at is not null and expires_at <= now())::int as expired_blocks
+      from public.abuse_ip_blocks
+    `) as unknown as Array<{ active_blocks: number; expired_blocks: number }>;
+  } catch {
+    // Backward-compatible fallback while abuse block tables are being rolled out.
+  }
 
-  const activeBlocks = (await sql`
-    select
-      ip_hash::text as ip_hash,
-      reason::text as reason,
-      source::text as source,
-      created_at::text as created_at,
-      expires_at::text as expires_at
-    from public.abuse_ip_blocks
-    where expires_at is null or expires_at > now()
-    order by coalesce(expires_at, now() + interval '100 years') asc, created_at desc
-    limit 100
-  `).catch(() => []) as unknown as Array<{
+  let activeBlocks = [] as Array<{
     ip_hash: string;
     reason: string;
     source: string | null;
     created_at: string;
     expires_at: string | null;
   }>;
+  try {
+    activeBlocks = (await sql`
+      select
+        ip_hash::text as ip_hash,
+        reason::text as reason,
+        source::text as source,
+        created_at::text as created_at,
+        expires_at::text as expires_at
+      from public.abuse_ip_blocks
+      where expires_at is null or expires_at > now()
+      order by coalesce(expires_at, now() + interval '100 years') asc, created_at desc
+      limit 100
+    `) as unknown as Array<{
+      ip_hash: string;
+      reason: string;
+      source: string | null;
+      created_at: string;
+      expires_at: string | null;
+    }>;
+  } catch {
+    // Backward-compatible fallback while abuse block tables are being rolled out.
+  }
 
-  const hitRows = (await sql`
-    select count(*)::int as hits_24h
-    from public.security_events
-    where type = 'abuse_ip_block_hit'
-      and created_at > now() - interval '24 hours'
-  `).catch(() => [{ hits_24h: 0 }]) as unknown as Array<{ hits_24h: number }>;
+  let hitRows = [{ hits_24h: 0 }] as Array<{ hits_24h: number }>;
+  try {
+    hitRows = (await sql`
+      select count(*)::int as hits_24h
+      from public.security_events
+      where type = 'abuse_ip_block_hit'
+        and created_at > now() - interval '24 hours'
+    `) as unknown as Array<{ hits_24h: number }>;
+  } catch {
+    // Backward-compatible fallback if security event type/table is unavailable.
+  }
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-8">
