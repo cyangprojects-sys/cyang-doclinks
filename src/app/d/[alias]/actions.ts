@@ -116,14 +116,6 @@ export async function createAndEmailShareToken(
 
     await requireDocWrite(docId);
 
-    if (shareTitle) {
-      await sql`
-        update public.docs
-        set title = ${shareTitle}
-        where id = ${docId}::uuid
-      `;
-    }
-
     const toEmail = toEmailRaw ? toEmailRaw.toLowerCase() : null;
 
     let expiresAt =
@@ -151,22 +143,32 @@ export async function createAndEmailShareToken(
     }
 
 
-const ownerId = (docRows as any)?.[0]?.owner_id ?? null;
-if (ownerId) {
-  const shareAllowed = await assertCanCreateShare(ownerId);
-  if (!shareAllowed.ok) {
-    return { ok: false, error: shareAllowed.error, message: shareAllowed.message };
-  }
-}
+    const ownerId = (docRows as any)?.[0]?.owner_id ?? null;
+    let ownerPlan: Awaited<ReturnType<typeof getPlanForUser>> | null = null;
+    if (ownerId) {
+      ownerPlan = await getPlanForUser(ownerId);
+      const shareAllowed = await assertCanCreateShare(ownerId);
+      if (!shareAllowed.ok) {
+        return { ok: false, error: shareAllowed.error, message: shareAllowed.message };
+      }
+    }
+
+    // Free plan cannot mutate document title from share creation flow.
+    if (shareTitle && ownerPlan?.id !== "free") {
+      await sql`
+        update public.docs
+        set title = ${shareTitle}
+        where id = ${docId}::uuid
+      `;
+    }
 
 // --- Monetization: custom expiration is currently hidden ---
 // If plan disallows, clamp to <= 7 days.
-if (ownerId) {
-  const plan = await getPlanForUser(ownerId);
-  const normalized = normalizeExpiresAtForPlan({ plan, requestedExpiresAtIso: expiresAt, defaultDaysIfNotAllowed: 7 });
+    if (ownerPlan) {
+      const normalized = normalizeExpiresAtForPlan({ plan: ownerPlan, requestedExpiresAtIso: expiresAt, defaultDaysIfNotAllowed: 7 });
       expiresAt = normalized;
-      maxViews = normalizeMaxViewsForPlan({ plan, requestedMaxViews });
-}
+      maxViews = normalizeMaxViewsForPlan({ plan: ownerPlan, requestedMaxViews });
+    }
 
     const token = newToken();
 
@@ -200,7 +202,7 @@ if (ownerId) {
     // no recipient email → just return
     if (!toEmail) return { ok: true, token, url };
 
-    const title = shareTitle || docRows[0]?.title || "Document";
+    const title = (ownerPlan?.id === "free" ? null : shareTitle) || docRows[0]?.title || "Document";
     const pretty = alias ? `/d/${alias}` : title;
 
     const subject = `Cyang Docs: ${title}`;

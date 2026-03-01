@@ -10,6 +10,7 @@ import { authOptions } from "@/auth";
 import { sql } from "@/lib/db";
 import { isAliasUnlockedAction } from "./unlockActions";
 import { getAuthedUser, roleAtLeast } from "@/lib/authz";
+import { getPlanForUser } from "@/lib/monetization";
 import { allowUnencryptedServing } from "@/lib/securityPolicy";
 import SecurePdfCanvasViewer from "@/app/components/SecurePdfCanvasViewer";
 import { detectFileFamily, fileFamilyLabel, isMicrosoftOfficeDocument } from "@/lib/fileFamily";
@@ -366,11 +367,12 @@ export default async function SharePage({
     (u ? roleAtLeast(u.role, "admin") || (await userOwnsDoc(u.id, bypass.docId)) : false);
 
   if (isPrivileged) {
+    const canEditTitle = u ? (await getPlanForUser(u.id)).id !== "free" : ownerEmail;
     const availabilityHint = await getDocAvailabilityHint(bypass.docId);
     const viewMeta = await getDocViewMeta(bypass.docId);
     return (
       <main className="mx-auto max-w-5xl px-4 py-10">
-        <ShareForm docId={bypass.docId} />
+        <ShareForm docId={bypass.docId} canEditTitle={canEditTitle} />
         <DocumentViewer alias={alias} contentType={viewMeta.contentType} filename={viewMeta.filename} availabilityHint={availabilityHint} />
       </main>
     );
