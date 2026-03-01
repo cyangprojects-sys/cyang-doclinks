@@ -34,6 +34,7 @@ export default function ShareForm({ docId, alias }: { docId: string; alias?: str
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [token, setToken] = useState<string | null>(null);
+  const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [stats, setStats] = useState<any>(null);
 
   async function onCreate() {
@@ -57,6 +58,10 @@ export default function ShareForm({ docId, alias }: { docId: string; alias?: str
         return;
       }
       setToken(res.token);
+      const resolvedUrl =
+        (typeof res.url === "string" && res.url.trim()) ||
+        `${window.location.origin}/s/${encodeURIComponent(String(res.token || ""))}`;
+      setShareUrl(resolvedUrl);
     } catch (e: any) {
       setErr(e?.message || "Unexpected error.");
     } finally {
@@ -79,6 +84,15 @@ export default function ShareForm({ docId, alias }: { docId: string; alias?: str
       setErr(e?.message || "Unexpected error.");
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function onCopyShareUrl() {
+    if (!shareUrl) return;
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+    } catch {
+      setErr("Unable to copy link. Copy manually from the field.");
     }
   }
 
@@ -196,6 +210,29 @@ export default function ShareForm({ docId, alias }: { docId: string; alias?: str
             Load stats
           </button>
         </div>
+
+        {shareUrl ? (
+          <div>
+            <label className="text-sm font-medium text-neutral-300">Share link</label>
+            <div className="mt-1 text-xs text-neutral-500">
+              Created share URL for this document.
+            </div>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <input
+                readOnly
+                value={shareUrl}
+                className="min-w-0 flex-1 rounded-lg border border-neutral-800 bg-neutral-900 px-3 py-2 text-sm text-neutral-100"
+              />
+              <button
+                type="button"
+                onClick={onCopyShareUrl}
+                className="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-200 hover:bg-neutral-800"
+              >
+                Copy link
+              </button>
+            </div>
+          </div>
+        ) : null}
 
         {err ? (
           <div className="rounded-lg border border-red-900/40 bg-red-950/30 p-3 text-sm text-red-200">
