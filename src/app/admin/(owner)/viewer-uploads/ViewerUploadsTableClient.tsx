@@ -139,8 +139,8 @@ export default function ViewerUploadsTableClient({ rows }: { rows: ViewerUploadR
   return (
     <div className="space-y-4">
       <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-4">
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
-          <div>
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-12">
+          <div className="xl:col-span-2">
             <label htmlFor="viewer-uploads-search" className="sr-only">Search uploads</label>
             <input
               id="viewer-uploads-search"
@@ -148,12 +148,12 @@ export default function ViewerUploadsTableClient({ rows }: { rows: ViewerUploadR
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder="Search title, alias, uploader, doc id"
-              className="rounded-lg border border-neutral-800 bg-black/30 px-3 py-2 text-sm text-white"
+              className="w-full rounded-lg border border-neutral-800 bg-black/30 px-3 py-2 text-sm text-white"
             />
           </div>
-          <div>
+          <div className="xl:col-span-2">
           <label htmlFor="viewer-uploads-moderation" className="sr-only">Moderation filter</label>
-          <select id="viewer-uploads-moderation" aria-label="Moderation filter" value={moderation} onChange={(e) => setModeration(e.target.value)} className="rounded-lg border border-neutral-800 bg-black/30 px-3 py-2 text-sm">
+          <select id="viewer-uploads-moderation" aria-label="Moderation filter" value={moderation} onChange={(e) => setModeration(e.target.value)} className="w-full rounded-lg border border-neutral-800 bg-black/30 px-3 py-2 text-sm">
             <option value="all">Moderation: all</option>
             <option value="active">Active</option>
             <option value="quarantined">Quarantined</option>
@@ -161,9 +161,9 @@ export default function ViewerUploadsTableClient({ rows }: { rows: ViewerUploadR
             <option value="deleted">Deleted</option>
           </select>
           </div>
-          <div>
+          <div className="xl:col-span-2">
           <label htmlFor="viewer-uploads-scan" className="sr-only">Scan status filter</label>
-          <select id="viewer-uploads-scan" aria-label="Scan status filter" value={scan} onChange={(e) => setScan(e.target.value)} className="rounded-lg border border-neutral-800 bg-black/30 px-3 py-2 text-sm">
+          <select id="viewer-uploads-scan" aria-label="Scan status filter" value={scan} onChange={(e) => setScan(e.target.value)} className="w-full rounded-lg border border-neutral-800 bg-black/30 px-3 py-2 text-sm">
             <option value="all">Scan: all</option>
             <option value="clean">Clean</option>
             <option value="risky">Risky</option>
@@ -173,25 +173,25 @@ export default function ViewerUploadsTableClient({ rows }: { rows: ViewerUploadR
             <option value="unscanned">Unscanned</option>
           </select>
           </div>
-          <div>
+          <div className="xl:col-span-2">
           <label htmlFor="viewer-uploads-risk" className="sr-only">Risk filter</label>
-          <select id="viewer-uploads-risk" aria-label="Risk filter" value={risk} onChange={(e) => setRisk(e.target.value)} className="rounded-lg border border-neutral-800 bg-black/30 px-3 py-2 text-sm">
+          <select id="viewer-uploads-risk" aria-label="Risk filter" value={risk} onChange={(e) => setRisk(e.target.value)} className="w-full rounded-lg border border-neutral-800 bg-black/30 px-3 py-2 text-sm">
             <option value="all">Risk: all</option>
             <option value="low">Low</option>
             <option value="medium">Medium</option>
             <option value="high">High</option>
           </select>
           </div>
-          <div>
+          <div className="xl:col-span-2">
           <label htmlFor="viewer-uploads-recent" className="sr-only">Created date filter</label>
-          <select id="viewer-uploads-recent" aria-label="Created date filter" value={recent} onChange={(e) => setRecent(e.target.value)} className="rounded-lg border border-neutral-800 bg-black/30 px-3 py-2 text-sm">
+          <select id="viewer-uploads-recent" aria-label="Created date filter" value={recent} onChange={(e) => setRecent(e.target.value)} className="w-full rounded-lg border border-neutral-800 bg-black/30 px-3 py-2 text-sm">
             <option value="all">Created: all</option>
             <option value="24h">Last 24h</option>
             <option value="7d">Last 7d</option>
             <option value="30d">Last 30d</option>
           </select>
           </div>
-          <div>
+          <div className="xl:col-span-2">
             <label htmlFor="viewer-uploads-reason" className="sr-only">Action reason</label>
             <input
               id="viewer-uploads-reason"
@@ -199,7 +199,7 @@ export default function ViewerUploadsTableClient({ rows }: { rows: ViewerUploadR
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               placeholder="Action reason (logged)"
-              className="rounded-lg border border-neutral-800 bg-black/30 px-3 py-2 text-sm text-white"
+              className="w-full rounded-lg border border-neutral-800 bg-black/30 px-3 py-2 text-sm text-white"
             />
           </div>
         </div>
@@ -268,8 +268,8 @@ export default function ViewerUploadsTableClient({ rows }: { rows: ViewerUploadR
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-neutral-800">
-        <table className="w-full text-sm">
+      <div className="overflow-x-auto rounded-xl border border-neutral-800">
+        <table className="min-w-[1180px] w-full text-sm">
           <thead className="bg-neutral-900 text-neutral-300">
             <tr>
               <th className="px-3 py-2 text-left">
