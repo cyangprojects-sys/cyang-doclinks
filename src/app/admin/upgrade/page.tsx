@@ -59,7 +59,9 @@ export default async function ViewerUpgradePage(props: {
 
       <section className="grid gap-4 md:grid-cols-2">
         <article className="glass-card rounded-2xl p-6">
-          <h2 className="text-xl font-semibold tracking-tight">Free - $0</h2>
+          <div className="inline-flex items-center rounded-lg border border-sky-200/70 bg-gradient-to-r from-sky-300 to-cyan-200 px-3 py-1.5 text-sm font-semibold text-black shadow-[0_8px_24px_rgba(73,179,255,0.30)]">
+            Free - $0
+          </div>
           <ul className="mt-4 space-y-2.5 text-sm text-white/75">
             <li>100 MB storage</li>
             <li>25 MB max per file</li>
