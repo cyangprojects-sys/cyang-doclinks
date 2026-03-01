@@ -18,7 +18,7 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 function Card({ children }: { children: React.ReactNode }) {
-  return <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-4">{children}</div>;
+  return <div className="glass-card-strong rounded-2xl p-5">{children}</div>;
 }
 
 function ToggleRow({
@@ -33,16 +33,16 @@ function ToggleRow({
   defaultChecked: boolean;
 }) {
   return (
-    <label className="flex items-start justify-between gap-4 rounded-lg border border-neutral-800 bg-black/30 p-3">
+    <label className="flex items-start justify-between gap-4 rounded-xl border border-white/12 bg-black/20 p-3.5">
       <div>
         <div className="text-sm font-medium text-white">{title}</div>
-        <div className="mt-1 text-xs text-neutral-400">{description}</div>
+        <div className="mt-1 text-xs text-white/60">{description}</div>
       </div>
       <input
         type="checkbox"
         name={name}
         defaultChecked={defaultChecked}
-        className="mt-1 h-4 w-4 rounded border-neutral-700 bg-neutral-950"
+        className="mt-1 h-4 w-4 rounded border-white/20 bg-black/30"
       />
     </label>
   );
@@ -93,10 +93,10 @@ export default async function BillingSettingsPage({
   const error = searchParams?.error ? decodeURIComponent(searchParams.error) : null;
 
   return (
-    <div className="mx-auto max-w-3xl p-6 text-white">
+    <div className="w-full space-y-4 text-white">
       <div className="mb-6">
-        <h1 className="text-2xl font-semibold">Billing & Monetization</h1>
-        <p className="mt-2 text-sm text-neutral-300">
+        <h1 className="text-3xl font-semibold tracking-tight">Billing & Monetization</h1>
+        <p className="mt-2 text-sm text-white/65">
           Owner-only runtime flags backed by <span className="font-mono text-xs">public.app_settings</span>.
           These toggle enforcement and UI visibility without a redeploy.
         </p>
@@ -106,7 +106,7 @@ export default async function BillingSettingsPage({
         <div
           className={[
             "mb-4 rounded-lg border p-3 text-sm",
-            error ? "border-red-900/60 bg-red-950/40 text-red-200" : "border-emerald-900/60 bg-emerald-950/30 text-emerald-200",
+            error ? "border-red-900/60 bg-red-950/35 text-red-200" : "border-emerald-900/60 bg-emerald-950/25 text-emerald-200",
           ].join(" ")}
         >
           {error ? `Failed to save: ${error}` : "Saved."}
@@ -220,11 +220,11 @@ export default async function BillingSettingsPage({
               </thead>
               <tbody>
                 {billingSnapshot.events.map((e) => (
-                  <tr key={e.eventId} className="border-t border-neutral-800">
-                    <td className="px-3 py-2 whitespace-nowrap text-neutral-300">{new Date(e.receivedAt).toLocaleString()}</td>
-                    <td className="px-3 py-2 font-mono text-neutral-200">{e.eventType}</td>
-                    <td className="px-3 py-2 text-neutral-200">{e.status}</td>
-                    <td className="px-3 py-2 text-neutral-400">{e.message || "—"}</td>
+                  <tr key={e.eventId} className="border-t border-white/10">
+                    <td className="px-3 py-2 whitespace-nowrap text-white/70">{new Date(e.receivedAt).toLocaleString()}</td>
+                    <td className="px-3 py-2 font-mono text-white/90">{e.eventType}</td>
+                    <td className="px-3 py-2 text-white/85">{e.status}</td>
+                    <td className="px-3 py-2 text-white/65">{e.message || "—"}</td>
                   </tr>
                 ))}
               </tbody>
@@ -329,14 +329,14 @@ export default async function BillingSettingsPage({
               min={1}
               max={720}
               defaultValue={24}
-              className="w-full rounded-md border border-neutral-700 bg-neutral-950 px-2 py-2 text-sm text-white"
+              className="w-full rounded-md border border-white/15 bg-black/25 px-2 py-2 text-sm text-white"
             />
             <label className="block text-xs text-neutral-400">Reason (required in ops)</label>
             <input
               type="text"
               name="reason"
               placeholder="Incident response / temporary support"
-              className="w-full rounded-md border border-neutral-700 bg-neutral-950 px-2 py-2 text-sm text-white"
+              className="w-full rounded-md border border-white/15 bg-black/25 px-2 py-2 text-sm text-white"
             />
             <button
               type="submit"
@@ -354,7 +354,7 @@ export default async function BillingSettingsPage({
               type="text"
               name="reason"
               placeholder="Override no longer needed"
-              className="w-full rounded-md border border-neutral-700 bg-neutral-950 px-2 py-2 text-sm text-white"
+              className="w-full rounded-md border border-white/15 bg-black/25 px-2 py-2 text-sm text-white"
             />
             <button
               type="submit"
