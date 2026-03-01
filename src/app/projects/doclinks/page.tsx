@@ -238,50 +238,6 @@ export default function DoclinksPage() {
         </div>
       </section>
 
-      <section id="pricing" className="mt-16">
-        <h2 className="text-2xl font-semibold tracking-tight">Pricing</h2>
-        <p className="mt-2 max-w-2xl text-sm leading-relaxed text-white/70">
-          Transparent numbers. Clear capability differences.
-        </p>
-        <div className="mt-6 grid gap-4 md:grid-cols-2">
-          <div className="rounded-3xl bg-white/5 p-6 ring-1 ring-white/10">
-            <div className="inline-flex items-center rounded-lg border border-sky-200/70 bg-gradient-to-r from-sky-300 to-cyan-200 px-3 py-1.5 text-sm font-semibold text-black shadow-[0_8px_24px_rgba(73,179,255,0.30)]">
-              Free - $0/month
-            </div>
-            <ul className="mt-4 space-y-2 text-sm text-white/75">
-              <li>25 MB max upload</li>
-              <li>100 MB total storage</li>
-              <li>Limited active shares</li>
-              <li>Basic audit logs</li>
-            </ul>
-            <Link
-              href="/signin"
-              className="btn-base mt-5 inline-flex rounded-lg border border-sky-200/70 bg-gradient-to-r from-sky-300 to-cyan-200 px-4 py-2.5 text-sm font-semibold text-black shadow-[0_8px_24px_rgba(73,179,255,0.30)] hover:brightness-105"
-            >
-              Start Free
-            </Link>
-          </div>
-          <div className="rounded-3xl border border-amber-300/40 bg-white/5 p-6 ring-1 ring-amber-200/15">
-            <div className="inline-flex items-center rounded-lg border border-amber-200/70 bg-gradient-to-r from-amber-300 to-amber-200 px-3 py-1.5 text-sm font-semibold text-black shadow-[0_8px_24px_rgba(232,194,122,0.32)]">
-              Pro - $12/month
-            </div>
-            <ul className="mt-4 space-y-2 text-sm text-white/85">
-              <li>100 MB max upload</li>
-              <li>5 GB total storage</li>
-              <li>Custom expiration controls</li>
-              <li>Audit export</li>
-              <li>Advanced access controls</li>
-            </ul>
-            <Link
-              href="/admin/upgrade"
-              className="btn-base mt-5 inline-flex rounded-lg border border-amber-200/70 bg-gradient-to-r from-amber-300 to-amber-200 px-4 py-2.5 text-sm font-semibold text-black shadow-[0_8px_24px_rgba(232,194,122,0.32)] hover:brightness-105"
-            >
-              Upgrade to Pro
-            </Link>
-          </div>
-        </div>
-      </section>
-
       <section className="mt-16">
         <h2 className="text-2xl font-semibold tracking-tight">Supported Upload Types</h2>
         <div className="mt-6 rounded-3xl bg-white/5 p-6 ring-1 ring-white/10">
@@ -371,6 +327,56 @@ export default function DoclinksPage() {
             cta="Open demo →"
           />
         </div>
+      </section>
+
+      <section id="pricing" className="mt-16">
+        <h2 className="text-2xl font-semibold tracking-tight">Pricing</h2>
+        <p className="mt-2 max-w-2xl text-sm leading-relaxed text-white/70">
+          Transparent numbers. Clear capability differences.
+        </p>
+        <div className="mt-6 grid gap-4 md:grid-cols-2">
+          <div className="rounded-3xl bg-white/5 p-6 ring-1 ring-white/10">
+            <div className="inline-flex items-center rounded-lg border border-sky-200/70 bg-gradient-to-r from-sky-300 to-cyan-200 px-3 py-1.5 text-sm font-semibold text-black shadow-[0_8px_24px_rgba(73,179,255,0.30)]">
+              Free - $0/month
+            </div>
+            <ul className="mt-4 space-y-2 text-sm text-white/75">
+              <li>25 MB max upload</li>
+              <li>100 MB total storage</li>
+              <li>Limited active shares</li>
+              <li>Basic audit logs</li>
+            </ul>
+            <Link
+              href="/signin"
+              className="btn-base mt-5 inline-flex rounded-lg border border-sky-200/70 bg-gradient-to-r from-sky-300 to-cyan-200 px-4 py-2.5 text-sm font-semibold text-black shadow-[0_8px_24px_rgba(73,179,255,0.30)] hover:brightness-105"
+            >
+              Start Free
+            </Link>
+          </div>
+          <div className="rounded-3xl border border-amber-300/40 bg-white/5 p-6 ring-1 ring-amber-200/15">
+            <div className="inline-flex items-center rounded-lg border border-amber-200/70 bg-gradient-to-r from-amber-300 to-amber-200 px-3 py-1.5 text-sm font-semibold text-black shadow-[0_8px_24px_rgba(232,194,122,0.32)]">
+              Pro - $12/month
+            </div>
+            <ul className="mt-4 space-y-2 text-sm text-white/85">
+              <li>100 MB max upload</li>
+              <li>5 GB total storage</li>
+              <li>Custom expiration controls</li>
+              <li>Audit export</li>
+              <li>Advanced access controls</li>
+            </ul>
+            <Link
+              href="/admin/upgrade"
+              className="btn-base mt-5 inline-flex rounded-lg border border-amber-200/70 bg-gradient-to-r from-amber-300 to-amber-200 px-4 py-2.5 text-sm font-semibold text-black shadow-[0_8px_24px_rgba(232,194,122,0.32)] hover:brightness-105"
+            >
+              Upgrade to Pro
+            </Link>
+          </div>
+        </div>
+        <Link
+          href="/pricing"
+          className="mt-4 inline-flex text-sm text-white/80 underline underline-offset-4 hover:text-white"
+        >
+          View full plan comparison
+        </Link>
       </section>
 
       <section className="mt-16">

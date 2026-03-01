@@ -22,6 +22,9 @@ export function SiteHeader() {
           <Link href="/projects/doclinks" className="btn-base btn-secondary rounded-lg px-3.5 py-2">
             Doclinks
           </Link>
+          <Link href="/pricing" className="btn-base btn-secondary rounded-lg px-3.5 py-2">
+            Pricing
+          </Link>
           <Link href="/about" className="btn-base btn-secondary rounded-lg px-3.5 py-2">
             About
           </Link>
