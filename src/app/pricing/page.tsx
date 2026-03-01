@@ -37,7 +37,7 @@ export default function PricingPage() {
           Doclinks pricing
         </p>
         <h1 className="mt-6 text-4xl font-semibold tracking-tight md:text-5xl">
-          Free vs Pro, line by line
+          Free vs Pro
         </h1>
         <p className="mt-4 max-w-3xl text-sm leading-relaxed text-white/70">
           Controlled delivery infrastructure with transparent plan boundaries. No hidden math.
