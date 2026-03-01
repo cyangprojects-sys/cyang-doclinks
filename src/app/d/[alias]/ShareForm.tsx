@@ -105,7 +105,7 @@ export default function ShareForm({ docId, alias }: { docId: string; alias?: str
             Recipient Email (optional)
           </label>
           <div className="mt-1 text-xs text-neutral-500">
-            If set, the viewer must enter this email to unlock.
+            If set, access is restricted to this recipient email.
           </div>
           <input
             value={toEmail}
@@ -120,7 +120,7 @@ export default function ShareForm({ docId, alias }: { docId: string; alias?: str
             Password (optional)
           </label>
           <div className="mt-1 text-xs text-neutral-500">
-            If set, the viewer must enter this password (in addition to email, if required).
+            If set, a password is required (in addition to recipient email, if enabled).
           </div>
           <input
             value={password}
@@ -138,12 +138,12 @@ export default function ShareForm({ docId, alias }: { docId: string; alias?: str
             onChange={(e) => setAllowDownload(e.target.checked)}
             className="mt-0.5 h-4 w-4 rounded border-neutral-700 bg-neutral-950 text-cyan-400 focus:ring-cyan-500"
           />
-          <span>
-            <span className="font-medium text-neutral-200">Allow recipient download</span>
-            <span className="mt-1 block text-xs text-neutral-500">
-              If disabled, recipients can view but cannot download.
+            <span>
+              <span className="font-medium text-neutral-200">Allow recipient download</span>
+              <span className="mt-1 block text-xs text-neutral-500">
+              If disabled, recipients can preview but cannot download.
+              </span>
             </span>
-          </span>
         </label>
 
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
@@ -152,7 +152,7 @@ export default function ShareForm({ docId, alias }: { docId: string; alias?: str
               Max Views (optional)
             </label>
             <div className="mt-1 text-xs text-neutral-500">
-              Leave blank for unlimited. Use 1 for single-view.
+              Leave blank for no share-level cap. Use 1 for single-view delivery.
             </div>
             <input
               value={maxViews}
@@ -168,7 +168,7 @@ export default function ShareForm({ docId, alias }: { docId: string; alias?: str
               Expiration (optional)
             </label>
             <div className="mt-1 text-xs text-neutral-500">
-              When set, the link stops working after this time.
+              When set, access stops at this exact time.
             </div>
             <input
               value={expiresLocal}
@@ -185,7 +185,7 @@ export default function ShareForm({ docId, alias }: { docId: string; alias?: str
             disabled={busy || !docId}
             className="rounded-lg bg-neutral-100 px-3 py-2 text-sm font-medium text-neutral-950 hover:bg-white disabled:opacity-50"
           >
-            {busy ? "Working…" : "Create + Email link"}
+            {busy ? "Creating..." : "Create share link"}
           </button>
 
           <button
@@ -193,7 +193,7 @@ export default function ShareForm({ docId, alias }: { docId: string; alias?: str
             disabled={busy || !token}
             className="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-200 hover:bg-neutral-800 disabled:opacity-50"
           >
-            Stats
+            Load stats
           </button>
         </div>
 

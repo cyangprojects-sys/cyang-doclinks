@@ -88,7 +88,7 @@ export default async function ShareTokenPage(props: {
           <ShareBadge tone="good">Encrypted</ShareBadge>
           {expiresLabel ? <ShareBadge>Expires {expiresLabel}</ShareBadge> : <ShareBadge>No expiration</ShareBadge>}
           {meta.maxViews !== null ? (
-            <ShareBadge>{meta.maxViews === 0 ? "Unlimited views" : `Max views ${meta.maxViews}`}</ShareBadge>
+            <ShareBadge>{meta.maxViews === 0 ? "No share-level view cap" : `Max views ${meta.maxViews}`}</ShareBadge>
           ) : null}
           {requireEmail ? <ShareBadge tone="warn">Recipient restricted</ShareBadge> : null}
           {meta.hasPassword ? <ShareBadge tone="warn">Password protected</ShareBadge> : null}
@@ -105,7 +105,7 @@ export default async function ShareTokenPage(props: {
             <input type="hidden" name="token" value={t} />
             <input type="hidden" name="password" value="" />
             <button type="submit" className="btn-base btn-primary rounded-xl px-4 py-2 text-sm font-medium">
-              View document
+              Open document
             </button>
           </form>
         ) : (

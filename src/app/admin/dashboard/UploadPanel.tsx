@@ -215,7 +215,7 @@ export default function UploadPanel({
       return ALLOWED_EXTS.has(ext);
     });
     if (arr.length && !allowed.length) {
-      setError("Unsupported file type. Executable file types are blocked.");
+      setError("Unsupported file type. Executable and macro-enabled file types are blocked by policy.");
       return;
     }
     if (!allowed.length) return;
@@ -269,7 +269,7 @@ export default function UploadPanel({
 
     const presignParsed = (await presignRes.json().catch(() => null)) as PresignResponse | null;
     if (!presignRes.ok || !presignParsed || presignParsed.ok !== true) {
-      const msg = (presignParsed as any)?.message || (presignParsed as any)?.error || `Init failed (${presignRes.status})`;
+      const msg = (presignParsed as any)?.message || (presignParsed as any)?.error || `Upload initialization failed (${presignRes.status})`;
       throw new Error(msg);
     }
     presignJson = presignParsed;
@@ -308,7 +308,7 @@ export default function UploadPanel({
 
     const completeJson = (await completeRes.json().catch(() => null)) as CompleteResponse | null;
     if (!completeRes.ok || !completeJson || completeJson.ok !== true) {
-      const msg = (completeJson as any)?.message || (completeJson as any)?.error || `Finalize failed (${completeRes.status})`;
+      const msg = (completeJson as any)?.message || (completeJson as any)?.error || `Upload finalization failed (${completeRes.status})`;
       throw new Error(msg);
     }
 
@@ -330,7 +330,7 @@ export default function UploadPanel({
       return;
     }
     if (!items.some((i) => i.status === "queued")) {
-      setError("Add at least one supported file first.");
+      setError("Select at least one supported file to continue.");
       return;
     }
 
@@ -356,9 +356,9 @@ export default function UploadPanel({
     <div className="rounded-xl border border-white/10 bg-white/5 p-5">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold">Upload documents</h2>
+          <h2 className="text-lg font-semibold">Upload Documents</h2>
           <p className="mt-1 text-sm text-white/60">
-            Drag and drop one or many supported files. Document title is automatically set from filename.
+            Drag and drop one or more supported files. Document title is set from filename by default.
           </p>
           <p className="mt-2 text-xs leading-relaxed text-white/60">
             Allowed types: {allowedTypeSummary}
@@ -373,7 +373,7 @@ export default function UploadPanel({
           disabled={busy || queuedCount === 0 || encryptionReady === false}
           className="rounded-lg border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold hover:bg-white/10 disabled:opacity-50"
         >
-          {busy ? "Uploading..." : `Upload${queuedCount > 0 ? ` (${queuedCount})` : ""}`}
+          {busy ? "Uploading..." : `Upload now${queuedCount > 0 ? ` (${queuedCount})` : ""}`}
         </button>
       </div>
 
@@ -405,7 +405,7 @@ export default function UploadPanel({
           }`}
         >
           <div className="text-sm font-medium text-white">Drop files here</div>
-          <div id="upload-dropzone-help" className="mt-1 text-xs text-white/60">or click to browse multiple files</div>
+          <div id="upload-dropzone-help" className="mt-1 text-xs text-white/60">or click to select files</div>
           <input
             id={inputId}
             ref={fileInputRef}
@@ -423,11 +423,11 @@ export default function UploadPanel({
       </div>
 
       <div className="mt-3 rounded-lg border border-emerald-400/10 bg-emerald-400/5 px-3 py-2 text-xs text-emerald-200/90">
-        Documents are encrypted end-to-end (AES-256-GCM). Unencrypted upload/serve paths are disabled.
+        Files are encrypted at rest and served only through controlled delivery paths.
       </div>
 
       {canCheckEncryptionStatus && encryptionReady === false && (
-        <div role="status" aria-live="polite" className="mt-2 text-sm text-red-300">{encryptionMsg ?? "Encryption not configured."}</div>
+        <div role="status" aria-live="polite" className="mt-2 text-sm text-red-300">{encryptionMsg ?? "Encryption configuration unavailable."}</div>
       )}
 
       {error && <div role="alert" aria-live="assertive" className="mt-3 text-sm text-red-300">{error}</div>}
@@ -465,10 +465,10 @@ export default function UploadPanel({
                     </td>
                     <td className="py-2 pr-2 text-white/70">
                       {item.status === "error" ? (
-                        <span className="text-red-300">{item.message || "Upload failed"}</span>
+                        <span className="text-red-300">{item.message || "Upload failed."}</span>
                       ) : item.viewUrl ? (
                         <a href={item.viewUrl} className="text-sky-300 hover:underline">
-                          Open
+                          Open document
                         </a>
                       ) : (
                         "-"

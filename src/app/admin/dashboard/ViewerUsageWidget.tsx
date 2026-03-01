@@ -112,17 +112,17 @@ export default async function ViewerUsageWidget(props: { userId: string }) {
     <section className="glass-card-strong rounded-2xl p-4">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <div className="text-sm font-medium text-white">Your usage</div>
+          <div className="text-sm font-medium text-white">Usage Snapshot</div>
           <div className="mt-0.5 text-xs text-white/60">Plan: {planName}</div>
         </div>
         <div className="flex items-center gap-2">
           {showUpgrade ? (
             <a href="/admin/upgrade" className="btn-base rounded-lg border border-cyan-400/35 bg-cyan-400/20 px-3 py-1.5 text-xs text-cyan-50 hover:bg-cyan-400/30">
-              Upgrade
+              Upgrade to Pro
             </a>
           ) : null}
           <a href="#shares" className="btn-base btn-secondary rounded-lg px-3 py-1.5 text-xs">
-            Manage shares
+            Open shares
           </a>
         </div>
       </div>
@@ -131,12 +131,12 @@ export default async function ViewerUsageWidget(props: { userId: string }) {
         <MetricCard
           title="Active shares"
           value={`${activeShares}${maxActiveShares == null ? " / inf" : ` / ${maxActiveShares}`}`}
-          note={sharesLeft == null ? "Unlimited shares" : `${sharesLeft} share${sharesLeft === 1 ? "" : "s"} left`}
+          note={sharesLeft == null ? "No hard share cap" : `${sharesLeft} share${sharesLeft === 1 ? "" : "s"} remaining`}
         />
         <MetricCard
           title="Storage"
           value={`${fmtBytes(usedStorage)}${maxStorageBytes == null ? " / inf" : ` / ${fmtBytes(maxStorageBytes)}`}`}
-          note={storageLeft == null ? "Unlimited storage" : `${fmtBytes(storageLeft)} free`}
+          note={storageLeft == null ? "No hard storage cap" : `${fmtBytes(storageLeft)} remaining`}
           warning={storageWarn ? `Storage usage is ${storagePct}% of plan limit.` : null}
         />
         <MetricCard

@@ -76,12 +76,12 @@ export default function AuthModal({
           onClick={() => signIn("google")}
           className="mt-6 w-full rounded-2xl bg-white px-5 py-3 text-sm font-medium text-black hover:bg-white/90"
         >
-          Sign in with Google
+          Continue with Google
         </button>
 
         <div className="mt-6">
           <label htmlFor="auth-org-slug" className="text-xs text-white/60">
-            Organization Slug (for SSO)
+            Organization slug (SSO)
           </label>
           <input
             id="auth-org-slug"
@@ -97,7 +97,7 @@ export default function AuthModal({
             onClick={handleSSO}
             className="mt-3 w-full rounded-2xl bg-white/10 px-5 py-3 text-sm font-medium text-white hover:bg-white/15"
           >
-            Sign in with Enterprise SSO
+            Continue with Enterprise SSO
           </button>
         </div>
 

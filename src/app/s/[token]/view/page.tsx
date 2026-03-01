@@ -119,40 +119,40 @@ export default async function ShareTokenViewPage(props: {
   });
 
   return (
-    <ShareShell token={t} title="Secure Document" subtitle="View-only document delivery with policy controls.">
+    <ShareShell token={t} title="Secure Document" subtitle="Access-controlled delivery with policy enforcement.">
       <div className="space-y-4">
         <div className="flex flex-wrap items-center gap-2">
           <ShareBadge>{typeLabel}</ShareBadge>
           <ShareBadge tone="good">Encrypted</ShareBadge>
           <ShareBadge>{meta.expiresAt ? `Expires ${new Date(meta.expiresAt).toLocaleString()}` : "No expiration"}</ShareBadge>
           {meta.maxViews !== null ? (
-            <ShareBadge>{meta.maxViews === 0 ? "Unlimited views" : `Max views ${meta.maxViews}`}</ShareBadge>
+            <ShareBadge>{meta.maxViews === 0 ? "No share-level view cap" : `Max views ${meta.maxViews}`}</ShareBadge>
           ) : null}
           <ShareBadge tone={risky ? "warn" : "good"}>Scan: {clean ? "Clean" : scanStatus}</ShareBadge>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
           <Link href="/" className="btn-base btn-secondary rounded-xl px-4 py-2 text-sm">
-            Go to Doclinks
+            Back to Doclinks
           </Link>
           {meta.allowDownload !== false || isArchive || isMicrosoftOffice ? (
             <Link href={`/s/${encodeURIComponent(t)}/download`} className="btn-base btn-secondary rounded-xl px-4 py-2 text-sm">
-              Download
+              Download file
             </Link>
           ) : null}
         </div>
 
         {risky ? (
           <div className="rounded-2xl border border-amber-500/25 bg-amber-500/10 p-4 text-sm text-amber-100">
-            This file has characteristics commonly used for phishing or malware delivery. Inline view is disabled.
+            This file has elevated risk characteristics. Inline preview is disabled by policy.
           </div>
         ) : isArchive ? (
           <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-100">
-            Archive files are download-only for security. Inline preview is disabled.
+            Archive files are download-only. Inline preview is disabled by policy.
           </div>
         ) : isMicrosoftOffice ? (
           <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-100">
-            Microsoft Office files are download-only. Inline preview is disabled.
+            Microsoft Office files are download-only. Inline preview is disabled by policy.
           </div>
         ) : (
           <div className="overflow-hidden rounded-2xl border border-white/15 bg-black/20">

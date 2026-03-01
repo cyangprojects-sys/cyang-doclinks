@@ -24,22 +24,22 @@ export default function PasswordGate({
   const passwordInputId = `share-password-${token}`;
 
   const title = useMemo(() => {
-    if (hasPassword && requireEmail) return "Password and recipient email required";
-    if (hasPassword) return "Password required";
-    if (requireEmail) return "Recipient email required";
+    if (hasPassword && requireEmail) return "Recipient verification required";
+    if (hasPassword) return "Password verification required";
+    if (requireEmail) return "Recipient email verification required";
     return "Continue";
   }, [hasPassword, requireEmail]);
 
   const buttonText = useMemo(() => {
-    if (busy) return hasPassword ? "Unlocking..." : "Continuing...";
-    return hasPassword ? "Unlock" : "Continue";
+        if (busy) return hasPassword ? "Verifying..." : "Continuing...";
+    return hasPassword ? "Verify and continue" : "Continue";
   }, [busy, hasPassword]);
 
   return (
     <div className="glass-card rounded-2xl p-4 sm:p-5">
       <h2 className="text-base font-semibold tracking-tight text-white">{title}</h2>
       <p className="mt-1 text-sm text-white/65">
-        This link is protected. Enter the required credentials to continue.
+        This document is access-controlled. Enter the required credentials to continue.
       </p>
 
       {requireEmail ? (

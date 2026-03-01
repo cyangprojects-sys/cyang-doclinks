@@ -41,7 +41,7 @@ export default function SharePasswordForm(props: {
           className="btn-base btn-secondary rounded-lg px-2 py-1 text-xs disabled:opacity-50"
           title="Set or change password"
         >
-          {busy ? "..." : props.hasPassword ? "Change" : "Set"}
+          {busy ? "..." : props.hasPassword ? "Update" : "Set"}
         </button>
       </form>
 
@@ -62,10 +62,9 @@ export default function SharePasswordForm(props: {
           className="btn-base btn-secondary rounded-lg px-2 py-1 text-xs disabled:opacity-50"
           title="Remove password protection"
         >
-          Clear
+          Remove
         </button>
       </form>
     </div>
   );
 }
-

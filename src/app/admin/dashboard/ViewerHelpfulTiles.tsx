@@ -202,8 +202,8 @@ export default async function ViewerHelpfulTiles({ userId, orgId, hasOrgId }: Pr
     <section className="glass-card-strong rounded-2xl p-4">
       <div className="flex items-center justify-between">
         <div>
-          <div className="text-sm font-medium text-white">Helpful</div>
-          <div className="mt-1 text-xs text-white/60">Quick shortcuts for your own content</div>
+          <div className="text-sm font-medium text-white">Quick Insights</div>
+          <div className="mt-1 text-xs text-white/60">Shortcuts for your controlled delivery workflow</div>
         </div>
         <div className="flex gap-2">
           {!hasDocs ? chip("Tracking off") : null}
@@ -224,7 +224,7 @@ export default async function ViewerHelpfulTiles({ userId, orgId, hasOrgId }: Pr
               </Link>
             </div>
           ) : (
-            <div className="text-sm text-white/60">-</div>
+            <div className="text-sm text-white/60">No view activity this month.</div>
           )}
         </Tile>
 
@@ -244,7 +244,7 @@ export default async function ViewerHelpfulTiles({ userId, orgId, hasOrgId }: Pr
               ))}
             </div>
           ) : (
-            <div className="text-sm text-white/60">-</div>
+            <div className="text-sm text-white/60">No recent shares.</div>
           )}
         </Tile>
 
@@ -266,7 +266,7 @@ export default async function ViewerHelpfulTiles({ userId, orgId, hasOrgId }: Pr
               ))}
             </div>
           ) : (
-            <div className="text-sm text-white/60">-</div>
+            <div className="text-sm text-white/60">No items expiring in the next 7 days.</div>
           )}
         </Tile>
       </div>

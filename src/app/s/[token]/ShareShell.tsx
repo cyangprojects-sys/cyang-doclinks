@@ -55,7 +55,7 @@ export function ShareShell({
         </div>
         <section className="glass-card-strong rounded-2xl p-4 sm:p-6">{children}</section>
         <div className="mt-4 text-xs text-white/55">
-          Protected by cyang.io. Shared links may expire or be revoked.
+          Controlled delivery by cyang.io. Access may expire or be revoked by policy.
         </div>
       </div>
     </main>

@@ -30,9 +30,8 @@ export default function RevokeShareForm(props: {
         className="btn-base btn-danger rounded-lg px-3 py-1.5 text-xs disabled:cursor-not-allowed disabled:opacity-50"
         title={props.revoked ? "Already revoked" : "Revoke this share"}
       >
-        {props.revoked ? "Revoked" : busy ? "Revoking..." : "Revoke"}
+        {props.revoked ? "Revoked" : busy ? "Revoking..." : "Revoke access"}
       </button>
     </form>
   );
 }
-

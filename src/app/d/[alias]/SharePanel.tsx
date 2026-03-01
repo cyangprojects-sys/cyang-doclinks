@@ -163,7 +163,7 @@ export default function SharePanel({
                     className="rounded-lg bg-black px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
                     title={!docId ? "docId missing" : ""}
                 >
-                    {busy ? "Working…" : "Create share token"}
+                    {busy ? "Creating..." : "Create share token"}
                 </button>
             </div>
 
@@ -179,7 +179,7 @@ export default function SharePanel({
                     <h3 className="mb-2 text-sm font-semibold">Tokens</h3>
 
                     {shares.length === 0 ? (
-                        <p className="text-sm text-neutral-600">No tokens yet.</p>
+                        <p className="text-sm text-neutral-600">No share tokens yet.</p>
                     ) : (
                         <ul className="space-y-2">
                             {shares.map((r) => {
@@ -221,7 +221,7 @@ export default function SharePanel({
                                                     disabled={busy}
                                                     className="rounded-md border border-neutral-300 px-2 py-1 text-xs disabled:opacity-50"
                                                 >
-                                                    Stats
+                                                    Load stats
                                                 </button>
 
                                                 <button
@@ -237,7 +237,7 @@ export default function SharePanel({
 
                                         {isSelected ? (
                                             <div className="mt-2 rounded-md bg-neutral-50 p-2 text-xs text-neutral-600">
-                                                Share link generated.
+                                                Share token selected.
                                             </div>
                                         ) : null}
                                     </li>
@@ -252,7 +252,7 @@ export default function SharePanel({
                     <h3 className="mb-2 text-sm font-semibold">Selected token</h3>
 
                     {!selectedRow ? (
-                        <p className="text-sm text-neutral-600">Select a token.</p>
+                        <p className="text-sm text-neutral-600">Select a token to review details.</p>
                     ) : (
                         <div className="space-y-2 text-sm">
                             <div className="font-mono text-xs break-all">{selectedRow.token}</div>
@@ -295,7 +295,7 @@ export default function SharePanel({
                                         </div>
                                         <div>
                                             <span className="text-neutral-600">Expires:</span>{" "}
-                                            {stats.row.expires_at ? fmtIso(stats.row.expires_at) : "No"}
+                                            {stats.row.expires_at ? fmtIso(stats.row.expires_at) : "Not set"}
                                         </div>
                                         <div>
                                             <span className="text-neutral-600">Revoked:</span>{" "}
@@ -308,7 +308,7 @@ export default function SharePanel({
                                     </div>
                                 ) : (
                                     <p className="text-sm text-neutral-600">
-                                        Click <span className="font-medium">Stats</span> on a token to load.
+                                        Click <span className="font-medium">Load stats</span> on a token to fetch current server data.
                                     </p>
                                 )}
                             </div>

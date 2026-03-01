@@ -211,7 +211,7 @@ export default function SharesTableClient(props: { shares: ShareRow[]; nowTs: nu
             }}
             className="btn-base btn-secondary rounded-xl px-3 py-2 text-sm md:mb-[2px]"
           >
-            Clear
+            Reset filters
           </button>
         </div>
 
@@ -241,7 +241,7 @@ export default function SharesTableClient(props: { shares: ShareRow[]; nowTs: nu
             </thead>
             <tbody>
               {filtered.length === 0 ? (
-                <tr><td colSpan={10} className="px-4 py-6 text-white/60">No shares match your filters.</td></tr>
+                <tr><td colSpan={10} className="px-4 py-6 text-white/60">No share records match these filters.</td></tr>
               ) : (
                 filtered.map((s) => {
                   const st = computeStatus(s, nowTs);
@@ -258,7 +258,7 @@ export default function SharesTableClient(props: { shares: ShareRow[]; nowTs: nu
                       </td>
                       <td className="px-4 py-3">
                         <div className="font-mono text-xs text-white/90">{tokenShort}</div>
-                        <div className="mt-1 text-xs text-white/50">Hidden share path</div>
+                        <div className="mt-1 text-xs text-white/50">Tokenized access path</div>
                       </td>
                       <td className="px-4 py-3">
                         <div className="text-white">{s.doc_title || "Untitled"}</div>
@@ -284,12 +284,12 @@ export default function SharesTableClient(props: { shares: ShareRow[]; nowTs: nu
                           <form action={extendShareExpirationAction}>
                             <input type="hidden" name="token" value={s.token} />
                             <input type="hidden" name="days" value="7" />
-                            <button type="submit" disabled={!!s.revoked_at} className="btn-base btn-secondary rounded-lg px-2.5 py-1.5 text-xs disabled:opacity-40">+7d</button>
+                            <button type="submit" disabled={!!s.revoked_at} className="btn-base btn-secondary rounded-lg px-2.5 py-1.5 text-xs disabled:opacity-40">Extend 7d</button>
                           </form>
                           <form action={extendShareExpirationAction}>
                             <input type="hidden" name="token" value={s.token} />
                             <input type="hidden" name="days" value="30" />
-                            <button type="submit" disabled={!!s.revoked_at} className="btn-base btn-secondary rounded-lg px-2.5 py-1.5 text-xs disabled:opacity-40">+30d</button>
+                            <button type="submit" disabled={!!s.revoked_at} className="btn-base btn-secondary rounded-lg px-2.5 py-1.5 text-xs disabled:opacity-40">Extend 30d</button>
                           </form>
                           <form action={resetShareViewsCountAction}>
                             <input type="hidden" name="token" value={s.token} />
@@ -297,14 +297,14 @@ export default function SharesTableClient(props: { shares: ShareRow[]; nowTs: nu
                           </form>
                           <form action={forceSharePasswordResetAction}>
                             <input type="hidden" name="token" value={s.token} />
-                            <button type="submit" disabled={!!s.revoked_at} className="btn-base btn-secondary rounded-lg px-2.5 py-1.5 text-xs disabled:opacity-40">Clear pw</button>
+                            <button type="submit" disabled={!!s.revoked_at} className="btn-base btn-secondary rounded-lg px-2.5 py-1.5 text-xs disabled:opacity-40">Clear password</button>
                           </form>
                           <form
                             action={setShareMaxViewsAction}
                             onSubmit={(e) => {
                               const input = (e.currentTarget.querySelector('input[name="maxViews"]') as HTMLInputElement) || null;
                               if (!input) return;
-                              const v = window.prompt("Set max views (number). Use 0 for unlimited. Leave blank to clear.", s.max_views == null ? "" : String(s.max_views));
+                              const v = window.prompt("Set max views. Use 0 for no cap. Leave blank to clear.", s.max_views == null ? "" : String(s.max_views));
                               if (v === null) {
                                 e.preventDefault();
                                 return;
@@ -314,7 +314,7 @@ export default function SharesTableClient(props: { shares: ShareRow[]; nowTs: nu
                           >
                             <input type="hidden" name="token" value={s.token} />
                             <input type="hidden" name="maxViews" defaultValue="" />
-                            <button type="submit" disabled={!!s.revoked_at} className="btn-base btn-secondary rounded-lg px-2.5 py-1.5 text-xs disabled:opacity-40">Set max</button>
+                            <button type="submit" disabled={!!s.revoked_at} className="btn-base btn-secondary rounded-lg px-2.5 py-1.5 text-xs disabled:opacity-40">Set max views</button>
                           </form>
                           <RevokeShareForm token={s.token} revoked={Boolean(s.revoked_at)} action={revokeDocShareAction} />
                         </div>
@@ -353,13 +353,13 @@ export default function SharesTableClient(props: { shares: ShareRow[]; nowTs: nu
           >
             <input type="hidden" name="tokens" value={JSON.stringify(selectedTokens)} />
             <input type="hidden" name="days" defaultValue="7" />
-            <button type="submit" disabled={!anySelected} className="btn-base btn-secondary rounded-xl px-3 py-2 text-sm disabled:opacity-40">Extend selected...</button>
+            <button type="submit" disabled={!anySelected} className="btn-base btn-secondary rounded-xl px-3 py-2 text-sm disabled:opacity-40">Extend selected</button>
           </form>
           <button type="button" disabled={!anySelected} onClick={() => { if (anySelected) downloadCsvForSelected(); }} className="btn-base btn-secondary rounded-xl px-3 py-2 text-sm disabled:opacity-40">
             Export CSV
           </button>
           <button type="button" onClick={() => setSelected({})} className="btn-base btn-secondary rounded-xl px-3 py-2 text-sm">
-            Clear selection
+            Clear selected
           </button>
         </div>
       </div>
