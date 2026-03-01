@@ -124,30 +124,15 @@ async function userOwnsDoc(userId: string, docId: string): Promise<boolean> {
 }
 
 async function getDocAvailabilityHint(docId: string): Promise<string | null> {
-  try {
-    const rows = (await sql`
-      select
-        coalesce(encryption_enabled, false) as encryption_enabled,
-        coalesce(moderation_status::text, 'active') as moderation_status,
-        coalesce(scan_status::text, 'unscanned') as scan_status,
-        coalesce(status::text, 'ready') as status,
-        nullif(coalesce(r2_key::text, ''), '') as r2_key,
-        coalesce(o.disabled, false) as org_disabled,
-        coalesce(o.is_active, true) as org_active
-      from public.docs
-      left join public.organizations o on o.id = public.docs.org_id
-      where id = ${docId}::uuid
-      limit 1
-    `) as unknown as Array<{
-      encryption_enabled: boolean;
-      moderation_status: string;
-      scan_status: string;
-      status: string;
-      r2_key: string | null;
-      org_disabled: boolean;
-      org_active: boolean;
-    }>;
-
+  async function fromRows(rows: Array<{
+    encryption_enabled: boolean;
+    moderation_status: string;
+    scan_status: string;
+    status: string;
+    r2_key: string | null;
+    org_disabled?: boolean;
+    org_active?: boolean;
+  }>) {
     const r = rows?.[0];
     if (!r) return null;
 
@@ -173,8 +158,57 @@ async function getDocAvailabilityHint(docId: string): Promise<string | null> {
     if (scan !== "clean") {
       return `Serving is blocked due to scan status: ${r.scan_status}. File must be clean before it can be viewed or downloaded.`;
     }
+    return null;
+  }
+
+  try {
+    const rows = (await sql`
+      select
+        coalesce(encryption_enabled, false) as encryption_enabled,
+        coalesce(moderation_status::text, 'active') as moderation_status,
+        coalesce(scan_status::text, 'unscanned') as scan_status,
+        coalesce(status::text, 'ready') as status,
+        nullif(coalesce(r2_key::text, ''), '') as r2_key,
+        coalesce(o.disabled, false) as org_disabled,
+        coalesce(o.is_active, true) as org_active
+      from public.docs
+      left join public.organizations o on o.id = public.docs.org_id
+      where id = ${docId}::uuid
+      limit 1
+    `) as unknown as Array<{
+      encryption_enabled: boolean;
+      moderation_status: string;
+      scan_status: string;
+      status: string;
+      r2_key: string | null;
+      org_disabled: boolean;
+      org_active: boolean;
+    }>;
+    return await fromRows(rows);
   } catch {
-    // ignore
+    // Compatibility fallback when organizations columns/table differ across envs.
+    try {
+      const rows = (await sql`
+        select
+          coalesce(encryption_enabled, false) as encryption_enabled,
+          coalesce(moderation_status::text, 'active') as moderation_status,
+          coalesce(scan_status::text, 'unscanned') as scan_status,
+          coalesce(status::text, 'ready') as status,
+          nullif(coalesce(r2_key::text, ''), '') as r2_key
+        from public.docs
+        where id = ${docId}::uuid
+        limit 1
+      `) as unknown as Array<{
+        encryption_enabled: boolean;
+        moderation_status: string;
+        scan_status: string;
+        status: string;
+        r2_key: string | null;
+      }>;
+      return await fromRows(rows);
+    } catch {
+      // ignore
+    }
   }
   return null;
 }

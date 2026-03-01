@@ -112,6 +112,12 @@ export async function GET(req: NextRequest) {
         absMaxBytes,
       });
 
+      // Unknown scanner result is retryable, not a final quarantine verdict.
+      // This avoids permanently blocking fresh uploads when scanner is degraded.
+      if (verdict.verdict === "unknown") {
+        throw new Error(`SCAN_UNKNOWN_VERDICT:${(verdict.flags || []).join(",")}`);
+      }
+
       const isHigh = verdict.riskLevel === "high";
       const scanStatus =
         verdict.verdict === "clean"
