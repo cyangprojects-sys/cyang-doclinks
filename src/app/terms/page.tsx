@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getSupportEmail } from "@/lib/legal";
+import { SiteShell } from "@/app/components/SiteShell";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -8,7 +9,8 @@ export default function TermsPage() {
   const supportEmail = getSupportEmail();
 
   return (
-    <main className="mx-auto max-w-3xl px-4 py-10">
+    <SiteShell maxWidth="full">
+      <main className="mx-auto w-full max-w-5xl px-4 py-10">
       <div className="flex items-center justify-between">
         <div>
           <div className="text-xs text-white/60">cyang.io</div>
@@ -87,6 +89,7 @@ export default function TermsPage() {
           .
         </p>
       </div>
-    </main>
+      </main>
+    </SiteShell>
   );
 }

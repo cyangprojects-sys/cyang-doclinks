@@ -1,5 +1,6 @@
 import Link from "next/link";
 import ReportForm from "./ReportForm";
+import { SiteShell } from "@/app/components/SiteShell";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,7 +16,8 @@ export default async function ReportPage(props: {
   const alias = Array.isArray(aliasRaw) ? aliasRaw[0] : aliasRaw;
 
   return (
-    <main className="mx-auto max-w-2xl px-4 py-10">
+    <SiteShell maxWidth="full">
+      <main className="mx-auto w-full max-w-4xl px-4 py-10">
       <div className="flex items-center justify-between gap-3">
         <div>
           <div className="text-xs text-white/60">cyang.io</div>
@@ -42,6 +44,7 @@ export default async function ReportPage(props: {
         Abuse reports are reviewed by the owner/admin team. Intentional false reports may result in
         access restrictions.
       </div>
-    </main>
+      </main>
+    </SiteShell>
   );
 }

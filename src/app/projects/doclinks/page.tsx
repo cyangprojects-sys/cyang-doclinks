@@ -13,7 +13,7 @@ export const metadata: Metadata = {
 
 export default function DoclinksPage() {
   return (
-    <SiteShell maxWidth="6xl">
+    <SiteShell maxWidth="full">
       <section className="relative mt-16 grid gap-10 md:grid-cols-12 md:items-end">
         <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
           <div className="absolute -top-24 left-10 h-64 w-64 rounded-full bg-emerald-500/12 blur-3xl" />
