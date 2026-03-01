@@ -308,6 +308,7 @@ export default async function AdminDocDetailPage({
               <label className="text-xs text-neutral-400">
                 Create alias
                 <input
+                  aria-label="Create alias"
                   name="alias"
                   placeholder="new-alias"
                   className="mt-1 w-40 rounded-md border border-neutral-700 bg-black/40 px-2 py-1 text-xs text-neutral-100"
@@ -316,6 +317,7 @@ export default async function AdminDocDetailPage({
               <label className="text-xs text-neutral-400">
                 TTL days
                 <input
+                  aria-label="Alias TTL days"
                   type="number"
                   name="expiresDays"
                   min={1}
@@ -335,6 +337,7 @@ export default async function AdminDocDetailPage({
                 <label className="text-xs text-neutral-400">
                   Rename alias
                   <input
+                    aria-label="Rename alias"
                     name="newAlias"
                     defaultValue={alias}
                     className="mt-1 w-44 rounded-md border border-neutral-700 bg-black/40 px-2 py-1 text-xs text-neutral-100"
@@ -351,6 +354,7 @@ export default async function AdminDocDetailPage({
               <label className="text-xs text-neutral-400">
                 Set expiration (days)
                 <input
+                  aria-label="Set alias expiration days"
                   type="number"
                   name="days"
                   min={1}

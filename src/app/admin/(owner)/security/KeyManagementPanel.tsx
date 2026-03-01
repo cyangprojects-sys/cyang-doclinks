@@ -228,6 +228,7 @@ export default function KeyManagementPanel() {
           <div className="text-xs font-semibold text-white/80">Active key switch</div>
           <div className="mt-1 text-[11px] text-white/60">Current: {activeId || "none"}</div>
           <select
+            aria-label="Select active key"
             value={activateKey}
             onChange={(e) => setActivateKey(e.target.value)}
             className="mt-2 w-full rounded-lg border border-white/10 bg-black/40 px-2 py-2 text-xs outline-none focus:border-white/20"
@@ -240,6 +241,7 @@ export default function KeyManagementPanel() {
             ))}
           </select>
           <input
+            aria-label="Activation reason"
             type="text"
             value={activateReason}
             onChange={(e) => setActivateReason(e.target.value)}
@@ -262,6 +264,7 @@ export default function KeyManagementPanel() {
           </p>
           <div className="mt-2 grid gap-2 md:grid-cols-3">
             <select
+              aria-label="Rotation from key"
               value={fromKey}
               onChange={(e) => setFromKey(e.target.value)}
               className="rounded-lg border border-white/10 bg-black/40 px-2 py-2 text-xs outline-none focus:border-white/20"
@@ -274,6 +277,7 @@ export default function KeyManagementPanel() {
               ))}
             </select>
             <select
+              aria-label="Rotation to key"
               value={toKey}
               onChange={(e) => setToKey(e.target.value)}
               className="rounded-lg border border-white/10 bg-black/40 px-2 py-2 text-xs outline-none focus:border-white/20"
@@ -286,6 +290,7 @@ export default function KeyManagementPanel() {
               ))}
             </select>
             <input
+              aria-label="Rotation batch size"
               type="number"
               min={1}
               max={2000}

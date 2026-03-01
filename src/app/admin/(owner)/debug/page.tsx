@@ -87,7 +87,10 @@ export default async function AdminDebugPage({
       </p>
 
       <form className="mt-6 flex gap-2" action="/admin/debug" method="get">
+        <label htmlFor="admin-debug-alias" className="sr-only">Alias</label>
         <input
+          id="admin-debug-alias"
+          aria-label="Alias to debug"
           name="alias"
           defaultValue={alias}
           placeholder="alias (e.g. the-mom-test-en-2)"

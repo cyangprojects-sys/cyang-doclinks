@@ -53,8 +53,8 @@ function Pill({ children }: { children: React.ReactNode }) {
   return <span className="ui-badge inline-flex items-center rounded-full px-2 py-0.5 text-[11px]">{children}</span>;
 }
 
-function FieldLabel({ children }: { children: React.ReactNode }) {
-  return <label className="text-xs text-white/65">{children}</label>;
+function FieldLabel({ children, htmlFor }: { children: React.ReactNode; htmlFor: string }) {
+  return <label htmlFor={htmlFor} className="text-xs text-white/65">{children}</label>;
 }
 
 function TextInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
@@ -71,7 +71,7 @@ function EventCheckboxes({ defaultEvents, namePrefix }: { defaultEvents: string[
     <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
       {ALL_EVENTS.map((e) => (
         <label key={`${namePrefix}-${e}`} className="flex items-center gap-2 text-xs text-white/75">
-          <input type="checkbox" name="events" value={e} defaultChecked={defaultEvents.includes(e)} className="h-4 w-4 rounded border-white/20 bg-black/30" />
+          <input aria-label={`Webhook event ${e}`} type="checkbox" name="events" value={e} defaultChecked={defaultEvents.includes(e)} className="h-4 w-4 rounded border-white/20 bg-black/30" />
           <span className="font-mono text-[11px]">{e}</span>
         </label>
       ))}
@@ -145,25 +145,25 @@ export default async function WebhooksPage() {
             <form action={createWebhookAction} className="mt-3 space-y-3">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
-                  <FieldLabel>Name</FieldLabel>
-                  <TextInput name="name" placeholder="Production" />
+                  <FieldLabel htmlFor="create-webhook-name">Name</FieldLabel>
+                  <TextInput id="create-webhook-name" aria-label="Webhook name" name="name" placeholder="Production" />
                 </div>
                 <div className="flex items-end gap-2">
                   <label className="flex items-center gap-2 text-xs text-white/75">
-                    <input type="checkbox" name="enabled" defaultChecked className="h-4 w-4 rounded border-white/20 bg-black/30" />
+                    <input aria-label="Webhook enabled" type="checkbox" name="enabled" defaultChecked className="h-4 w-4 rounded border-white/20 bg-black/30" />
                     Enabled
                   </label>
                 </div>
               </div>
 
               <div>
-                <FieldLabel>URL</FieldLabel>
-                <TextInput name="url" placeholder="https://example.com/webhook" />
+                <FieldLabel htmlFor="create-webhook-url">URL</FieldLabel>
+                <TextInput id="create-webhook-url" aria-label="Webhook URL" name="url" placeholder="https://example.com/webhook" />
               </div>
 
               <div>
-                <FieldLabel>Secret (optional)</FieldLabel>
-                <TextInput name="secret" placeholder="shared secret" />
+                <FieldLabel htmlFor="create-webhook-secret">Secret (optional)</FieldLabel>
+                <TextInput id="create-webhook-secret" aria-label="Webhook secret" name="secret" placeholder="shared secret" />
               </div>
 
               <div>
@@ -227,23 +227,23 @@ export default async function WebhooksPage() {
                   <input type="hidden" name="id" value={h.id} />
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div>
-                      <FieldLabel>Name</FieldLabel>
-                      <TextInput name="name" defaultValue={h.name} />
+                      <FieldLabel htmlFor={`webhook-name-${h.id}`}>Name</FieldLabel>
+                      <TextInput id={`webhook-name-${h.id}`} aria-label={`Webhook name ${h.name}`} name="name" defaultValue={h.name} />
                     </div>
                     <div className="flex items-end gap-2">
                       <label className="flex items-center gap-2 text-xs text-white/75">
-                        <input type="checkbox" name="enabled" defaultChecked={h.enabled} className="h-4 w-4 rounded border-white/20 bg-black/30" />
+                        <input aria-label={`Enabled ${h.name}`} type="checkbox" name="enabled" defaultChecked={h.enabled} className="h-4 w-4 rounded border-white/20 bg-black/30" />
                         Enabled
                       </label>
                     </div>
                   </div>
                   <div>
-                    <FieldLabel>URL</FieldLabel>
-                    <TextInput name="url" defaultValue={h.url} />
+                    <FieldLabel htmlFor={`webhook-url-${h.id}`}>URL</FieldLabel>
+                    <TextInput id={`webhook-url-${h.id}`} aria-label={`Webhook URL ${h.name}`} name="url" defaultValue={h.url} />
                   </div>
                   <div>
-                    <FieldLabel>Secret (optional)</FieldLabel>
-                    <TextInput name="secret" defaultValue={h.secret ?? ""} />
+                    <FieldLabel htmlFor={`webhook-secret-${h.id}`}>Secret (optional)</FieldLabel>
+                    <TextInput id={`webhook-secret-${h.id}`} aria-label={`Webhook secret ${h.name}`} name="secret" defaultValue={h.secret ?? ""} />
                   </div>
                   <div>
                     <div className="text-xs text-white/65">Events</div>

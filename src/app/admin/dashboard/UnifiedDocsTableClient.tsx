@@ -86,6 +86,7 @@ function SortButton({
 }) {
   return (
     <button
+      aria-label={`Sort by ${label}`}
       className={`inline-flex items-center gap-1 text-xs font-medium ${active ? "text-white" : "text-white/70 hover:text-white"}`}
       onClick={onClick}
       type="button"
@@ -243,6 +244,7 @@ export default function UnifiedDocsTableClient(props: {
         <div className="flex flex-col gap-2">
           <div className="text-xs text-white/60">Search</div>
           <input
+            aria-label="Search documents"
             value={q}
             onChange={(e) => {
               syncUrl({ docQ: e.target.value, docPage: 1 });
@@ -274,6 +276,7 @@ export default function UnifiedDocsTableClient(props: {
           <label className="flex items-center gap-2">
             <span>Page size</span>
             <select
+              aria-label="Document table page size"
               value={pageSize}
               onChange={(e) => {
                 const next = Number(e.target.value);
@@ -333,13 +336,13 @@ export default function UnifiedDocsTableClient(props: {
                     ) : null}
                     <td className="px-4 py-3">
                       <div className="flex flex-col gap-1">
-                        <Link href={`/admin/docs/${r.doc_id}`} className="text-white hover:underline" title="Open per-document detail">
+                        <Link aria-label={`Open document ${r.doc_title || r.doc_id}`} href={`/admin/docs/${r.doc_id}`} className="text-white hover:underline" title="Open per-document detail">
                           {r.doc_title || "Untitled"}
                         </Link>
                         <div className="flex flex-wrap items-center gap-2 text-xs text-white/60">
                           <span className="font-mono">{r.doc_id}</span>
                           {r.alias ? (
-                            <Link href={`/d/${r.alias}`} target="_blank" className="text-cyan-200 hover:underline">/d/{r.alias}</Link>
+                            <Link aria-label={`Open alias ${r.alias}`} href={`/d/${r.alias}`} target="_blank" className="text-cyan-200 hover:underline">/d/{r.alias}</Link>
                           ) : null}
                         </div>
                       </div>

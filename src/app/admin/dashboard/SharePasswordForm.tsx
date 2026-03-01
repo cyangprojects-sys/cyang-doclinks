@@ -28,6 +28,7 @@ export default function SharePasswordForm(props: {
       >
         <input type="hidden" name="token" value={props.token} />
         <input
+          aria-label="Share password"
           name="password"
           type="password"
           value={pw}

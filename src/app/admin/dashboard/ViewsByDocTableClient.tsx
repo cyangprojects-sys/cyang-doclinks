@@ -107,6 +107,7 @@ export default function ViewsByDocTableClient(props: { rows: ViewsByDocRow[] }) 
             <label htmlFor="view-doc-search" className="block text-xs text-white/60">Search</label>
             <input
               id="view-doc-search"
+              aria-label="Search viewed documents"
               value={q}
               onChange={(e) => {
                 const v = e.target.value;
@@ -122,6 +123,7 @@ export default function ViewsByDocTableClient(props: { rows: ViewsByDocRow[] }) 
             <label htmlFor="view-doc-limit" className="block text-xs text-white/60">Show</label>
             <select
               id="view-doc-limit"
+              aria-label="Viewed documents limit"
               value={limit == null ? "all" : String(limit)}
               onChange={(e) => {
                 const v = e.target.value;
@@ -211,6 +213,7 @@ export default function ViewsByDocTableClient(props: { rows: ViewsByDocRow[] }) 
                       <div className="flex flex-wrap justify-end gap-2">
                         <button
                           type="button"
+                          aria-label={`Copy link for ${r.doc_title || r.doc_id}`}
                           onClick={async () => {
                             const link = r.alias ? `${window.location.origin}/d/${r.alias}` : r.doc_id;
                             await navigator.clipboard.writeText(link);
@@ -221,16 +224,16 @@ export default function ViewsByDocTableClient(props: { rows: ViewsByDocRow[] }) 
                         </button>
                         <form action={revokeAllSharesForDocAction}>
                           <input type="hidden" name="docId" value={r.doc_id} />
-                          <button type="submit" className="btn-base btn-secondary rounded-lg px-2.5 py-1.5 text-xs">Revoke shares</button>
+                          <button aria-label={`Revoke shares for ${r.doc_title || r.doc_id}`} type="submit" className="btn-base btn-secondary rounded-lg px-2.5 py-1.5 text-xs">Revoke shares</button>
                         </form>
                         <form action={extendAliasExpirationAction}>
                           <input type="hidden" name="docId" value={r.doc_id} />
                           <input type="hidden" name="days" value="7" />
-                          <button type="submit" className="btn-base btn-secondary rounded-lg px-2.5 py-1.5 text-xs">+7d</button>
+                          <button aria-label={`Extend alias seven days for ${r.doc_title || r.doc_id}`} type="submit" className="btn-base btn-secondary rounded-lg px-2.5 py-1.5 text-xs">+7d</button>
                         </form>
                         <form action={disableAliasForDocAction}>
                           <input type="hidden" name="docId" value={r.doc_id} />
-                          <button type="submit" className="btn-base btn-danger rounded-lg px-2.5 py-1.5 text-xs">Disable alias</button>
+                          <button aria-label={`Disable alias for ${r.doc_title || r.doc_id}`} type="submit" className="btn-base btn-danger rounded-lg px-2.5 py-1.5 text-xs">Disable alias</button>
                         </form>
                       </div>
                     </td>

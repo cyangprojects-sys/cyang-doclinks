@@ -48,6 +48,7 @@ export default function AbuseActionsClient({ reportId, token, docId }: Props) {
       </label>
       <input
         id={`abuse-reason-${reportId}`}
+        aria-label="Moderation reason"
         value={reason}
         onChange={(e) => setReason(e.target.value)}
         placeholder="Reason (optional)"

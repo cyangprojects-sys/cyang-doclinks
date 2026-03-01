@@ -28,6 +28,7 @@ export default function DeleteDocForm({
       <input type="hidden" name="docId" value={docId} />
       <button
         type="submit"
+        aria-label={`Delete document ${title}`}
         disabled={pending}
         className="btn-base btn-danger rounded-lg px-3 py-1.5 text-xs disabled:cursor-not-allowed disabled:opacity-60"
         title="Delete document"
@@ -37,4 +38,3 @@ export default function DeleteDocForm({
     </form>
   );
 }
-

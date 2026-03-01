@@ -14,8 +14,10 @@ export default function CreateApiKeyForm() {
     <div className="space-y-3">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
         <div className="flex-1">
-          <label className="block text-sm text-white/75">Key name</label>
+          <label htmlFor="api-key-name" className="block text-sm text-white/75">Key name</label>
           <input
+            id="api-key-name"
+            aria-label="API key name"
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="e.g. CI deploy bot"

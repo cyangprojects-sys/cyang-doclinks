@@ -278,19 +278,19 @@ export default async function SecurityTelemetryPage(props: {
         <form action="/api/admin/security/freeze" method="post" className="mt-3 grid gap-2 sm:grid-cols-2">
           <label className="flex items-center justify-between gap-3 rounded-lg border border-red-500/30 bg-black/30 px-3 py-2 text-xs text-red-100">
             <span>Global serve freeze</span>
-            <input type="checkbox" name="globalServeDisabled" value="1" defaultChecked={freeze.globalServeDisabled} />
+            <input aria-label="Global serve freeze" type="checkbox" name="globalServeDisabled" value="1" defaultChecked={freeze.globalServeDisabled} />
           </label>
           <label className="flex items-center justify-between gap-3 rounded-lg border border-red-500/30 bg-black/30 px-3 py-2 text-xs text-red-100">
             <span>Share route freeze</span>
-            <input type="checkbox" name="shareServeDisabled" value="1" defaultChecked={freeze.shareServeDisabled} />
+            <input aria-label="Share route freeze" type="checkbox" name="shareServeDisabled" value="1" defaultChecked={freeze.shareServeDisabled} />
           </label>
           <label className="flex items-center justify-between gap-3 rounded-lg border border-red-500/30 bg-black/30 px-3 py-2 text-xs text-red-100">
             <span>Alias route freeze</span>
-            <input type="checkbox" name="aliasServeDisabled" value="1" defaultChecked={freeze.aliasServeDisabled} />
+            <input aria-label="Alias route freeze" type="checkbox" name="aliasServeDisabled" value="1" defaultChecked={freeze.aliasServeDisabled} />
           </label>
           <label className="flex items-center justify-between gap-3 rounded-lg border border-red-500/30 bg-black/30 px-3 py-2 text-xs text-red-100">
             <span>Ticket route freeze</span>
-            <input type="checkbox" name="ticketServeDisabled" value="1" defaultChecked={freeze.ticketServeDisabled} />
+            <input aria-label="Ticket route freeze" type="checkbox" name="ticketServeDisabled" value="1" defaultChecked={freeze.ticketServeDisabled} />
           </label>
           <div className="sm:col-span-2">
             <button
@@ -478,11 +478,11 @@ export default async function SecurityTelemetryPage(props: {
               <input type="hidden" name="action" value="invite" />
               <label className="text-xs text-white/70">
                 Email
-                <input name="email" type="email" required className="mt-1 block rounded border border-white/15 bg-black/40 px-2 py-1 text-xs text-white" />
+                <input aria-label="Invite email" name="email" type="email" required className="mt-1 block rounded border border-white/15 bg-black/40 px-2 py-1 text-xs text-white" />
               </label>
               <label className="text-xs text-white/70">
                 Role
-                <select name="role" defaultValue="viewer" className="mt-1 block rounded border border-white/15 bg-black/40 px-2 py-1 text-xs text-white">
+                <select aria-label="Invite role" name="role" defaultValue="viewer" className="mt-1 block rounded border border-white/15 bg-black/40 px-2 py-1 text-xs text-white">
                   <option value="viewer">viewer</option>
                   <option value="admin">admin</option>
                   <option value="owner">owner</option>
@@ -490,7 +490,7 @@ export default async function SecurityTelemetryPage(props: {
               </label>
               <label className="text-xs text-white/70">
                 Expires (days)
-                <input name="expires_days" type="number" min={1} max={90} defaultValue={7} className="mt-1 block w-24 rounded border border-white/15 bg-black/40 px-2 py-1 text-xs text-white" />
+                <input aria-label="Invite expiration days" name="expires_days" type="number" min={1} max={90} defaultValue={7} className="mt-1 block w-24 rounded border border-white/15 bg-black/40 px-2 py-1 text-xs text-white" />
               </label>
               <button type="submit" className="rounded border border-white/15 bg-white/10 px-3 py-1.5 text-xs hover:bg-white/15">
                 Create Invite
@@ -515,12 +515,12 @@ export default async function SecurityTelemetryPage(props: {
                         <form action="/api/admin/security/org-access" method="post" className="flex items-center gap-2">
                           <input type="hidden" name="action" value="set_member_role" />
                           <input type="hidden" name="user_id" value={m.user_id} />
-                          <select name="role" defaultValue={m.role} className="rounded border border-white/15 bg-black/40 px-2 py-1 text-xs text-white">
+                          <select aria-label={`Role for ${m.email}`} name="role" defaultValue={m.role} className="rounded border border-white/15 bg-black/40 px-2 py-1 text-xs text-white">
                             <option value="viewer">viewer</option>
                             <option value="admin">admin</option>
                             <option value="owner">owner</option>
                           </select>
-                          <button type="submit" className="rounded border border-white/15 bg-white/5 px-2 py-1 text-xs hover:bg-white/10">Save</button>
+                          <button aria-label={`Save role for ${m.email}`} type="submit" className="rounded border border-white/15 bg-white/5 px-2 py-1 text-xs hover:bg-white/10">Save</button>
                         </form>
                       </td>
                       <td className="px-3 py-2 text-xs text-white/60">{m.joined_at}</td>
@@ -528,7 +528,7 @@ export default async function SecurityTelemetryPage(props: {
                         <form action="/api/admin/security/org-access" method="post">
                           <input type="hidden" name="action" value="remove_member" />
                           <input type="hidden" name="user_id" value={m.user_id} />
-                          <button type="submit" className="rounded border border-red-500/30 bg-red-500/10 px-2 py-1 text-xs text-red-200 hover:bg-red-500/20">
+                          <button aria-label={`Remove member ${m.email}`} type="submit" className="rounded border border-red-500/30 bg-red-500/10 px-2 py-1 text-xs text-red-200 hover:bg-red-500/20">
                             Remove
                           </button>
                         </form>
@@ -559,7 +559,7 @@ export default async function SecurityTelemetryPage(props: {
                         <form action="/api/admin/security/org-access" method="post">
                           <input type="hidden" name="action" value="revoke_invite" />
                           <input type="hidden" name="invite_id" value={i.id} />
-                          <button type="submit" className="rounded border border-red-500/30 bg-red-500/10 px-2 py-1 text-xs text-red-200 hover:bg-red-500/20">
+                          <button aria-label={`Revoke invite for ${i.email}`} type="submit" className="rounded border border-red-500/30 bg-red-500/10 px-2 py-1 text-xs text-red-200 hover:bg-red-500/20">
                             Revoke
                           </button>
                         </form>
@@ -612,6 +612,7 @@ export default async function SecurityTelemetryPage(props: {
                             <input type="hidden" name="permission" value={perm} />
                             <input type="hidden" name="role" value={role} />
                             <select
+                              aria-label={`Permission override for ${perm} / ${role}`}
                               name="allowed"
                               defaultValue={current === "deny" ? "0" : "1"}
                               className="rounded border border-white/15 bg-black/40 px-2 py-1 text-xs text-white"

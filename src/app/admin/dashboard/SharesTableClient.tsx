@@ -177,6 +177,7 @@ export default function SharesTableClient(props: { shares: ShareRow[]; nowTs: nu
             <label htmlFor="share-search" className="block text-xs text-white/60">Search</label>
             <input
               id="share-search"
+              aria-label="Search shares"
               value={q}
               onChange={(e) => {
                 const v = e.target.value;
@@ -190,6 +191,7 @@ export default function SharesTableClient(props: { shares: ShareRow[]; nowTs: nu
             <label htmlFor="share-status" className="block text-xs text-white/60">Status</label>
             <select
               id="share-status"
+              aria-label="Filter share status"
               value={status}
               onChange={(e) => {
                 const v = e.target.value as StatusFilter;

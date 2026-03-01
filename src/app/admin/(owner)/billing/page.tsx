@@ -32,19 +32,22 @@ function ToggleRow({
   description: string;
   defaultChecked: boolean;
 }) {
+  const inputId = `billing-flag-${name}`;
   return (
-    <label className="flex items-start justify-between gap-4 rounded-xl border border-white/12 bg-black/20 p-3.5">
+    <div className="flex items-start justify-between gap-4 rounded-xl border border-white/12 bg-black/20 p-3.5">
       <div>
-        <div className="text-sm font-medium text-white">{title}</div>
+        <label htmlFor={inputId} className="text-sm font-medium text-white">{title}</label>
         <div className="mt-1 text-xs text-white/60">{description}</div>
       </div>
       <input
+        id={inputId}
+        aria-label={title}
         type="checkbox"
         name={name}
         defaultChecked={defaultChecked}
         className="mt-1 h-4 w-4 rounded border-white/20 bg-black/30"
       />
-    </label>
+    </div>
   );
 }
 
@@ -322,8 +325,10 @@ export default async function BillingSettingsPage({
           <form action="/api/admin/billing/view-override" method="post" className="space-y-2 rounded-lg border border-neutral-800 bg-black/30 p-3">
             <input type="hidden" name="action" value="set" />
             <input type="hidden" name="ownerId" value={u.id} />
-            <label className="block text-xs text-neutral-400">Hours</label>
+            <label htmlFor="view-override-hours" className="block text-xs text-neutral-400">Hours</label>
             <input
+              id="view-override-hours"
+              aria-label="Override duration in hours"
               type="number"
               name="hours"
               min={1}
@@ -331,8 +336,10 @@ export default async function BillingSettingsPage({
               defaultValue={24}
               className="w-full rounded-md border border-white/15 bg-black/25 px-2 py-2 text-sm text-white"
             />
-            <label className="block text-xs text-neutral-400">Reason (required in ops)</label>
+            <label htmlFor="view-override-set-reason" className="block text-xs text-neutral-400">Reason (required in ops)</label>
             <input
+              id="view-override-set-reason"
+              aria-label="Override reason"
               type="text"
               name="reason"
               placeholder="Incident response / temporary support"
@@ -349,8 +356,10 @@ export default async function BillingSettingsPage({
           <form action="/api/admin/billing/view-override" method="post" className="space-y-2 rounded-lg border border-neutral-800 bg-black/30 p-3">
             <input type="hidden" name="action" value="clear" />
             <input type="hidden" name="ownerId" value={u.id} />
-            <label className="block text-xs text-neutral-400">Reason</label>
+            <label htmlFor="view-override-clear-reason" className="block text-xs text-neutral-400">Reason</label>
             <input
+              id="view-override-clear-reason"
+              aria-label="Clear override reason"
               type="text"
               name="reason"
               placeholder="Override no longer needed"
