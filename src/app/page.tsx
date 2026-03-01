@@ -5,9 +5,9 @@ import { SiteShell } from "./components/SiteShell";
 import { DemoDocButton } from "@/components/DemoDocButton";
 
 export const metadata: Metadata = {
-  title: "cyang.io - Chang Yang",
+  title: "Doclinks - Secure Document Delivery Infrastructure",
   description:
-    "Chang Yang's personal hub for practical projects and security-first product builds.",
+    "Deliver sensitive documents without losing control. Access-controlled delivery, enforced policies, and audit visibility.",
 };
 
 export default function HomePage() {
@@ -16,22 +16,22 @@ export default function HomePage() {
       <section className="mt-12 grid gap-6 lg:grid-cols-12 lg:items-end">
         <div className="lg:col-span-8">
           <span className="ui-badge inline-flex rounded-full px-3 py-1 text-xs uppercase tracking-[0.16em]">
-            Security-first document systems
+            Disciplined. Intentional. Controlled.
           </span>
           <h1 className="font-editorial mt-5 max-w-4xl text-5xl leading-[1.02] tracking-tight text-white sm:text-6xl lg:text-7xl">
-            Modern document delivery,
-            <span className="block text-white/70">without loose edges.</span>
+            Deliver documents
+            <span className="block text-white/70">without losing control.</span>
           </h1>
           <p className="mt-7 max-w-3xl text-lg leading-relaxed text-white/70">
-            cyang.io builds practical software with strict defaults, clean operator workflows, and fast response patterns.
-            Product UX stays minimal. Policy and controls stay non-negotiable.
+            Doclinks is secure document delivery infrastructure for small teams that send sensitive files externally.
+            Access is tokenized, controlled, and auditable.
           </p>
           <div className="mt-10 flex flex-wrap items-center gap-3">
-            <Link href="/projects" className="btn-base btn-primary rounded-xl px-6 py-3 text-sm font-semibold">
-              View projects
+            <Link href="/signin" className="btn-base btn-primary rounded-xl px-6 py-3 text-sm font-semibold">
+              Start Free
             </Link>
-            <Link href="/projects/doclinks" className="btn-base btn-secondary rounded-xl px-6 py-3 text-sm">
-              Explore Doclinks
+            <Link href="/projects/doclinks#security-model" className="btn-base btn-secondary rounded-xl px-6 py-3 text-sm">
+              View Security
             </Link>
             <DemoDocButton
               label="Open demo document"
@@ -39,9 +39,9 @@ export default function HomePage() {
             />
           </div>
           <div className="mt-9 grid gap-3 sm:grid-cols-3">
-            <Stat title="Posture" value="Secure by default" />
-            <Stat title="Primary" value="Document delivery infra" />
-            <Stat title="Mode" value="Fast iteration, strict checks" />
+            <Stat title="Primary Buyer" value="Small teams (1-25 employees)" />
+            <Stat title="Delivery Model" value="Controlled, policy-enforced access" />
+            <Stat title="Risk Posture" value="Scan-gated + auditable delivery" />
           </div>
         </div>
 
@@ -50,22 +50,22 @@ export default function HomePage() {
             <div className="text-xs uppercase tracking-[0.14em] text-white/55">Featured product</div>
             <h2 className="mt-2 text-2xl font-semibold tracking-tight text-white">Doclinks</h2>
             <p className="mt-3 text-sm leading-relaxed text-white/70">
-              Share high-sensitivity files with enforceable controls, malware gating, and immutable audit trails.
+              Built for operations and compliance-minded teams sending contracts, tax records, HR documents, case files, and reports.
             </p>
             <div className="mt-5 flex flex-wrap gap-2">
               <Pill>Encrypted uploads</Pill>
-              <Pill>MIME + signature checks</Pill>
-              <Pill>Executable/macro blocking</Pill>
-              <Pill>Alias + token controls</Pill>
-              <Pill>Owner moderation</Pill>
-              <Pill>Cron scanning pipeline</Pill>
+              <Pill>Policy-enforced access</Pill>
+              <Pill>Expiring links</Pill>
+              <Pill>Audit events</Pill>
+              <Pill>Scan-gated delivery</Pill>
+              <Pill>Tokenized access</Pill>
             </div>
             <div className="mt-6 flex flex-wrap gap-2">
-              <Link href="/admin" className="btn-base btn-primary rounded-xl px-4 py-2.5 text-sm font-semibold">
-                Open admin
+              <Link href="/signin" className="btn-base btn-primary rounded-xl px-4 py-2.5 text-sm font-semibold">
+                Start Free
               </Link>
-              <Link href="/api/health" className="btn-base btn-secondary rounded-xl px-4 py-2.5 text-sm">
-                Health endpoint
+              <Link href="/projects/doclinks#pricing" className="btn-base btn-secondary rounded-xl px-4 py-2.5 text-sm">
+                View Pricing
               </Link>
             </div>
           </div>
@@ -74,41 +74,41 @@ export default function HomePage() {
 
       <section className="mt-11 grid gap-4 md:grid-cols-3">
         <FeatureCard
-          title="Projects"
-          description="A curated list of tools and experiments with ongoing maintenance."
-          href="/projects"
-          cta="Browse projects"
+          title="How It Works"
+          description="Upload securely, set access policy, and deliver with control in three clear steps."
+          href="/projects/doclinks#how-it-works"
+          cta="See workflow"
         />
         <FeatureCard
-          title="Doclinks"
-          description="Secure document sharing with monetization controls and compliance logging."
-          href="/projects/doclinks"
-          cta="Read product page"
+          title="Security"
+          description="System-level controls are enforced by default, not left to user behavior."
+          href="/projects/doclinks#security-model"
+          cta="Review controls"
         />
         <FeatureCard
-          title="Operations"
-          description="Upload docs, monitor activity, review shares, and manage security controls."
-          href="/admin"
-          cta="Open console"
+          title="Pricing"
+          description="Transparent Free vs Pro limits with no hidden capability math."
+          href="/projects/doclinks#pricing"
+          cta="Compare plans"
         />
       </section>
 
       <section className="mt-11 grid gap-4 lg:grid-cols-12">
         <div className="glass-card rounded-2xl p-6 lg:col-span-7">
-          <h3 className="text-xl font-semibold tracking-tight text-white">Operating principles</h3>
+          <h3 className="text-xl font-semibold tracking-tight text-white">Why teams choose controlled delivery</h3>
           <div className="mt-5 grid gap-3 sm:grid-cols-2">
-            <Mini title="Secure defaults" body="Controls enforced on the server, not hidden in client state." />
-            <Mini title="Compliance clarity" body="Auditable actions, explicit overrides, and predictable policies." />
-            <Mini title="Lean architecture" body="Small surface area and practical tooling over complexity." />
-            <Mini title="Fast feedback loops" body="Ship in small increments, verify locally, then deploy." />
+            <Mini title="Not storage" body="Doclinks is controlled delivery infrastructure, not cloud file storage." />
+            <Mini title="System-enforced controls" body="Security policies are applied by architecture, not optional user steps." />
+            <Mini title="Audit visibility" body="Delivery activity is tracked so teams can review and defend process decisions." />
+            <Mini title="Scan-first delivery" body="Files flagged as infected, failed, or quarantined are blocked from delivery." />
           </div>
         </div>
         <div className="glass-card rounded-2xl p-6 lg:col-span-5">
-          <h3 className="text-xl font-semibold tracking-tight text-white">Start quickly</h3>
+          <h3 className="text-xl font-semibold tracking-tight text-white">Address common objections early</h3>
           <div className="mt-5 space-y-3">
-            <Step title="Upload supported files" desc="Docs, sheets, presentations, media, and archives with strict type enforcement." href="/admin/upload" />
-            <Step title="Create a share" desc="Issue an alias or share token with expiration and limits." href="/admin/dashboard#shares" />
-            <Step title="Test viewer flow" desc="Open a protected link and verify access gate behavior." href="/projects/doclinks" />
+            <Step title="Why not Drive/Dropbox?" desc="Because this is controlled delivery with enforceable policies and audit visibility." href="/projects/doclinks#why-doclinks" />
+            <Step title="Is this actually secure?" desc="Review the security model and enforced controls before adopting." href="/projects/doclinks#security-model" />
+            <Step title="Is adoption heavy?" desc="See the 3-step workflow and start without infrastructure migration." href="/projects/doclinks#how-it-works" />
           </div>
         </div>
       </section>

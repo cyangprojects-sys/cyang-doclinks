@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { requireUser } from "@/lib/authz";
 import { getBillingFlags } from "@/lib/settings";
 import { getPlanForUser } from "@/lib/monetization";
@@ -29,7 +30,7 @@ export default async function ViewerUpgradePage(props: {
       <div>
         <h1 className="text-3xl font-semibold tracking-tight">Upgrade to Pro</h1>
         <p className="mt-2 text-sm text-white/70">
-          Unlock higher limits and billing-backed entitlement with Stripe checkout.
+          Pro is built for teams that need higher delivery capacity, stronger access control, and expanded visibility into how documents move.
         </p>
       </div>
 
@@ -73,11 +74,16 @@ export default async function ViewerUpgradePage(props: {
             <li>No audit export</li>
             <li>Basic analytics only (view count)</li>
           </ul>
+          <div className="mt-5">
+            <Link href="/signin" className="btn-base btn-secondary rounded-lg px-4 py-2.5 text-sm font-medium">
+              Start Free
+            </Link>
+          </div>
         </article>
 
         <article className="glass-card-strong rounded-2xl border border-amber-300/35 p-6 shadow-[0_16px_50px_rgba(222,176,82,0.16)]">
           <div className="ui-premium inline-flex rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em]">Pro</div>
-          <h2 className="mt-3 text-xl font-semibold tracking-tight text-white">Pro Plan</h2>
+          <h2 className="mt-3 text-xl font-semibold tracking-tight text-white">Pro - $12/month</h2>
           <ul className="mt-4 space-y-2.5 text-sm text-white/85">
             <li>5 GB total storage</li>
             <li>100 MB max per file</li>
@@ -87,8 +93,7 @@ export default async function ViewerUpgradePage(props: {
             <li>Audit export</li>
             <li>API + webhooks</li>
             <li>Standard abuse throttling</li>
-            <li>Stripe Customer Portal access</li>
-            <li>Grace-state protection on payment failures</li>
+            <li>Advanced controls</li>
           </ul>
           <form action="/api/billing/checkout" method="post" className="mt-5">
             <button

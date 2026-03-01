@@ -28,8 +28,8 @@ export function SiteHeader() {
         </nav>
 
         <div className="flex items-center gap-2">
-          <Link href="/admin" className="btn-base btn-primary rounded-xl px-4 py-2.5 text-sm font-semibold">
-            Admin
+          <Link href="/signin" className="btn-base btn-primary rounded-xl px-4 py-2.5 text-sm font-semibold">
+            Start Free
           </Link>
         </div>
       </div>

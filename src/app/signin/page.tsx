@@ -16,7 +16,7 @@ export default function SignInPage() {
     <div className="min-h-[calc(100vh-64px)] flex items-center justify-center px-4">
       <div className="w-full max-w-md rounded-2xl border border-white/10 bg-black/30 backdrop-blur p-6 shadow-lg">
         <h1 className="text-2xl font-semibold tracking-tight">Sign in</h1>
-        <p className="mt-2 text-sm text-white/70">Choose a sign-in method.</p>
+        <p className="mt-2 text-sm text-white/70">Access your controlled delivery workspace.</p>
 
         <div className="mt-6 space-y-3">
           <button
@@ -29,7 +29,7 @@ export default function SignInPage() {
           >
             <div className="font-medium">Continue with Google</div>
             <div className="text-xs text-white/60">
-              {googleConfigured ? "Personal email accounts" : "Google sign-in not configured"}
+              {googleConfigured ? "Small team and owner accounts" : "Google sign-in not configured"}
             </div>
           </button>
 
@@ -43,13 +43,13 @@ export default function SignInPage() {
           >
             <div className="font-medium">Continue with Enterprise SSO</div>
             <div className="text-xs text-white/60">
-              {enterpriseConfigured ? "Organization accounts (OIDC)" : "Enterprise SSO not configured"}
+              {enterpriseConfigured ? "Organization-managed identity (OIDC)" : "Enterprise SSO not configured"}
             </div>
           </button>
         </div>
 
         <p className="mt-6 text-xs text-white/50">
-          If you don&apos;t see the option you need, contact your administrator.
+          Calm onboarding, enforced controls. If you do not see your sign-in method, contact your administrator.
         </p>
       </div>
     </div>

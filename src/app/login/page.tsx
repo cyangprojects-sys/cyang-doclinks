@@ -12,7 +12,7 @@ export default function LoginPage() {
                     <div className="text-xs text-white/60">cyang.io</div>
                     <h1 className="mt-2 text-2xl font-semibold">Sign in</h1>
                     <p className="mt-2 text-sm text-white/70">
-                        This admin area is restricted to the site owner.
+                        Access the controlled document delivery console.
                         <span className="ml-1 text-white/60">(Enterprise SSO appears only if configured.)</span>
                     </p>
 
@@ -32,7 +32,7 @@ export default function LoginPage() {
 
                     <div className="mt-6 text-xs text-white/50">
                         <p>
-                            If you’re not the owner email, you’ll be denied.
+                            Access is restricted by policy and role.
                         </p>
                         <p className="mt-2">
                             <Link href="/" className="text-white/70 hover:underline">

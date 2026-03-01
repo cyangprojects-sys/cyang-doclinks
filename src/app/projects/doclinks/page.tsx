@@ -8,7 +8,7 @@ import { DEMO_DOC_URL } from "@/lib/demo";
 export const metadata: Metadata = {
   title: "Doclinks — cyang.io",
   description:
-    "Doclinks is a security-first file sharing platform with encryption by default, immutable audit logging, strict share gating, MIME/signature validation, and owner/admin operations.",
+    "Doclinks is secure document delivery infrastructure with policy-enforced access, scan-gated delivery, and audit visibility.",
 };
 
 export default function DoclinksPage() {
@@ -27,14 +27,13 @@ export default function DoclinksPage() {
           </p>
 
           <h1 className="mt-6 text-4xl font-semibold tracking-tight md:text-5xl">
-            Secure document sharing
-            <span className="block text-white/70">with short, usable links.</span>
+            Secure document delivery infrastructure
+            <span className="block text-white/70">for teams that cannot lose control.</span>
           </h1>
 
           <p className="mt-5 max-w-2xl text-base leading-relaxed text-white/70">
-            Doclinks uploads supported business file types and serves them behind strict, server-side access checks.
-            Links are friendly; rules are enforced. The goal is polished UX with a
-            smaller, safer surface area.
+            Built for operations and compliance managers at small organizations, Doclinks delivers sensitive documents
+            with token-based access, enforced expiration controls, and audit visibility.
           </p>
 
           <div className="mt-6 flex flex-wrap gap-2 text-xs text-white/60">
@@ -51,16 +50,18 @@ export default function DoclinksPage() {
 
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
             <Link
-              href="/admin"
+              href="/signin"
               className="rounded-2xl bg-white px-6 py-3 text-sm font-medium text-black hover:bg-white/90"
             >
-              Upload files
+              Start Free
             </Link>
 
-            <DemoDocButton
-              label="Open demo document →"
+            <Link
+              href="/projects/doclinks#security-model"
               className="rounded-2xl bg-white/10 px-6 py-3 text-sm font-medium text-white ring-1 ring-white/10 hover:bg-white/15"
-            />
+            >
+              View Security
+            </Link>
           </div>
 
           <div className="mt-10 grid gap-4 sm:grid-cols-3">
@@ -77,18 +78,18 @@ export default function DoclinksPage() {
             <div className="mt-4 space-y-3">
               <Step
                 n="1"
-                title="Resolve link"
-                desc="Map a short alias or token to a document record."
+                title="Upload securely"
+                desc="Upload business documents through encrypted storage paths."
               />
               <Step
                 n="2"
-                title="Authorize"
-                desc="Apply rules (expiry, max views, rate limits, policy checks)."
+                title="Set access policy"
+                desc="Apply expiration, view limits, and recipient controls."
               />
               <Step
                 n="3"
-                title="Serve + log"
-                desc="Return the file (or stream) and write an access event to Postgres."
+                title="Deliver with control"
+                desc="Serve access through tokenized checks and audit every event."
               />
             </div>
 
@@ -106,7 +107,7 @@ export default function DoclinksPage() {
         </div>
       </section>
 
-      <section className="mt-20 md:mt-28">
+      <section id="how-it-works" className="mt-20 md:mt-28">
         <div className="flex items-end justify-between gap-6">
           <div>
             <h2 className="text-2xl font-semibold tracking-tight">What it optimizes for</h2>
@@ -125,20 +126,20 @@ export default function DoclinksPage() {
         <div className="mt-6 grid gap-4 md:grid-cols-3">
           <Feature
             title="Small surface area"
-            desc="Minimal pages, minimal endpoints, predictable behavior."
+            desc="Purpose-built for external delivery, without broad storage complexity."
           />
           <Feature
-            title="Security by default"
-            desc="Server-side checks, strict validation, and rate limiting."
+            title="Controlled delivery"
+            desc="Policy enforcement happens on every serve request."
           />
           <Feature
             title="Auditability"
-            desc="Access logs and analytics hooks for operational clarity."
+            desc="Access visibility and exportable audit records support review."
           />
         </div>
       </section>
 
-      <section className="mt-16">
+      <section id="security-model" className="mt-16">
         <h2 className="text-2xl font-semibold tracking-tight">Security model (high level)</h2>
         <div className="mt-6 grid gap-4 md:grid-cols-12">
           <div className="md:col-span-7">
@@ -153,12 +154,14 @@ export default function DoclinksPage() {
                   not public; access is mediated by the app.
                 </ListItem>
                 <ListItem>
-                  <b className="text-white/85">Track access.</b> Every request can be logged
-                  (doc, path, time, hashed IP, user agent) for review.
+                  <b className="text-white/85">Access is auditable.</b> Delivery activity can be tracked for review and export.
                 </ListItem>
                 <ListItem>
                   <b className="text-white/85">Operational guardrails.</b> Rate limiting and
                   policy clamps reduce abuse and accidental leaks.
+                </ListItem>
+                <ListItem>
+                  <b className="text-white/85">Scan-gated delivery.</b> Files flagged as infected, failed, or quarantined are blocked.
                 </ListItem>
               </ul>
             </div>
@@ -178,14 +181,12 @@ export default function DoclinksPage() {
         </div>
       </section>
 
-      {/* Competitive angle */}
-      <section className="mt-16">
+      <section id="why-doclinks" className="mt-16">
         <div className="flex items-end justify-between gap-6">
           <div>
-            <h2 className="text-2xl font-semibold tracking-tight">Why it’s built this way</h2>
+            <h2 className="text-2xl font-semibold tracking-tight">Why not Drive or Dropbox?</h2>
             <p className="mt-2 max-w-2xl text-sm leading-relaxed text-white/70">
-              Most “document sharing” products lean heavily on the secrecy of a link. Doclinks
-              treats links as convenience — and enforces policy on every request.
+              Those tools optimize for broad storage and collaboration. Doclinks is built for controlled external delivery of sensitive documents.
             </p>
           </div>
         </div>
@@ -196,29 +197,28 @@ export default function DoclinksPage() {
               <h3 className="text-sm font-medium text-white/90">Doclinks vs typical share links</h3>
               <div className="mt-4 space-y-3">
                 <Compare
-                  leftTitle="Policy"
-                  left="Server-side checks every time (expiry, max views, rate limits)."
+                  leftTitle="Policy enforcement"
+                  left="Server-side checks on every request (expiry, max views, throttles)."
                   rightTitle="Typical"
                   right="Often: “If you have the link, you’re in.”"
                 />
                 <Compare
                   leftTitle="Observability"
-                  left="Audit logs + rollups so you can review access."
+                  left="Access visibility + audit exports for operational review."
                   rightTitle="Typical"
                   right="Little-to-no reliable access history."
                 />
                 <Compare
-                  leftTitle="Surface area"
-                  left="Keep endpoints minimal; harden the critical path."
+                  leftTitle="Delivery posture"
+                  left="Built for controlled delivery of sensitive external documents."
                   rightTitle="Typical"
-                  right="Many features → more places to be wrong."
+                  right="Built for general storage and broad sharing convenience."
                 />
               </div>
 
               <div className="mt-6 rounded-2xl bg-black/40 p-4 ring-1 ring-white/10">
                 <p className="text-xs leading-relaxed text-white/60">
-                  Note: “better than competitor” here means a design target — smaller surface
-                  area, stronger defaults, and more operational clarity.
+                  The goal is clear: controlled delivery, enforced architecture, and operational clarity.
                 </p>
               </div>
             </div>
@@ -229,11 +229,47 @@ export default function DoclinksPage() {
               <h3 className="text-sm font-medium text-white/90">What you can control</h3>
               <div className="mt-4 grid gap-3">
                 <Control title="Time-box access" desc="Reduce risk with expiration." />
-                <Control title="Cap usage" desc="Max views stops infinite forwarding." />
+                <Control title="Cap usage" desc="View caps reduce uncontrolled resharing." />
                 <Control title="Revoke instantly" desc="Disable a token server-side." />
                 <Control title="Review access" desc="Logs help you validate behavior." />
               </div>
             </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="pricing" className="mt-16">
+        <h2 className="text-2xl font-semibold tracking-tight">Pricing</h2>
+        <p className="mt-2 max-w-2xl text-sm leading-relaxed text-white/70">
+          Transparent numbers. Clear capability differences.
+        </p>
+        <div className="mt-6 grid gap-4 md:grid-cols-2">
+          <div className="rounded-3xl bg-white/5 p-6 ring-1 ring-white/10">
+            <div className="text-lg font-semibold text-white">Free</div>
+            <div className="mt-1 text-sm text-white/65">$0/month</div>
+            <ul className="mt-4 space-y-2 text-sm text-white/75">
+              <li>25 MB max upload</li>
+              <li>100 MB total storage</li>
+              <li>Limited active shares</li>
+              <li>Basic audit logs</li>
+            </ul>
+            <Link href="/signin" className="mt-5 inline-flex rounded-xl bg-white px-4 py-2 text-sm font-medium text-black hover:bg-white/90">
+              Start Free
+            </Link>
+          </div>
+          <div className="rounded-3xl border border-amber-300/35 bg-white/5 p-6 ring-1 ring-white/10">
+            <div className="ui-premium inline-flex rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em]">Pro</div>
+            <div className="mt-3 text-lg font-semibold text-white">$12/month</div>
+            <ul className="mt-4 space-y-2 text-sm text-white/85">
+              <li>100 MB max upload</li>
+              <li>5 GB total storage</li>
+              <li>Custom expiration controls</li>
+              <li>Audit export</li>
+              <li>Advanced access controls</li>
+            </ul>
+            <Link href="/admin/upgrade" className="mt-5 inline-flex rounded-xl bg-white px-4 py-2 text-sm font-medium text-black hover:bg-white/90">
+              View Pro Plan
+            </Link>
           </div>
         </div>
       </section>
@@ -262,13 +298,13 @@ export default function DoclinksPage() {
                   <b className="text-white/85">Encryption is default.</b> New uploads are encrypted and legacy migration tooling is in place.
                 </ListItem>
                 <ListItem>
-                  <b className="text-white/85">Share enforcement is stricter.</b> Expiry, revocation, max-views, password gates, and quarantine/scan blocks are enforced server-side.
+                  <b className="text-white/85">Access control is enforced.</b> Expiry, revocation, max-views, password gates, and scan-state blocks are enforced server-side.
                 </ListItem>
                 <ListItem>
                   <b className="text-white/85">Viewer hardening shipped.</b> Public inline flows are view-oriented with reduced direct-open and raw URL exposure.
                 </ListItem>
                 <ListItem>
-                  <b className="text-white/85">Monetization guardrails active.</b> View, storage, and active-share limits are enforced by plan.
+                  <b className="text-white/85">Plan guardrails are active.</b> View, storage, and active-share limits are enforced by plan.
                 </ListItem>
               </ul>
             </div>
@@ -301,7 +337,7 @@ export default function DoclinksPage() {
           />
           <Faq
             q="Is this a competitor clone?"
-            a="No. It’s a focused subset with a smaller surface area: fast sharing + strong defaults + auditability."
+            a="No. It is focused on controlled external document delivery with enforced policies and audit visibility."
           />
           <Faq
             q="What’s next?"

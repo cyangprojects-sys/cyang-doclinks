@@ -32,6 +32,10 @@ export default function AboutPage() {
           direction is simple: enforce controls on the server, keep policy deterministic, and make
           operations reviewable through immutable logs.
         </p>
+        <p className="mt-4 max-w-3xl text-sm leading-relaxed text-white/65">
+          Doclinks was built out of frustration with how casually sensitive documents are shared.
+          Security should not depend on user behavior alone. Policies should be built in, not bolted on.
+        </p>
 
         <div className="mt-10 grid gap-4 md:grid-cols-12">
           <div className="md:col-span-7">
