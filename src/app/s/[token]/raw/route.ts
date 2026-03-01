@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { cookies } from "next/headers";
 import { consumeShareTokenView } from "@/lib/resolveDoc";
-import { incrementMonthlyViews } from "@/lib/monetization";
+import { assertCanServeView, incrementMonthlyViews } from "@/lib/monetization";
 import { getClientIpFromHeaders, getUserAgentFromHeaders, logDocAccess } from "@/lib/audit";
 import crypto from "crypto";
 import { rateLimit, rateLimitHeaders, stableHash } from "@/lib/rateLimit";
@@ -401,6 +401,10 @@ export async function GET(
     // Count view against the owner's monthly quota.
     if (ownerIdForLimit) {
       try {
+        const allowed = await assertCanServeView(ownerIdForLimit);
+        if (!allowed.ok) {
+          return await deny("owner_plan_throttled", 429, allowed.message || "Temporarily unavailable");
+        }
         await incrementMonthlyViews(ownerIdForLimit, 1);
       } catch {
         // ignore usage counter failures

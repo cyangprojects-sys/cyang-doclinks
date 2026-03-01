@@ -1,6 +1,8 @@
 import { sql } from "@/lib/db";
 import { getBillingFlags } from "@/lib/settings";
 import { hasActiveViewLimitOverride } from "@/lib/viewLimitOverride";
+import { rateLimit } from "@/lib/rateLimit";
+import { logSecurityEvent } from "@/lib/securityTelemetry";
 
 export type Plan = {
   id: "free" | "pro" | (string & {});
@@ -248,6 +250,12 @@ export type LimitResult =
   | { ok: true }
   | { ok: false; error: "LIMIT_REACHED"; message: string };
 
+function envInt(name: string, fallback: number, min: number = 1): number {
+  const raw = Number(process.env[name]);
+  if (!Number.isFinite(raw)) return fallback;
+  return Math.max(min, Math.floor(raw));
+}
+
 export async function assertCanUpload(args: {
   userId: string;
   sizeBytes: number | null;
@@ -285,10 +293,46 @@ export async function assertCanCreateShare(ownerId: string): Promise<LimitResult
   if (!billingRes.flags.enforcePlanLimits) return { ok: true };
 
   const plan = await getPlanForUser(ownerId);
-  if (plan.maxActiveShares == null) return { ok: true };
-
   const active = await getActiveShareCountForOwner(ownerId);
-  if (active >= plan.maxActiveShares) {
+
+  if (plan.id === "pro") {
+    const softActiveShares = envInt("PRO_SOFT_MAX_ACTIVE_SHARES", 1000);
+    if (active >= softActiveShares) {
+      void logSecurityEvent({
+        type: "pro_share_soft_cap_reached",
+        severity: "medium",
+        actorUserId: ownerId,
+        scope: "share_create",
+        message: "Pro active-share soft cap reached",
+        meta: { activeShares: active, softCap: softActiveShares },
+      });
+      return { ok: false, error: "LIMIT_REACHED", message: "Active share limit reached for this account." };
+    }
+
+    const perMinute = await rateLimit({
+      scope: "pro:share_create:user:min",
+      id: ownerId,
+      limit: envInt("PRO_SHARE_CREATE_PER_MIN", 90),
+      windowSeconds: 60,
+    });
+    if (!perMinute.ok) {
+      return { ok: false, error: "LIMIT_REACHED", message: "Too many share creates. Please retry shortly." };
+    }
+
+    const burst = await rateLimit({
+      scope: "pro:share_create:user:burst",
+      id: ownerId,
+      limit: envInt("PRO_SHARE_CREATE_BURST_LIMIT", 300),
+      windowSeconds: envInt("PRO_SHARE_CREATE_BURST_WINDOW_SECONDS", 300),
+    });
+    if (!burst.ok) {
+      return { ok: false, error: "LIMIT_REACHED", message: "Share creation burst limit reached. Please retry shortly." };
+    }
+
+    return { ok: true };
+  }
+
+  if (plan.maxActiveShares != null && active >= plan.maxActiveShares) {
     return { ok: false, error: "LIMIT_REACHED", message: "Active share limit reached." };
   }
   return { ok: true };
@@ -302,6 +346,41 @@ export async function assertCanServeView(ownerId: string): Promise<LimitResult> 
   if (overridden) return { ok: true };
 
   const plan = await getPlanForUser(ownerId);
+  if (plan.id === "pro") {
+    void maybeFlagHeavyProEgress(ownerId);
+    const softViews = envInt("PRO_SOFT_MAX_VIEWS_PER_MONTH", 50000);
+    const used = await getMonthlyViewCount(ownerId);
+    if (used >= softViews) {
+      const throttle = await rateLimit({
+        scope: "pro:view_overage:user:min",
+        id: ownerId,
+        limit: envInt("PRO_VIEW_OVERAGE_PER_MIN", 120),
+        windowSeconds: 60,
+      });
+      if (!throttle.ok) {
+        return { ok: false, error: "LIMIT_REACHED", message: "Traffic temporarily throttled. Please retry shortly." };
+      }
+
+      const alertGate = await rateLimit({
+        scope: "pro:view_soft_cap_alert:user:day",
+        id: ownerId,
+        limit: 1,
+        windowSeconds: 86400,
+      });
+      if (alertGate.ok && alertGate.count === 1) {
+        void logSecurityEvent({
+          type: "pro_view_soft_cap_exceeded",
+          severity: "medium",
+          actorUserId: ownerId,
+          scope: "view_limit",
+          message: "Pro monthly view soft cap exceeded",
+          meta: { viewsUsed: used, softCap: softViews },
+        });
+      }
+    }
+    return { ok: true };
+  }
+
   if (plan.maxViewsPerMonth == null) return { ok: true };
 
   const used = await getMonthlyViewCount(ownerId);
@@ -309,6 +388,90 @@ export async function assertCanServeView(ownerId: string): Promise<LimitResult> 
     return { ok: false, error: "LIMIT_REACHED", message: "Monthly view limit reached." };
   }
   return { ok: true };
+}
+
+export async function getMonthlyEstimatedEgressBytesForOwner(ownerId: string): Promise<number> {
+  try {
+    const rows = (await sql`
+      select coalesce(sum(coalesce(d.size_bytes, 0)), 0)::bigint as total
+      from public.doc_views v
+      join public.docs d on d.id = v.doc_id
+      where d.owner_id = ${ownerId}::uuid
+        and v.created_at >= date_trunc('month', now())
+        and v.created_at < date_trunc('month', now()) + interval '1 month'
+        and coalesce(d.status, 'ready') <> 'deleted'
+    `) as unknown as Array<{ total: number | string }>;
+    const total = rows?.[0]?.total ?? 0;
+    return typeof total === "string" ? Number(total) : Number(total);
+  } catch {
+    return 0;
+  }
+}
+
+async function maybeFlagHeavyProEgress(ownerId: string): Promise<void> {
+  const probeGate = await rateLimit({
+    scope: "pro:egress_probe:user:15m",
+    id: ownerId,
+    limit: 1,
+    windowSeconds: 900,
+  });
+  if (!(probeGate.ok && probeGate.count === 1)) return;
+
+  const softCap = envInt("PRO_SOFT_MAX_EGRESS_BYTES", 30 * 1024 * 1024 * 1024);
+  const estimated = await getMonthlyEstimatedEgressBytesForOwner(ownerId);
+  if (estimated < softCap) return;
+
+  const alertGate = await rateLimit({
+    scope: "pro:egress_alert:user:day",
+    id: ownerId,
+    limit: 1,
+    windowSeconds: 86400,
+  });
+  if (!(alertGate.ok && alertGate.count === 1)) return;
+
+  await logSecurityEvent({
+    type: "pro_egress_soft_cap_exceeded",
+    severity: "high",
+    actorUserId: ownerId,
+    scope: "bandwidth_guardrail",
+    message: "Estimated monthly egress exceeded Pro soft cap",
+    meta: { estimatedBytes: estimated, softCapBytes: softCap },
+  });
+}
+
+export type OwnerEgressRow = {
+  ownerId: string;
+  email: string | null;
+  estimatedBytes: number;
+};
+
+export async function getTopOwnersByMonthlyEstimatedEgress(limit: number = 20): Promise<OwnerEgressRow[]> {
+  const safeLimit = Math.max(1, Math.min(100, Math.floor(limit)));
+  try {
+    const rows = (await sql`
+      select
+        d.owner_id::text as owner_id,
+        max(u.email)::text as email,
+        coalesce(sum(coalesce(d.size_bytes, 0)), 0)::bigint as estimated_bytes
+      from public.doc_views v
+      join public.docs d on d.id = v.doc_id
+      left join public.users u on u.id = d.owner_id
+      where v.created_at >= date_trunc('month', now())
+        and v.created_at < date_trunc('month', now()) + interval '1 month'
+        and coalesce(d.status, 'ready') <> 'deleted'
+      group by d.owner_id
+      order by estimated_bytes desc
+      limit ${safeLimit}
+    `) as unknown as Array<{ owner_id: string; email: string | null; estimated_bytes: number | string }>;
+
+    return rows.map((r) => ({
+      ownerId: r.owner_id,
+      email: r.email ?? null,
+      estimatedBytes: typeof r.estimated_bytes === "string" ? Number(r.estimated_bytes) : Number(r.estimated_bytes),
+    }));
+  } catch {
+    return [];
+  }
 }
 
 /**

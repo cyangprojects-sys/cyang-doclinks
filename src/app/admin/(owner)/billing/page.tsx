@@ -4,7 +4,12 @@ import Link from "next/link";
 
 import { getAuthedUser } from "@/lib/authz";
 import { getBillingFlags } from "@/lib/settings";
-import { getPlanForUser, getStorageBytesForOwner } from "@/lib/monetization";
+import {
+  getMonthlyEstimatedEgressBytesForOwner,
+  getPlanForUser,
+  getStorageBytesForOwner,
+  getTopOwnersByMonthlyEstimatedEgress,
+} from "@/lib/monetization";
 import { getActiveViewLimitOverride } from "@/lib/viewLimitOverride";
 import { classifyBillingEntitlement, getBillingSnapshotForUser } from "@/lib/billingSubscription";
 
@@ -43,6 +48,18 @@ function ToggleRow({
   );
 }
 
+function fmtBytes(value: number): string {
+  if (!Number.isFinite(value) || value <= 0) return "0 B";
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  let n = value;
+  let i = 0;
+  while (n >= 1024 && i < units.length - 1) {
+    n /= 1024;
+    i += 1;
+  }
+  return `${n.toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
+}
+
 export default async function BillingSettingsPage({
   searchParams,
 }: {
@@ -61,6 +78,11 @@ export default async function BillingSettingsPage({
   const activeViewOverride = await getActiveViewLimitOverride(u.id);
   const billingSnapshot = await getBillingSnapshotForUser(u.id);
   const entitlement = classifyBillingEntitlement(billingSnapshot.subscription);
+  const ownerEgress = await getMonthlyEstimatedEgressBytesForOwner(u.id);
+  const heavyUsers = await getTopOwnersByMonthlyEstimatedEgress(10);
+  const egressSoftCapBytes = 30 * 1024 * 1024 * 1024;
+  const ownerEgressPct = Math.max(0, Math.round((ownerEgress / egressSoftCapBytes) * 100));
+  const ownerEgressWarn = ownerEgress >= egressSoftCapBytes;
   const storagePct =
     plan.maxStorageBytes && plan.maxStorageBytes > 0
       ? Math.min(100, Math.max(0, Math.round((usedStorage / plan.maxStorageBytes) * 100)))
@@ -230,6 +252,57 @@ export default async function BillingSettingsPage({
       </Card>
 
       <Card>
+        <div className="text-sm font-medium text-white">Internal bandwidth guardrails (owner/admin only)</div>
+        <div className="mt-1 text-xs text-neutral-400">
+          Not shown in public pricing. Pro is marketed as unlimited, but backend monitors estimated monthly egress and flags heavy usage.
+        </div>
+        <div className="mt-3 text-sm text-neutral-200">
+          Your estimated monthly egress: {fmtBytes(ownerEgress)} ({ownerEgressPct}% of 30 GB soft cap baseline)
+        </div>
+        {ownerEgressWarn ? (
+          <div className="mt-3 rounded-lg border border-amber-900/50 bg-amber-950/30 px-3 py-2 text-sm text-amber-200">
+            Soft cap exceeded: account should be monitored for abuse and throttling behavior.
+          </div>
+        ) : null}
+        <div className="mt-4 overflow-x-auto rounded-lg border border-neutral-800">
+          <table className="min-w-full text-left text-xs">
+            <thead className="bg-black/40 text-neutral-400">
+              <tr>
+                <th className="px-3 py-2">Owner</th>
+                <th className="px-3 py-2">Estimated month egress</th>
+                <th className="px-3 py-2">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {heavyUsers.length ? (
+                heavyUsers.map((row) => {
+                  const flagged = row.estimatedBytes >= egressSoftCapBytes;
+                  return (
+                    <tr key={row.ownerId} className="border-t border-neutral-800">
+                      <td className="px-3 py-2 text-neutral-300">{row.email || row.ownerId}</td>
+                      <td className="px-3 py-2 text-neutral-200">{fmtBytes(row.estimatedBytes)}</td>
+                      <td className={["px-3 py-2", flagged ? "text-amber-200" : "text-emerald-300"].join(" ")}>
+                        {flagged ? "Flag heavy usage" : "Normal"}
+                      </td>
+                    </tr>
+                  );
+                })
+              ) : (
+                <tr>
+                  <td colSpan={3} className="px-3 py-3 text-neutral-400">
+                    No usage rows yet for this month.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+        <div className="mt-2 text-xs text-neutral-500">
+          Recommended soft cap window: 20-50 GB/month. This dashboard uses a 30 GB baseline for flagging.
+        </div>
+      </Card>
+
+      <Card>
         <div className="text-sm font-medium text-white">View limit override</div>
         <div className="mt-1 text-xs text-neutral-400">
           Temporarily bypass monthly view cap for this owner account.
@@ -305,7 +378,7 @@ export default async function BillingSettingsPage({
           <ToggleRow
             name="proPlanEnabled"
             title="Enable Pro plan"
-            description="When OFF, users with plan_id='pro' are treated as Free. When ON, Pro enforces 5GB storage, 100MB/file, unlimited shares/views, custom expiration, and audit export." 
+            description="When OFF, users with plan_id='pro' are treated as Free. When ON, Pro enforces 5GB storage + 100MB/file hard caps, advertises unlimited shares/views, and applies internal soft guardrails (views, shares, rate limits, egress monitoring)." 
             defaultChecked={flags.proPlanEnabled}
           />
 
