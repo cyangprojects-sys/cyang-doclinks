@@ -15,7 +15,7 @@ export default function AcceptableUsePage() {
         <div>
           <div className="text-xs text-white/60">cyang.io</div>
           <h1 className="mt-1 text-2xl font-semibold text-white">Acceptable Use Policy</h1>
-          <div className="mt-2 text-sm text-white/60">Policy for cyang-doclinks content and behavior.</div>
+          <div className="mt-2 text-sm text-white/60">Rules for Doclinks content, sharing behavior, and platform safety.</div>
         </div>
         <Link href="/" className="rounded-xl bg-white/10 px-4 py-2 text-sm text-white hover:bg-white/15">
           Home
@@ -37,7 +37,7 @@ export default function AcceptableUsePage() {
 
         <section>
           <h2 className="text-base font-semibold text-white">Upload safety rules</h2>
-          <p className="mt-2">Uploads are allowlist-only and validated by extension, MIME type, and file signature where applicable.</p>
+          <p className="mt-2">Uploads are allowlist-only and validated by extension, MIME type, and file signature checks where applicable.</p>
           <ul className="mt-2 list-disc space-y-1 pl-5">
             <li>Disallowed: executables, scripts, shortcut/system binaries, and macro-enabled office files.</li>
             <li>Rejected examples include .exe, .bat, .cmd, .msi, .js, .vbs, .ps1, .py, .php, .dll, .sys, .lnk, .pif, .scr, .docm, .xlsm, and .pptm.</li>

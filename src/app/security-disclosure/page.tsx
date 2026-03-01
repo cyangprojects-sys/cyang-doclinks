@@ -32,7 +32,7 @@ export default function SecurityDisclosurePage() {
             <a className="underline text-white/90 hover:text-white" href={`mailto:${securityEmail}`}>
               {securityEmail}
             </a>
-            {" "}with reproduction steps, impact, and affected routes or flows.
+            {" "}with clear reproduction steps, expected vs actual behavior, impact, and affected routes or flows.
           </p>
         </section>
 
@@ -60,7 +60,7 @@ export default function SecurityDisclosurePage() {
           <h2 className="text-base font-semibold text-white">Response targets</h2>
           <ul className="mt-2 list-disc space-y-1 pl-5">
             <li>Acknowledgment within 2 business days.</li>
-            <li>Triage and severity assignment after validation.</li>
+            <li>Triage and severity assignment after initial validation.</li>
             <li>Status updates for critical findings through remediation.</li>
           </ul>
         </section>

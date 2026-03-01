@@ -14,9 +14,9 @@ export default function DataRetentionPage() {
       <div className="flex items-center justify-between">
         <div>
           <div className="text-xs text-white/60">cyang.io</div>
-          <h1 className="mt-1 text-2xl font-semibold text-white">Data Retention Disclosure</h1>
+          <h1 className="mt-1 text-2xl font-semibold text-white">Data Retention Policy</h1>
           <div className="mt-2 text-sm text-white/60">
-            Effective date: February 27, 2026. Lifecycle controls for cyang-doclinks documents and security data.
+            Effective date: February 27, 2026. Lifecycle controls for Doclinks documents and security data.
           </div>
         </div>
         <Link href="/" className="rounded-xl bg-white/10 px-4 py-2 text-sm text-white hover:bg-white/15">
@@ -49,7 +49,7 @@ export default function DataRetentionPage() {
           <ul className="mt-2 list-disc space-y-1 pl-5">
             <li>Scheduled jobs clean expired shares and aged data according to configured retention rules.</li>
             <li>Cleanup flows are designed to avoid orphaned storage objects and orphaned DB references.</li>
-            <li>Operational telemetry tracks cron job success and failures for recovery visibility.</li>
+            <li>Operational telemetry tracks scheduled job success and failures for recovery visibility.</li>
           </ul>
         </section>
 

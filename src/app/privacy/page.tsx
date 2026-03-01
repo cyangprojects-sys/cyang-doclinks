@@ -17,7 +17,7 @@ export default function PrivacyPage() {
           <div className="text-xs text-white/60">cyang.io</div>
           <h1 className="mt-1 text-2xl font-semibold text-white">Privacy Policy</h1>
           <div className="mt-2 text-sm text-white/60">
-            Effective date: February 27, 2026. How cyang-doclinks handles account, document, and security data.
+            Effective date: February 27, 2026. How Doclinks handles account, document, and security data.
           </div>
         </div>
         <Link href="/" className="rounded-xl bg-white/10 px-4 py-2 text-sm text-white hover:bg-white/15">
@@ -39,10 +39,10 @@ export default function PrivacyPage() {
         <section>
           <h2 className="text-base font-semibold text-white">How data is used</h2>
           <ul className="mt-2 list-disc space-y-1 pl-5">
-            <li>Operate secure upload, scan, and share workflows.</li>
-            <li>Enforce authentication, authorization, anti-abuse, and quota controls.</li>
+            <li>Operate secure upload, scanning, and controlled share-delivery workflows.</li>
+            <li>Enforce authentication, authorization, anti-abuse, and plan quota controls.</li>
             <li>Investigate incidents and maintain immutable operational audit records.</li>
-            <li>Support subscription and entitlement enforcement through verified billing events.</li>
+            <li>Enforce subscription entitlement through verified billing events.</li>
           </ul>
         </section>
 
@@ -83,7 +83,7 @@ export default function PrivacyPage() {
             <Link href="/report" className="underline text-white/90 hover:text-white">
               /report
             </Link>
-            .
+            {" "}for abuse submissions.
           </p>
         </section>
       </div>
