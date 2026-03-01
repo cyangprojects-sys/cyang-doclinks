@@ -4,9 +4,14 @@ import { SiteFooter } from "./SiteFooter";
 
 export function SiteShell(props: {
   children: React.ReactNode;
-  maxWidth?: "4xl" | "6xl";
+  maxWidth?: "4xl" | "6xl" | "full";
 }) {
-  const maxWidthClass = props.maxWidth === "4xl" ? "max-w-4xl" : "max-w-6xl";
+  const maxWidthClass =
+    props.maxWidth === "4xl"
+      ? "max-w-4xl"
+      : props.maxWidth === "full"
+        ? "max-w-[1760px]"
+        : "max-w-6xl";
 
   return (
     <main className="marketing-shell min-h-screen text-white">

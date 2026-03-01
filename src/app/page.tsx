@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 
 export default function HomePage() {
   return (
-    <SiteShell maxWidth="6xl">
+    <SiteShell maxWidth="full">
       <section className="mt-12 grid gap-6 lg:grid-cols-12 lg:items-end">
         <div className="lg:col-span-8">
           <span className="ui-badge inline-flex rounded-full px-3 py-1 text-xs uppercase tracking-[0.16em]">
