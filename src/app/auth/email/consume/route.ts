@@ -2,8 +2,6 @@ import { sql } from "@/lib/db";
 import { cookieHeader } from "@/lib/cookies";
 import { hmacSha256Hex, signPayload } from "@/lib/crypto";
 
-type DocSession = { grant_id: number; exp: number };
-
 type LoginTokenRow = {
   id: number;
   email: string;
