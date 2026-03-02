@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { convertOfficeBytes } from "@/lib/officePreview";
+import { enforceGlobalApiRateLimit } from "@/lib/securityTelemetry";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,6 +18,19 @@ function isAllowedRawPath(pathname: string): boolean {
 
 export async function POST(req: NextRequest) {
   try {
+    const rl = await enforceGlobalApiRateLimit({
+      req,
+      scope: "ip:viewer_office_preview",
+      limit: Number(process.env.RATE_LIMIT_VIEWER_OFFICE_PREVIEW_IP_PER_MIN || 20),
+      windowSeconds: 60,
+    });
+    if (!rl.ok) {
+      return NextResponse.json(
+        { ok: false, error: "RATE_LIMIT", message: "Too many preview attempts. Try again shortly." },
+        { status: rl.status, headers: { "Retry-After": String(rl.retryAfterSeconds) } }
+      );
+    }
+
     const body = await req.json().catch(() => null);
     const parsed = BodySchema.safeParse(body);
     if (!parsed.success) {

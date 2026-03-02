@@ -56,6 +56,15 @@ test.describe("api route guardrails", () => {
     expect(takedown.includes("enforceGlobalApiRateLimit(")).toBeTruthy();
   });
 
+  test("public unauthenticated POST endpoints include abuse throttling", () => {
+    const manualSignup = src("src/app/api/auth/manual-signup/route.ts");
+    const signupConsent = src("src/app/api/auth/signup-consent/route.ts");
+    const officePreview = src("src/app/api/viewer/office/route.ts");
+    expect(manualSignup.includes("enforceGlobalApiRateLimit(")).toBeTruthy();
+    expect(signupConsent.includes("enforceGlobalApiRateLimit(")).toBeTruthy();
+    expect(officePreview.includes("enforceGlobalApiRateLimit(")).toBeTruthy();
+  });
+
   test("debug alias lookup route requires admin role", () => {
     const code = src("src/app/api/debug/alias/[alias]/route.ts");
     expect(code.includes('await requireRole("admin")')).toBeTruthy();
@@ -68,5 +77,35 @@ test.describe("api route guardrails", () => {
     expect(code.includes("isAllowedRawPath")).toBeTruthy();
     expect(/\/\^\\\/s\\\/\[\^\/\]\+\\\/raw\$\/i/.test(code)).toBeTruthy();
     expect(/\/\^\\\/d\\\/\[\^\/\]\+\\\/raw\$\/i/.test(code)).toBeTruthy();
+  });
+
+  test("all POST routes have an explicit security control", () => {
+    const files = routeFiles();
+    const findings: string[] = [];
+    const allowedWithoutInlineGuard = new Set<string>(["src/app/api/auth/[...nextauth]/route.ts"]);
+    const guardTokens = [
+      "requireRole(",
+      "requireUser(",
+      "requirePermission(",
+      "requireOwner(",
+      "requireOwnerAdmin(",
+      "enforceGlobalApiRateLimit(",
+      "verifyStripeWebhookSignature(",
+      "verifyApiKeyFromRequest(",
+      "validateApiToken(",
+      "isCronAuthorized(",
+      "isAuthorized(",
+    ];
+
+    for (const f of files) {
+      const code = src(f);
+      if (!/export\s+async\s+function\s+POST\b|export\s+function\s+POST\b/.test(code)) continue;
+      if (allowedWithoutInlineGuard.has(f)) continue;
+      if (!guardTokens.some((t) => code.includes(t))) {
+        findings.push(f);
+      }
+    }
+
+    expect(findings).toEqual([]);
   });
 });

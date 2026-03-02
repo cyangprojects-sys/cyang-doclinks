@@ -1,5 +1,6 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { sendAccountActivationEmail } from "@/lib/email";
+import { enforceGlobalApiRateLimit } from "@/lib/securityTelemetry";
 import {
   createOrRefreshManualSignup,
   recordTermsAcceptance,
@@ -31,7 +32,20 @@ function appUrl(req: Request): string {
   return new URL(req.url).origin;
 }
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
+  const rl = await enforceGlobalApiRateLimit({
+    req,
+    scope: "ip:manual_signup",
+    limit: Number(process.env.RATE_LIMIT_MANUAL_SIGNUP_IP_PER_MIN || 8),
+    windowSeconds: 60,
+  });
+  if (!rl.ok) {
+    return NextResponse.json(
+      { ok: false, error: "RATE_LIMIT", message: "Too many signup attempts. Try again shortly." },
+      { status: rl.status, headers: { "Retry-After": String(rl.retryAfterSeconds) } }
+    );
+  }
+
   const body = (await req.json().catch(() => ({}))) as Payload;
 
   const firstName = String(body.firstName || "").trim();
@@ -91,4 +105,3 @@ export async function POST(req: Request) {
     message: "Check your email for an activation link before signing in.",
   });
 }
-
