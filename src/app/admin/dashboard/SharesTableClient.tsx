@@ -74,6 +74,16 @@ export default function SharesTableClient(props: { shares: ShareRow[]; nowTs: nu
   const pathname = usePathname();
 
   const [selected, setSelected] = useState<Record<string, boolean>>({});
+  const [copiedAlias, setCopiedAlias] = useState<string | null>(null);
+  async function copyAliasUrl(alias: string) {
+    try {
+      await navigator.clipboard.writeText(`${window.location.origin}/d/${encodeURIComponent(alias)}`);
+      setCopiedAlias(alias);
+      window.setTimeout(() => setCopiedAlias((prev) => (prev === alias ? null : prev)), 1200);
+    } catch {
+      setCopiedAlias(null);
+    }
+  }
 
   const q = (sp.get("shareQ") || "").trim();
   const status = (sp.get("shareStatus") || "all") as StatusFilter;
@@ -266,7 +276,13 @@ export default function SharesTableClient(props: { shares: ShareRow[]; nowTs: nu
                         <div className="text-white">{s.doc_title || "Untitled"}</div>
                         <div className="mt-1 text-xs text-white/55">
                           {s.alias ? (
-                            <Link href={`/d/${s.alias}`} target="_blank" className="text-cyan-200 hover:underline">/d/{s.alias}</Link>
+                            <button
+                              type="button"
+                              onClick={() => copyAliasUrl(s.alias as string)}
+                              className="rounded-md border border-cyan-500/35 bg-cyan-500/15 px-2 py-0.5 text-[11px] text-cyan-100 hover:bg-cyan-500/25"
+                            >
+                              {copiedAlias === s.alias ? "Copied" : "Share"}
+                            </button>
                           ) : (
                             <span className="font-mono">{s.doc_id}</span>
                           )}

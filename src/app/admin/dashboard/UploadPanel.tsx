@@ -380,7 +380,7 @@ export default function UploadPanel({
         <button
           onClick={onUploadAll}
           disabled={busy || queuedCount === 0 || encryptionReady === false}
-          className="rounded-lg border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold hover:bg-white/10 disabled:opacity-50"
+          className="rounded-lg border border-sky-300/40 bg-gradient-to-r from-sky-500/45 via-cyan-400/40 to-sky-500/45 px-4 py-2 text-sm font-semibold text-white shadow-[0_0_0_1px_rgba(56,189,248,0.25),0_0_24px_rgba(14,165,233,0.45)] transition hover:brightness-110 hover:shadow-[0_0_0_1px_rgba(103,232,249,0.45),0_0_32px_rgba(34,211,238,0.55)] disabled:border-white/15 disabled:bg-white/10 disabled:text-white/60 disabled:shadow-none disabled:opacity-60"
         >
           {busy ? "Uploading..." : `Upload now${queuedCount > 0 ? ` (${queuedCount})` : ""}`}
         </button>
