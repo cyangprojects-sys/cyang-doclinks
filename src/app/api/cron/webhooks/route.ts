@@ -33,15 +33,16 @@ export async function GET(req: NextRequest) {
   const startedAt = Date.now();
   try {
     const res = await processWebhookDeliveries({ maxBatch: 25, maxAttempts: 8 });
+    const resObj = (res && typeof res === "object" ? res : {}) as Record<string, unknown>;
     const duration = Date.now() - startedAt;
     await logCronRun({
       job: "webhooks",
       ok: true,
       durationMs: duration,
       meta: {
-        attempted: (res as any)?.attempted ?? null,
-        delivered: (res as any)?.delivered ?? null,
-        failed: (res as any)?.failed ?? null,
+        attempted: resObj.attempted ?? null,
+        delivered: resObj.delivered ?? null,
+        failed: resObj.failed ?? null,
       },
     });
     return NextResponse.json({
