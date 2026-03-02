@@ -18,6 +18,29 @@ export type WebhookEvent =
   | "doc.deleted"
   | "webhook.test";
 
+export const WEBHOOK_EVENTS: ReadonlyArray<WebhookEvent> = [
+  "doc.accessed",
+  "doc.viewed",
+  "share.created",
+  "share.revoked",
+  "alias.created",
+  "alias.disabled",
+  "doc.deleted",
+  "webhook.test",
+];
+
+export function normalizeWebhookEvents(input: string[]): WebhookEvent[] {
+  const allowed = new Set<string>(WEBHOOK_EVENTS);
+  const out: WebhookEvent[] = [];
+  for (const raw of input) {
+    const event = String(raw || "").trim();
+    if (!allowed.has(event)) continue;
+    if (out.includes(event as WebhookEvent)) continue;
+    out.push(event as WebhookEvent);
+  }
+  return out;
+}
+
 type WebhookRow = {
   id: string;
   owner_id: string;

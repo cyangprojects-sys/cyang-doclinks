@@ -4,12 +4,11 @@
 import { revalidatePath } from "next/cache";
 import { sql } from "@/lib/db";
 import { requireUser } from "@/lib/authz";
-import { normalizeWebhookUrl, processWebhookDeliveries } from "@/lib/webhooks";
+import { normalizeWebhookEvents, normalizeWebhookUrl, processWebhookDeliveries } from "@/lib/webhooks";
 
 function parseEvents(formData: FormData): string[] {
   const raw = formData.getAll("events").map((v) => String(v || "").trim()).filter(Boolean);
-  // Ensure uniqueness
-  return Array.from(new Set(raw));
+  return normalizeWebhookEvents(raw);
 }
 
 export async function createWebhookAction(formData: FormData): Promise<void> {
