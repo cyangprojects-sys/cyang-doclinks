@@ -68,7 +68,16 @@ export function getLegalDocBySlug(slug: string) {
 }
 
 export async function readLegalDocMarkdown(file: string) {
-  const fullPath = path.join(docsDir(), file);
+  const name = String(file || "").trim();
+  const base = docsDir();
+  const resolved = path.resolve(base, name);
+  const baseWithSep = base.endsWith(path.sep) ? base : `${base}${path.sep}`;
+
+  // Fail closed: legal docs are loaded only from /docs top-level markdown files.
+  if (!name || path.basename(name) !== name || !name.toLowerCase().endsWith(".md") || !resolved.startsWith(baseWithSep)) {
+    throw new Error("INVALID_LEGAL_DOC_FILE");
+  }
+
+  const fullPath = resolved;
   return await readFile(fullPath, "utf8");
 }
-
