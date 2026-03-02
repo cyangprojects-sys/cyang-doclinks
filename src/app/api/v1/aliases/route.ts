@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: auth.error }, { status: auth.status });
   }
 
-  let body: any = null;
+  let body: Record<string, unknown> | null = null;
   try {
     body = await req.json();
   } catch {
@@ -61,8 +61,8 @@ export async function POST(req: NextRequest) {
       values (${alias}, ${docId}::uuid, true, now() + (${expiresDays}::int * interval '1 day'), null)
       returning alias::text as alias
     `) as unknown as Array<{ alias: string }>;
-  } catch (e: any) {
-    const msg = String(e?.message || "");
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e || "");
     const missingCol =
       msg.includes("column") &&
       (msg.includes("expires_at") || msg.includes("revoked_at") || msg.includes("is_active"));
@@ -77,7 +77,7 @@ export async function POST(req: NextRequest) {
       }
       return NextResponse.json({ ok: true, alias: created[0].alias, doc_id: docId });
     }
-    if (String(e?.code || "") === "23505") {
+    if (typeof e === "object" && e !== null && "code" in e && String((e as { code?: string }).code || "") === "23505") {
       return NextResponse.json({ ok: false, error: "ALIAS_TAKEN" }, { status: 409 });
     }
     throw e;
