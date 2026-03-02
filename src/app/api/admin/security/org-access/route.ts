@@ -10,6 +10,7 @@ import {
 } from "@/lib/orgMembership";
 import { sql } from "@/lib/db";
 import { logSecurityEvent } from "@/lib/securityTelemetry";
+import { resolvePublicAppBaseUrl } from "@/lib/publicBaseUrl";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -75,8 +76,8 @@ export async function POST(req: Request) {
         expiresDays,
       });
 
-      const base = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXTAUTH_URL || "http://localhost:3000";
-      const inviteUrl = `${String(base).replace(/\/+$/, "")}/org/${encodeURIComponent(u.orgSlug || "default")}/login?invite=${encodeURIComponent(token)}`;
+      const base = resolvePublicAppBaseUrl(req.url);
+      const inviteUrl = `${base}/org/${encodeURIComponent(u.orgSlug || "default")}/login?invite=${encodeURIComponent(token)}`;
 
       await logSecurityEvent({
         type: "org_invite_created",
@@ -137,7 +138,12 @@ export async function POST(req: Request) {
     return NextResponse.redirect(new URL("/admin/security?error=bad_action", req.url), { status: 303 });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "SERVER_ERROR";
-    const safeError = msg === "FORBIDDEN" || msg === "UNAUTHENTICATED" ? "FORBIDDEN" : "SERVER_ERROR";
+    const safeError =
+      msg === "FORBIDDEN" || msg === "UNAUTHENTICATED"
+        ? "FORBIDDEN"
+        : msg.startsWith("APP_BASE_URL_")
+          ? "ENV_MISCONFIGURED"
+          : "SERVER_ERROR";
     return NextResponse.redirect(new URL(`/admin/security?error=${encodeURIComponent(safeError)}`, req.url), { status: 303 });
   }
 }
