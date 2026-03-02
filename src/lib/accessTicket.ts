@@ -38,12 +38,16 @@ export function hashIpForTicket(ip: string | null | undefined) {
 
 export function ticketTtlSeconds() {
   // Ticket itself should be very short-lived; this is the "exchange" window.
-  return Number(process.env.ACCESS_TICKET_TTL_SECONDS || 30);
+  const raw = Number(process.env.ACCESS_TICKET_TTL_SECONDS || 30);
+  if (!Number.isFinite(raw)) return 30;
+  return Math.max(1, Math.floor(raw));
 }
 
 export function signedUrlTtlSeconds() {
   // Signed URL minted *from* a ticket should be even shorter-lived than normal.
-  return Number(process.env.ACCESS_TICKET_SIGNED_URL_TTL_SECONDS || 30);
+  const raw = Number(process.env.ACCESS_TICKET_SIGNED_URL_TTL_SECONDS || 30);
+  if (!Number.isFinite(raw)) return 30;
+  return Math.max(1, Math.floor(raw));
 }
 
 export async function mintAccessTicket(args: {
