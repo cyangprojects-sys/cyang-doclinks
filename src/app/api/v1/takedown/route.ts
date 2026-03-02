@@ -21,7 +21,7 @@ type Body = {
   signature?: string | null;
 };
 
-function norm(s: any, max = 4000): string | null {
+function norm(s: unknown, max = 4000): string | null {
   const v = String(s ?? "").trim();
   if (!v) return null;
   return v.length > max ? v.slice(0, max) : v;
