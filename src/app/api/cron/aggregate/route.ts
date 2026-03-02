@@ -29,11 +29,15 @@ export async function GET(req: NextRequest) {
   try {
     const aggregate = await aggregateDocViewDaily(daysBack ? { daysBack: Math.floor(daysBack) } : undefined);
     const duration = Date.now() - startedAt;
+    const aggregateMeta =
+      typeof aggregate === "object" && aggregate !== null && "aggregated" in aggregate
+        ? (aggregate as { aggregated?: unknown }).aggregated
+        : null;
     await logCronRun({
       job: "aggregate",
       ok: true,
       durationMs: duration,
-      meta: { aggregated: (aggregate as any)?.aggregated ?? null, daysBack: daysBack ?? null },
+      meta: { aggregated: aggregateMeta ?? null, daysBack: daysBack ?? null },
     });
     return NextResponse.json({
       ok: true,
