@@ -34,11 +34,10 @@ export async function runUsageMaintenance(): Promise<{
       seededCurrentMonth: Number(seedRows?.[0]?.c ?? 0),
       deletedOldDailyRows: Number(dailyRows?.[0]?.c ?? 0),
     };
-  } catch (e: any) {
-    if (String(e?.code || "") === "42P01") {
+  } catch (e: unknown) {
+    if (typeof e === "object" && e !== null && "code" in e && String((e as { code?: string }).code || "") === "42P01") {
       return { seededCurrentMonth: 0, deletedOldDailyRows: 0 };
     }
     throw e;
   }
 }
-
