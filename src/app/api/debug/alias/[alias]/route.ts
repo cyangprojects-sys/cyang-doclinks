@@ -4,6 +4,16 @@ import { sql } from "@/lib/db";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+type AliasLookupRow = {
+  source_table: string;
+  alias: string;
+  doc_id: string;
+  is_active: boolean | null;
+  revoked_at: string | null;
+  expires_at: string | null;
+  created_at: string | null;
+};
+
 export async function GET(
   _req: Request,
   context: { params: Promise<{ alias: string }> }
@@ -22,7 +32,7 @@ export async function GET(
     select current_database() as db, current_schema() as schema
   `;
 
-  let rowDocAliases: any[] = [];
+  let rowDocAliases: AliasLookupRow[] = [];
   try {
     rowDocAliases = await sql`
     select
@@ -41,7 +51,7 @@ export async function GET(
     rowDocAliases = [];
   }
 
-  let rowDocumentAliases: any[] = [];
+  let rowDocumentAliases: AliasLookupRow[] = [];
   try {
     rowDocumentAliases = await sql`
     select
