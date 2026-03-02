@@ -18,7 +18,7 @@ export function logStructured(args: {
 
   const line = JSON.stringify(payload);
   if ((args.severity ?? "info") === "error") {
-    console.warn(line);
+    console.error(line);
     return;
   }
   if ((args.severity ?? "info") === "warn") {
