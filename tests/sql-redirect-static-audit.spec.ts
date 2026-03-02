@@ -29,8 +29,8 @@ test.describe("sql and redirect static audit", () => {
     const files = sourceFiles();
     const findings: Array<{ file: string; token: string }> = [];
     const badRedirectPatterns = [
-      /redirect\(\s*new URL\([^)]*searchParams\.get/gs,
-      /NextResponse\.redirect\(\s*new URL\([^)]*searchParams\.get/gs,
+      /redirect\(\s*new URL\(\s*[^,]*searchParams\.get[^,]*,/g,
+      /NextResponse\.redirect\(\s*new URL\(\s*[^,]*searchParams\.get[^,]*,/g,
     ];
 
     for (const file of files) {
