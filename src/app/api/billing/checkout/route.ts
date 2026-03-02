@@ -48,6 +48,13 @@ async function persistCustomerId(userId: string, customerId: string): Promise<vo
 }
 
 export async function POST(req: NextRequest) {
+  let appBaseUrl: string;
+  try {
+    appBaseUrl = resolvePublicAppBaseUrl(req.url);
+  } catch {
+    return NextResponse.json({ ok: false, error: "ENV_MISCONFIGURED" }, { status: 500 });
+  }
+
   const timeoutMs = getRouteTimeoutMs("ROUTE_TIMEOUT_BILLING_CHECKOUT_MS", 15_000);
   try {
     return await withRouteTimeout(
@@ -55,7 +62,7 @@ export async function POST(req: NextRequest) {
         assertRuntimeEnv("stripe_admin");
         const flags = await getBillingFlags();
         if (!flags.flags.pricingUiEnabled) {
-          return NextResponse.redirect(new URL("/admin/dashboard", req.url), { status: 303 });
+          return NextResponse.redirect(new URL("/admin/dashboard", appBaseUrl), { status: 303 });
         }
 
         const u = await requireUser();
@@ -69,9 +76,8 @@ export async function POST(req: NextRequest) {
           await persistCustomerId(u.id, customerId);
         }
 
-        const origin = resolvePublicAppBaseUrl(req.url);
-        const successUrl = `${origin}/admin/upgrade?checkout=success`;
-        const cancelUrl = `${origin}/admin/upgrade?checkout=canceled`;
+        const successUrl = `${appBaseUrl}/admin/upgrade?checkout=success`;
+        const cancelUrl = `${appBaseUrl}/admin/upgrade?checkout=canceled`;
         const priceId = getProPriceId();
 
         const session = await stripeApi("checkout/sessions", {
@@ -103,7 +109,7 @@ export async function POST(req: NextRequest) {
     );
   } catch (e: unknown) {
     if (isRuntimeEnvError(e)) {
-      return NextResponse.redirect(new URL("/admin/upgrade?error=ENV_MISCONFIGURED", req.url), { status: 303 });
+      return NextResponse.redirect(new URL("/admin/upgrade?error=ENV_MISCONFIGURED", appBaseUrl), { status: 303 });
     }
     if (isRouteTimeoutError(e)) {
       await logSecurityEvent({
@@ -113,7 +119,7 @@ export async function POST(req: NextRequest) {
         message: "Viewer checkout session creation exceeded timeout",
         meta: { timeoutMs },
       });
-      return NextResponse.redirect(new URL("/admin/upgrade?error=TIMEOUT", req.url), { status: 303 });
+      return NextResponse.redirect(new URL("/admin/upgrade?error=TIMEOUT", appBaseUrl), { status: 303 });
     }
     const msg = e instanceof Error ? e.message : String(e || "checkout_failed");
     const safeError =
@@ -131,6 +137,6 @@ export async function POST(req: NextRequest) {
       message: "Viewer checkout session creation failed",
       meta: { code: safeError },
     });
-    return NextResponse.redirect(new URL(`/admin/upgrade?error=${encodeURIComponent(safeError)}`, req.url), { status: 303 });
+    return NextResponse.redirect(new URL(`/admin/upgrade?error=${encodeURIComponent(safeError)}`, appBaseUrl), { status: 303 });
   }
 }

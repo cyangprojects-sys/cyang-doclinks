@@ -9,6 +9,7 @@ import {
 } from "@/lib/rbac";
 import { type Role } from "@/lib/authz";
 import { logSecurityEvent } from "@/lib/securityTelemetry";
+import { resolvePublicAppBaseUrl } from "@/lib/publicBaseUrl";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -44,6 +45,13 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+  let appBaseUrl: string;
+  try {
+    appBaseUrl = resolvePublicAppBaseUrl(req.url);
+  } catch {
+    return NextResponse.json({ ok: false, error: "ENV_MISCONFIGURED" }, { status: 500 });
+  }
+
   try {
     const user = await requirePermission("security.keys.manage");
 
@@ -85,7 +93,7 @@ export async function POST(req: Request) {
     if (ct.includes("application/json")) {
       return NextResponse.json({ ok: true });
     }
-    return NextResponse.redirect(new URL("/admin/security?saved=rbac", req.url), { status: 303 });
+    return NextResponse.redirect(new URL("/admin/security?saved=rbac", appBaseUrl), { status: 303 });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "SERVER_ERROR";
     const status = msg === "FORBIDDEN" || msg === "UNAUTHENTICATED" ? 403 : 500;
@@ -93,6 +101,6 @@ export async function POST(req: Request) {
     if (String(req.headers.get("content-type") || "").toLowerCase().includes("application/json")) {
       return NextResponse.json({ ok: false, error: safeError }, { status });
     }
-    return NextResponse.redirect(new URL(`/admin/security?error=${encodeURIComponent(safeError)}`, req.url), { status: 303 });
+    return NextResponse.redirect(new URL(`/admin/security?error=${encodeURIComponent(safeError)}`, appBaseUrl), { status: 303 });
   }
 }

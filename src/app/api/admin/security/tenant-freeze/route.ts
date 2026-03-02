@@ -3,6 +3,7 @@ import { requireRole } from "@/lib/authz";
 import { sql } from "@/lib/db";
 import { appendImmutableAudit } from "@/lib/immutableAudit";
 import { logSecurityEvent } from "@/lib/securityTelemetry";
+import { resolvePublicAppBaseUrl } from "@/lib/publicBaseUrl";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -45,6 +46,13 @@ async function setOrgFreeze(orgId: string, freeze: boolean): Promise<void> {
 }
 
 export async function POST(req: Request) {
+  let appBaseUrl: string;
+  try {
+    appBaseUrl = resolvePublicAppBaseUrl(req.url);
+  } catch {
+    return NextResponse.json({ ok: false, error: "ENV_MISCONFIGURED" }, { status: 500 });
+  }
+
   try {
     const user = await requireRole("owner");
     if (!user.orgId) {
@@ -87,7 +95,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true, freeze });
     }
     return NextResponse.redirect(
-      new URL(`/admin/security?saved=${freeze ? "tenant_frozen" : "tenant_unfrozen"}`, req.url),
+      new URL(`/admin/security?saved=${freeze ? "tenant_frozen" : "tenant_unfrozen"}`, appBaseUrl),
       { status: 303 }
     );
   } catch (e: unknown) {
@@ -97,7 +105,7 @@ export async function POST(req: Request) {
     if (String(req.headers.get("content-type") || "").toLowerCase().includes("application/json")) {
       return NextResponse.json({ ok: false, error: safeError }, { status });
     }
-    return NextResponse.redirect(new URL(`/admin/security?error=${encodeURIComponent(safeError)}`, req.url), {
+    return NextResponse.redirect(new URL(`/admin/security?error=${encodeURIComponent(safeError)}`, appBaseUrl), {
       status: 303,
     });
   }

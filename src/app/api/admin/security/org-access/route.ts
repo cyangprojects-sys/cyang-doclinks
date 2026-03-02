@@ -51,6 +51,13 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+  let appBaseUrl: string;
+  try {
+    appBaseUrl = resolvePublicAppBaseUrl(req.url);
+  } catch {
+    return NextResponse.json({ ok: false, error: "ENV_MISCONFIGURED" }, { status: 500 });
+  }
+
   try {
     const u = await requireOwnerInOrg();
     if (!(await orgMembershipTablesReady())) {
@@ -65,7 +72,7 @@ export async function POST(req: Request) {
       const role = parseRole(form.get("role")) || "viewer";
       const expiresDays = Number(form.get("expires_days") || 7);
       if (!email || !email.includes("@")) {
-        return NextResponse.redirect(new URL("/admin/security?error=invalid_invite_email", req.url), { status: 303 });
+        return NextResponse.redirect(new URL("/admin/security?error=invalid_invite_email", appBaseUrl), { status: 303 });
       }
 
       const { token } = await createOrgInvite({
@@ -76,8 +83,7 @@ export async function POST(req: Request) {
         expiresDays,
       });
 
-      const base = resolvePublicAppBaseUrl(req.url);
-      const inviteUrl = `${base}/org/${encodeURIComponent(u.orgSlug || "default")}/login?invite=${encodeURIComponent(token)}`;
+      const inviteUrl = `${appBaseUrl}/org/${encodeURIComponent(u.orgSlug || "default")}/login?invite=${encodeURIComponent(token)}`;
 
       await logSecurityEvent({
         type: "org_invite_created",
@@ -89,14 +95,14 @@ export async function POST(req: Request) {
         meta: { email, role },
       });
 
-      return NextResponse.redirect(new URL(`/admin/security?saved=org_invite&invite_url=${encodeURIComponent(inviteUrl)}`, req.url), { status: 303 });
+      return NextResponse.redirect(new URL(`/admin/security?saved=org_invite&invite_url=${encodeURIComponent(inviteUrl)}`, appBaseUrl), { status: 303 });
     }
 
     if (action === "set_member_role") {
       const userId = String(form.get("user_id") || "").trim();
       const role = parseRole(form.get("role"));
       if (!userId || !role) {
-        return NextResponse.redirect(new URL("/admin/security?error=invalid_member_role", req.url), { status: 303 });
+        return NextResponse.redirect(new URL("/admin/security?error=invalid_member_role", appBaseUrl), { status: 303 });
       }
       await upsertMembership({
         orgId: u.orgId!,
@@ -109,13 +115,13 @@ export async function POST(req: Request) {
         set role = ${role}
         where id = ${userId}::uuid
       `;
-      return NextResponse.redirect(new URL("/admin/security?saved=org_member_role", req.url), { status: 303 });
+      return NextResponse.redirect(new URL("/admin/security?saved=org_member_role", appBaseUrl), { status: 303 });
     }
 
     if (action === "remove_member") {
       const userId = String(form.get("user_id") || "").trim();
       if (!userId) {
-        return NextResponse.redirect(new URL("/admin/security?error=invalid_member", req.url), { status: 303 });
+        return NextResponse.redirect(new URL("/admin/security?error=invalid_member", appBaseUrl), { status: 303 });
       }
       await sql`
         update public.org_memberships
@@ -123,19 +129,19 @@ export async function POST(req: Request) {
         where org_id = ${u.orgId!}::uuid
           and user_id = ${userId}::uuid
       `;
-      return NextResponse.redirect(new URL("/admin/security?saved=org_member_removed", req.url), { status: 303 });
+      return NextResponse.redirect(new URL("/admin/security?saved=org_member_removed", appBaseUrl), { status: 303 });
     }
 
     if (action === "revoke_invite") {
       const inviteId = String(form.get("invite_id") || "").trim();
       if (!inviteId) {
-        return NextResponse.redirect(new URL("/admin/security?error=invalid_invite", req.url), { status: 303 });
+        return NextResponse.redirect(new URL("/admin/security?error=invalid_invite", appBaseUrl), { status: 303 });
       }
       await revokeOrgInvite({ orgId: u.orgId!, inviteId });
-      return NextResponse.redirect(new URL("/admin/security?saved=org_invite_revoked", req.url), { status: 303 });
+      return NextResponse.redirect(new URL("/admin/security?saved=org_invite_revoked", appBaseUrl), { status: 303 });
     }
 
-    return NextResponse.redirect(new URL("/admin/security?error=bad_action", req.url), { status: 303 });
+    return NextResponse.redirect(new URL("/admin/security?error=bad_action", appBaseUrl), { status: 303 });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "SERVER_ERROR";
     const safeError =
@@ -144,6 +150,6 @@ export async function POST(req: Request) {
         : msg.startsWith("APP_BASE_URL_")
           ? "ENV_MISCONFIGURED"
           : "SERVER_ERROR";
-    return NextResponse.redirect(new URL(`/admin/security?error=${encodeURIComponent(safeError)}`, req.url), { status: 303 });
+    return NextResponse.redirect(new URL(`/admin/security?error=${encodeURIComponent(safeError)}`, appBaseUrl), { status: 303 });
   }
 }

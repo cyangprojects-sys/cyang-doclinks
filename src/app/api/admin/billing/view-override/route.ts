@@ -6,8 +6,16 @@ import { requirePermission } from "@/lib/rbac";
 import { clearViewLimitOverride, setViewLimitOverride } from "@/lib/viewLimitOverride";
 import { appendImmutableAudit } from "@/lib/immutableAudit";
 import { logSecurityEvent } from "@/lib/securityTelemetry";
+import { resolvePublicAppBaseUrl } from "@/lib/publicBaseUrl";
 
 export async function POST(req: Request) {
+  let appBaseUrl: string;
+  try {
+    appBaseUrl = resolvePublicAppBaseUrl(req.url);
+  } catch {
+    return NextResponse.json({ ok: false, error: "ENV_MISCONFIGURED" }, { status: 500 });
+  }
+
   try {
     const u = await requirePermission("billing.override");
     const form = await req.formData();
@@ -40,7 +48,7 @@ export async function POST(req: Request) {
         subjectId: ownerId,
         payload: { hours, reason },
       });
-      return NextResponse.redirect(new URL("/admin/billing?saved=1", req.url), { status: 303 });
+      return NextResponse.redirect(new URL("/admin/billing?saved=1", appBaseUrl), { status: 303 });
     }
 
     if (action === "clear") {
@@ -62,13 +70,13 @@ export async function POST(req: Request) {
         subjectId: ownerId,
         payload: { reason },
       });
-      return NextResponse.redirect(new URL("/admin/billing?saved=1", req.url), { status: 303 });
+      return NextResponse.redirect(new URL("/admin/billing?saved=1", appBaseUrl), { status: 303 });
     }
 
-    return NextResponse.redirect(new URL("/admin/billing?error=bad_action", req.url), { status: 303 });
+    return NextResponse.redirect(new URL("/admin/billing?error=bad_action", appBaseUrl), { status: 303 });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "SERVER_ERROR";
     const safeError = msg === "FORBIDDEN" || msg === "UNAUTHENTICATED" ? "FORBIDDEN" : "SERVER_ERROR";
-    return NextResponse.redirect(new URL(`/admin/billing?error=${encodeURIComponent(safeError)}`, req.url), { status: 303 });
+    return NextResponse.redirect(new URL(`/admin/billing?error=${encodeURIComponent(safeError)}`, appBaseUrl), { status: 303 });
   }
 }

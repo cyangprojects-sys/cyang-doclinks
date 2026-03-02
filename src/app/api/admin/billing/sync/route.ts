@@ -8,8 +8,16 @@ import { appendImmutableAudit } from "@/lib/immutableAudit";
 import { logSecurityEvent } from "@/lib/securityTelemetry";
 import { getRouteTimeoutMs, isRouteTimeoutError, withRouteTimeout } from "@/lib/routeTimeout";
 import { assertRuntimeEnv, isRuntimeEnvError } from "@/lib/runtimeEnv";
+import { resolvePublicAppBaseUrl } from "@/lib/publicBaseUrl";
 
 export async function POST(req: NextRequest) {
+  let appBaseUrl: string;
+  try {
+    appBaseUrl = resolvePublicAppBaseUrl(req.url);
+  } catch {
+    return NextResponse.json({ ok: false, error: "ENV_MISCONFIGURED" }, { status: 500 });
+  }
+
   const timeoutMs = getRouteTimeoutMs("ROUTE_TIMEOUT_BILLING_SYNC_MS", 30_000);
   try {
     return await withRouteTimeout(
@@ -38,13 +46,13 @@ export async function POST(req: NextRequest) {
           meta: result,
         });
 
-        return NextResponse.redirect(new URL("/admin/billing/stripe?sync=ok", req.url), { status: 303 });
+        return NextResponse.redirect(new URL("/admin/billing/stripe?sync=ok", appBaseUrl), { status: 303 });
       })(),
       timeoutMs
     );
   } catch (e: unknown) {
     if (isRuntimeEnvError(e)) {
-      return NextResponse.redirect(new URL("/admin/billing/stripe?error=ENV_MISCONFIGURED", req.url), { status: 303 });
+      return NextResponse.redirect(new URL("/admin/billing/stripe?error=ENV_MISCONFIGURED", appBaseUrl), { status: 303 });
     }
     if (isRouteTimeoutError(e)) {
       await logSecurityEvent({
@@ -54,13 +62,13 @@ export async function POST(req: NextRequest) {
         message: "Manual billing maintenance exceeded timeout",
         meta: { timeoutMs },
       });
-      return NextResponse.redirect(new URL("/admin/billing/stripe?error=TIMEOUT", req.url), { status: 303 });
+      return NextResponse.redirect(new URL("/admin/billing/stripe?error=TIMEOUT", appBaseUrl), { status: 303 });
     }
     const msg = e instanceof Error ? e.message : String(e || "billing_sync_failed");
     const safeError =
       msg === "FORBIDDEN" || msg === "UNAUTHENTICATED"
         ? "FORBIDDEN"
         : "BILLING_SYNC_FAILED";
-    return NextResponse.redirect(new URL(`/admin/billing/stripe?error=${encodeURIComponent(safeError)}`, req.url), { status: 303 });
+    return NextResponse.redirect(new URL(`/admin/billing/stripe?error=${encodeURIComponent(safeError)}`, appBaseUrl), { status: 303 });
   }
 }

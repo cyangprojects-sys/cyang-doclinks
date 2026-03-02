@@ -130,4 +130,18 @@ test.describe("api route guardrails", () => {
 
     expect(findings).toEqual([]);
   });
+
+  test("api redirects avoid request-host-derived absolute URLs", () => {
+    const files = routeFiles();
+    const findings: string[] = [];
+
+    for (const f of files) {
+      const code = src(f);
+      if (code.includes("NextResponse.redirect(new URL(") && code.includes(", req.url)")) {
+        findings.push(f);
+      }
+    }
+
+    expect(findings).toEqual([]);
+  });
 });

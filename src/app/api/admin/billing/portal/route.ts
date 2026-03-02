@@ -38,6 +38,13 @@ async function persistCustomerId(userId: string, customerId: string): Promise<vo
 }
 
 export async function POST(req: NextRequest) {
+  let appBaseUrl: string;
+  try {
+    appBaseUrl = resolvePublicAppBaseUrl(req.url);
+  } catch {
+    return NextResponse.json({ ok: false, error: "ENV_MISCONFIGURED" }, { status: 500 });
+  }
+
   const timeoutMs = getRouteTimeoutMs("ROUTE_TIMEOUT_BILLING_PORTAL_MS", 15_000);
   try {
     return await withRouteTimeout(
@@ -54,7 +61,7 @@ export async function POST(req: NextRequest) {
           await persistCustomerId(u.id, customerId);
         }
 
-        const returnUrl = `${resolvePublicAppBaseUrl(req.url)}/admin/billing`;
+        const returnUrl = `${appBaseUrl}/admin/billing`;
         const portal = await stripeApi("billing_portal/sessions", {
           method: "POST",
           body: {
@@ -81,7 +88,7 @@ export async function POST(req: NextRequest) {
     );
   } catch (e: unknown) {
     if (isRuntimeEnvError(e)) {
-      return NextResponse.redirect(new URL("/admin/billing?error=ENV_MISCONFIGURED", req.url), { status: 303 });
+      return NextResponse.redirect(new URL("/admin/billing?error=ENV_MISCONFIGURED", appBaseUrl), { status: 303 });
     }
     if (isRouteTimeoutError(e)) {
       await logSecurityEvent({
@@ -91,7 +98,7 @@ export async function POST(req: NextRequest) {
         message: "Portal session creation exceeded timeout",
         meta: { timeoutMs },
       });
-      return NextResponse.redirect(new URL("/admin/billing?error=TIMEOUT", req.url), { status: 303 });
+      return NextResponse.redirect(new URL("/admin/billing?error=TIMEOUT", appBaseUrl), { status: 303 });
     }
     const msg = e instanceof Error ? e.message : String(e || "portal_failed");
     const safeError =
@@ -109,6 +116,6 @@ export async function POST(req: NextRequest) {
       message: "Stripe portal session creation failed",
       meta: { code: safeError },
     });
-    return NextResponse.redirect(new URL(`/admin/billing?error=${encodeURIComponent(safeError)}`, req.url), { status: 303 });
+    return NextResponse.redirect(new URL(`/admin/billing?error=${encodeURIComponent(safeError)}`, appBaseUrl), { status: 303 });
   }
 }

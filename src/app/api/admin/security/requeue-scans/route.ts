@@ -2,11 +2,19 @@ import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/authz";
 import { sql } from "@/lib/db";
 import { logSecurityEvent } from "@/lib/securityTelemetry";
+import { resolvePublicAppBaseUrl } from "@/lib/publicBaseUrl";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
+  let appBaseUrl: string;
+  try {
+    appBaseUrl = resolvePublicAppBaseUrl(req.url);
+  } catch {
+    return NextResponse.json({ ok: false, error: "ENV_MISCONFIGURED" }, { status: 500 });
+  }
+
   try {
     const u = await requireRole("owner");
 
@@ -98,11 +106,10 @@ export async function POST(req: Request) {
       meta: { requeued },
     });
 
-    return NextResponse.redirect(new URL(`/admin/security?saved=scan_requeued&requeued=${requeued}`, req.url), { status: 303 });
+    return NextResponse.redirect(new URL(`/admin/security?saved=scan_requeued&requeued=${requeued}`, appBaseUrl), { status: 303 });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "";
     const safeError = msg === "FORBIDDEN" || msg === "UNAUTHENTICATED" ? msg : "requeue_failed";
-    return NextResponse.redirect(new URL(`/admin/security?error=${encodeURIComponent(safeError)}`, req.url), { status: 303 });
+    return NextResponse.redirect(new URL(`/admin/security?error=${encodeURIComponent(safeError)}`, appBaseUrl), { status: 303 });
   }
 }
-

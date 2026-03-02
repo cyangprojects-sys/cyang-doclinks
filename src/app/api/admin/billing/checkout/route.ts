@@ -47,6 +47,13 @@ async function persistCustomerId(userId: string, customerId: string): Promise<vo
 }
 
 export async function POST(req: NextRequest) {
+  let appBaseUrl: string;
+  try {
+    appBaseUrl = resolvePublicAppBaseUrl(req.url);
+  } catch {
+    return NextResponse.json({ ok: false, error: "ENV_MISCONFIGURED" }, { status: 500 });
+  }
+
   const timeoutMs = getRouteTimeoutMs("ROUTE_TIMEOUT_BILLING_CHECKOUT_MS", 15_000);
   try {
     return await withRouteTimeout(
@@ -63,9 +70,8 @@ export async function POST(req: NextRequest) {
           await persistCustomerId(u.id, customerId);
         }
 
-        const origin = resolvePublicAppBaseUrl(req.url);
-        const successUrl = `${origin}/admin/billing?checkout=success`;
-        const cancelUrl = `${origin}/admin/billing?checkout=canceled`;
+        const successUrl = `${appBaseUrl}/admin/billing?checkout=success`;
+        const cancelUrl = `${appBaseUrl}/admin/billing?checkout=canceled`;
         const priceId = getProPriceId();
 
         const session = await stripeApi("checkout/sessions", {
@@ -100,7 +106,7 @@ export async function POST(req: NextRequest) {
     );
   } catch (e: unknown) {
     if (isRuntimeEnvError(e)) {
-      return NextResponse.redirect(new URL("/admin/billing?error=ENV_MISCONFIGURED", req.url), { status: 303 });
+      return NextResponse.redirect(new URL("/admin/billing?error=ENV_MISCONFIGURED", appBaseUrl), { status: 303 });
     }
     if (isRouteTimeoutError(e)) {
       await logSecurityEvent({
@@ -110,7 +116,7 @@ export async function POST(req: NextRequest) {
         message: "Checkout session creation exceeded timeout",
         meta: { timeoutMs },
       });
-      return NextResponse.redirect(new URL("/admin/billing?error=TIMEOUT", req.url), { status: 303 });
+      return NextResponse.redirect(new URL("/admin/billing?error=TIMEOUT", appBaseUrl), { status: 303 });
     }
     const msg = e instanceof Error ? e.message : String(e || "checkout_failed");
     const safeError =
@@ -128,6 +134,6 @@ export async function POST(req: NextRequest) {
       message: "Stripe checkout session creation failed",
       meta: { code: safeError },
     });
-    return NextResponse.redirect(new URL(`/admin/billing?error=${encodeURIComponent(safeError)}`, req.url), { status: 303 });
+    return NextResponse.redirect(new URL(`/admin/billing?error=${encodeURIComponent(safeError)}`, appBaseUrl), { status: 303 });
   }
 }
