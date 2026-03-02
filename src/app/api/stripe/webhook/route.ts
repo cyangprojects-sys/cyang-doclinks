@@ -35,9 +35,9 @@ function planFromStripePriceId(priceId: string | null): "free" | "pro" {
   return "free";
 }
 
-function getSubPriceId(obj: any): string | null {
+function getSubPriceId(obj: unknown): string | null {
   try {
-    const arr = obj?.items?.data;
+    const arr = (obj as { items?: { data?: Array<{ price?: { id?: unknown } }> } } | null | undefined)?.items?.data;
     if (!Array.isArray(arr) || arr.length === 0) return null;
     return String(arr[0]?.price?.id || "").trim() || null;
   } catch {
@@ -196,9 +196,9 @@ export async function POST(req: NextRequest) {
               eventType,
             },
           });
-        } catch (e: any) {
+        } catch (e: unknown) {
           webhookStatus = "failed";
-          webhookMessage = String(e?.message || e || "webhook_failed");
+          webhookMessage = e instanceof Error ? e.message : String(e || "webhook_failed");
           await logDbErrorEvent({
             scope: "billing_webhook",
             message: webhookMessage,
