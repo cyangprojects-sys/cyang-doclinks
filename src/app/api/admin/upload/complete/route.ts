@@ -20,6 +20,7 @@ import { getActiveMasterKeyOrThrow } from "@/lib/masterKeys";
 import { getRouteTimeoutMs, isRouteTimeoutError, withRouteTimeout } from "@/lib/routeTimeout";
 import { assertRuntimeEnv, isRuntimeEnvError } from "@/lib/runtimeEnv";
 import { validateUploadType } from "@/lib/uploadTypeValidation";
+import { resolvePublicAppBaseUrl } from "@/lib/publicBaseUrl";
 
 type CompleteRequest = {
   // Newer flow: doc_id from /presign response
@@ -534,7 +535,7 @@ try {
   }
 } catch (e) {
   // best-effort; do not block completion
-  console.warn("Failed to increment upload usage:", e);
+  console.warn("Failed to increment upload usage.");
 }
 
 
@@ -585,9 +586,7 @@ try {
       return NextResponse.json({ ok: false, error: "alias_generation_failed" }, { status: 500 });
     }
 
-    const baseUrl =
-      process.env.NEXT_PUBLIC_SITE_URL ||
-      (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000");
+    const baseUrl = resolvePublicAppBaseUrl(req.url);
 
         await logSecurityEvent({
           type: "upload_complete_success",
