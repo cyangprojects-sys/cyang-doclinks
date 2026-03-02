@@ -115,18 +115,24 @@ export async function GET(req: NextRequest) {
   }
 
   const duration = Date.now() - startedAt;
+  const aggregateObj = (aggregate && typeof aggregate === "object" ? aggregate : {}) as Record<string, unknown>;
+  const retentionObj = (retention && typeof retention === "object" ? retention : {}) as Record<string, unknown>;
+  const orphanSweepObj = (orphan_sweep && typeof orphan_sweep === "object" ? orphan_sweep : {}) as Record<string, unknown>;
+  const keyRotationJobsObj = (key_rotation_jobs && typeof key_rotation_jobs === "object" ? key_rotation_jobs : {}) as Record<string, unknown>;
+  const backupRecoveryObj = (backup_recovery && typeof backup_recovery === "object" ? backup_recovery : {}) as Record<string, unknown>;
+  const billingSyncObj = (billing_sync && typeof billing_sync === "object" ? billing_sync : {}) as Record<string, unknown>;
   await logCronRun({
     job: "nightly",
     ok: true,
     durationMs: duration,
     meta: {
-      aggregateOk: Boolean((aggregate as any)?.ok),
-      retentionOk: Boolean((retention as any)?.ok),
-      orphanSweepOk: Boolean((orphan_sweep as any)?.ok),
-      keyRotationProcessed: (key_rotation_jobs as any)?.processed ?? null,
+      aggregateOk: Boolean(aggregateObj.ok),
+      retentionOk: Boolean(retentionObj.ok),
+      orphanSweepOk: Boolean(orphanSweepObj.ok),
+      keyRotationProcessed: keyRotationJobsObj.processed ?? null,
       revokedExpiredShares: expiredSharesRevoked.revoked,
-      backupStatus: (backup_recovery as any)?.backupStatus ?? null,
-      billingUsersScanned: (billing_sync as any)?.usersScanned ?? null,
+      backupStatus: backupRecoveryObj.backupStatus ?? null,
+      billingUsersScanned: billingSyncObj.usersScanned ?? null,
     },
   });
   return NextResponse.json({
