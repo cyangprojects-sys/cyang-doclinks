@@ -86,4 +86,51 @@ test.describe("runtime env validation", () => {
     process.env.STRIPE_PRO_PRICE_IDS = "price_test";
     expect(() => assertRuntimeEnv("stripe_webhook")).not.toThrow();
   });
+
+  test("enforces upload_presign required envs", () => {
+    process.env.NODE_ENV = "development";
+    process.env.ENABLE_STRICT_ENV_VALIDATION = "true";
+    process.env.DATABASE_URL = "postgres://test";
+    process.env.DOC_MASTER_KEYS = "v1:base64key";
+    process.env.R2_BUCKET = "bucket";
+    process.env.R2_ENDPOINT = "https://example.r2.cloudflarestorage.com";
+    process.env.R2_ACCESS_KEY_ID = "key";
+    delete process.env.R2_SECRET_ACCESS_KEY;
+    process.env.UPLOAD_ABSOLUTE_MAX_BYTES = "26214400";
+
+    expect(() => assertRuntimeEnv("upload_presign")).toThrow(RuntimeEnvError);
+
+    process.env.R2_SECRET_ACCESS_KEY = "secret";
+    expect(() => assertRuntimeEnv("upload_presign")).not.toThrow();
+  });
+
+  test("enforces upload_complete required envs including PDF_MAX_PAGES", () => {
+    process.env.NODE_ENV = "development";
+    process.env.ENABLE_STRICT_ENV_VALIDATION = "true";
+    process.env.DATABASE_URL = "postgres://test";
+    process.env.DOC_MASTER_KEYS = "v1:base64key";
+    process.env.R2_BUCKET = "bucket";
+    process.env.R2_ENDPOINT = "https://example.r2.cloudflarestorage.com";
+    process.env.R2_ACCESS_KEY_ID = "key";
+    process.env.R2_SECRET_ACCESS_KEY = "secret";
+    process.env.UPLOAD_ABSOLUTE_MAX_BYTES = "26214400";
+    delete process.env.PDF_MAX_PAGES;
+
+    expect(() => assertRuntimeEnv("upload_complete")).toThrow(RuntimeEnvError);
+
+    process.env.PDF_MAX_PAGES = "2000";
+    expect(() => assertRuntimeEnv("upload_complete")).not.toThrow();
+  });
+
+  test("enforces stripe_admin required envs", () => {
+    process.env.NODE_ENV = "development";
+    process.env.ENABLE_STRICT_ENV_VALIDATION = "true";
+    process.env.DATABASE_URL = "postgres://test";
+    delete process.env.STRIPE_SECRET_KEY;
+    process.env.STRIPE_PRO_PRICE_IDS = "price_test";
+    expect(() => assertRuntimeEnv("stripe_admin")).toThrow(RuntimeEnvError);
+
+    process.env.STRIPE_SECRET_KEY = "sk_test_123";
+    expect(() => assertRuntimeEnv("stripe_admin")).not.toThrow();
+  });
 });
