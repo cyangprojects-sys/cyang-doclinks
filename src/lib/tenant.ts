@@ -4,6 +4,13 @@ import { cookies } from "next/headers";
 export const ORG_COOKIE_NAME = "cyang_org";
 export const ORG_INVITE_COOKIE_NAME = "cyang_org_invite";
 
+export function normalizeOrgSlug(input: string | null | undefined): string | null {
+  const slug = String(input || "").trim().toLowerCase();
+  if (!slug) return null;
+  if (!/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(slug)) return null;
+  return slug;
+}
+
 /**
  * Returns org slug from cookie, or null.
  * This cookie is set by /org/[slug]/auth/* routes (Option 2 routing).
@@ -16,8 +23,7 @@ export function getOrgSlugFromCookies(): string | null {
   try {
     const c = cookies() as unknown as { get?: (name: string) => { value?: string } | undefined };
     const v = c.get?.(ORG_COOKIE_NAME)?.value ?? "";
-    const slug = String(v || "").trim().toLowerCase();
-    return slug ? slug : null;
+    return normalizeOrgSlug(v);
   } catch {
     return null;
   }
