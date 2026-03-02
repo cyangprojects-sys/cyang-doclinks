@@ -282,6 +282,38 @@ test.describe("attack simulation", () => {
     }
   });
 
+  test("serve route honors dl=1 attachment semantics for valid token", async ({ request }) => {
+    const databaseUrl = String(process.env.DATABASE_URL || "").trim();
+    test.skip(!databaseUrl, "DATABASE_URL not available");
+    const sql = neon(databaseUrl);
+
+    const docId = await pickDocId(sql);
+    test.skip(!docId, "No doc available for fixture setup");
+    if (!docId) return;
+
+    const token = `tok_attack_serve_dl_${randSuffix()}`.slice(0, 64);
+    await sql`
+      insert into public.share_tokens (token, doc_id, max_views, views_count)
+      values (${token}, ${docId}::uuid, null, 0)
+    `;
+
+    try {
+      const r = await request.get(`/serve/${docId}?token=${encodeURIComponent(token)}&dl=1`, {
+        maxRedirects: 0,
+      });
+      if (r.status() === 429) {
+        test.skip(true, "Rate limited in environment");
+      }
+      expect(r.status()).toBe(302);
+      const loc = r.headers()["location"] || "";
+      expect(loc).toContain("/t/");
+      expect(loc).not.toContain(".r2.");
+      expect(loc).not.toContain("amazonaws.com");
+    } finally {
+      await sql`delete from public.share_tokens where token = ${token}`;
+    }
+  });
+
   test("share raw path does not expose direct object-store URL", async ({ request }) => {
     const databaseUrl = String(process.env.DATABASE_URL || "").trim();
     test.skip(!databaseUrl, "DATABASE_URL not available");
@@ -504,6 +536,24 @@ test.describe("attack simulation", () => {
         type: "invoice.payment_failed",
         data: { object: { customer: "cus_fake", subscription: "sub_fake" } },
       },
+    });
+    expect([400, 403, 429, 503]).toContain(r.status());
+  });
+
+  test("stripe webhook rejects signatures with stale timestamps", async ({ request }) => {
+    const webhookSecret = String(process.env.STRIPE_WEBHOOK_SECRET || "").trim();
+    test.skip(!webhookSecret, "STRIPE_WEBHOOK_SECRET not available in test runtime");
+
+    const payload = {
+      id: `evt_attack_sim_stale_sig_${Date.now()}`,
+      type: "invoice.payment_failed",
+      data: { object: { customer: "cus_fake", subscription: "sub_fake" } },
+    };
+
+    const staleTs = Math.floor(Date.now() / 1000) - 60 * 60; // 1h old, beyond default tolerance
+    const r = await request.post("/api/stripe/webhook", {
+      data: payload,
+      headers: { "stripe-signature": stripeSignature(payload, webhookSecret, staleTs) },
     });
     expect([400, 403, 429, 503]).toContain(r.status());
   });
