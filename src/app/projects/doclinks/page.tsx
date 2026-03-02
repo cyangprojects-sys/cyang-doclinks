@@ -54,20 +54,6 @@ export default async function DoclinksPage() {
 
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
             <Link
-              href="/signin"
-              className="rounded-2xl bg-white/10 px-6 py-3 text-sm font-medium text-white ring-1 ring-white/10 hover:bg-white/15"
-            >
-              Sign in
-            </Link>
-
-            <Link
-              href="/signup"
-              className="rounded-2xl bg-white px-6 py-3 text-sm font-medium text-black hover:bg-white/90"
-            >
-              Sign up
-            </Link>
-
-            <Link
               href="/projects/doclinks#security-model"
               className="rounded-2xl bg-white/10 px-6 py-3 text-sm font-medium text-white ring-1 ring-white/10 hover:bg-white/15"
             >
