@@ -90,6 +90,72 @@ async function tableExists(sql: Sql, tableName: string): Promise<boolean> {
 }
 
 test.describe("security state enforcement", () => {
+  test("top-level raw navigation is blocked while non-navigation raw access can mint a ticket", async ({ request }) => {
+    const databaseUrl = String(process.env.DATABASE_URL || "").trim();
+    test.skip(!databaseUrl, "DATABASE_URL not available");
+    const sql = neon(databaseUrl);
+
+    const doc = await pickServableDoc(sql);
+    test.skip(!doc, "No servable docs available for fixture setup");
+    if (!doc) return;
+
+    const token = `tok_top_level_block_${randSuffix()}`.slice(0, 64);
+    await sql`
+      insert into public.share_tokens (token, doc_id, max_views, views_count)
+      values (${token}, ${doc.id}::uuid, null, 0)
+    `;
+
+    try {
+      const topLevelResp = await request.get(`/s/${token}/raw`, {
+        headers: {
+          "sec-fetch-dest": "document",
+          "sec-fetch-mode": "navigate",
+          "sec-fetch-user": "?1",
+        },
+      });
+      if (topLevelResp.status() === 429) {
+        test.skip(true, "Rate-limited in environment; cannot validate top-level raw blocking");
+      }
+      expect(topLevelResp.status()).toBe(403);
+
+      const nonTopLevelResp = await request.get(`/s/${token}/raw`, { maxRedirects: 0 });
+      if (nonTopLevelResp.status() === 429) {
+        test.skip(true, "Rate-limited in environment; cannot validate non-top-level raw access");
+      }
+      expect(nonTopLevelResp.status()).toBe(302);
+      expect(nonTopLevelResp.headers()["location"] || "").toContain("/t/");
+    } finally {
+      await sql`delete from public.share_tokens where token = ${token}`;
+    }
+  });
+
+  test("first open of non-password share lands on /view, not /raw", async ({ page }) => {
+    const databaseUrl = String(process.env.DATABASE_URL || "").trim();
+    test.skip(!databaseUrl, "DATABASE_URL not available");
+    const sql = neon(databaseUrl);
+
+    const doc = await pickServableDoc(sql);
+    test.skip(!doc, "No servable docs available for fixture setup");
+    if (!doc) return;
+
+    const token = `tok_first_open_view_${randSuffix()}`.slice(0, 64);
+    await sql`
+      insert into public.share_tokens (token, doc_id, max_views, views_count, password_hash)
+      values (${token}, ${doc.id}::uuid, null, 0, null)
+    `;
+
+    try {
+      await page.goto(`/s/${token}`);
+      await expect(page.getByRole("button", { name: "Open document" })).toBeVisible();
+      await page.getByRole("button", { name: "Open document" }).click();
+      await page.waitForURL(new RegExp(`/s/${token}/view`));
+      expect(page.url()).toContain(`/s/${token}/view`);
+      expect(page.url()).not.toContain(`/s/${token}/raw`);
+    } finally {
+      await sql`delete from public.share_tokens where token = ${token}`;
+    }
+  });
+
   test("expired and revoked shares are blocked", async ({ request }) => {
     const databaseUrl = String(process.env.DATABASE_URL || "").trim();
     test.skip(!databaseUrl, "DATABASE_URL not available");

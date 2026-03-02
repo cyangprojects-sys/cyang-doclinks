@@ -406,7 +406,7 @@ test.describe("attack simulation", () => {
         "stripe-signature": "t=1700000000,v1=deadbeef",
       },
     });
-    expect([400, 429, 503]).toContain(r.status());
+    expect([400, 403, 429, 503]).toContain(r.status());
   });
 
   test("stripe webhook rejects missing signature header", async ({ request }) => {
@@ -417,7 +417,7 @@ test.describe("attack simulation", () => {
         data: { object: { customer: "cus_fake", subscription: "sub_fake" } },
       },
     });
-    expect([400, 429, 503]).toContain(r.status());
+    expect([400, 403, 429, 503]).toContain(r.status());
   });
 
   test("stripe webhook dedupes duplicate events (when secret configured)", async ({ request }) => {
