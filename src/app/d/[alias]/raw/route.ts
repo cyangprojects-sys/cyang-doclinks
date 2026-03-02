@@ -385,7 +385,13 @@ if (shouldCountView(req)) {
       ip: clientIpKey(req).ip,
       meta: { route: "/d/[alias]/raw" },
     });
-    console.error("RAW ROUTE ERROR:", err);
+    const isProd = String(process.env.NODE_ENV || "").toLowerCase() === "production";
+    if (isProd) {
+      console.warn("RAW ROUTE ERROR");
+    } else {
+      const msg = err instanceof Error ? err.message : String(err || "unknown");
+      console.warn(`RAW ROUTE ERROR: ${msg}`);
+    }
     return new Response("Internal server error", { status: 500 });
   }
 }
