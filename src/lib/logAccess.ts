@@ -34,13 +34,7 @@ export async function logAccess({
       )
     `;
     } catch (err) {
-        const isProd = String(process.env.NODE_ENV || "").toLowerCase() === "production";
-        if (isProd) {
-            console.warn("Failed to log access.");
-        } else {
-            const msg = err instanceof Error ? err.message : String(err || "unknown");
-            console.warn(`Failed to log access: ${msg}`);
-        }
+        console.warn("Failed to log access.");
         // Never throw — logging should not break file delivery
     }
 }
