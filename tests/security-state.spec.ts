@@ -156,6 +156,116 @@ test.describe("security state enforcement", () => {
     }
   });
 
+  test("password-protected raw access redirects HTML to gate and rejects non-HTML", async ({ request }) => {
+    const databaseUrl = String(process.env.DATABASE_URL || "").trim();
+    test.skip(!databaseUrl, "DATABASE_URL not available");
+    const sql = neon(databaseUrl);
+
+    const doc = await pickServableDoc(sql);
+    test.skip(!doc, "No servable docs available for fixture setup");
+    if (!doc) return;
+
+    const token = `tok_pw_gate_${randSuffix()}`.slice(0, 64);
+    await sql`
+      insert into public.share_tokens (token, doc_id, max_views, views_count, password_hash)
+      values (${token}, ${doc.id}::uuid, null, 0, 'placeholder_hash')
+    `;
+
+    try {
+      const htmlResp = await request.get(`/s/${token}/raw`, {
+        maxRedirects: 0,
+        headers: { accept: "text/html" },
+      });
+      if (htmlResp.status() === 429) {
+        test.skip(true, "Rate-limited in environment; cannot validate password HTML redirect");
+      }
+      expect([302, 303, 307, 308]).toContain(htmlResp.status());
+      expect(htmlResp.headers()["location"] || "").toContain(`/s/${token}`);
+
+      const apiResp = await request.get(`/s/${token}/raw`, {
+        headers: { accept: "application/pdf" },
+      });
+      if (apiResp.status() === 429) {
+        test.skip(true, "Rate-limited in environment; cannot validate password non-HTML denial");
+      }
+      expect(apiResp.status()).toBe(401);
+    } finally {
+      await sql`delete from public.share_tokens where token = ${token}`;
+    }
+  });
+
+  test("download-disabled share blocks attachment disposition when flag exists", async ({ request }) => {
+    const databaseUrl = String(process.env.DATABASE_URL || "").trim();
+    test.skip(!databaseUrl, "DATABASE_URL not available");
+    const sql = neon(databaseUrl);
+
+    const hasAllowDownload = await columnExists(sql, "share_tokens", "allow_download");
+    test.skip(!hasAllowDownload, "share_tokens.allow_download column not available");
+
+    const doc = await pickServableDoc(sql);
+    test.skip(!doc, "No servable docs available for fixture setup");
+    if (!doc) return;
+
+    const token = `tok_dl_disabled_${randSuffix()}`.slice(0, 64);
+    await sql`
+      insert into public.share_tokens (token, doc_id, max_views, views_count, allow_download)
+      values (${token}, ${doc.id}::uuid, null, 0, false)
+    `;
+
+    try {
+      const resp = await request.get(`/s/${token}/raw?disposition=attachment`);
+      if (resp.status() === 429) {
+        test.skip(true, "Rate-limited in environment; cannot validate download-disabled enforcement");
+      }
+      expect(resp.status()).toBe(403);
+    } finally {
+      await sql`delete from public.share_tokens where token = ${token}`;
+    }
+  });
+
+  test("high-risk inline preview is blocked while attachment still works", async ({ request }) => {
+    const databaseUrl = String(process.env.DATABASE_URL || "").trim();
+    test.skip(!databaseUrl, "DATABASE_URL not available");
+    const sql = neon(databaseUrl);
+
+    const doc = await pickServableDoc(sql);
+    test.skip(!doc, "No servable docs available for fixture setup");
+    if (!doc) return;
+
+    const token = `tok_risky_inline_${randSuffix()}`.slice(0, 64);
+    await sql`
+      insert into public.share_tokens (token, doc_id, max_views, views_count)
+      values (${token}, ${doc.id}::uuid, null, 0)
+    `;
+
+    try {
+      await sql`update public.docs set scan_status = 'clean', risk_level = 'high' where id = ${doc.id}::uuid`;
+
+      const inlineResp = await request.get(`/s/${token}/raw`);
+      if (inlineResp.status() === 429) {
+        test.skip(true, "Rate-limited in environment; cannot validate risky inline blocking");
+      }
+      expect(inlineResp.status()).toBe(403);
+
+      const attachmentResp = await request.get(`/s/${token}/raw?disposition=attachment`, { maxRedirects: 0 });
+      if (attachmentResp.status() === 429) {
+        test.skip(true, "Rate-limited in environment; cannot validate risky attachment fallback");
+      }
+      expect([302, 303, 307, 308]).toContain(attachmentResp.status());
+      expect(attachmentResp.headers()["location"] || "").toContain("/t/");
+    } finally {
+      await sql`
+        update public.docs
+        set
+          moderation_status = ${doc.moderation_status ?? "active"},
+          scan_status = ${doc.scan_status ?? "clean"},
+          risk_level = ${doc.risk_level ?? "low"}
+        where id = ${doc.id}::uuid
+      `;
+      await sql`delete from public.share_tokens where token = ${token}`;
+    }
+  });
+
   test("expired and revoked shares are blocked", async ({ request }) => {
     const databaseUrl = String(process.env.DATABASE_URL || "").trim();
     test.skip(!databaseUrl, "DATABASE_URL not available");
