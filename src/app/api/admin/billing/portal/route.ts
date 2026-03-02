@@ -9,15 +9,7 @@ import { appendImmutableAudit } from "@/lib/immutableAudit";
 import { logSecurityEvent } from "@/lib/securityTelemetry";
 import { getRouteTimeoutMs, isRouteTimeoutError, withRouteTimeout } from "@/lib/routeTimeout";
 import { assertRuntimeEnv, isRuntimeEnvError } from "@/lib/runtimeEnv";
-
-function baseUrl(req: NextRequest): string {
-  const configured =
-    String(process.env.APP_URL || "").trim() ||
-    String(process.env.NEXTAUTH_URL || "").trim() ||
-    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "");
-  if (configured) return configured.replace(/\/+$/, "");
-  return new URL(req.url).origin.replace(/\/+$/, "");
-}
+import { resolvePublicAppBaseUrl } from "@/lib/publicBaseUrl";
 
 async function readExistingCustomerId(userId: string): Promise<string | null> {
   try {
@@ -62,7 +54,7 @@ export async function POST(req: NextRequest) {
           await persistCustomerId(u.id, customerId);
         }
 
-        const returnUrl = `${baseUrl(req)}/admin/billing`;
+        const returnUrl = `${resolvePublicAppBaseUrl(req.url)}/admin/billing`;
         const portal = await stripeApi("billing_portal/sessions", {
           method: "POST",
           body: {
@@ -106,6 +98,8 @@ export async function POST(req: NextRequest) {
       msg === "FORBIDDEN" || msg === "UNAUTHENTICATED"
         ? "FORBIDDEN"
         : msg === "STRIPE_SECRET_KEY is not configured"
+          ? "ENV_MISCONFIGURED"
+          : msg.startsWith("APP_BASE_URL_")
           ? "ENV_MISCONFIGURED"
           : "PORTAL_FAILED";
     await logSecurityEvent({

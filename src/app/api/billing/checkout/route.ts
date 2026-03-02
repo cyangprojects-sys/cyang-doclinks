@@ -10,15 +10,7 @@ import { logSecurityEvent } from "@/lib/securityTelemetry";
 import { getRouteTimeoutMs, isRouteTimeoutError, withRouteTimeout } from "@/lib/routeTimeout";
 import { assertRuntimeEnv, isRuntimeEnvError } from "@/lib/runtimeEnv";
 import { getBillingFlags } from "@/lib/settings";
-
-function baseUrl(req: NextRequest): string {
-  const configured =
-    String(process.env.APP_URL || "").trim() ||
-    String(process.env.NEXTAUTH_URL || "").trim() ||
-    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "");
-  if (configured) return configured.replace(/\/+$/, "");
-  return new URL(req.url).origin.replace(/\/+$/, "");
-}
+import { resolvePublicAppBaseUrl } from "@/lib/publicBaseUrl";
 
 function getProPriceId(): string {
   const ids = String(process.env.STRIPE_PRO_PRICE_IDS || "")
@@ -77,7 +69,7 @@ export async function POST(req: NextRequest) {
           await persistCustomerId(u.id, customerId);
         }
 
-        const origin = baseUrl(req);
+        const origin = resolvePublicAppBaseUrl(req.url);
         const successUrl = `${origin}/admin/upgrade?checkout=success`;
         const cancelUrl = `${origin}/admin/upgrade?checkout=canceled`;
         const priceId = getProPriceId();
@@ -128,6 +120,8 @@ export async function POST(req: NextRequest) {
       msg === "FORBIDDEN" || msg === "UNAUTHENTICATED"
         ? "FORBIDDEN"
         : msg === "STRIPE_PRO_PRICE_IDS is not configured"
+          ? "ENV_MISCONFIGURED"
+          : msg.startsWith("APP_BASE_URL_")
           ? "ENV_MISCONFIGURED"
           : "CHECKOUT_FAILED";
     await logSecurityEvent({
