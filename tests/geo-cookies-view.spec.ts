@@ -58,4 +58,20 @@ test.describe("geo, cookie, and view helpers", () => {
     expect(h1).toBe(h2);
     expect(h1).toHaveLength(64);
   });
+
+  test("view hashIp returns null for empty values", () => {
+    expect(hashIp("")).toBeNull();
+    expect(hashIp(null)).toBeNull();
+    expect(hashIp(undefined)).toBeNull();
+  });
+
+  test("view hashIp output changes with VIEW_SALT", () => {
+    process.env.VIEW_SALT = "salt-a";
+    const a = hashIp("8.8.8.8");
+    process.env.VIEW_SALT = "salt-b";
+    const b = hashIp("8.8.8.8");
+    expect(a).not.toBeNull();
+    expect(b).not.toBeNull();
+    expect(a).not.toBe(b);
+  });
 });
