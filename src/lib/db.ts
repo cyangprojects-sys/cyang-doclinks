@@ -16,4 +16,6 @@ function getSql(): ReturnType<typeof neon> {
 
 // Lazy DB init prevents build-time module evaluation from failing in CI
 // when DATABASE_URL is intentionally not present.
-export const sql: any = (...args: any[]) => (getSql() as any)(...args);
+type SqlCompat = <T = unknown>(strings: TemplateStringsArray, ...values: unknown[]) => Promise<T[]>;
+export const sql: SqlCompat = (strings, ...values) =>
+  (getSql() as unknown as SqlCompat)(strings, ...values);
