@@ -15,14 +15,6 @@ function clearCookie(headers: Headers, name: string) {
   headers.append("Set-Cookie", `${name}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${secure}`);
 }
 
-function signInFallback(alias?: string) {
-  const a = alias ? encodeURIComponent(alias) : "";
-  return new Response(null, {
-    status: 302,
-    headers: { Location: a ? `/d/${a}` : "/" },
-  });
-}
-
 export async function GET(req: Request) {
   const alias = (getCookie(req, "cy_oauth_alias") || "").trim();
   const codeVerifier = (getCookie(req, "cy_oauth_cv") || "").trim();
