@@ -14,7 +14,7 @@ export default async function OwnerAdminLayout({
   if (!session?.user) redirect("/signin");
 
   // Hard gate all (owner) routes.
-  const role = (session.user as any)?.role as string | undefined;
+  const role = (session.user as { role?: string })?.role;
   const isOwner = role === "owner";
   if (!isOwner) redirect("/admin/dashboard");
 

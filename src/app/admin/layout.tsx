@@ -17,7 +17,7 @@ export default async function AdminLayout({
   // Require login for all /admin routes
   if (!session?.user) redirect("/signin");
 
-  const role = (session.user as any)?.role as string | undefined;
+  const role = (session.user as { role?: string })?.role;
   const isOwner = role === "owner";
   const billingFlags = await getBillingFlags();
 
