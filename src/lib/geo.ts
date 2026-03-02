@@ -14,15 +14,15 @@ export function getCountryFromHeaders(headers: Headers): string | null {
   return c;
 }
 
-function normList(list: any): string[] {
+function normList(list: unknown): string[] {
   if (!Array.isArray(list)) return [];
   return list.map((x) => String(x || "").trim().toUpperCase()).filter((x) => /^[A-Z]{2}$/.test(x));
 }
 
 export function isCountryAllowed(args: {
   country: string | null;
-  allowedCountries?: any;
-  blockedCountries?: any;
+  allowedCountries?: unknown;
+  blockedCountries?: unknown;
 }): boolean {
   const country = args.country;
   if (!country) return true; // unknown => allow (best-effort)
@@ -45,12 +45,13 @@ export async function geoDecisionForRequest(args: {
   // 1) Share-level policy (if available)
   if (token) {
     try {
+      type GeoPolicyRow = { allowed_countries: unknown; blocked_countries: unknown };
       const rows = (await sql`
         select allowed_countries, blocked_countries
         from public.share_tokens
         where token = ${token}
         limit 1
-      `) as any[];
+      `) as GeoPolicyRow[];
       const r = rows?.[0];
       if (r) {
         const ok = isCountryAllowed({ country, allowedCountries: r.allowed_countries, blockedCountries: r.blocked_countries });
@@ -63,12 +64,13 @@ export async function geoDecisionForRequest(args: {
 
   // 2) Doc-level policy (if available)
   try {
+    type GeoPolicyRow = { allowed_countries: unknown; blocked_countries: unknown };
     const rows = (await sql`
       select allowed_countries, blocked_countries
       from public.docs
       where id = ${docId}::uuid
       limit 1
-    `) as any[];
+    `) as GeoPolicyRow[];
     const r = rows?.[0];
     if (r) {
       const ok = isCountryAllowed({ country, allowedCountries: r.allowed_countries, blockedCountries: r.blocked_countries });
