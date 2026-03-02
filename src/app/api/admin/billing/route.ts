@@ -4,6 +4,7 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { requirePermission } from "@/lib/rbac";
 import { setBillingFlags, getBillingFlags } from "@/lib/settings";
+import { resolvePublicAppBaseUrl } from "@/lib/publicBaseUrl";
 
 function asCheckboxBool(v: FormDataEntryValue | null): boolean {
   // unchecked checkboxes are absent
@@ -19,7 +20,7 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  const url = new URL(req.url);
+  const base = resolvePublicAppBaseUrl(req.url);
 
   try {
     await requirePermission("billing.manage");
@@ -32,8 +33,7 @@ export async function POST(req: Request) {
 
     const saved = await setBillingFlags(next);
 
-    url.pathname = "/admin/billing";
-    url.search = "";
+    const url = new URL("/admin/billing", base);
 
     if (saved.ok) {
       url.searchParams.set("saved", "1");
@@ -44,9 +44,13 @@ export async function POST(req: Request) {
     return NextResponse.redirect(url, { status: 303 });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "SERVER_ERROR";
-    const safeError = msg === "FORBIDDEN" || msg === "UNAUTHENTICATED" ? "FORBIDDEN" : "SERVER_ERROR";
-    url.pathname = "/admin/billing";
-    url.search = "";
+    const safeError =
+      msg === "FORBIDDEN" || msg === "UNAUTHENTICATED"
+        ? "FORBIDDEN"
+        : msg.startsWith("APP_BASE_URL_")
+          ? "ENV_MISCONFIGURED"
+          : "SERVER_ERROR";
+    const url = new URL("/admin/billing", base);
     url.searchParams.set("error", safeError);
     return NextResponse.redirect(url, { status: 303 });
   }
