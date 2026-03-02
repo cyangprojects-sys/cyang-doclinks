@@ -50,7 +50,7 @@ export default function SignInPage() {
         </div>
 
         <div className="mt-6 rounded-xl border border-white/15 bg-white/5 p-3">
-          <div className="text-xs text-white/60">Need a new account?</div>
+          <div className="text-xs text-white/60">Need Account, sign up here</div>
           <div className="mt-2 flex flex-wrap gap-2">
             <Link href="/signup" className="rounded-lg border border-white/20 bg-white/10 px-3 py-1.5 text-xs text-white hover:bg-white/15">
               Sign up
