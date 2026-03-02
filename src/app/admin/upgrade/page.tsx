@@ -77,12 +77,20 @@ export default async function ViewerUpgradePage(props: {
             <li>Basic analytics only (view count)</li>
           </ul>
           <div className="mt-5">
-            <Link
-              href="/signin"
-              className="btn-base inline-flex rounded-lg border border-sky-200/70 bg-gradient-to-r from-sky-300 to-cyan-200 px-4 py-2.5 text-sm font-semibold text-black shadow-[0_8px_24px_rgba(73,179,255,0.30)] hover:brightness-105"
-            >
-              Start Free
-            </Link>
+            <div className="flex flex-wrap gap-2">
+              <Link
+                href="/signin"
+                className="btn-base inline-flex rounded-lg border border-white/20 bg-white/10 px-4 py-2.5 text-sm font-semibold text-white hover:bg-white/15"
+              >
+                Sign in
+              </Link>
+              <Link
+                href="/signup"
+                className="btn-base inline-flex rounded-lg border border-sky-200/70 bg-gradient-to-r from-sky-300 to-cyan-200 px-4 py-2.5 text-sm font-semibold text-black shadow-[0_8px_24px_rgba(73,179,255,0.30)] hover:brightness-105"
+              >
+                Sign up
+              </Link>
+            </div>
           </div>
         </article>
 

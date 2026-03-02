@@ -55,9 +55,16 @@ export default async function DoclinksPage() {
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
             <Link
               href="/signin"
+              className="rounded-2xl bg-white/10 px-6 py-3 text-sm font-medium text-white ring-1 ring-white/10 hover:bg-white/15"
+            >
+              Sign in
+            </Link>
+
+            <Link
+              href="/signup"
               className="rounded-2xl bg-white px-6 py-3 text-sm font-medium text-black hover:bg-white/90"
             >
-              Start Free
+              Sign up
             </Link>
 
             <Link
@@ -328,7 +335,7 @@ export default async function DoclinksPage() {
             title="Admin upload"
             desc="Upload supported file types and generate a shareable link."
             href="/admin"
-            cta="Start Free"
+            cta="Sign up"
           />
           <Callout
             title="Open a demo document"
@@ -358,10 +365,10 @@ export default async function DoclinksPage() {
                 <li>Basic audit logs</li>
               </ul>
               <Link
-                href="/signin"
+                href="/signup"
                 className="btn-base mt-5 inline-flex rounded-lg border border-sky-200/70 bg-gradient-to-r from-sky-300 to-cyan-200 px-4 py-2.5 text-sm font-semibold text-black shadow-[0_8px_24px_rgba(73,179,255,0.30)] hover:brightness-105"
               >
-                Start Free
+                Sign up
               </Link>
             </div>
             <div className="rounded-3xl border border-amber-300/40 bg-white/5 p-6 ring-1 ring-amber-200/15">

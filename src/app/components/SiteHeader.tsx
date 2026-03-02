@@ -37,8 +37,11 @@ export async function SiteHeader() {
         </nav>
 
         <div className="flex items-center gap-2">
-          <Link href="/signin" className="btn-base btn-primary rounded-xl px-4 py-2.5 text-sm font-semibold">
-            Start Free
+          <Link href="/signin" className="btn-base btn-secondary rounded-xl px-4 py-2.5 text-sm font-semibold">
+            Sign in
+          </Link>
+          <Link href="/signup" className="btn-base btn-primary rounded-xl px-4 py-2.5 text-sm font-semibold">
+            Sign up
           </Link>
         </div>
       </div>

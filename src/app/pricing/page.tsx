@@ -62,12 +62,20 @@ export default async function PricingPage() {
             <p className="mt-4 text-sm text-white/75">
               For individuals and small teams validating controlled delivery workflows.
             </p>
-            <Link
-              href="/signin"
-              className="btn-base mt-5 inline-flex rounded-lg border border-sky-200/70 bg-gradient-to-r from-sky-300 to-cyan-200 px-4 py-2.5 text-sm font-semibold text-black shadow-[0_8px_24px_rgba(73,179,255,0.30)] hover:brightness-105"
-            >
-              Start Free
-            </Link>
+            <div className="mt-5 flex flex-wrap gap-2">
+              <Link
+                href="/signin"
+                className="btn-base inline-flex rounded-lg border border-white/20 bg-white/10 px-4 py-2.5 text-sm font-semibold text-white hover:bg-white/15"
+              >
+                Sign in
+              </Link>
+              <Link
+                href="/signup"
+                className="btn-base inline-flex rounded-lg border border-sky-200/70 bg-gradient-to-r from-sky-300 to-cyan-200 px-4 py-2.5 text-sm font-semibold text-black shadow-[0_8px_24px_rgba(73,179,255,0.30)] hover:brightness-105"
+              >
+                Sign up
+              </Link>
+            </div>
           </article>
 
           <article className="rounded-3xl border border-amber-300/40 bg-white/5 p-6 ring-1 ring-amber-200/15">
