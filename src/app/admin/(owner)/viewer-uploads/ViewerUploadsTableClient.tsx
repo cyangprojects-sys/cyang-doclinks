@@ -138,7 +138,7 @@ export default function ViewerUploadsTableClient({ rows }: { rows: ViewerUploadR
 
   return (
     <div className="space-y-4">
-      <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-4">
+      <div className="glass-card-strong rounded-2xl p-4">
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-12">
           <div className="xl:col-span-2">
             <label htmlFor="viewer-uploads-search" className="sr-only">Search uploads</label>
@@ -228,7 +228,7 @@ export default function ViewerUploadsTableClient({ rows }: { rows: ViewerUploadR
 
       {error ? <div className="rounded-lg border border-red-800 bg-red-950/40 px-3 py-2 text-sm text-red-200">{error}</div> : null}
 
-      <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-3">
+      <div className="glass-card-strong rounded-2xl p-3">
         <div className="flex flex-wrap gap-2">
           <button type="button" disabled={isPending || !selectedIds.length} onClick={() => runAbuseAction("quarantine_doc", selectedIds)} className="rounded-md border border-amber-600/40 bg-amber-500/20 px-3 py-1.5 text-sm text-amber-100 disabled:opacity-50">
             Quarantine selected
@@ -268,9 +268,10 @@ export default function ViewerUploadsTableClient({ rows }: { rows: ViewerUploadR
         </div>
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-neutral-800">
+      <div className="overflow-hidden rounded-2xl border border-white/10">
+        <div className="max-h-[560px] overflow-auto">
         <table className="min-w-[1180px] w-full text-sm">
-          <thead className="bg-neutral-900 text-neutral-300">
+          <thead className="sticky top-0 bg-[#10192b]/95 text-neutral-300 backdrop-blur">
             <tr>
               <th className="px-3 py-2 text-left">
                 <input type="checkbox" aria-label="Select all visible uploads" checked={allVisibleSelected} onChange={(e) => setAllVisible(e.target.checked)} />
@@ -287,7 +288,7 @@ export default function ViewerUploadsTableClient({ rows }: { rows: ViewerUploadR
           </thead>
           <tbody>
             {filtered.map((r) => (
-              <tr key={r.doc_id} className="border-t border-neutral-800 bg-black/20">
+              <tr key={r.doc_id} className="border-t border-white/10 bg-black/20">
                 <td className="px-3 py-2 align-top">
                   <input type="checkbox" aria-label={`Select upload ${r.title || r.doc_id}`} checked={!!selected[r.doc_id]} onChange={(e) => setSelected((prev) => ({ ...prev, [r.doc_id]: e.target.checked }))} />
                 </td>
@@ -311,7 +312,7 @@ export default function ViewerUploadsTableClient({ rows }: { rows: ViewerUploadR
                 <td className="px-3 py-2 text-right">{r.active_shares}</td>
                 <td className="px-3 py-2 text-right">
                   <div className="flex flex-wrap justify-end gap-2">
-                    <Link aria-label={`Open upload ${r.title || r.doc_id}`} href={`/admin/docs/${r.doc_id}`} className="rounded-md border border-neutral-700 bg-white/5 px-2 py-1 text-xs">Open</Link>
+                    <Link aria-label={`Open upload ${r.title || r.doc_id}`} href={`/admin/docs/${r.doc_id}`} className="rounded-md border border-white/20 bg-white/10 px-2 py-1 text-xs">Open</Link>
                     <button aria-label={`Quarantine upload ${r.title || r.doc_id}`} type="button" onClick={() => runAbuseAction("quarantine_doc", [r.doc_id])} className="rounded-md border border-amber-700/50 bg-amber-700/20 px-2 py-1 text-xs text-amber-100">Quarantine</button>
                     <button aria-label={`Disable upload ${r.title || r.doc_id}`} type="button" onClick={() => runAbuseAction("disable_doc", [r.doc_id])} className="rounded-md border border-amber-700/50 bg-amber-700/10 px-2 py-1 text-xs text-amber-100">Disable</button>
                     <form
@@ -346,6 +347,7 @@ export default function ViewerUploadsTableClient({ rows }: { rows: ViewerUploadR
             ) : null}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );

@@ -211,9 +211,10 @@ export default async function BillingSettingsPage({
       <Card>
         <div className="text-sm font-medium text-white">Recent Stripe webhook events</div>
         {billingSnapshot.events.length ? (
-          <div className="mt-3 overflow-x-auto rounded-lg border border-neutral-800">
+          <div className="mt-3 overflow-hidden rounded-lg border border-neutral-800">
+            <div className="max-h-[380px] overflow-auto">
             <table className="min-w-full text-left text-xs">
-              <thead className="bg-black/40 text-neutral-400">
+              <thead className="sticky top-0 bg-[#10192b]/95 text-neutral-400 backdrop-blur">
                 <tr>
                   <th className="px-3 py-2">Received</th>
                   <th className="px-3 py-2">Type</th>
@@ -232,6 +233,7 @@ export default async function BillingSettingsPage({
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
         ) : (
           <div className="mt-2 text-xs text-neutral-400">No webhook events recorded yet.</div>
@@ -267,9 +269,10 @@ export default async function BillingSettingsPage({
             Soft cap exceeded: account should be monitored for abuse and throttling behavior.
           </div>
         ) : null}
-        <div className="mt-4 overflow-x-auto rounded-lg border border-neutral-800">
+        <div className="mt-4 overflow-hidden rounded-lg border border-neutral-800">
+          <div className="max-h-[380px] overflow-auto">
           <table className="min-w-full text-left text-xs">
-            <thead className="bg-black/40 text-neutral-400">
+            <thead className="sticky top-0 bg-[#10192b]/95 text-neutral-400 backdrop-blur">
               <tr>
                 <th className="px-3 py-2">Owner</th>
                 <th className="px-3 py-2">Estimated month egress</th>
@@ -299,6 +302,7 @@ export default async function BillingSettingsPage({
               )}
             </tbody>
           </table>
+          </div>
         </div>
         <div className="mt-2 text-xs text-neutral-500">
           Recommended soft cap window: 20-50 GB/month. This dashboard uses a 30 GB baseline for flagging.

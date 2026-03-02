@@ -55,8 +55,8 @@ function fmtDate(s: string | null) {
   return d.toLocaleString();
 }
 
-const card = "rounded-2xl border border-neutral-800 bg-neutral-950 p-4 shadow-sm";
-const subtle = "text-xs text-neutral-400";
+const card = "glass-card-strong rounded-2xl p-4";
+const subtle = "text-xs text-white/60";
 
 export default async function AdminDocDetailPage({
   params,
@@ -260,19 +260,19 @@ export default async function AdminDocDetailPage({
       <div className="flex items-center justify-between gap-3">
         <div>
           <div className={subtle}>Document</div>
-          <h1 className="text-2xl font-semibold text-neutral-100">{doc.title || doc.id}</h1>
-          <div className="mt-1 text-xs text-neutral-400">Created: {fmtDate(doc.created_at)}</div>
+          <h1 className="text-2xl font-semibold text-white">{doc.title || doc.id}</h1>
+          <div className="mt-1 text-xs text-white/60">Created: {fmtDate(doc.created_at)}</div>
         </div>
         <div className="flex items-center gap-2">
           <Link
-            className="rounded-xl border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm text-neutral-100 shadow-sm hover:bg-neutral-900"
+            className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-white hover:bg-white/15"
             href="/admin/dashboard"
           >
             ← Back
           </Link>
           {alias ? (
             <Link
-              className="rounded-xl border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm text-neutral-100 shadow-sm hover:bg-neutral-900"
+              className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-white hover:bg-white/15"
               href={`/d/${alias}`}
             >
               Open
@@ -284,13 +284,13 @@ export default async function AdminDocDetailPage({
       <section className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
         <div className={card}>
           <div className={subtle}>Views</div>
-          <div className="mt-1 text-2xl font-semibold text-neutral-100">{fmtInt(views30)}</div>
+          <div className="mt-1 text-2xl font-semibold text-white">{fmtInt(views30)}</div>
           <div className={subtle}>Last 30 days</div>
           <div className="mt-2 flex items-center justify-between gap-3">
-            <div className="text-sm font-medium text-neutral-200">
-              {fmtInt(views7)} <span className="text-xs text-neutral-400">/ 7d</span>
+            <div className="text-sm font-medium text-white/90">
+              {fmtInt(views7)} <span className="text-xs text-white/60">/ 7d</span>
             </div>
-            <div className="text-neutral-400">
+            <div className="text-white/60">
               <Sparkline values={sparkVals} ariaLabel="30 day views sparkline" />
             </div>
           </div>
@@ -298,8 +298,8 @@ export default async function AdminDocDetailPage({
 
         <div className={card}>
           <div className={subtle}>Alias</div>
-          <div className="mt-1 text-sm font-medium text-neutral-200">{alias || "—"}</div>
-          <div className="mt-2 text-xs text-neutral-400">
+          <div className="mt-1 text-sm font-medium text-white/90">{alias || "—"}</div>
+          <div className="mt-2 text-xs text-white/60">
             Expires: {fmtDate(aliasExpires)} • Active: {String(aliasActive ?? true)} • Revoked: {fmtDate(aliasRevokedAt)}
           </div>
           <div className="mt-3 space-y-2">
@@ -326,7 +326,7 @@ export default async function AdminDocDetailPage({
                   className="mt-1 w-20 rounded-md border border-neutral-700 bg-black/40 px-2 py-1 text-xs text-neutral-100"
                 />
               </label>
-              <button type="submit" className="rounded-md border border-neutral-700 bg-neutral-900 px-2 py-1 text-xs text-neutral-100">
+              <button type="submit" className="rounded-md border border-white/20 bg-white/10 px-2 py-1 text-xs text-white">
                 Create
               </button>
             </form>
@@ -343,7 +343,7 @@ export default async function AdminDocDetailPage({
                     className="mt-1 w-44 rounded-md border border-neutral-700 bg-black/40 px-2 py-1 text-xs text-neutral-100"
                   />
                 </label>
-                <button type="submit" className="rounded-md border border-neutral-700 bg-neutral-900 px-2 py-1 text-xs text-neutral-100">
+                <button type="submit" className="rounded-md border border-white/20 bg-white/10 px-2 py-1 text-xs text-white">
                   Rename
                 </button>
               </form>
@@ -363,7 +363,7 @@ export default async function AdminDocDetailPage({
                   className="mt-1 w-20 rounded-md border border-neutral-700 bg-black/40 px-2 py-1 text-xs text-neutral-100"
                 />
               </label>
-              <button type="submit" className="rounded-md border border-neutral-700 bg-neutral-900 px-2 py-1 text-xs text-neutral-100">
+              <button type="submit" className="rounded-md border border-white/20 bg-white/10 px-2 py-1 text-xs text-white">
                 Apply
               </button>
             </form>
@@ -379,56 +379,59 @@ export default async function AdminDocDetailPage({
 
         <div className={card}>
           <div className={subtle}>Shares</div>
-          <div className="mt-1 text-2xl font-semibold text-neutral-100">{fmtInt(activeShares)}</div>
+          <div className="mt-1 text-2xl font-semibold text-white">{fmtInt(activeShares)}</div>
           <div className={subtle}>Active (top 50 listed)</div>
         </div>
       </section>
 
       <section className={card}>
         <div className="flex items-center justify-between">
-          <h2 className="text-base font-semibold text-neutral-100">30-day view history</h2>
+          <h2 className="text-base font-semibold text-white">30-day view history</h2>
           <div className={subtle}>{hasDocViewDaily ? "Using doc_view_daily" : hasDocViews ? "Using doc_views" : "No view tables found"}</div>
         </div>
 
-        <div className="mt-3 overflow-x-auto">
+        <div className="mt-3 overflow-hidden rounded-2xl border border-white/10">
+          <div className="max-h-[560px] overflow-auto">
           <table className="min-w-[680px] w-full text-sm">
-            <thead className="text-left text-xs text-neutral-400">
+            <thead className="sticky top-0 bg-[#10192b]/95 text-left text-xs text-white/60 backdrop-blur">
               <tr>
                 <th className="py-2 pr-4">Day</th>
                 <th className="py-2 pr-4">Views</th>
                 <th className="py-2 pr-4">Unique IPs</th>
               </tr>
             </thead>
-            <tbody className="text-neutral-200">
+            <tbody className="text-white/85">
               {series30.length ? (
                 series30
                   .slice()
                   .reverse()
                   .map((r) => (
-                    <tr key={r.day} className="border-t border-neutral-800">
+                    <tr key={r.day} className="border-t border-white/10">
                       <td className="py-2 pr-4">{r.day}</td>
                       <td className="py-2 pr-4">{fmtInt(r.views)}</td>
                       <td className="py-2 pr-4">{fmtInt(r.unique_ips)}</td>
                     </tr>
                   ))
               ) : (
-                <tr className="border-t border-neutral-800">
-                  <td className="py-3 text-xs text-neutral-400" colSpan={3}>
+                <tr className="border-t border-white/10">
+                  <td className="py-3 text-xs text-white/60" colSpan={3}>
                     No data yet.
                   </td>
                 </tr>
               )}
             </tbody>
           </table>
+          </div>
         </div>
       </section>
 
       <section className="grid grid-cols-1 gap-3 xl:grid-cols-2">
         <div className={card}>
-          <h2 className="text-base font-semibold text-neutral-100">Share history</h2>
-          <div className="mt-3 overflow-x-auto">
+          <h2 className="text-base font-semibold text-white">Share history</h2>
+          <div className="mt-3 overflow-hidden rounded-2xl border border-white/10">
+            <div className="max-h-[560px] overflow-auto">
             <table className="min-w-[760px] w-full text-sm">
-              <thead className="text-left text-xs text-neutral-400">
+              <thead className="sticky top-0 bg-[#10192b]/95 text-left text-xs text-white/60 backdrop-blur">
                 <tr>
                   <th className="py-2 pr-4">Token</th>
                   <th className="py-2 pr-4">Created</th>
@@ -438,10 +441,10 @@ export default async function AdminDocDetailPage({
                   <th className="py-2 pr-4">Revoked</th>
                 </tr>
               </thead>
-              <tbody className="text-neutral-200">
+              <tbody className="text-white/85">
                 {shares.length ? (
                   shares.map((s) => (
-                    <tr key={s.token} className="border-t border-neutral-800">
+                    <tr key={s.token} className="border-t border-white/10">
                       <td className="py-2 pr-4 font-mono text-xs">{s.token.slice(0, 10)}…</td>
                       <td className="py-2 pr-4">{fmtDate(s.created_at)}</td>
                       <td className="py-2 pr-4">{fmtDate(s.expires_at)}</td>
@@ -451,50 +454,53 @@ export default async function AdminDocDetailPage({
                     </tr>
                   ))
                 ) : (
-                  <tr className="border-t border-neutral-800">
-                    <td className="py-3 text-xs text-neutral-400" colSpan={6}>
+                  <tr className="border-t border-white/10">
+                    <td className="py-3 text-xs text-white/60" colSpan={6}>
                       No shares found.
                     </td>
                   </tr>
                 )}
               </tbody>
             </table>
+            </div>
           </div>
         </div>
 
         <div className={card}>
-          <h2 className="text-base font-semibold text-neutral-100">IP breakdown (30d)</h2>
-          <div className="mt-1 text-xs text-neutral-400">Hashed IPs (privacy-preserving).</div>
-          <div className="mt-3 overflow-x-auto">
+          <h2 className="text-base font-semibold text-white">IP breakdown (30d)</h2>
+          <div className="mt-1 text-xs text-white/60">Hashed IPs (privacy-preserving).</div>
+          <div className="mt-3 overflow-hidden rounded-2xl border border-white/10">
+            <div className="max-h-[420px] overflow-auto">
             <table className="min-w-[520px] w-full text-sm">
-              <thead className="text-left text-xs text-neutral-400">
+              <thead className="sticky top-0 bg-[#10192b]/95 text-left text-xs text-white/60 backdrop-blur">
                 <tr>
                   <th className="py-2 pr-4">IP hash</th>
                   <th className="py-2 pr-4">Views</th>
                 </tr>
               </thead>
-              <tbody className="text-neutral-200">
+              <tbody className="text-white/85">
                 {ipRows.length ? (
                   ipRows.map((r) => (
-                    <tr key={r.ip_hash} className="border-t border-neutral-800">
+                    <tr key={r.ip_hash} className="border-t border-white/10">
                       <td className="py-2 pr-4 font-mono text-xs">{(r.ip_hash || "—").slice(0, 18)}…</td>
                       <td className="py-2 pr-4">{fmtInt(r.views)}</td>
                     </tr>
                   ))
                 ) : (
-                  <tr className="border-t border-neutral-800">
-                    <td className="py-3 text-xs text-neutral-400" colSpan={2}>
+                  <tr className="border-t border-white/10">
+                    <td className="py-3 text-xs text-white/60" colSpan={2}>
                       No data yet.
                     </td>
                   </tr>
                 )}
               </tbody>
             </table>
+            </div>
           </div>
         </div>
       </section>
 
-      <div className="text-xs text-neutral-400">
+      <div className="text-xs text-white/60">
         Note: download counts are not tracked separately yet; current page shows view/access activity only.
       </div>
     </div>

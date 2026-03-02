@@ -308,7 +308,7 @@ export default async function StripeBillingPage(props: {
         </div>
       </div>
 
-      <div className="mt-4 rounded-2xl border border-neutral-800 bg-neutral-950 p-5">
+      <div className="glass-card-strong mt-4 rounded-2xl p-5">
         <div className="text-sm font-medium text-white">Billing debug status</div>
         <div className="mt-3 grid gap-2 text-xs text-neutral-300 sm:grid-cols-2 lg:grid-cols-3">
           <div className="rounded-lg border border-neutral-800 bg-black/30 p-3">
@@ -352,7 +352,7 @@ export default async function StripeBillingPage(props: {
         </div>
       </div>
 
-      <div className="mt-4 rounded-2xl border border-neutral-800 bg-neutral-950 p-5">
+      <div className="glass-card-strong mt-4 rounded-2xl p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <div className="text-sm font-medium text-white">Invoices</div>
@@ -364,9 +364,10 @@ export default async function StripeBillingPage(props: {
             {invoicesError}
           </div>
         ) : invoices.length ? (
-          <div className="mt-3 overflow-x-auto rounded-lg border border-neutral-800">
+          <div className="mt-3 overflow-hidden rounded-lg border border-white/10">
+            <div className="max-h-[380px] overflow-auto">
             <table className="min-w-full text-left text-xs">
-              <thead className="bg-black/40 text-neutral-400">
+              <thead className="sticky top-0 bg-[#10192b]/95 text-neutral-400 backdrop-blur">
                 <tr>
                   <th className="px-3 py-2">Date</th>
                   <th className="px-3 py-2">Invoice</th>
@@ -378,7 +379,7 @@ export default async function StripeBillingPage(props: {
               </thead>
               <tbody>
                 {invoices.map((inv, idx) => (
-                  <tr key={String(inv?.id || `${inv?.number || "row"}-${idx}`)} className="border-t border-neutral-800">
+                    <tr key={String(inv?.id || `${inv?.number || "row"}-${idx}`)} className="border-t border-white/10">
                     <td className="px-3 py-2 text-neutral-300">
                       {inv?.created ? new Date(Number(inv.created) * 1000).toLocaleString() : "-"}
                     </td>
@@ -408,6 +409,7 @@ export default async function StripeBillingPage(props: {
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
         ) : (
           <div className="mt-2 text-sm text-neutral-400">No invoices found yet.</div>

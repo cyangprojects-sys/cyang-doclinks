@@ -97,7 +97,7 @@ export default async function DbDebugPage() {
       </div>
 
       <div className="space-y-6">
-        <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-4">
+        <div className="glass-card-strong rounded-2xl p-4">
           <div className="text-sm text-neutral-400">Connection</div>
           <div className="mt-2 grid gap-2 text-sm">
             <div>
@@ -112,27 +112,29 @@ export default async function DbDebugPage() {
           </div>
         </div>
 
-        <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-4">
+        <div className="glass-card-strong rounded-2xl p-4">
           <div className="mb-3 text-sm text-neutral-400">public tables</div>
-          <div className="overflow-x-auto">
+          <div className="overflow-hidden rounded-lg border border-white/10">
+            <div className="max-h-[420px] overflow-auto">
             <table className="min-w-[420px] text-sm">
-              <thead className="text-left text-neutral-400">
-                <tr className="border-b border-neutral-800">
+              <thead className="sticky top-0 bg-[#10192b]/95 text-left text-neutral-400 backdrop-blur">
+                <tr className="border-b border-white/10">
                   <th className="py-2 pr-4">table_name</th>
                 </tr>
               </thead>
               <tbody>
                 {tables.map((t, i) => (
-                  <tr key={i} className="border-b border-neutral-900">
+                  <tr key={i} className="border-b border-white/10">
                     <td className="py-2 pr-4">{t.table_name}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
         </div>
 
-        <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-4">
+        <div className="glass-card-strong rounded-2xl p-4">
           <div className="mb-2 text-sm text-neutral-400">public.doc_access_log</div>
           {!accessLogRegclass ? (
             <div className="text-sm text-yellow-400">Not found (to_regclass returned null).</div>

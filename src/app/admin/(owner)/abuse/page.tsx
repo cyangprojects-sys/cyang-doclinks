@@ -114,26 +114,27 @@ export default async function AbuseReportsPage() {
       </div>
 
       <div className="mt-6 grid gap-3 md:grid-cols-3">
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+        <div className="glass-card-strong rounded-2xl p-4">
           <div className="text-xs text-white/60">Active blocked IPs</div>
           <div className="mt-1 text-2xl font-semibold text-white">{Number(blockStats?.[0]?.active_blocks ?? 0)}</div>
         </div>
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+        <div className="glass-card-strong rounded-2xl p-4">
           <div className="text-xs text-white/60">Expired blocks</div>
           <div className="mt-1 text-2xl font-semibold text-white">{Number(blockStats?.[0]?.expired_blocks ?? 0)}</div>
         </div>
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+        <div className="glass-card-strong rounded-2xl p-4">
           <div className="text-xs text-white/60">Block hits (24h)</div>
           <div className="mt-1 text-2xl font-semibold text-white">{Number(hitRows?.[0]?.hits_24h ?? 0)}</div>
         </div>
       </div>
 
-      <div className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-4">
+      <div className="glass-card-strong mt-6 rounded-2xl p-4">
         <div className="text-sm font-medium text-white">Active blocked IPs</div>
         <div className="mt-1 text-xs text-white/60">Hashed IP only. Expires automatically when TTL passes.</div>
-        <div className="mt-3 overflow-x-auto">
+        <div className="mt-3 overflow-hidden rounded-2xl border border-white/10">
+          <div className="max-h-[420px] overflow-auto">
           <table className="min-w-full text-left text-xs">
-            <thead className="text-white/50">
+            <thead className="sticky top-0 bg-[#10192b]/95 text-white/60 backdrop-blur">
               <tr>
                 <th className="py-2 pr-4">IP hash</th>
                 <th className="py-2 pr-4">Reason</th>
@@ -162,16 +163,17 @@ export default async function AbuseReportsPage() {
               )}
             </tbody>
           </table>
+          </div>
         </div>
       </div>
 
-      <div className="mt-6 space-y-4">
+      <div className="mt-6 max-h-[920px] space-y-4 overflow-auto pr-1">
         {rows.length === 0 ? (
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-white/70">No reports yet.</div>
+          <div className="glass-card-strong rounded-2xl p-4 text-sm text-white/70">No reports yet.</div>
         ) : null}
 
         {rows.map((r) => (
-          <div key={r.id} className="rounded-2xl border border-white/10 bg-white/5 p-4">
+          <div key={r.id} className="glass-card-strong rounded-2xl p-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <div className="text-sm font-medium text-white">

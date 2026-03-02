@@ -64,11 +64,12 @@ export default async function DmcaPage() {
 
       <div className="mt-6 space-y-3">
         {rows.length === 0 ? (
-          <div className="rounded-xl border border-white/10 bg-white/5 p-5 text-sm text-white/60">No notices yet.</div>
+          <div className="glass-card-strong rounded-2xl p-5 text-sm text-white/60">No notices yet.</div>
         ) : null}
 
+        <div className="max-h-[920px] space-y-3 overflow-auto pr-1">
         {rows.map((r) => (
-          <div key={r.id} className="rounded-xl border border-white/10 bg-white/5 p-5">
+          <div key={r.id} className="glass-card-strong rounded-2xl p-5">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div className="min-w-[260px]">
                 <div className="text-xs text-white/50">{r.created_at}</div>
@@ -96,9 +97,10 @@ export default async function DmcaPage() {
             </div>
           </div>
         ))}
+        </div>
       </div>
 
-      <div className="mt-10 rounded-xl border border-white/10 bg-white/5 p-5">
+      <div className="glass-card-strong mt-10 rounded-2xl p-5">
         <div className="text-sm font-medium text-white">Public endpoint</div>
         <div className="mt-1 text-sm text-white/60">
           Accepts JSON POST to <code className="rounded bg-black/30 px-1 py-0.5">/api/v1/takedown</code> with{" "}

@@ -187,9 +187,10 @@ export default async function AuditPage() {
         <section className="space-y-4">
           <h2 className="text-lg font-medium">Audit Events</h2>
 
-          <div className="overflow-x-auto rounded-xl border border-neutral-800">
+          <div className="overflow-hidden rounded-2xl border border-white/10">
+            <div className="max-h-[560px] overflow-auto">
             <table className="min-w-[1200px] text-sm">
-              <thead className="bg-neutral-900 text-neutral-400">
+              <thead className="sticky top-0 bg-[#10192b]/95 text-neutral-400 backdrop-blur">
                 <tr>
                   {auditRows[0] &&
                     Object.keys(auditRows[0]).map((key) => (
@@ -203,7 +204,7 @@ export default async function AuditPage() {
                 {auditRows.map((row, i) => (
                   <tr
                     key={i}
-                    className="border-t border-neutral-800 hover:bg-neutral-900"
+                    className="border-t border-white/10 hover:bg-white/[0.03]"
                   >
                     {Object.values(row).map((val, j) => (
                       <td key={j} className="px-4 py-3 whitespace-nowrap">
@@ -214,6 +215,7 @@ export default async function AuditPage() {
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
         </section>
 
@@ -228,9 +230,10 @@ export default async function AuditPage() {
             </div>
           )}
 
-          <div className="overflow-x-auto rounded-xl border border-neutral-800">
+          <div className="overflow-hidden rounded-2xl border border-white/10">
+            <div className="max-h-[560px] overflow-auto">
             <table className="min-w-[1200px] text-sm">
-              <thead className="bg-neutral-900 text-neutral-400">
+              <thead className="sticky top-0 bg-[#10192b]/95 text-neutral-400 backdrop-blur">
                 <tr>
                   {accessRows[0] &&
                     Object.keys(accessRows[0]).map((key) => (
@@ -244,7 +247,7 @@ export default async function AuditPage() {
                 {accessRows.map((row, i) => (
                   <tr
                     key={i}
-                    className="border-t border-neutral-800 hover:bg-neutral-900"
+                    className="border-t border-white/10 hover:bg-white/[0.03]"
                   >
                     {Object.values(row).map((val, j) => (
                       <td key={j} className="px-4 py-3 whitespace-nowrap">
@@ -255,6 +258,7 @@ export default async function AuditPage() {
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
         </section>
 
@@ -262,9 +266,10 @@ export default async function AuditPage() {
         <section className="space-y-4">
           <h2 className="text-lg font-medium">Views</h2>
 
-          <div className="overflow-x-auto rounded-xl border border-neutral-800">
+          <div className="overflow-hidden rounded-2xl border border-white/10">
+            <div className="max-h-[560px] overflow-auto">
             <table className="min-w-[1200px] text-sm">
-              <thead className="bg-neutral-900 text-neutral-400">
+              <thead className="sticky top-0 bg-[#10192b]/95 text-neutral-400 backdrop-blur">
                 <tr>
                   {viewRows[0] &&
                     Object.keys(viewRows[0]).map((key) => (
@@ -278,7 +283,7 @@ export default async function AuditPage() {
                 {viewRows.map((row, i) => (
                   <tr
                     key={i}
-                    className="border-t border-neutral-800 hover:bg-neutral-900"
+                    className="border-t border-white/10 hover:bg-white/[0.03]"
                   >
                     {Object.values(row).map((val, j) => (
                       <td key={j} className="px-4 py-3 whitespace-nowrap">
@@ -289,6 +294,7 @@ export default async function AuditPage() {
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
         </section>
 

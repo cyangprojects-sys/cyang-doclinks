@@ -341,12 +341,12 @@ export default async function SecurityTelemetryPage(props: {
       </div>
 
       <div className="mt-6 grid gap-4 lg:grid-cols-3">
-        <section className="rounded-xl border border-white/10 bg-white/5 p-4 lg:col-span-1">
+        <section className="glass-card-strong rounded-2xl p-4 lg:col-span-1">
           <h2 className="text-sm font-semibold">Top abusive IP hashes (24h)</h2>
           <p className="mt-1 text-xs text-white/50">
             Privacy-safe hashes derived from VIEW_SALT.
           </p>
-          <div className="mt-3 space-y-2">
+          <div className="mt-3 max-h-[560px] space-y-2 overflow-auto pr-1">
             {topIps.length ? (
               topIps.map((r) => (
                 <div
@@ -366,15 +366,16 @@ export default async function SecurityTelemetryPage(props: {
           </div>
         </section>
 
-        <section className="rounded-xl border border-white/10 bg-white/5 p-4 lg:col-span-2">
+        <section className="glass-card-strong rounded-2xl p-4 lg:col-span-2">
           <h2 className="text-sm font-semibold">Recent security events</h2>
           <p className="mt-1 text-xs text-white/50">
             These events are best-effort signals (rate limits, spikes, decrypts). Use them as a starting point.
           </p>
 
-          <div className="mt-3 overflow-hidden rounded-lg border border-white/10">
+          <div className="mt-3 overflow-hidden rounded-2xl border border-white/10">
+            <div className="max-h-[560px] overflow-auto">
             <table className="w-full text-left text-sm">
-              <thead className="bg-black/30 text-xs text-white/60">
+              <thead className="sticky top-0 bg-[#10192b]/95 text-xs text-white/60 backdrop-blur">
                 <tr>
                   <th className="px-3 py-2">Time</th>
                   <th className="px-3 py-2">Type</th>
@@ -408,11 +409,12 @@ export default async function SecurityTelemetryPage(props: {
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
         </section>
       </div>
 
-      <div className="mt-4 rounded-xl border border-white/10 bg-white/5 p-4">
+      <div className="glass-card-strong mt-4 rounded-2xl p-4">
         <div className="flex items-start justify-between gap-3">
           <h2 className="text-sm font-semibold">Scan dead-letter queue</h2>
           <form action="/api/admin/security/requeue-scans" method="post">
@@ -428,9 +430,10 @@ export default async function SecurityTelemetryPage(props: {
           Jobs here exceeded retry limits and require manual investigation or requeue.
         </p>
 
-        <div className="mt-3 overflow-hidden rounded-lg border border-white/10">
+        <div className="mt-3 overflow-hidden rounded-2xl border border-white/10">
+          <div className="max-h-[520px] overflow-auto">
           <table className="w-full text-left text-sm">
-            <thead className="bg-black/30 text-xs text-white/60">
+            <thead className="sticky top-0 bg-[#10192b]/95 text-xs text-white/60 backdrop-blur">
               <tr>
                 <th className="px-3 py-2">Finished</th>
                 <th className="px-3 py-2">Doc</th>
@@ -459,10 +462,11 @@ export default async function SecurityTelemetryPage(props: {
               )}
             </tbody>
           </table>
+          </div>
         </div>
       </div>
 
-      <div className="mt-4 rounded-xl border border-white/10 bg-white/5 p-4">
+      <div className="glass-card-strong mt-4 rounded-2xl p-4">
         <h2 className="text-sm font-semibold">Organization Membership</h2>
         <p className="mt-1 text-xs text-white/50">
           Invite-only access model for your tenant. Domain allowlists are supplemental, not primary access control.
@@ -497,9 +501,10 @@ export default async function SecurityTelemetryPage(props: {
               </button>
             </form>
 
-            <div className="mt-3 overflow-x-auto">
+            <div className="mt-3 overflow-hidden rounded-2xl border border-white/10">
+              <div className="max-h-[420px] overflow-auto">
               <table className="w-full min-w-[760px] text-left text-sm">
-                <thead className="bg-black/30 text-xs text-white/60">
+                <thead className="sticky top-0 bg-[#10192b]/95 text-xs text-white/60 backdrop-blur">
                   <tr>
                     <th className="px-3 py-2">Member</th>
                     <th className="px-3 py-2">Role</th>
@@ -537,11 +542,13 @@ export default async function SecurityTelemetryPage(props: {
                   ))}
                 </tbody>
               </table>
+              </div>
             </div>
 
-            <div className="mt-3 overflow-x-auto">
+            <div className="mt-3 overflow-hidden rounded-2xl border border-white/10">
+              <div className="max-h-[420px] overflow-auto">
               <table className="w-full min-w-[760px] text-left text-sm">
-                <thead className="bg-black/30 text-xs text-white/60">
+                <thead className="sticky top-0 bg-[#10192b]/95 text-xs text-white/60 backdrop-blur">
                   <tr>
                     <th className="px-3 py-2">Pending invite</th>
                     <th className="px-3 py-2">Role</th>
@@ -572,12 +579,13 @@ export default async function SecurityTelemetryPage(props: {
                   )}
                 </tbody>
               </table>
+              </div>
             </div>
           </>
         )}
       </div>
 
-      <div className="mt-4 rounded-xl border border-white/10 bg-white/5 p-4">
+      <div className="glass-card-strong mt-4 rounded-2xl p-4">
         <h2 className="text-sm font-semibold">RBAC permission overrides</h2>
         <p className="mt-1 text-xs text-white/50">
           Owner-level policy controls for role permissions. These overrides take precedence over defaults in code.
@@ -588,9 +596,10 @@ export default async function SecurityTelemetryPage(props: {
             RBAC override table not found. Run <span className="font-mono">scripts/sql/enterprise_rbac.sql</span>.
           </div>
         ) : (
-          <div className="mt-3 overflow-x-auto">
+          <div className="mt-3 overflow-hidden rounded-2xl border border-white/10">
+            <div className="max-h-[560px] overflow-auto">
             <table className="w-full min-w-[740px] text-left text-sm">
-              <thead className="bg-black/30 text-xs text-white/60">
+              <thead className="sticky top-0 bg-[#10192b]/95 text-xs text-white/60 backdrop-blur">
                 <tr>
                   <th className="px-3 py-2">Permission</th>
                   {roles.map((r) => (
@@ -631,6 +640,7 @@ export default async function SecurityTelemetryPage(props: {
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
         )}
       </div>

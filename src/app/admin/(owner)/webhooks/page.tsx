@@ -197,7 +197,7 @@ export default async function WebhooksPage() {
       <section className="mt-8">
         <h2 className="text-lg font-medium">Your webhooks</h2>
 
-        <div className="mt-3 space-y-3">
+        <div className="mt-3 max-h-[920px] space-y-3 overflow-auto pr-1">
           {hooks.map((h) => (
             <div key={h.id} className="glass-card-strong rounded-2xl p-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
@@ -274,9 +274,10 @@ export default async function WebhooksPage() {
 
       <section className="mt-10">
         <h2 className="text-lg font-medium">Recent deliveries</h2>
-        <div className="glass-card-strong mt-3 overflow-x-auto rounded-2xl border border-white/10">
+        <div className="glass-card-strong mt-3 overflow-hidden rounded-2xl border border-white/10">
+          <div className="max-h-[560px] overflow-auto">
           <table className="min-w-[1100px] text-sm">
-            <thead className="bg-[#10192b]/95 text-white/75 backdrop-blur">
+            <thead className="sticky top-0 bg-[#10192b]/95 text-white/75 backdrop-blur">
               <tr>
                 <th className="px-4 py-3 text-left">Created</th>
                 <th className="px-4 py-3 text-left">Webhook</th>
@@ -318,6 +319,7 @@ export default async function WebhooksPage() {
               ) : null}
             </tbody>
           </table>
+          </div>
         </div>
       </section>
     </div>

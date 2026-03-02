@@ -184,7 +184,7 @@ export default function KeyManagementPanel() {
   }
 
   return (
-    <section className="rounded-xl border border-white/10 bg-white/5 p-4">
+    <section className="glass-card-strong rounded-2xl p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-sm font-semibold">Master key operations</h2>
@@ -317,7 +317,7 @@ export default function KeyManagementPanel() {
       <div className="mt-4 grid gap-3 lg:grid-cols-2">
         <div className="rounded-lg border border-white/10 bg-black/30 p-3">
           <div className="text-xs font-semibold text-white/80">Recent key changes</div>
-          <div className="mt-2 space-y-2">
+          <div className="mt-2 max-h-[360px] space-y-2 overflow-auto pr-1">
             {changes.length ? (
               changes.map((c) => (
                 <div key={c.id} className="rounded-lg border border-white/10 bg-black/20 p-2 text-xs">
@@ -341,7 +341,7 @@ export default function KeyManagementPanel() {
 
         <div className="rounded-lg border border-white/10 bg-black/30 p-3">
           <div className="text-xs font-semibold text-white/80">Rotation jobs</div>
-          <div className="mt-2 space-y-2">
+          <div className="mt-2 max-h-[360px] space-y-2 overflow-auto pr-1">
             {jobs.length ? (
               jobs.map((j) => (
                 <div key={j.id} className="rounded-lg border border-white/10 bg-black/20 p-2 text-xs">
