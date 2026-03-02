@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: auth.error }, { status: auth.status });
   }
 
-  let body: any = null;
+  let body: Record<string, unknown> | null = null;
   try {
     body = await req.json();
   } catch {
@@ -77,13 +77,13 @@ export async function POST(req: NextRequest) {
     // Small immediate attempt
     const delivered = await processWebhookDeliveries({ maxBatch: 10, maxAttempts: 8 });
     return NextResponse.json({ ok: true, enqueued: hooks.length, delivered });
-  } catch (e: any) {
+  } catch (e: unknown) {
     return NextResponse.json(
       {
         ok: false,
         error: "DELIVERY_QUEUE_UNAVAILABLE",
         hint: "Run scripts/sql/webhooks.sql to create public.webhook_deliveries, and configure /api/cron/webhooks",
-        details: String(e?.message || e || "failed"),
+        details: e instanceof Error ? e.message : String(e || "failed"),
       },
       { status: 501 }
     );
