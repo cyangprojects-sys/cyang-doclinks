@@ -13,9 +13,9 @@ const env = {
   TEMP: tmpDir,
 };
 
-const child = spawn("npx", ["lhci", "autorun", "--config=.lighthouserc.json"], {
+const npxBin = process.platform === "win32" ? "npx.cmd" : "npx";
+const child = spawn(npxBin, ["lhci", "autorun", "--config=.lighthouserc.json"], {
   stdio: "inherit",
-  shell: true,
   env,
 });
 

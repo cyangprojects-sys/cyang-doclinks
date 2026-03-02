@@ -157,10 +157,10 @@ async function main() {
     "tests/billing-webhook.spec.ts",
   ];
 
-  const run = spawnSync("npx", ["playwright", "test", "--workers=1", ...files], {
+  const npxBin = process.platform === "win32" ? "npx.cmd" : "npx";
+  const run = spawnSync(npxBin, ["playwright", "test", "--workers=1", ...files], {
     stdio: "inherit",
     env,
-    shell: true,
   });
   process.exit(run.status ?? 1);
 }

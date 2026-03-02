@@ -12,6 +12,15 @@ function listSourceFiles(): string[] {
     .filter((f) => /\.(ts|tsx|js|jsx)$/.test(f));
 }
 
+function listScriptFiles(): string[] {
+  const raw = execSync("rg --files scripts", { encoding: "utf8" });
+  return raw
+    .split(/\r?\n/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .filter((f) => /\.(ts|js|mjs|cjs)$/.test(f));
+}
+
 test.describe("security static audit", () => {
   test("no dangerous dynamic code execution sinks are present", () => {
     const files = listSourceFiles();
@@ -45,6 +54,19 @@ test.describe("security static audit", () => {
       for (const { name, re } of denyRegexes) {
         if (re.test(src)) findings.push({ file: rel, token: name });
       }
+    }
+
+    expect(findings).toEqual([]);
+  });
+
+  test("scripts avoid shell=true process spawning", () => {
+    const files = listScriptFiles();
+    const findings: Array<{ file: string; token: string }> = [];
+
+    for (const rel of files) {
+      const abs = path.resolve(rel);
+      const src = readFileSync(abs, "utf8");
+      if (src.includes("shell: true")) findings.push({ file: rel, token: "shell:true" });
     }
 
     expect(findings).toEqual([]);
