@@ -29,6 +29,15 @@ test.describe("upload type validation", () => {
     if (!out.ok) expect(out.error).toBe("EXECUTABLE_BLOCKED");
   });
 
+  test("blocks dangerous exact MIME types even when extension is allowed", () => {
+    const out = validateUploadType({
+      filename: "image.heic",
+      declaredMime: "image/svg+xml",
+    });
+    expect(out.ok).toBeFalsy();
+    if (!out.ok) expect(out.error).toBe("EXECUTABLE_BLOCKED");
+  });
+
   test("rejects extension and declared MIME mismatch", () => {
     const out = validateUploadType({
       filename: "notes.txt",
@@ -66,6 +75,24 @@ test.describe("upload type validation", () => {
     });
     expect(out.ok).toBeFalsy();
     if (!out.ok) expect(out.error).toBe("MIME_MISMATCH");
+  });
+
+  test("validates RTF signatures", () => {
+    const bad = validateUploadType({
+      filename: "doc.rtf",
+      declaredMime: "application/rtf",
+      bytes: Buffer.from("not-rtf"),
+    });
+    expect(bad.ok).toBeFalsy();
+    if (!bad.ok) expect(bad.error).toBe("MIME_MISMATCH");
+
+    const good = validateUploadType({
+      filename: "doc.rtf",
+      declaredMime: "application/rtf",
+      bytes: Buffer.from("{\\rtf1\\ansi\\deff0 test}"),
+    });
+    expect(good.ok).toBeTruthy();
+    if (good.ok) expect(good.ext).toBe("rtf");
   });
 
   test("accepts valid PDF signature", () => {
