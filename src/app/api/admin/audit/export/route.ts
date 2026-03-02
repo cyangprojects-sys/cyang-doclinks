@@ -91,8 +91,8 @@ export async function GET(req: NextRequest) {
       `) as CsvRow[];
     }
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : "unknown error";
-    return new Response(`Export failed: ${msg}`, { status: 500 });
+    void err;
+    return new Response("Export failed.", { status: 500 });
   }
 
   const cols = rows?.[0] ? Object.keys(rows[0]) : [];

@@ -77,6 +77,8 @@ test.describe("api route guardrails", () => {
     expect(code.includes("isAllowedRawPath")).toBeTruthy();
     expect(/\/\^\\\/s\\\/\[\^\/\]\+\\\/raw\$\/i/.test(code)).toBeTruthy();
     expect(/\/\^\\\/d\\\/\[\^\/\]\+\\\/raw\$\/i/.test(code)).toBeTruthy();
+    expect(code.includes("resolvePublicAppBaseUrl(req.url)")).toBeTruthy();
+    expect(code.includes("req.nextUrl.origin")).toBeFalsy();
   });
 
   test("all POST routes have an explicit security control", () => {

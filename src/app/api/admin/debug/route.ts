@@ -15,10 +15,6 @@ type AliasRow = {
   expires_at: string | null;
   created_at?: string | null;
 };
-function errorMessage(e: unknown): string {
-  return e instanceof Error ? e.message : String(e);
-}
-
 function boolEnv(name: string) {
   return Boolean(process.env[name] && String(process.env[name]).trim().length > 0);
 }
@@ -198,7 +194,8 @@ export async function GET(req: NextRequest) {
       notes,
     });
   } catch (err: unknown) {
-    console.error("ADMIN DEBUG ERROR:", err);
-    return NextResponse.json({ ok: false, error: "SERVER_ERROR", message: `Debug inspection failed: ${errorMessage(err)}` }, { status: 500 });
+    void err;
+    console.warn("ADMIN DEBUG ERROR");
+    return NextResponse.json({ ok: false, error: "SERVER_ERROR", message: "Debug inspection failed." }, { status: 500 });
   }
 }

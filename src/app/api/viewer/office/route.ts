@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { convertOfficeBytes } from "@/lib/officePreview";
 import { enforceGlobalApiRateLimit } from "@/lib/securityTelemetry";
+import { resolvePublicAppBaseUrl } from "@/lib/publicBaseUrl";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -43,7 +44,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: "BAD_PATH" }, { status: 400 });
     }
 
-    const src = new URL(rawPath, req.nextUrl.origin);
+    let appBaseUrl: string;
+    try {
+      appBaseUrl = resolvePublicAppBaseUrl(req.url);
+    } catch {
+      return NextResponse.json({ ok: false, error: "ENV_MISCONFIGURED" }, { status: 500 });
+    }
+
+    const src = new URL(rawPath, appBaseUrl);
     const upstream = await fetch(src.toString(), {
       method: "GET",
       cache: "no-store",
