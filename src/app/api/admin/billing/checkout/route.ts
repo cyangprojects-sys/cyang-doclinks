@@ -107,7 +107,7 @@ export async function POST(req: NextRequest) {
       })(),
       timeoutMs
     );
-  } catch (e: any) {
+  } catch (e: unknown) {
     if (isRuntimeEnvError(e)) {
       return NextResponse.redirect(new URL("/admin/billing?error=ENV_MISCONFIGURED", req.url), { status: 303 });
     }
@@ -121,7 +121,7 @@ export async function POST(req: NextRequest) {
       });
       return NextResponse.redirect(new URL("/admin/billing?error=TIMEOUT", req.url), { status: 303 });
     }
-    const msg = String(e?.message || e || "checkout_failed");
+    const msg = e instanceof Error ? e.message : String(e || "checkout_failed");
     const safeError =
       msg === "FORBIDDEN" || msg === "UNAUTHENTICATED"
         ? "FORBIDDEN"
