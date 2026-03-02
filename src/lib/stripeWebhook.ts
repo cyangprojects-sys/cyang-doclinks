@@ -8,7 +8,7 @@ type VerifyArgs = {
 };
 
 type VerifyResult =
-  | { ok: true; payload: any; eventId: string; eventType: string }
+  | { ok: true; payload: Record<string, unknown>; eventId: string; eventType: string }
   | { ok: false; error: string };
 
 function parseSigHeader(header: string): { ts: number | null; v1: string[] } {
@@ -64,9 +64,11 @@ export function verifyStripeWebhookSignature(args: VerifyArgs): VerifyResult {
   const matched = parsed.v1.some((sig) => timingSafeHexEqual(expected, sig));
   if (!matched) return { ok: false, error: "SIGNATURE_MISMATCH" };
 
-  let payload: any;
+  let payload: Record<string, unknown>;
   try {
-    payload = JSON.parse(args.rawBody);
+    const parsed = JSON.parse(args.rawBody) as unknown;
+    if (!parsed || typeof parsed !== "object") return { ok: false, error: "MALFORMED_EVENT" };
+    payload = parsed as Record<string, unknown>;
   } catch {
     return { ok: false, error: "INVALID_JSON" };
   }
@@ -77,4 +79,3 @@ export function verifyStripeWebhookSignature(args: VerifyArgs): VerifyResult {
 
   return { ok: true, payload, eventId, eventType };
 }
-

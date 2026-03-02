@@ -122,10 +122,12 @@ export async function POST(req: NextRequest) {
         }
 
         const event = verified.payload;
-        const obj = event?.data?.object ?? {};
-        const eventType = String(event?.type || "");
-        const eventCreatedUnix = Number.isFinite(Number(event?.created))
-          ? Math.max(0, Math.floor(Number(event.created)))
+        const eventObj = (event && typeof event === "object" ? event : {}) as Record<string, unknown>;
+        const eventData = (eventObj.data && typeof eventObj.data === "object" ? eventObj.data : {}) as Record<string, unknown>;
+        const obj = (eventData.object && typeof eventData.object === "object" ? eventData.object : {}) as Record<string, unknown>;
+        const eventType = String(eventObj.type || "");
+        const eventCreatedUnix = Number.isFinite(Number(eventObj.created))
+          ? Math.max(0, Math.floor(Number(eventObj.created)))
           : null;
 
         let webhookStatus: "processed" | "ignored" | "failed" = "processed";
@@ -139,7 +141,8 @@ export async function POST(req: NextRequest) {
           ) {
             const stripeSubscriptionId = String(obj?.id || "").trim();
             const stripeCustomerId = String(obj?.customer || "").trim() || null;
-            const metadataUserId = String(obj?.metadata?.user_id || "").trim() || null;
+            const metadata = (obj.metadata && typeof obj.metadata === "object" ? obj.metadata : {}) as Record<string, unknown>;
+            const metadataUserId = String(metadata.user_id || "").trim() || null;
             const userId = metadataUserId || (await getUserIdByStripeCustomerId(stripeCustomerId));
 
             const status = String(obj?.status || (eventType.endsWith(".deleted") ? "canceled" : "incomplete")).toLowerCase();
