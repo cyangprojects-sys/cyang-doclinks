@@ -39,9 +39,9 @@ export async function GET(req: NextRequest) {
       duration_ms: duration,
       billing_sync: result,
     });
-  } catch (e: any) {
+  } catch (e: unknown) {
     const duration = Date.now() - startedAt;
-    const msg = String(e?.message || e || "failed");
+    const msg = e instanceof Error ? e.message : String(e || "failed");
     await logCronRun({
       job: "billing-sync",
       ok: false,
