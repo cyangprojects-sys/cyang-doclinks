@@ -108,16 +108,6 @@ export default function UnifiedDocsTableClient(props: {
   const showDelete = !!props.showDelete;
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isPending, startTransition] = useTransition();
-  const [copiedAlias, setCopiedAlias] = useState<string | null>(null);
-  async function copyAliasUrl(alias: string) {
-    try {
-      await navigator.clipboard.writeText(`${window.location.origin}/d/${encodeURIComponent(alias)}`);
-      setCopiedAlias(alias);
-      window.setTimeout(() => setCopiedAlias((prev) => (prev === alias ? null : prev)), 1200);
-    } catch {
-      setCopiedAlias(null);
-    }
-  }
 
   const q = (sp.get("docQ") || "").trim();
   const pageRaw = Number(sp.get("docPage") || "1");
@@ -352,13 +342,12 @@ export default function UnifiedDocsTableClient(props: {
                         <div className="flex flex-wrap items-center gap-2 text-xs text-white/60">
                           <span className="font-mono">{r.doc_id}</span>
                           {r.alias ? (
-                            <button
-                              type="button"
-                              onClick={() => copyAliasUrl(r.alias as string)}
-                              className="rounded-md border border-cyan-500/35 bg-cyan-500/15 px-2 py-0.5 text-[11px] text-cyan-100 hover:bg-cyan-500/25"
+                            <Link
+                              href={`/d/${r.alias}`}
+                              className="inline-flex rounded-md border border-cyan-500/35 bg-cyan-500/15 px-2 py-0.5 text-[11px] text-cyan-100 hover:bg-cyan-500/25"
                             >
-                              {copiedAlias === r.alias ? "Copied" : "Share"}
-                            </button>
+                              Share
+                            </Link>
                           ) : null}
                         </div>
                       </div>

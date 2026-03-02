@@ -41,16 +41,6 @@ export default function ViewsByDocTableClient(props: { rows: ViewsByDocRow[] }) 
   const [q, setQ] = useState(qFromUrl);
   const [limit, setLimit] = useState<number | null>(limitFromUrl);
   const [selected, setSelected] = useState<Record<string, boolean>>({});
-  const [copiedAlias, setCopiedAlias] = useState<string | null>(null);
-  async function copyAliasUrl(alias: string) {
-    try {
-      await navigator.clipboard.writeText(`${window.location.origin}/d/${encodeURIComponent(alias)}`);
-      setCopiedAlias(alias);
-      window.setTimeout(() => setCopiedAlias((prev) => (prev === alias ? null : prev)), 1200);
-    } catch {
-      setCopiedAlias(null);
-    }
-  }
 
   const normalizedQ = q.trim().toLowerCase();
   const filtered = useMemo(() => {
@@ -209,13 +199,12 @@ export default function ViewsByDocTableClient(props: { rows: ViewsByDocRow[] }) 
                     </td>
                     <td className="px-4 py-3">
                       {r.alias ? (
-                        <button
-                          type="button"
-                          onClick={() => copyAliasUrl(r.alias as string)}
-                          className="rounded-md border border-cyan-500/35 bg-cyan-500/15 px-2 py-0.5 text-xs text-cyan-100 hover:bg-cyan-500/25"
+                        <Link
+                          href={`/d/${r.alias}`}
+                          className="inline-flex rounded-md border border-cyan-500/35 bg-cyan-500/15 px-2 py-0.5 text-xs text-cyan-100 hover:bg-cyan-500/25"
                         >
-                          {copiedAlias === r.alias ? "Copied" : "Share"}
-                        </button>
+                          Share
+                        </Link>
                       ) : (
                         <span className="text-white/55">-</span>
                       )}

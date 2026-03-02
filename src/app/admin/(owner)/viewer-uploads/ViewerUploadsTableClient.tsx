@@ -56,13 +56,6 @@ export default function ViewerUploadsTableClient({ rows }: { rows: ViewerUploadR
   const [reason, setReason] = useState("");
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [error, setError] = useState<string | null>(null);
-  async function copyAliasUrl(alias: string) {
-    try {
-      await navigator.clipboard.writeText(`${window.location.origin}/d/${encodeURIComponent(alias)}`);
-    } catch {
-      setError("Unable to copy share link.");
-    }
-  }
 
   const filtered = useMemo(() => {
     const query = q.trim().toLowerCase();
@@ -308,13 +301,12 @@ export default function ViewerUploadsTableClient({ rows }: { rows: ViewerUploadR
                   <div className="font-medium text-white">{r.title || "Untitled"}</div>
                   <div className="font-mono text-xs text-neutral-400">{r.doc_id}</div>
                   {r.alias ? (
-                    <button
-                      type="button"
-                      onClick={() => copyAliasUrl(r.alias as string)}
-                      className="rounded-md border border-cyan-500/35 bg-cyan-500/15 px-2 py-0.5 text-xs text-cyan-100 hover:bg-cyan-500/25"
+                    <Link
+                      href={`/d/${r.alias}`}
+                      className="inline-flex rounded-md border border-cyan-500/35 bg-cyan-500/15 px-2 py-0.5 text-xs text-cyan-100 hover:bg-cyan-500/25"
                     >
                       Share
-                    </button>
+                    </Link>
                   ) : null}
                 </td>
                 <td className="px-3 py-2">
