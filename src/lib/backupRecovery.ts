@@ -1,9 +1,24 @@
 import { sql } from "@/lib/db";
 
-function boolEnv(name: string, fallback = false): boolean {
-  const v = String(process.env[name] || "").trim().toLowerCase();
-  if (!v) return fallback;
-  return ["1", "true", "yes", "y", "on"].includes(v);
+function parsePositiveInt(raw: unknown, fallback: number, min = 1, max = 3650): number {
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n <= 0) return fallback;
+  return Math.max(min, Math.min(max, Math.floor(n)));
+}
+
+export function parseBackupRecoveryConfig(env: NodeJS.ProcessEnv = process.env): {
+  enabled: boolean;
+  maxAgeHours: number;
+  recoveryDrillDays: number;
+  webhook: string;
+} {
+  const enabled = ["1", "true", "yes", "y", "on"].includes(
+    String(env.BACKUP_AUTOMATION_ENABLED || "").trim().toLowerCase()
+  );
+  const maxAgeHours = parsePositiveInt(env.BACKUP_MAX_AGE_HOURS, 30, 1, 24 * 365);
+  const recoveryDrillDays = parsePositiveInt(env.RECOVERY_DRILL_DAYS, 30, 1, 3650);
+  const webhook = String(env.BACKUP_WEBHOOK_URL || "").trim();
+  return { enabled, maxAgeHours, recoveryDrillDays, webhook };
 }
 
 async function pingBackupWebhook(url: string): Promise<{ ok: boolean; status: number; body?: string }> {
@@ -22,11 +37,8 @@ async function pingBackupWebhook(url: string): Promise<{ ok: boolean; status: nu
 }
 
 export async function runBackupRecoveryCheck() {
-  const enabled = boolEnv("BACKUP_AUTOMATION_ENABLED", false);
+  const { enabled, maxAgeHours, recoveryDrillDays, webhook } = parseBackupRecoveryConfig();
   if (!enabled) return { enabled: false, ran: false };
-
-  const maxAgeHours = Math.max(1, Number(process.env.BACKUP_MAX_AGE_HOURS || 30));
-  const webhook = String(process.env.BACKUP_WEBHOOK_URL || "").trim();
 
   let backupOk = false;
   let backupStatus = "skipped";
@@ -68,7 +80,6 @@ export async function runBackupRecoveryCheck() {
     freshnessOk = false;
   }
 
-  const recoveryDrillDays = Math.max(1, Number(process.env.RECOVERY_DRILL_DAYS || 30));
   let recoveryDrillDue = false;
   try {
     const rows = (await sql`
