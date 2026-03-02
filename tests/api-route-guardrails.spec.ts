@@ -108,4 +108,24 @@ test.describe("api route guardrails", () => {
 
     expect(findings).toEqual([]);
   });
+
+  test("database metadata/debug queries require admin auth", () => {
+    const files = routeFiles();
+    const findings: string[] = [];
+    const debugTokens = ["current_database()", "pg_catalog", "information_schema", "to_regclass("];
+
+    for (const f of files) {
+      const code = src(f);
+      if (!debugTokens.some((t) => code.includes(t))) continue;
+      const adminGuarded =
+        code.includes('requireRole("admin")') ||
+        code.includes('requireRole("owner")') ||
+        code.includes('requirePermission("security.keys.read")') ||
+        code.includes("requireOwner(") ||
+        code.includes("requireOwnerAdmin(");
+      if (!adminGuarded) findings.push(f);
+    }
+
+    expect(findings).toEqual([]);
+  });
 });
