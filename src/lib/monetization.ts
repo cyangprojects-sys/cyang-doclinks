@@ -113,7 +113,18 @@ export async function getPlanForUser(userId: string): Promise<Plan> {
     join public.plans p on p.id = u.plan_id
     where u.id = ${userId}::uuid
     limit 1
-  `) as unknown as Array<any>;
+  `) as unknown as Array<{
+    role: string | null;
+    id: string | null;
+    name: string | null;
+    max_views_per_month: number | null;
+    max_active_shares: number | null;
+    max_storage_bytes: number | string | null;
+    max_uploads_per_day: number | null;
+    max_file_size_bytes: number | string | null;
+    allow_custom_expiration: boolean | null;
+    allow_audit_export: boolean | null;
+  }>;
 
   const r = rows?.[0];
   if (!r) {
@@ -148,17 +159,18 @@ export async function getPlanForUser(userId: string): Promise<Plan> {
     return PRO_PLAN;
   }
 
+  const normalizedId = String(r.id || "free") as Plan["id"];
   return {
-    id: r.id,
-    name: r.name,
+    id: normalizedId,
+    name: String(r.name || "Free"),
     maxViewsPerMonth: r.max_views_per_month ?? null,
     maxActiveShares: r.max_active_shares ?? null,
-    maxStorageBytes: r.max_storage_bytes ?? null,
+    maxStorageBytes: r.max_storage_bytes == null ? null : Number(r.max_storage_bytes),
     maxUploadsPerDay: r.max_uploads_per_day ?? null,
-    maxFileSizeBytes: r.max_file_size_bytes ?? null,
+    maxFileSizeBytes: r.max_file_size_bytes == null ? null : Number(r.max_file_size_bytes),
     allowCustomExpiration: Boolean(r.allow_custom_expiration),
     allowAuditExport: Boolean(r.allow_audit_export),
-    allowAdvancedAnalytics: String(r.id) !== "free",
+    allowAdvancedAnalytics: normalizedId !== "free",
   };
 }
 
@@ -191,7 +203,7 @@ export async function getStorageBytesForOwner(ownerId: string): Promise<number> 
     from public.docs d
     where d.owner_id = ${ownerId}::uuid
       and coalesce(d.status, 'ready') <> 'deleted'
-  `) as unknown as Array<{ total: any }>;
+  `) as unknown as Array<{ total: number | string | null }>;
   // neon returns bigint as string sometimes
   const v = rows?.[0]?.total ?? 0;
   return typeof v === "string" ? Number(v) : Number(v);
