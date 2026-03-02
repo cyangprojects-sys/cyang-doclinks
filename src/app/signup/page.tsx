@@ -99,6 +99,11 @@ export default function SignupPage() {
         <p className="mt-6 text-xs text-white/55">
           Already have an account? <Link href="/signin" className="text-cyan-200 underline">Sign in</Link>.
         </p>
+        <div className="mt-3">
+          <Link href="/" className="inline-flex rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-xs text-white/85 hover:bg-white/10">
+            Home
+          </Link>
+        </div>
       </div>
     </main>
   );

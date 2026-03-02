@@ -56,6 +56,9 @@ export default function ManualSignupPage() {
             <Link href="/signin" className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm text-white/85 hover:bg-white/10">
               Other sign in options
             </Link>
+            <Link href="/" className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm text-white/85 hover:bg-white/10">
+              Home
+            </Link>
           </div>
         </div>
       </main>
@@ -144,10 +147,12 @@ export default function ManualSignupPage() {
             <Link href="/signup" className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm text-white/85 hover:bg-white/10">
               Back to signup options
             </Link>
+            <Link href="/" className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm text-white/85 hover:bg-white/10">
+              Home
+            </Link>
           </div>
         </form>
       </div>
     </main>
   );
 }
-

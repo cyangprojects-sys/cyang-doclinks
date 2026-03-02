@@ -43,9 +43,11 @@ export default async function SignupActivatePage(props: {
           <Link href="/terms" className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm text-white/85 hover:bg-white/10">
             Terms of Service
           </Link>
+          <Link href="/" className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm text-white/85 hover:bg-white/10">
+            Home
+          </Link>
         </div>
       </div>
     </main>
   );
 }
-
