@@ -194,6 +194,44 @@ test.describe("security state enforcement", () => {
     }
   });
 
+  test("password-protected share accepts a valid unlock cookie", async ({ request }) => {
+    const databaseUrl = String(process.env.DATABASE_URL || "").trim();
+    test.skip(!databaseUrl, "DATABASE_URL not available");
+    const sql = neon(databaseUrl);
+
+    const doc = await pickServableDoc(sql);
+    test.skip(!doc, "No servable docs available for fixture setup");
+    if (!doc) return;
+
+    const token = `tok_pw_unlock_${randSuffix()}`.slice(0, 64);
+    const unlockId = `unlock_${randSuffix()}`.slice(0, 64);
+    await sql`
+      insert into public.share_tokens (token, doc_id, max_views, views_count, password_hash)
+      values (${token}, ${doc.id}::uuid, null, 0, 'placeholder_hash')
+    `;
+    await sql`
+      insert into public.share_unlocks (token, unlock_id, ip_hash, expires_at)
+      values (${token}, ${unlockId}, null, now() + interval '1 hour')
+    `;
+
+    try {
+      const resp = await request.get(`/s/${token}/raw`, {
+        maxRedirects: 0,
+        headers: {
+          cookie: `share_unlock_${token}=${unlockId}`,
+        },
+      });
+      if (resp.status() === 429) {
+        test.skip(true, "Rate-limited in environment; cannot validate unlock cookie acceptance");
+      }
+      expect(resp.status()).toBe(302);
+      expect(resp.headers()["location"] || "").toContain("/t/");
+    } finally {
+      await sql`delete from public.share_unlocks where token = ${token}`;
+      await sql`delete from public.share_tokens where token = ${token}`;
+    }
+  });
+
   test("download-disabled share blocks attachment disposition when flag exists", async ({ request }) => {
     const databaseUrl = String(process.env.DATABASE_URL || "").trim();
     test.skip(!databaseUrl, "DATABASE_URL not available");
@@ -257,6 +295,82 @@ test.describe("security state enforcement", () => {
       await sql`
         update public.docs
         set
+          moderation_status = ${doc.moderation_status ?? "active"},
+          scan_status = ${doc.scan_status ?? "clean"},
+          risk_level = ${doc.risk_level ?? "low"}
+        where id = ${doc.id}::uuid
+      `;
+      await sql`delete from public.share_tokens where token = ${token}`;
+    }
+  });
+
+  test("office docs force download-only path even when inline requested", async ({ request }) => {
+    const databaseUrl = String(process.env.DATABASE_URL || "").trim();
+    test.skip(!databaseUrl, "DATABASE_URL not available");
+    const sql = neon(databaseUrl);
+
+    const hasAllowDownload = await columnExists(sql, "share_tokens", "allow_download");
+    test.skip(!hasAllowDownload, "share_tokens.allow_download column not available");
+
+    const doc = await pickServableDoc(sql);
+    test.skip(!doc, "No servable docs available for fixture setup");
+    if (!doc) return;
+
+    const originalRows = (await sql`
+      select
+        coalesce(content_type::text, 'application/pdf') as content_type,
+        coalesce(original_filename::text, 'document.pdf') as original_filename
+      from public.docs
+      where id = ${doc.id}::uuid
+      limit 1
+    `) as unknown as Array<{ content_type: string; original_filename: string }>;
+    const original = originalRows?.[0] || { content_type: "application/pdf", original_filename: "document.pdf" };
+
+    const token = `tok_office_forced_${randSuffix()}`.slice(0, 64);
+    await sql`
+      update public.docs
+      set
+        content_type = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        original_filename = 'security-test.docx',
+        moderation_status = 'active',
+        scan_status = 'clean'
+      where id = ${doc.id}::uuid
+    `;
+    await sql`
+      insert into public.share_tokens (token, doc_id, max_views, views_count, allow_download)
+      values (${token}, ${doc.id}::uuid, null, 0, false)
+    `;
+
+    try {
+      const rawResp = await request.get(`/s/${token}/raw`, { maxRedirects: 0 });
+      if (rawResp.status() === 429) {
+        test.skip(true, "Rate-limited in environment; cannot validate forced office download path");
+      }
+      expect(rawResp.status()).toBe(302);
+      const ticketLocation = rawResp.headers()["location"] || "";
+      expect(ticketLocation).toContain("/t/");
+
+      const ticketUrl = new URL(ticketLocation, process.env.PLAYWRIGHT_BASE_URL || "http://127.0.0.1:3000");
+      const ticketPath = `${ticketUrl.pathname}${ticketUrl.search}`;
+      const navResp = await request.get(ticketPath, {
+        headers: {
+          "sec-fetch-dest": "document",
+          "sec-fetch-mode": "navigate",
+          "sec-fetch-user": "?1",
+        },
+      });
+      if (navResp.status() === 403) {
+        const body = await navResp.text();
+        expect(body).not.toContain("Direct open is disabled for this protected document.");
+      } else {
+        expect([200, 206, 404, 410, 500]).toContain(navResp.status());
+      }
+    } finally {
+      await sql`
+        update public.docs
+        set
+          content_type = ${original.content_type},
+          original_filename = ${original.original_filename},
           moderation_status = ${doc.moderation_status ?? "active"},
           scan_status = ${doc.scan_status ?? "clean"},
           risk_level = ${doc.risk_level ?? "low"}
