@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import type { APIRequestContext } from "@playwright/test";
 import crypto from "node:crypto";
 import { neon } from "@neondatabase/serverless";
 
@@ -43,7 +44,7 @@ function encryptForUpload(plain: Buffer, keyB64: string, ivB64: string): Buffer 
 }
 
 async function presignUpload(
-  request: { post: (...args: any[]) => Promise<any> },
+  request: APIRequestContext,
   headers: Record<string, string>,
   args: { filename: string; sizeBytes: number }
 ): Promise<{
