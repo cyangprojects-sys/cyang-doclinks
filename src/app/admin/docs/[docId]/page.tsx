@@ -71,7 +71,7 @@ export default async function AdminDocDetailPage({
     redirect("/api/auth/signin");
   }
 
-  const resolvedParams = (await (params as any)) as { docId?: string };
+  const resolvedParams = await Promise.resolve(params);
   const docId = resolvedParams?.docId;
   if (!docId) notFound();
 
