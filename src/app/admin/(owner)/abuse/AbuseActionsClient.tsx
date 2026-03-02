@@ -9,7 +9,7 @@ type Props = {
   currentStatus: string;
 };
 
-async function post(body: any) {
+async function post(body: Record<string, unknown>) {
   const res = await fetch("/api/admin/abuse", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -27,15 +27,15 @@ export default function AbuseActionsClient({ reportId, token, docId }: Props) {
   const [reason, setReason] = useState("");
   const [err, setErr] = useState<string | null>(null);
 
-  async function run(action: any) {
+  async function run(action: Record<string, unknown>) {
     setBusy(true);
     setErr(null);
     try {
       await post({ ...action, reportId, reason: reason || null });
       // simplest refresh
       window.location.reload();
-    } catch (e: any) {
-      setErr(e?.message || "Failed");
+    } catch (e: unknown) {
+      setErr(e instanceof Error ? e.message : "Failed");
     } finally {
       setBusy(false);
     }
