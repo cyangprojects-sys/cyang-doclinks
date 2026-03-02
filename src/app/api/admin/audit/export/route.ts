@@ -8,8 +8,9 @@ import { requirePermission } from "@/lib/rbac";
 import { getPlanForUser } from "@/lib/monetization";
 
 type ExportType = "audit" | "access" | "views";
+type CsvRow = Record<string, unknown>;
 
-function csvEscape(v: any): string {
+function csvEscape(v: unknown): string {
   if (v === null || v === undefined) return "";
   const s = String(v);
   if (/[",\r\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
@@ -62,7 +63,7 @@ export async function GET(req: NextRequest) {
   // Build query (static per table) so we can keep using the tagged template.
   // We assume these tables have `created_at` (true for our schemas).
   // If a table is missing the column, we'll surface a clean error.
-  let rows: any[] = [];
+  let rows: CsvRow[] = [];
   try {
     if (type === "audit") {
       rows = (await sql`
@@ -71,7 +72,7 @@ export async function GET(req: NextRequest) {
         where created_at >= (now() - (${days}::int * interval '1 day'))
         order by created_at desc
         limit ${limit}
-      `) as any[];
+      `) as CsvRow[];
     } else if (type === "access") {
       rows = (await sql`
         select *
@@ -79,7 +80,7 @@ export async function GET(req: NextRequest) {
         where created_at >= (now() - (${days}::int * interval '1 day'))
         order by created_at desc
         limit ${limit}
-      `) as any[];
+      `) as CsvRow[];
     } else {
       rows = (await sql`
         select *
@@ -87,15 +88,16 @@ export async function GET(req: NextRequest) {
         where created_at >= (now() - (${days}::int * interval '1 day'))
         order by created_at desc
         limit ${limit}
-      `) as any[];
+      `) as CsvRow[];
     }
-  } catch (err: any) {
-    return new Response(`Export failed: ${err?.message || "unknown error"}`, { status: 500 });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "unknown error";
+    return new Response(`Export failed: ${msg}`, { status: 500 });
   }
 
   const cols = rows?.[0] ? Object.keys(rows[0]) : [];
   const header = cols.join(",");
-  const lines = rows.map((r) => cols.map((c) => csvEscape((r as any)[c])).join(","));
+  const lines = rows.map((r) => cols.map((c) => csvEscape(r[c])).join(","));
   const csv = [header, ...lines].join("\n");
 
   const stamp = new Date().toISOString().slice(0, 10);

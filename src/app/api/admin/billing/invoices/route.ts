@@ -7,6 +7,22 @@ import { sql } from "@/lib/db";
 import { ensureStripeCustomer, stripeApi } from "@/lib/stripeClient";
 import { getRouteTimeoutMs, isRouteTimeoutError, withRouteTimeout } from "@/lib/routeTimeout";
 import { assertRuntimeEnv, isRuntimeEnvError } from "@/lib/runtimeEnv";
+type StripeInvoiceLike = {
+  id?: string;
+  number?: string;
+  status?: string;
+  amount_due?: number;
+  amount_paid?: number;
+  currency?: string;
+  hosted_invoice_url?: string;
+  invoice_pdf?: string;
+  period_start?: number;
+  period_end?: number;
+  created?: number;
+};
+function errorMessage(e: unknown): string {
+  return e instanceof Error ? e.message : String(e);
+}
 
 async function readExistingCustomerId(userId: string): Promise<string | null> {
   try {
@@ -62,7 +78,7 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({
           ok: true,
           customerId,
-          invoices: items.map((inv: any) => ({
+          invoices: items.map((inv: StripeInvoiceLike) => ({
             id: String(inv?.id || ""),
             number: String(inv?.number || ""),
             status: String(inv?.status || ""),
@@ -79,14 +95,14 @@ export async function GET(req: NextRequest) {
       })(),
       timeoutMs
     );
-  } catch (e: any) {
+  } catch (e: unknown) {
     if (isRuntimeEnvError(e)) {
       return NextResponse.json({ ok: false, error: "ENV_MISCONFIGURED" }, { status: 503 });
     }
     if (isRouteTimeoutError(e)) {
       return NextResponse.json({ ok: false, error: "TIMEOUT" }, { status: 504 });
     }
-    const msg = String(e?.message || e || "failed");
+    const msg = errorMessage(e) || "failed";
     if (msg === "FORBIDDEN" || msg === "UNAUTHENTICATED") {
       return NextResponse.json({ ok: false, error: "FORBIDDEN" }, { status: 403 });
     }

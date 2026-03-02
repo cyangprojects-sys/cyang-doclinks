@@ -99,14 +99,20 @@ function secureDocHeaders(extra?: Record<string, string>): Record<string, string
 }
 
 function isR2MissingObjectError(err: unknown): boolean {
-  const e = err as any;
+  const e = err as {
+    Code?: string;
+    code?: string;
+    name?: string;
+    $metadata?: { httpStatusCode?: number };
+    statusCode?: number;
+  };
   const code = String(e?.Code || e?.code || e?.name || "").toLowerCase();
   const status = Number(e?.$metadata?.httpStatusCode || e?.statusCode || 0);
   if (status === 404) return true;
   return code.includes("nosuchkey") || code.includes("notfound") || code.includes("not_found");
 }
 
-function toWebStream(body: any): ReadableStream<Uint8Array> {
+function toWebStream(body: unknown): ReadableStream<Uint8Array> {
   // AWS SDK v3 in Node returns a Node.js Readable stream.
   // NextResponse expects a web stream (or a Blob/Buffer).
   if (!body) {
@@ -117,17 +123,20 @@ function toWebStream(body: any): ReadableStream<Uint8Array> {
     });
   }
   // If it already looks like a web stream, return as-is.
-  if (typeof body?.getReader === "function") return body as ReadableStream<Uint8Array>;
+  if (typeof (body as { getReader?: unknown })?.getReader === "function") {
+    return body as ReadableStream<Uint8Array>;
+  }
   // Convert Node Readable -> Web ReadableStream
   try {
-    return Readable.toWeb(body) as unknown as ReadableStream<Uint8Array>;
+    return Readable.toWeb(body as Readable) as unknown as ReadableStream<Uint8Array>;
   } catch {
     // Fallback: buffer the whole response (last resort)
     const rs = new ReadableStream<Uint8Array>({
       async start(controller) {
-        const ab = body?.transformToByteArray
-          ? await body.transformToByteArray()
-          : Buffer.from(await new Response(body).arrayBuffer());
+        const bodyLike = body as { transformToByteArray?: () => Promise<Uint8Array> };
+        const ab = bodyLike?.transformToByteArray
+          ? await bodyLike.transformToByteArray()
+          : Buffer.from(await new Response(body as BodyInit).arrayBuffer());
         controller.enqueue(new Uint8Array(ab));
         controller.close();
       },
@@ -141,6 +150,11 @@ export async function GET(
   { params }: { params: Promise<{ ticketId: string }> }
 ) {
   const timeoutMs = getRouteTimeoutMs("ROUTE_TIMEOUT_TICKET_SERVE_MS", 30_000);
+  type S3ObjectLike = {
+    Body?: unknown;
+    ContentRange?: string;
+    ContentLength?: number;
+  };
   try {
     return await withRouteTimeout(
       (async () => {
@@ -323,7 +337,7 @@ export async function GET(
         masterKey: mk.key,
       });
 
-      let obj: any;
+      let obj: S3ObjectLike;
       try {
         obj = await r2Client.send(
           new GetObjectCommand({
@@ -347,10 +361,11 @@ export async function GET(
         throw e;
       }
 
-      const body = obj?.Body as any;
-      const ab = body?.transformToByteArray
-        ? await body.transformToByteArray()
-        : Buffer.from(await new Response(body).arrayBuffer());
+      const body = obj?.Body;
+      const bodyLike = body as { transformToByteArray?: () => Promise<Uint8Array> };
+      const ab = bodyLike?.transformToByteArray
+        ? await bodyLike.transformToByteArray()
+        : Buffer.from(await new Response(body as BodyInit).arrayBuffer());
 
       let decrypted = decryptAes256Gcm({ ciphertext: Buffer.from(ab), iv: enc.iv, key: dataKey });
 
@@ -418,14 +433,14 @@ export async function GET(
           "Content-Disposition": t.response_content_disposition || "inline",
         }),
       });
-    } catch (e: any) {
+    } catch (e: unknown) {
       void logSecurityEvent({
         type: "anomaly",
         severity: "high",
         ip: clientIpKey(req).ip,
         docId: t.doc_id,
         scope: "doc_decrypt_error",
-        message: e?.message || "Decrypt failed",
+        message: e instanceof Error ? e.message : "Decrypt failed",
       });
       return new NextResponse("Server error", { status: 500, headers: secureDocHeaders() });
     }
@@ -449,7 +464,7 @@ export async function GET(
   // Also prevents leaking presigned URLs into client-side logs/telemetry.
   const range = req.headers.get("range") || undefined;
 
-  let obj: any;
+  let obj: S3ObjectLike;
   try {
     obj = await r2Client.send(
       new GetObjectCommand({
@@ -483,16 +498,17 @@ export async function GET(
     "Accept-Ranges": "bytes",
   });
 
-  const contentRange = (obj as any)?.ContentRange as string | undefined;
-  const contentLength = (obj as any)?.ContentLength as number | undefined;
+  const contentRange = obj?.ContentRange;
+  const contentLength = obj?.ContentLength;
   if (contentRange) headers["Content-Range"] = contentRange;
   if (typeof contentLength === "number") headers["Content-Length"] = String(contentLength);
 
   if (shouldPdfWatermarkDownload) {
-    const body = obj?.Body as any;
-    const ab = body?.transformToByteArray
-      ? await body.transformToByteArray()
-      : Buffer.from(await new Response(body).arrayBuffer());
+    const body = obj?.Body;
+    const bodyLike = body as { transformToByteArray?: () => Promise<Uint8Array> };
+    const ab = bodyLike?.transformToByteArray
+      ? await bodyLike.transformToByteArray()
+      : Buffer.from(await new Response(body as BodyInit).arrayBuffer());
     const identity = await loadWatermarkIdentity({
       docId: t.doc_id || null,
       shareToken: t.share_token || null,
@@ -519,7 +535,7 @@ export async function GET(
     });
   }
 
-        return new NextResponse(toWebStream((obj as any).Body), {
+        return new NextResponse(toWebStream(obj?.Body), {
           status: contentRange ? 206 : 200,
           headers,
         });

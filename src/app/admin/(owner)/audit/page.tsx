@@ -7,6 +7,10 @@ import { getAuthedUser } from "@/lib/authz";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
+type GenericRow = Record<string, unknown>;
+function errorMessage(e: unknown): string {
+  return e instanceof Error ? e.message : String(e);
+}
 
 
 async function columnExists(table: string, column: string): Promise<boolean> {
@@ -36,9 +40,9 @@ export default async function AuditPage() {
   // Security: audit logs are admin/owner only. Viewers should not access this page.
   if (!canSeeAll) redirect("/admin/dashboard");
 
-  let auditRows: any[] = [];
-  let accessRows: any[] = [];
-  let viewRows: any[] = [];
+  let auditRows: GenericRow[] = [];
+  let accessRows: GenericRow[] = [];
+  let viewRows: GenericRow[] = [];
   let accessError: string | null = null;
 
   try {
@@ -75,7 +79,7 @@ export default async function AuditPage() {
       select *
       from public.doc_access_log
       limit 200
-    `) as unknown as any[];
+    `) as unknown as GenericRow[];
 
     // Tenant scope for admins/owners in multi-tenant mode.
     let allowedDocIds: Set<string> | null = null;
@@ -122,8 +126,9 @@ export default async function AuditPage() {
     if (!tsCol) {
       accessRows = scoped.slice(0, 50);
     } else {
-      const toTime = (v: any) => {
+      const toTime = (v: unknown) => {
         if (!v) return 0;
+        if (typeof v !== "string" && typeof v !== "number" && !(v instanceof Date)) return 0;
         const d = new Date(v);
         const t = d.getTime();
         return Number.isNaN(t) ? 0 : t;
@@ -133,8 +138,8 @@ export default async function AuditPage() {
         .sort((a, b) => toTime(b?.[tsCol]) - toTime(a?.[tsCol]))
         .slice(0, 50);
     }
-  } catch (err: any) {
-    accessError = err.message;
+  } catch (err: unknown) {
+    accessError = errorMessage(err);
   }
 
   try {

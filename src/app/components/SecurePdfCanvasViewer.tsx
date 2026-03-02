@@ -5,7 +5,16 @@ import { detectFileFamily, fileFamilyLabel, type FileFamily } from "@/lib/fileFa
 
 type PdfJsModule = {
   GlobalWorkerOptions: { workerSrc: string };
-  getDocument: (src: { data: ArrayBuffer }) => { promise: Promise<any> };
+  getDocument: (src: { data: ArrayBuffer }) => { promise: Promise<PdfDocLike> };
+};
+type PdfPageLike = {
+  getViewport: (opts: { scale: number }) => { width: number; height: number };
+  render: (opts: { canvasContext: CanvasRenderingContext2D; viewport: { width: number; height: number } }) => { promise: Promise<void> };
+};
+type PdfDocLike = {
+  numPages: number;
+  getPage: (pageNo: number) => Promise<PdfPageLike>;
+  destroy?: () => Promise<void>;
 };
 
 type PageDims = { width: number; height: number };
@@ -16,7 +25,7 @@ function PdfPageCanvas({
   scale,
   dims,
 }: {
-  doc: any;
+  doc: PdfDocLike | null;
   pageNo: number;
   scale: number;
   dims: PageDims;
@@ -70,7 +79,7 @@ export default function SecurePdfCanvasViewer(props: {
   const [scale, setScale] = useState(1);
 
   const [pdfjs, setPdfjs] = useState<PdfJsModule | null>(null);
-  const [pdfDoc, setPdfDoc] = useState<any>(null);
+  const [pdfDoc, setPdfDoc] = useState<PdfDocLike | null>(null);
   const [numPages, setNumPages] = useState(0);
   const [pageDims, setPageDims] = useState<Record<number, PageDims>>({});
   const [visibleRange, setVisibleRange] = useState<{ start: number; end: number }>({ start: 1, end: 3 });
@@ -119,7 +128,7 @@ export default function SecurePdfCanvasViewer(props: {
   useEffect(() => {
     if (mode !== "pdf" || !pdfjs) return;
     let cancelled = false;
-    let localDoc: any = null;
+    let localDoc: PdfDocLike | null = null;
     (async () => {
       try {
         const res = await fetch(props.rawUrl, {
@@ -141,8 +150,8 @@ export default function SecurePdfCanvasViewer(props: {
           const vp = first.getViewport({ scale: 1 });
           setPageDims({ 1: { width: vp.width, height: vp.height } });
         }
-      } catch (e: any) {
-        if (!cancelled) setError(e?.message || "Unable to load PDF.");
+      } catch (e: unknown) {
+        if (!cancelled) setError(e instanceof Error ? e.message : "Unable to load PDF.");
       } finally {
         if (!cancelled) setLoading(false);
       }

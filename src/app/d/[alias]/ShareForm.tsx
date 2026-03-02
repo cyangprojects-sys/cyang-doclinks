@@ -3,6 +3,7 @@
 
 import { useState } from "react";
 import { createAndEmailShareToken, getShareStatsByToken } from "./actions";
+import type { CreateShareResult, ShareStatsResult } from "./actions";
 
 function fmtIso(iso: string | null) {
   if (!iso) return "—";
@@ -32,6 +33,9 @@ export default function ShareForm({
   alias?: string;
   canEditTitle?: boolean;
 }) {
+  function errorMessage(e: unknown): string {
+    return e instanceof Error ? e.message : String(e);
+  }
   const [shareTitle, setShareTitle] = useState("");
   const [toEmail, setToEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -43,7 +47,7 @@ export default function ShareForm({
   const [err, setErr] = useState<string | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
-  const [stats, setStats] = useState<any>(null);
+  const [stats, setStats] = useState<ShareStatsResult | null>(null);
 
   async function onCreate() {
     setErr(null);
@@ -62,7 +66,7 @@ export default function ShareForm({
       fd.set("expiresAt", toIsoFromDatetimeLocal(expiresLocal));
       fd.set("maxViews", maxViews.trim() ? maxViews.trim() : "");
 
-      const res: any = await createAndEmailShareToken(fd);
+      const res: CreateShareResult = await createAndEmailShareToken(fd);
       if (!res.ok) {
         setErr(res.message || res.error || "Failed to create token.");
         return;
@@ -72,8 +76,8 @@ export default function ShareForm({
         (typeof res.url === "string" && res.url.trim()) ||
         `${window.location.origin}/s/${encodeURIComponent(String(res.token || ""))}`;
       setShareUrl(resolvedUrl);
-    } catch (e: any) {
-      setErr(e?.message || "Unexpected error.");
+    } catch (e: unknown) {
+      setErr(errorMessage(e) || "Unexpected error.");
     } finally {
       setBusy(false);
     }
@@ -84,14 +88,14 @@ export default function ShareForm({
     setErr(null);
     setBusy(true);
     try {
-      const res: any = await getShareStatsByToken(token);
+      const res: ShareStatsResult = await getShareStatsByToken(token);
       if (!res.ok) {
         setErr(res.message || res.error || "Failed to load stats.");
         return;
       }
       setStats(res);
-    } catch (e: any) {
-      setErr(e?.message || "Unexpected error.");
+    } catch (e: unknown) {
+      setErr(errorMessage(e) || "Unexpected error.");
     } finally {
       setBusy(false);
     }
@@ -269,7 +273,7 @@ export default function ShareForm({
               </div>
               <div>
                 <span className="text-neutral-500">Views:</span>{" "}
-                {stats.row.view_count ?? stats.row.views_count ?? 0}
+                {stats.row.view_count ?? 0}
               </div>
               <div className="md:col-span-2">
                 <span className="text-neutral-500">Recipient:</span>{" "}

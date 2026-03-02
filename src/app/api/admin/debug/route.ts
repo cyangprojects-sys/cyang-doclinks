@@ -15,6 +15,9 @@ type AliasRow = {
   expires_at: string | null;
   created_at?: string | null;
 };
+function errorMessage(e: unknown): string {
+  return e instanceof Error ? e.message : String(e);
+}
 
 function boolEnv(name: string) {
   return Boolean(process.env[name] && String(process.env[name]).trim().length > 0);
@@ -94,7 +97,7 @@ export async function GET(req: NextRequest) {
 
     // Read document row from whichever table exists
     const docId = aliasRow?.doc_id ?? null;
-    let docRow: any = null;
+    let docRow: Record<string, unknown> | null = null;
 
     if (docId) {
       if (hasDocs) {
@@ -114,7 +117,7 @@ export async function GET(req: NextRequest) {
           where id = ${docId}::uuid
           limit 1
         `;
-        docRow = (rows as any[])?.[0] ?? null;
+        docRow = (rows as Array<Record<string, unknown>>)?.[0] ?? null;
         if (!docRow) notes.push("No row found in public.docs for doc_id (alias points to missing doc).");
       } else if (hasDocuments) {
         const rows = await sql`
@@ -127,33 +130,36 @@ export async function GET(req: NextRequest) {
           where id = ${docId}::uuid
           limit 1
         `;
-        docRow = (rows as any[])?.[0] ?? null;
+        docRow = (rows as Array<Record<string, unknown>>)?.[0] ?? null;
         if (!docRow) notes.push("No row found in public.documents for doc_id (alias points to missing doc).");
       }
     }
 
     // Best-effort R2 HEAD (only if we have a bucket/key)
-    let r2Head: any = null;
-    if (docRow?.r2_key) {
+    let r2Head: Record<string, unknown> | null = null;
+    const docBucketVal = typeof docRow?.r2_bucket === "string" ? docRow.r2_bucket : null;
+    const docKeyVal = typeof docRow?.r2_key === "string" ? docRow.r2_key : null;
+    if (docKeyVal) {
       try {
-        const bucket = docRow?.r2_bucket || r2Bucket;
+        const bucket = docBucketVal || r2Bucket;
         const head = await r2Client.send(
           new HeadObjectCommand({
             Bucket: bucket,
-            Key: docRow.r2_key,
+            Key: docKeyVal,
           })
         );
         r2Head = {
           ok: true,
           bucket,
-          key: docRow.r2_key,
+          key: docKeyVal,
           contentLength: head.ContentLength ?? null,
           contentType: head.ContentType ?? null,
           etag: head.ETag ?? null,
           lastModified: head.LastModified ? new Date(head.LastModified).toISOString() : null,
         };
-      } catch (e: any) {
-        r2Head = { ok: false, error: e?.name ?? "HEAD_FAILED", message: "Object HEAD failed" };
+      } catch (e: unknown) {
+        const err = e as { name?: string };
+        r2Head = { ok: false, error: err?.name ?? "HEAD_FAILED", message: "Object HEAD failed" };
         notes.push("R2 HEAD failed (bucket/key may be wrong, or credentials missing).");
       }
     } else if (docRow && hasDocs) {
@@ -191,8 +197,8 @@ export async function GET(req: NextRequest) {
       r2_head: r2Head,
       notes,
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("ADMIN DEBUG ERROR:", err);
-    return NextResponse.json({ ok: false, error: "SERVER_ERROR", message: "Debug inspection failed." }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "SERVER_ERROR", message: `Debug inspection failed: ${errorMessage(err)}` }, { status: 500 });
   }
 }

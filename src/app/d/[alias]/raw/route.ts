@@ -364,7 +364,7 @@ if (shouldCountView(req)) {
       })(),
       timeoutMs
     );
-  } catch (err: any) {
+  } catch (err: unknown) {
     if (isRuntimeEnvError(err)) {
       return new Response("Unavailable", { status: 503 });
     }
@@ -381,7 +381,7 @@ if (shouldCountView(req)) {
     }
     await logDbErrorEvent({
       scope: "alias_raw",
-      message: String(err?.message || err || "alias_raw_error"),
+      message: err instanceof Error ? err.message : String(err || "alias_raw_error"),
       ip: clientIpKey(req).ip,
       meta: { route: "/d/[alias]/raw" },
     });

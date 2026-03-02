@@ -6,6 +6,7 @@ import { HeadObjectCommand } from "@aws-sdk/client-s3";
 import { GetObjectCommand } from "@aws-sdk/client-s3";
 import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { DeleteObjectCommand } from "@aws-sdk/client-s3";
+import type { HeadObjectCommandOutput, GetObjectCommandOutput } from "@aws-sdk/client-s3";
 import { validatePdfBuffer } from "@/lib/pdfSafety";
 import { sql } from "@/lib/db";
 import { slugify } from "@/lib/slug";
@@ -32,10 +33,29 @@ type CompleteRequest = {
   original_filename?: string | null;
 };
 
-async function streamToBuffer(body: any): Promise<Buffer> {
+function errorMessage(e: unknown): string {
+  return e instanceof Error ? e.message : String(e);
+}
+async function streamToBuffer(body: AsyncIterable<unknown>): Promise<Buffer> {
   const chunks: Buffer[] = [];
-  for await (const chunk of body as any) {
-    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  for await (const chunk of body) {
+    if (Buffer.isBuffer(chunk)) {
+      chunks.push(chunk);
+      continue;
+    }
+    if (chunk instanceof Uint8Array) {
+      chunks.push(Buffer.from(chunk));
+      continue;
+    }
+    if (typeof chunk === "string") {
+      chunks.push(Buffer.from(chunk));
+      continue;
+    }
+    if (chunk instanceof ArrayBuffer) {
+      chunks.push(Buffer.from(chunk));
+      continue;
+    }
+    throw new Error("Unsupported stream chunk type");
   }
   return Buffer.concat(chunks);
 }
@@ -181,7 +201,7 @@ export async function POST(req: NextRequest) {
             Key: docKey,
           })
         );
-      } catch (e: any) {
+      } catch (e: unknown) {
         await logSecurityEvent({
           type: "upload_complete_cleanup_failed",
           severity: "high",
@@ -189,7 +209,7 @@ export async function POST(req: NextRequest) {
           docId,
           scope: "upload_complete",
           message: "Failed to delete rejected object from R2",
-          meta: { reason, error: String(e?.message || e), ...(meta || {}) },
+          meta: { reason, error: errorMessage(e), ...(meta || {}) },
         });
       }
     };
@@ -227,7 +247,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: "encryption_required" }, { status: 409 });
     }
 
-    let head;
+    let head: HeadObjectCommandOutput;
     try {
       head = await r2Client.send(
         new HeadObjectCommand({
@@ -235,7 +255,7 @@ export async function POST(req: NextRequest) {
           Key: docKey,
         })
       );
-    } catch (e: any) {
+    } catch (e: unknown) {
       await logSecurityEvent({
         type: "upload_complete_missing_object",
         severity: "high",
@@ -243,14 +263,14 @@ export async function POST(req: NextRequest) {
         docId,
         scope: "upload_complete",
         message: "Upload complete called but R2 object missing",
-        meta: { err: e?.name ?? e?.message ?? String(e) },
+        meta: { err: e instanceof Error ? e.name || e.message : String(e) },
       });
       return NextResponse.json({ ok: false, error: "object_missing" }, { status: 409 });
     }
 
-    const contentLength = Number((head as any)?.ContentLength ?? 0);
-    const ct = String((head as any)?.ContentType ?? "");
-    const meta = ((head as any)?.Metadata ?? {}) as Record<string, string>;
+    const contentLength = Number(head?.ContentLength ?? 0);
+    const ct = String(head?.ContentType ?? "");
+    const meta = (head?.Metadata ?? {}) as Record<string, string>;
 
     if (!Number.isFinite(contentLength) || contentLength <= 0) {
       await cleanupRejectedObject("invalid_object", { contentLength });
@@ -350,16 +370,16 @@ export async function POST(req: NextRequest) {
     // 4) Read uploaded PDF bytes and validate server-side before encryption.
     let scanStatus: string = "pending";
     let riskLevel: string = "low";
-    let riskFlags: any = null;
+    let riskFlags: Record<string, unknown> | null = null;
     let uploadedBytes: Buffer;
     try {
-      const uploadedObj = await r2Client.send(
+      const uploadedObj: GetObjectCommandOutput = await r2Client.send(
         new GetObjectCommand({
           Bucket: docBucket,
           Key: docKey,
         })
       );
-      uploadedBytes = await streamToBuffer((uploadedObj as any).Body);
+      uploadedBytes = await streamToBuffer(uploadedObj.Body as AsyncIterable<unknown>);
     } catch {
       await cleanupRejectedObject("object_read_failed");
       return NextResponse.json({ ok: false, error: "object_read_failed" }, { status: 409 });
@@ -478,7 +498,7 @@ export async function POST(req: NextRequest) {
 // 4b) Enqueue async malware scan (best-effort; runs via /api/cron/scan)
 try {
   await enqueueDocScan({ docId, bucket: docBucket, key: docKey });
-} catch (e: any) {
+} catch (e: unknown) {
   // Non-fatal; upload is still usable unless other rules quarantine it.
   await logSecurityEvent({
     type: "malware_scan_enqueue_failed",
@@ -487,7 +507,7 @@ try {
     docId,
     scope: "upload_complete",
     message: "Failed to enqueue malware scan job",
-    meta: { error: String(e?.message || e) },
+    meta: { error: errorMessage(e) },
   });
 }
 // --- Monetization counters (hidden) ---
@@ -540,8 +560,8 @@ try {
         `;
         finalAlias = candidateAlias;
         break;
-      } catch (e: any) {
-        const msg = String(e?.message || "");
+      } catch (e: unknown) {
+        const msg = errorMessage(e);
         const missingCol =
           msg.includes("column") &&
           (msg.includes("expires_at") || msg.includes("revoked_at") || msg.includes("is_active"));
@@ -588,7 +608,7 @@ try {
       })(),
       timeoutMs
     );
-  } catch (e: any) {
+  } catch (e: unknown) {
     if (isRuntimeEnvError(e)) {
       return NextResponse.json({ ok: false, error: "ENV_MISCONFIGURED" }, { status: 503 });
     }
@@ -597,15 +617,15 @@ try {
         type: "upload_complete_timeout",
         severity: "high",
         ip: clientIpKey(req).ip,
-        scope: "upload_complete",
-        message: "Upload completion exceeded timeout",
-        meta: { timeoutMs },
+      scope: "upload_complete",
+      message: "Upload completion exceeded timeout",
+      meta: { timeoutMs },
       });
       return NextResponse.json({ ok: false, error: "TIMEOUT" }, { status: 504 });
     }
     await logDbErrorEvent({
       scope: "upload_complete",
-      message: String(e?.message || e || "server_error"),
+      message: errorMessage(e) || "server_error",
       ip: clientIpKey(req).ip,
       meta: { route: "/api/admin/upload/complete" },
     });

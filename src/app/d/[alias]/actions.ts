@@ -92,7 +92,7 @@ async function trySendResendEmail(opts: {
     }
 
     return { ok: true };
-  } catch (e: any) {
+  } catch (e: unknown) {
     return { ok: false, message: "Failed to send email" };
   }
 }
@@ -148,14 +148,14 @@ export async function createAndEmailShareToken(
       from public.docs
       where id = ${docId}::uuid
       limit 1
-    `) as unknown as { id: string; title: string | null }[];
+    `) as unknown as { id: string; title: string | null; owner_id: string | null }[];
 
     if (!docRows || docRows.length === 0) {
       return { ok: false, error: "not_found", message: "Document not found" };
     }
 
 
-    const ownerId = (docRows as any)?.[0]?.owner_id ?? null;
+    const ownerId = docRows?.[0]?.owner_id ?? null;
     let ownerPlan: Awaited<ReturnType<typeof getPlanForUser>> | null = null;
     if (ownerId) {
       ownerPlan = await getPlanForUser(ownerId);
@@ -243,7 +243,7 @@ export async function createAndEmailShareToken(
 
     await trySendResendEmail({ to: toEmail, subject, html });
     return { ok: true, token, url };
-  } catch (e: any) {
+  } catch (e: unknown) {
     return { ok: false, error: "exception", message: "Unable to create share." };
   }
 }
@@ -294,7 +294,7 @@ export async function getShareStatsByToken(
     };
 
     return { ok: true, row };
-  } catch (e: any) {
+  } catch (e: unknown) {
     return { ok: false, error: "exception", message: "Unable to load share stats." };
   }
 }
@@ -323,7 +323,7 @@ export async function revokeShareToken(
     `;
 
     return { ok: true, token };
-  } catch (e: any) {
+  } catch (e: unknown) {
     return { ok: false, error: "exception", message: "Unable to revoke share." };
   }
 }

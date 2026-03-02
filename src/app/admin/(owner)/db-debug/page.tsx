@@ -10,6 +10,9 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 type TableRow = { table_name: string };
+function errorMessage(e: unknown): string {
+  return e instanceof Error ? e.message : String(e);
+}
 
 export default async function DbDebugPage() {
   noStore();
@@ -38,8 +41,8 @@ export default async function DbDebugPage() {
     dbUser = r?.[0]?.current_user ?? "unknown";
     dbName = r?.[0]?.db ?? null;
     dbSchema = r?.[0]?.schema ?? null;
-  } catch (e: any) {
-    dbUser = `error: ${e?.message ?? String(e)}`;
+  } catch (e: unknown) {
+    dbUser = `error: ${errorMessage(e)}`;
   }
 
   try {
@@ -49,8 +52,8 @@ export default async function DbDebugPage() {
       where table_schema = 'public'
       order by table_name
     `) as unknown as TableRow[];
-  } catch (e: any) {
-    tables = [{ table_name: `error: ${e?.message ?? String(e)}` }];
+  } catch (e: unknown) {
+    tables = [{ table_name: `error: ${errorMessage(e)}` }];
   }
 
   try {
@@ -76,8 +79,8 @@ export default async function DbDebugPage() {
     try {
       const c = (await sql`select count(*)::int as n from public.doc_access_log`) as unknown as Array<{ n: number }>;
       accessLogCount = c?.[0]?.n ?? 0;
-    } catch (e: any) {
-      accessLogError = e?.message ?? String(e);
+    } catch (e: unknown) {
+      accessLogError = errorMessage(e);
     }
   }
 

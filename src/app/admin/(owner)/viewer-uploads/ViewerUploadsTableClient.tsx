@@ -25,6 +25,9 @@ export type ViewerUploadRow = {
 };
 
 type SortKey = "created_at" | "title" | "uploader_email" | "size_bytes" | "total_views" | "active_shares";
+function errorMessage(e: unknown): string {
+  return e instanceof Error ? e.message : String(e);
+}
 
 function fmtBytes(n: number | null) {
   if (!n || !Number.isFinite(n)) return "-";
@@ -75,6 +78,8 @@ export default function ViewerUploadsTableClient({ rows }: { rows: ViewerUploadR
       })
       .sort((a, b) => {
         const dir = sortDesc ? -1 : 1;
+        const textVal = (row: ViewerUploadRow, key: "title" | "uploader_email") =>
+          String(row[key] || "").toLowerCase();
         const av =
           sortKey === "created_at"
             ? new Date(a.created_at || 0).getTime()
@@ -84,7 +89,7 @@ export default function ViewerUploadsTableClient({ rows }: { rows: ViewerUploadR
                 ? Number(a.total_views || 0)
                 : sortKey === "active_shares"
                   ? Number(a.active_shares || 0)
-                  : String((a as any)[sortKey] || "").toLowerCase();
+                  : textVal(a, sortKey);
         const bv =
           sortKey === "created_at"
             ? new Date(b.created_at || 0).getTime()
@@ -94,7 +99,7 @@ export default function ViewerUploadsTableClient({ rows }: { rows: ViewerUploadR
                 ? Number(b.total_views || 0)
                 : sortKey === "active_shares"
                   ? Number(b.active_shares || 0)
-                  : String((b as any)[sortKey] || "").toLowerCase();
+                  : textVal(b, sortKey);
         if (av === bv) return 0;
         return av > bv ? dir : -dir;
       });
@@ -130,8 +135,8 @@ export default function ViewerUploadsTableClient({ rows }: { rows: ViewerUploadR
           if (!res.ok || !json?.ok) throw new Error(json?.error || json?.message || "Action failed");
         }
         window.location.reload();
-      } catch (e: any) {
-        setError(e?.message || "Action failed");
+      } catch (e: unknown) {
+        setError(errorMessage(e) || "Action failed");
       }
     });
   }

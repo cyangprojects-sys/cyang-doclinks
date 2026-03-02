@@ -13,6 +13,20 @@ import { getBillingFlags } from "@/lib/settings";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
+type StripeInvoice = {
+  id?: string;
+  number?: string;
+  status?: string;
+  amount_due?: number;
+  amount_paid?: number;
+  currency?: string;
+  created?: number;
+  hosted_invoice_url?: string;
+  invoice_pdf?: string;
+};
+function errorMessage(e: unknown): string {
+  return e instanceof Error ? e.message : String(e);
+}
 
 function statusClass(status: string): string {
   const s = String(status || "").toLowerCase();
@@ -124,11 +138,11 @@ export default async function StripeBillingPage(props: {
     if (customerId !== existingCustomerId) {
       await persistCustomerId(u.id, customerId);
     }
-  } catch (e: any) {
-    stripeConfigError = String(e?.message || e || "Stripe configuration error");
+  } catch (e: unknown) {
+    stripeConfigError = errorMessage(e) || "Stripe configuration error";
   }
 
-  let invoices: any[] = [];
+  let invoices: StripeInvoice[] = [];
   let invoicesError: string | null = null;
   if (customerId) {
     try {
@@ -136,8 +150,8 @@ export default async function StripeBillingPage(props: {
         method: "GET",
       });
       invoices = Array.isArray(data?.data) ? data.data : [];
-    } catch (e: any) {
-      invoicesError = String(e?.message || e || "Failed to load invoices");
+    } catch (e: unknown) {
+      invoicesError = errorMessage(e) || "Failed to load invoices";
     }
   }
 

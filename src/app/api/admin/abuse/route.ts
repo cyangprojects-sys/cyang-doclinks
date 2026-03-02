@@ -16,8 +16,18 @@ type Action =
   | { action: "revoke_share"; token: string; reason?: string | null; reportId?: string | null }
   | { action: "close_report"; reportId: string; notes?: string | null };
 
-function norm(s: any): string {
+type JsonBody = Record<string, unknown>;
+function norm(s: unknown): string {
   return String(s || "").trim();
+}
+function bodyString(body: JsonBody, key: string): string {
+  return norm(body[key]);
+}
+function bodyOptString(body: JsonBody, key: string, max: number): string | null {
+  const v = body[key];
+  if (v == null) return null;
+  const s = String(v).trim();
+  return s ? s.slice(0, max) : null;
 }
 
 export async function POST(req: NextRequest) {
@@ -47,17 +57,19 @@ export async function POST(req: NextRequest) {
   }
 
   let body: Action;
+  let rawBody: JsonBody;
   try {
-    body = (await req.json()) as Action;
+    rawBody = (await req.json()) as JsonBody;
+    body = rawBody as Action;
   } catch {
     return NextResponse.json({ ok: false, error: "BAD_JSON" }, { status: 400 });
   }
 
-  const act = (body as any)?.action;
-  const reason = (body as any)?.reason ? String((body as any).reason).slice(0, 500) : null;
+  const act = bodyString(rawBody, "action");
+  const reason = bodyOptString(rawBody, "reason", 500);
 
   if (act === "disable_doc" || act === "quarantine_doc") {
-    const docId = norm((body as any).docId);
+    const docId = bodyString(rawBody, "docId");
     if (!docId) return NextResponse.json({ ok: false, error: "MISSING_DOC" }, { status: 400 });
 
     await sql`
@@ -71,8 +83,8 @@ export async function POST(req: NextRequest) {
       where id = ${docId}::uuid
     `;
 
-    if ((body as any).reportId) {
-      const reportId = norm((body as any).reportId);
+    if (rawBody.reportId) {
+      const reportId = bodyString(rawBody, "reportId");
       if (reportId) {
         await sql`
           update public.abuse_reports
@@ -97,16 +109,16 @@ export async function POST(req: NextRequest) {
       orgId: user.orgId ?? null,
       docId,
       ipHash: ipInfo.ipHash,
-      payload: { action: act, reason, reportId: (body as any).reportId ?? null },
+      payload: { action: act, reason, reportId: rawBody.reportId ?? null },
     });
 
     return NextResponse.json({ ok: true });
   }
 
   if (act === "override_quarantine") {
-    const docId = norm((body as any).docId);
-    const confirm = norm((body as any).confirm);
-    const ttlMinutes = Number((body as any).ttlMinutes ?? 30);
+    const docId = bodyString(rawBody, "docId");
+    const confirm = bodyString(rawBody, "confirm");
+    const ttlMinutes = Number(rawBody.ttlMinutes ?? 30);
     if (!docId) return NextResponse.json({ ok: false, error: "MISSING_DOC" }, { status: 400 });
     if (confirm !== `OVERRIDE ${docId}`) {
       return NextResponse.json(
@@ -148,8 +160,8 @@ export async function POST(req: NextRequest) {
   }
 
   if (act === "revoke_override") {
-    const docId = norm((body as any).docId);
-    const confirm = norm((body as any).confirm);
+    const docId = bodyString(rawBody, "docId");
+    const confirm = bodyString(rawBody, "confirm");
     if (!docId) return NextResponse.json({ ok: false, error: "MISSING_DOC" }, { status: 400 });
     if (confirm !== `REVOKE_OVERRIDE ${docId}`) {
       return NextResponse.json(
@@ -187,7 +199,7 @@ export async function POST(req: NextRequest) {
   }
 
   if (act === "revoke_share") {
-    const token = norm((body as any).token);
+    const token = bodyString(rawBody, "token");
     if (!token) return NextResponse.json({ ok: false, error: "MISSING_TOKEN" }, { status: 400 });
 
     await sql`
@@ -196,8 +208,8 @@ export async function POST(req: NextRequest) {
       where token = ${token}
     `;
 
-    if ((body as any).reportId) {
-      const reportId = norm((body as any).reportId);
+    if (rawBody.reportId) {
+      const reportId = bodyString(rawBody, "reportId");
       if (reportId) {
         await sql`
           update public.abuse_reports
@@ -221,15 +233,15 @@ export async function POST(req: NextRequest) {
       actorUserId: user.id,
       orgId: user.orgId ?? null,
       ipHash: ipInfo.ipHash,
-      payload: { tokenPrefix: token.slice(0, 12), reason, reportId: (body as any).reportId ?? null },
+      payload: { tokenPrefix: token.slice(0, 12), reason, reportId: rawBody.reportId ?? null },
     });
 
     return NextResponse.json({ ok: true });
   }
 
   if (act === "close_report") {
-    const reportId = norm((body as any).reportId);
-    const notes = (body as any).notes ? String((body as any).notes).slice(0, 2000) : null;
+    const reportId = bodyString(rawBody, "reportId");
+    const notes = bodyOptString(rawBody, "notes", 2000);
     if (!reportId) return NextResponse.json({ ok: false, error: "MISSING_REPORT" }, { status: 400 });
 
     await sql`

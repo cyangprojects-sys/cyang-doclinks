@@ -13,14 +13,14 @@ type DebugResponse =
     tables: Record<string, boolean>;
     env: Record<string, boolean>;
     alias?: string;
-    alias_row?: any;
-    doc_row?: any;
-    r2_head?: any;
+    alias_row?: Record<string, unknown> | null;
+    doc_row?: Record<string, unknown> | null;
+    r2_head?: Record<string, unknown> | null;
     notes?: string[];
   }
   | { ok: false; error: string; message?: string };
 
-function Row({ k, v }: { k: string; v: any }) {
+function Row({ k, v }: { k: string; v: unknown }) {
   return (
     <div className="flex items-start justify-between gap-3 border-b border-white/10 py-2">
       <div className="text-sm text-white/70">{k}</div>

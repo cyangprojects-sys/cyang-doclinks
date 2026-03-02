@@ -140,6 +140,9 @@ function fmtBytes(n: number) {
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
   return `${(n / (1024 * 1024)).toFixed(2)} MB`;
 }
+function errorMessage(e: unknown): string {
+  return e instanceof Error ? e.message : String(e);
+}
 
 export default function UploadPanel({
   canCheckEncryptionStatus,
@@ -269,7 +272,10 @@ export default function UploadPanel({
 
     const presignParsed = (await presignRes.json().catch(() => null)) as PresignResponse | null;
     if (!presignRes.ok || !presignParsed || presignParsed.ok !== true) {
-      const msg = (presignParsed as any)?.message || (presignParsed as any)?.error || `Upload initialization failed (${presignRes.status})`;
+      const msg =
+        presignParsed && presignParsed.ok === false
+          ? presignParsed.message || presignParsed.error || `Upload initialization failed (${presignRes.status})`
+          : `Upload initialization failed (${presignRes.status})`;
       throw new Error(msg);
     }
     presignJson = presignParsed;
@@ -308,7 +314,10 @@ export default function UploadPanel({
 
     const completeJson = (await completeRes.json().catch(() => null)) as CompleteResponse | null;
     if (!completeRes.ok || !completeJson || completeJson.ok !== true) {
-      const msg = (completeJson as any)?.message || (completeJson as any)?.error || `Upload finalization failed (${completeRes.status})`;
+      const msg =
+        completeJson && completeJson.ok === false
+          ? completeJson.message || completeJson.error || `Upload finalization failed (${completeRes.status})`
+          : `Upload finalization failed (${completeRes.status})`;
       throw new Error(msg);
     }
 
@@ -340,13 +349,13 @@ export default function UploadPanel({
       for (const item of queue) {
         try {
           await uploadOne(item);
-        } catch (e: any) {
-          updateItem(item.id, { status: "error", message: e?.message || "Upload failed." });
+        } catch (e: unknown) {
+          updateItem(item.id, { status: "error", message: errorMessage(e) || "Upload failed." });
         }
       }
       router.refresh();
-    } catch (e: any) {
-      setError(e?.message || "Upload failed.");
+    } catch (e: unknown) {
+      setError(errorMessage(e) || "Upload failed.");
     } finally {
       setBusy(false);
     }

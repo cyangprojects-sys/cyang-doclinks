@@ -79,8 +79,8 @@ async function resolveR2LocationForDoc(docId: string): Promise<{ bucket: string;
     if (!pointer.startsWith(r2Prefix)) throw new Error("Invalid pointer.");
     const key = pointer.slice(r2Prefix.length);
     return { bucket: r2Bucket, key };
-  } catch (e: any) {
-    const msg = String(e?.message || "").toLowerCase();
+  } catch (e: unknown) {
+    const msg = String(e instanceof Error ? e.message : e || "").toLowerCase();
     const missingPointerCol =
       msg.includes("column") && msg.includes("pointer") && msg.includes("does not exist");
 
@@ -193,8 +193,8 @@ export async function createOrAssignAliasAction(formData: FormData): Promise<voi
       throw new Error("Alias is already in use.");
     }
     createdAlias = created[0].alias;
-  } catch (e: any) {
-    const msg = String(e?.message || "");
+  } catch (e: unknown) {
+    const msg = String(e instanceof Error ? e.message : e || "");
     const missingCol =
       msg.includes("column") &&
       (msg.includes("expires_at") || msg.includes("revoked_at") || msg.includes("is_active"));
@@ -206,7 +206,7 @@ export async function createOrAssignAliasAction(formData: FormData): Promise<voi
       `) as unknown as Array<{ alias: string }>;
       if (!created.length) throw new Error("Alias is already in use.");
       createdAlias = created[0].alias;
-    } else if (String(e?.code || "") === "23505") {
+    } else if (String((e as { code?: string })?.code || "") === "23505") {
       throw new Error("Alias is already in use.");
     } else {
       throw e;
@@ -265,8 +265,8 @@ export async function renameDocAliasAction(formData: FormData): Promise<void> {
     } else {
       updatedAlias = updated[0].alias;
     }
-  } catch (e: any) {
-    const msg = String(e?.message || "");
+  } catch (e: unknown) {
+    const msg = String(e instanceof Error ? e.message : e || "");
     const missingCol =
       msg.includes("column") &&
       (msg.includes("revoked_at") || msg.includes("is_active"));
@@ -294,7 +294,7 @@ export async function renameDocAliasAction(formData: FormData): Promise<void> {
       } else {
         updatedAlias = updated[0].alias;
       }
-    } else if (String(e?.code || "") === "23505") {
+    } else if (String((e as { code?: string })?.code || "") === "23505") {
       throw new Error("Alias is already in use.");
     } else {
       throw e;
