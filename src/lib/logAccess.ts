@@ -1,6 +1,5 @@
 // src/lib/logAccess.ts
 import { sql } from "@/lib/db";
-import { emitWebhook } from "@/lib/webhooks";
 
 interface LogAccessParams {
     docId: string;
@@ -35,7 +34,13 @@ export async function logAccess({
       )
     `;
     } catch (err) {
-        console.error("Failed to log access:", err);
+        const isProd = String(process.env.NODE_ENV || "").toLowerCase() === "production";
+        if (isProd) {
+            console.warn("Failed to log access.");
+        } else {
+            const msg = err instanceof Error ? err.message : String(err || "unknown");
+            console.warn(`Failed to log access: ${msg}`);
+        }
         // Never throw — logging should not break file delivery
     }
 }
