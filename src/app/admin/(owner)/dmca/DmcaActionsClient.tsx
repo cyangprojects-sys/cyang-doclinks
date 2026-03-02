@@ -8,7 +8,7 @@ type Props = {
   status: string;
 };
 
-async function post(body: any) {
+async function post(body: Record<string, unknown>) {
   const res = await fetch("/api/admin/dmca", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -25,15 +25,15 @@ export default function DmcaActionsClient({ noticeId, docId, status }: Props) {
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
 
-  async function act(action: any, label: string) {
+  async function act(action: Record<string, unknown>, label: string) {
     if (busy) return;
     setBusy(label);
     setMsg(null);
     try {
       await post(action);
       setMsg("Done. Refresh to see updates.");
-    } catch (e: any) {
-      setMsg(String(e?.message || e));
+    } catch (e: unknown) {
+      setMsg(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(null);
     }
