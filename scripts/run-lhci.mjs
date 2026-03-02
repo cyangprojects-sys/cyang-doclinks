@@ -13,11 +13,16 @@ const env = {
   TEMP: tmpDir,
 };
 
-const npxBin = process.platform === "win32" ? "npx.cmd" : "npx";
-const child = spawn(npxBin, ["lhci", "autorun", "--config=.lighthouserc.json"], {
-  stdio: "inherit",
-  env,
-});
+const child =
+  process.platform === "win32"
+    ? spawn(process.env.ComSpec || "cmd.exe", ["/d", "/s", "/c", "npx lhci autorun --config=.lighthouserc.json"], {
+      stdio: "inherit",
+      env,
+    })
+    : spawn("npx", ["lhci", "autorun", "--config=.lighthouserc.json"], {
+      stdio: "inherit",
+      env,
+    });
 
 child.on("exit", (code) => {
   process.exit(code ?? 1);
