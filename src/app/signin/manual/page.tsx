@@ -34,7 +34,7 @@ export default function ManualSignInPage() {
   return (
     <main className="mx-auto max-w-xl px-4 py-12">
       <div className="glass-card-strong rounded-2xl p-6 md:p-8">
-        <h1 className="text-2xl font-semibold text-white">Manual sign in</h1>
+        <h1 className="text-2xl font-semibold text-white">Sign in with email</h1>
         <p className="mt-2 text-sm text-white/70">
           Use email and password. Account must be activated from your email link first.
         </p>
@@ -78,4 +78,3 @@ export default function ManualSignInPage() {
     </main>
   );
 }
-
