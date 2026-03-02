@@ -10,6 +10,7 @@ import { assertCanCreateShare, getPlanForUser, normalizeExpiresAtForPlan, normal
 import crypto from "crypto";
 import { clientIpKey, enforceGlobalApiRateLimit } from "@/lib/securityTelemetry";
 import { appendImmutableAudit } from "@/lib/immutableAudit";
+import { resolvePublicAppBaseUrl } from "@/lib/publicBaseUrl";
 
 function newToken(): string {
   return crypto.randomBytes(16).toString("hex");
@@ -122,7 +123,12 @@ try {
   `;
 }
 
-const base = (process.env.BASE_URL || process.env.NEXTAUTH_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000")).replace(/\/+$/, "");
+  let base: string;
+  try {
+    base = resolvePublicAppBaseUrl(req.url);
+  } catch {
+    return NextResponse.json({ ok: false, error: "ENV_MISCONFIGURED" }, { status: 500 });
+  }
   const url = `${base}/s/${token}`;
 
   emitWebhook("share.created", {
