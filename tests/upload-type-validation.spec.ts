@@ -2,6 +2,15 @@ import { expect, test } from "@playwright/test";
 import { validateUploadType } from "../src/lib/uploadTypeValidation";
 
 test.describe("upload type validation", () => {
+  test("rejects invalid/path-traversal filenames", () => {
+    const out = validateUploadType({
+      filename: "../secret.pdf",
+      declaredMime: "application/pdf",
+    });
+    expect(out.ok).toBeFalsy();
+    if (!out.ok) expect(out.error).toBe("BAD_FILENAME");
+  });
+
   test("blocks executable extensions", () => {
     const out = validateUploadType({
       filename: "malware.exe",
@@ -69,6 +78,19 @@ test.describe("upload type validation", () => {
     if (out.ok) {
       expect(out.ext).toBe("pdf");
       expect(out.canonicalMime).toBe("application/pdf");
+      expect(out.family).toBe("document");
+    }
+  });
+
+  test("accepts OOXML docx files with ZIP signature", () => {
+    const out = validateUploadType({
+      filename: "contract.docx",
+      declaredMime: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      bytes: Buffer.from([0x50, 0x4b, 0x03, 0x04, 0x14, 0x00]), // PKZIP header
+    });
+    expect(out.ok).toBeTruthy();
+    if (out.ok) {
+      expect(out.ext).toBe("docx");
       expect(out.family).toBe("document");
     }
   });

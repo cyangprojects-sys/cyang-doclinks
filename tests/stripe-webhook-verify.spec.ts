@@ -38,6 +38,16 @@ test.describe("stripe webhook signature verifier", () => {
     if (!out.ok) expect(out.error).toBe("INVALID_SIGNATURE_HEADER");
   });
 
+  test("rejects signature header with non-numeric timestamp token", () => {
+    const out = verifyStripeWebhookSignature({
+      rawBody: "{}",
+      signatureHeader: "t=abc,v1=deadbeef",
+      secret: "whsec_test",
+    });
+    expect(out.ok).toBeFalsy();
+    if (!out.ok) expect(out.error).toBe("INVALID_SIGNATURE_HEADER");
+  });
+
   test("rejects timestamp outside tolerance", () => {
     const secret = "whsec_test";
     const rawBody = JSON.stringify({ id: "evt_old", type: "invoice.payment_failed" });
@@ -110,5 +120,22 @@ test.describe("stripe webhook signature verifier", () => {
       expect(out.eventId).toBe("evt_ok");
       expect(out.eventType).toBe("invoice.payment_succeeded");
     }
+  });
+
+  test("accepts multi-signature header when one v1 matches", () => {
+    const secret = "whsec_test";
+    const payload = { id: "evt_multi", type: "billing.test.unhandled", data: { object: {} } };
+    const rawBody = JSON.stringify(payload);
+    const ts = Math.floor(Date.now() / 1000);
+    const good = crypto.createHmac("sha256", secret).update(`${ts}.${rawBody}`).digest("hex");
+    const header = `t=${ts},v1=deadbeef,v1=${good},v1=badc0ffee`;
+    const out = verifyStripeWebhookSignature({
+      rawBody,
+      signatureHeader: header,
+      secret,
+      toleranceSeconds: 300,
+    });
+    expect(out.ok).toBeTruthy();
+    if (out.ok) expect(out.eventId).toBe("evt_multi");
   });
 });
