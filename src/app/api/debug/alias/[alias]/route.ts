@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { sql } from "@/lib/db";
+import { requireRole } from "@/lib/authz";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,6 +19,16 @@ export async function GET(
   _req: Request,
   context: { params: Promise<{ alias: string }> }
 ) {
+  try {
+    await requireRole("admin");
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : "";
+    if (msg === "UNAUTHENTICATED") {
+      return NextResponse.json({ ok: false, error: "UNAUTHENTICATED" }, { status: 401 });
+    }
+    return NextResponse.json({ ok: false, error: "FORBIDDEN" }, { status: 403 });
+  }
+
   const { alias: rawAlias } = await context.params;
   const alias = decodeURIComponent(rawAlias || "").trim().toLowerCase();
 
