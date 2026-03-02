@@ -20,6 +20,7 @@ import { enqueueDocScan, healScanQueue } from "../src/lib/scanQueue";
 import { runUsageMaintenance } from "../src/lib/usageMaintenance";
 
 const BASE_ENV = {
+  DATABASE_URL: process.env.DATABASE_URL,
   RESEND_API_KEY: process.env.RESEND_API_KEY,
   EMAIL_FROM: process.env.EMAIL_FROM,
   STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
@@ -29,6 +30,7 @@ const BASE_ENV = {
 };
 
 test.afterEach(() => {
+  process.env.DATABASE_URL = BASE_ENV.DATABASE_URL;
   process.env.RESEND_API_KEY = BASE_ENV.RESEND_API_KEY;
   process.env.EMAIL_FROM = BASE_ENV.EMAIL_FROM;
   process.env.STRIPE_SECRET_KEY = BASE_ENV.STRIPE_SECRET_KEY;
@@ -102,6 +104,7 @@ test.describe("gap sweep fallback behavior", () => {
   });
 
   test("settings fall back to env/defaults when DB is unavailable", async () => {
+    delete process.env.DATABASE_URL;
     process.env.ENFORCE_PLAN_LIMITS = "0";
     process.env.PRO_PLAN_ENABLED = "1";
     process.env.PRICING_UI_ENABLED = "yes";
@@ -146,6 +149,7 @@ test.describe("gap sweep fallback behavior", () => {
   });
 
   test("rbac defaults fail closed without override table", async () => {
+    delete process.env.DATABASE_URL;
     const adminUser = { id: "u1", email: "a@b.com", role: "admin" as const, orgId: null, orgSlug: null };
     const viewerUser = { id: "u2", email: "v@b.com", role: "viewer" as const, orgId: null, orgSlug: null };
 
@@ -162,6 +166,7 @@ test.describe("gap sweep fallback behavior", () => {
   });
 
   test("override/webhook/queue maintenance helpers fail closed without DB", async () => {
+    delete process.env.DATABASE_URL;
     await expect(getActiveViewLimitOverride("")).resolves.toBeNull();
     await expect(hasActiveViewLimitOverride("")).resolves.toBeFalsy();
     await expect(

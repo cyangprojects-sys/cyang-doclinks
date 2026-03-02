@@ -1,4 +1,7 @@
 import { defineConfig } from "@playwright/test";
+import { config as loadDotenv } from "dotenv";
+
+loadDotenv({ path: ".env.local", quiet: true });
 
 const baseURL = process.env.PLAYWRIGHT_BASE_URL || "http://127.0.0.1:3000";
 
@@ -20,4 +23,3 @@ export default defineConfig({
     },
   ],
 });
-

@@ -79,6 +79,7 @@ function setDocMasterKeys() {
 
 test.describe("remaining module sweep", () => {
   test("auth/admin/owner exports and role helpers are wired", async () => {
+    delete process.env.OWNER_EMAIL;
     process.env.OWNER_EMAILS = "owner1@example.com,owner2@example.com";
     expect(getOwnerEmail()).toBe("owner1@example.com");
     expect(roleAtLeast("owner", "admin")).toBeTruthy();
@@ -161,6 +162,7 @@ test.describe("remaining module sweep", () => {
 
   test("quarantine/share/db-writer helpers fail closed without DB", async () => {
     delete process.env.DATABASE_URL;
+    delete process.env.RESEND_API_KEY;
     await expect(hasActiveQuarantineOverride("")).resolves.toBeFalsy();
     await expect(
       createQuarantineOverride({ docId: "x", actorUserId: null, reason: "test", ttlMinutes: 5 })
