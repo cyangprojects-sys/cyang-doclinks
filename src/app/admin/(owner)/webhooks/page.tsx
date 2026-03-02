@@ -28,7 +28,7 @@ type HookRow = {
   id: string;
   name: string;
   url: string;
-  secret: string | null;
+  has_secret: boolean;
   events: string[];
   enabled: boolean;
   created_at: string;
@@ -92,7 +92,7 @@ export default async function WebhooksPage() {
       id::text as id,
       name,
       url,
-      secret,
+      (secret is not null and length(secret) > 0) as has_secret,
       events,
       enabled,
       created_at::text as created_at,
@@ -243,7 +243,21 @@ export default async function WebhooksPage() {
                   </div>
                   <div>
                     <FieldLabel htmlFor={`webhook-secret-${h.id}`}>Secret (optional)</FieldLabel>
-                    <TextInput id={`webhook-secret-${h.id}`} aria-label={`Webhook secret ${h.name}`} name="secret" defaultValue={h.secret ?? ""} />
+                    <TextInput
+                      id={`webhook-secret-${h.id}`}
+                      aria-label={`Webhook secret ${h.name}`}
+                      name="secret"
+                      placeholder={h.has_secret ? "Leave blank to keep current secret" : "shared secret"}
+                    />
+                    <label className="mt-2 flex items-center gap-2 text-xs text-white/65">
+                      <input
+                        aria-label={`Clear webhook secret ${h.name}`}
+                        type="checkbox"
+                        name="clear_secret"
+                        className="h-4 w-4 rounded border-white/20 bg-black/30"
+                      />
+                      Clear stored secret
+                    </label>
                   </div>
                   <div>
                     <div className="text-xs text-white/65">Events</div>

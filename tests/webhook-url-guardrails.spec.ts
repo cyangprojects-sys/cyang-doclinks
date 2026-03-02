@@ -36,5 +36,12 @@ test.describe("webhook url guardrails", () => {
   test("webhook actions normalize and validate URL input", () => {
     const code = readFileSync("src/app/admin/(owner)/webhooks/actions.ts", "utf8");
     expect(code.includes("normalizeWebhookUrl(")).toBeTruthy();
+    expect(code.includes("encryptWebhookSecretForStorage(")).toBeTruthy();
+  });
+
+  test("webhook edit page does not render stored secret values", () => {
+    const code = readFileSync("src/app/admin/(owner)/webhooks/page.tsx", "utf8");
+    expect(code.includes("defaultValue={h.secret")).toBeFalsy();
+    expect(code.includes("Leave blank to keep current secret")).toBeTruthy();
   });
 });

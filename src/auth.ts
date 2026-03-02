@@ -88,6 +88,26 @@ function computeRole(email?: string | null): "owner" | "viewer" {
   return OWNER_EMAIL_SET.has(e) ? "owner" : "viewer";
 }
 
+function parseBooleanEnv(name: string, fallback: boolean): boolean {
+  const raw = String(process.env[name] || "").trim().toLowerCase();
+  if (!raw) return fallback;
+  if (["1", "true", "yes", "on"].includes(raw)) return true;
+  if (["0", "false", "no", "off"].includes(raw)) return false;
+  return fallback;
+}
+
+function claimEmailVerified(profile: unknown): boolean | null {
+  const p = profile as Record<string, unknown> | null | undefined;
+  const value = p?.email_verified;
+  if (typeof value === "boolean") return value;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (["1", "true", "yes"].includes(normalized)) return true;
+    if (["0", "false", "no"].includes(normalized)) return false;
+  }
+  return null;
+}
+
 function enterpriseOidcProvider() {
   const issuer = process.env.OIDC_ISSUER!;
   const wellKnown = issuer.replace(/\/+$/, "") + "/.well-known/openid-configuration";
@@ -195,13 +215,26 @@ export const authOptions: NextAuthOptions = {
   session: { strategy: "jwt" },
 
   callbacks: {
-    async signIn({ user, account }) {
+    async signIn({ user, account, profile }) {
       const email = String((user as { email?: string | null } | undefined)?.email || "").trim().toLowerCase();
       const provider = String(account?.provider || "");
       if (!email) return false;
 
       if (provider === "manual-password") {
         return true;
+      }
+
+      if (provider === "google") {
+        if (claimEmailVerified(profile) !== true) {
+          return "/signin?error=email_not_verified";
+        }
+      }
+
+      if (provider === "enterprise-sso") {
+        const requireVerified = parseBooleanEnv("OIDC_REQUIRE_EMAIL_VERIFIED", true);
+        if (requireVerified && claimEmailVerified(profile) !== true) {
+          return "/signin?error=email_not_verified";
+        }
       }
 
       if (provider === "google" || provider === "enterprise-sso") {

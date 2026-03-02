@@ -8,9 +8,16 @@ const isProd = process.env.NODE_ENV === "production";
 // If you later embed docs in iframes, you'll need to relax frame-ancestors / X-Frame-Options.
 
 function cspValue(frameAncestors: string) {
+  const connectExtra = String(process.env.CSP_CONNECT_SRC || "")
+    .split(",")
+    .map((v) => v.trim())
+    .filter(Boolean)
+    .join(" ");
+  const connectSrc = connectExtra ? `connect-src 'self' ${connectExtra}` : "connect-src 'self'";
+
   // Keep this CSP compatible with Next.js + PDF rendering.
-  // We allow https: for images/connect (e.g., fonts/analytics) and blob: for PDF rendering.
-  const scriptSrc = "script-src 'self' 'unsafe-inline' https:";
+  // Keep script/style sources tight and add explicit hosts via CSP_CONNECT_SRC when needed.
+  const scriptSrc = "script-src 'self' 'unsafe-inline'";
   const parts = [
     "default-src 'self'",
     "base-uri 'self'",
@@ -20,9 +27,9 @@ function cspValue(frameAncestors: string) {
     "img-src 'self' data: blob: https:",
     "media-src 'self' blob:",
     "font-src 'self' data: https:",
-    "connect-src 'self' https:",
+    connectSrc,
     scriptSrc,
-    "style-src 'self' 'unsafe-inline' https:",
+    "style-src 'self' 'unsafe-inline'",
   ];
 
   // Do not add upgrade-insecure-requests in dev/local.

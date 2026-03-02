@@ -47,4 +47,27 @@ test.describe("security telemetry helper primitives", () => {
     expect(out2.ip).toBe("0.0.0.0");
     expect(out2.ipHash).toBe(hashIp("0.0.0.0"));
   });
+
+  test("clientIpKey ignores generic proxy headers in production unless explicitly trusted", () => {
+    const oldNodeEnv = process.env.NODE_ENV;
+    const oldTrust = process.env.TRUST_PROXY_HEADERS;
+    Reflect.set(process.env, "NODE_ENV", "production");
+    Reflect.deleteProperty(process.env, "TRUST_PROXY_HEADERS");
+    try {
+      const req = new Request("http://localhost", {
+        headers: {
+          "x-forwarded-for": "1.2.3.4",
+          "x-real-ip": "2.2.2.2",
+        },
+      });
+      const out = clientIpKey(req);
+      expect(out.ip).toBe("0.0.0.0");
+      expect(out.ipHash).toBe(hashIp("0.0.0.0"));
+    } finally {
+      if (typeof oldNodeEnv === "string") Reflect.set(process.env, "NODE_ENV", oldNodeEnv);
+      else Reflect.deleteProperty(process.env, "NODE_ENV");
+      if (typeof oldTrust === "string") Reflect.set(process.env, "TRUST_PROXY_HEADERS", oldTrust);
+      else Reflect.deleteProperty(process.env, "TRUST_PROXY_HEADERS");
+    }
+  });
 });

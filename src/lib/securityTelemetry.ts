@@ -38,26 +38,34 @@ export function hashIp(ip: string): string {
  */
 export function clientIpKey(req: Request): { ip: string; ipHash: string } {
   const h = req.headers;
+  const strictProxyTrust = String(process.env.TRUST_PROXY_HEADERS || "").trim().toLowerCase();
+  const allowUntrustedProxyHeaders =
+    strictProxyTrust === "1" ||
+    strictProxyTrust === "true" ||
+    strictProxyTrust === "yes" ||
+    strictProxyTrust === "on" ||
+    process.env.NODE_ENV !== "production";
 
   // Cloudflare
   const cf = h.get("cf-connecting-ip");
   if (cf) return { ip: cf, ipHash: hashIp(cf) };
-
-  // Common reverse-proxy headers
-  const xff = h.get("x-forwarded-for");
-  if (xff) {
-    const first = xff.split(",")[0]?.trim();
-    if (first) return { ip: first, ipHash: hashIp(first) };
-  }
-
-  const xri = h.get("x-real-ip");
-  if (xri) return { ip: xri, ipHash: hashIp(xri) };
-
-  // Vercel sometimes provides this
+  // Vercel edge forwarding
   const vercel = h.get("x-vercel-forwarded-for");
   if (vercel) {
     const first = vercel.split(",")[0]?.trim();
     if (first) return { ip: first, ipHash: hashIp(first) };
+  }
+
+  // Only trust generic proxy headers when explicitly allowed.
+  if (allowUntrustedProxyHeaders) {
+    const xff = h.get("x-forwarded-for");
+    if (xff) {
+      const first = xff.split(",")[0]?.trim();
+      if (first) return { ip: first, ipHash: hashIp(first) };
+    }
+
+    const xri = h.get("x-real-ip");
+    if (xri) return { ip: xri, ipHash: hashIp(xri) };
   }
 
   // Final fallback (unknown)

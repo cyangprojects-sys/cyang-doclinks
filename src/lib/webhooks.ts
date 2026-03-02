@@ -7,6 +7,7 @@
 
 import crypto from "crypto";
 import { sql } from "@/lib/db";
+import { decryptWebhookSecretForUse } from "@/lib/webhookSecrets";
 
 export type WebhookEvent =
   | "doc.accessed"
@@ -249,7 +250,13 @@ async function deliverSyncBestEffort(event: WebhookEvent, ownerId: string, paylo
       hooks
         .filter((h) => !h.events?.length || h.events.includes(event))
         .map(async (h) => {
-          const res = await deliverOnce({ url: h.url, secret: h.secret, event, body });
+      let webhookSecret: string | null = null;
+      try {
+        webhookSecret = decryptWebhookSecretForUse(h.secret);
+      } catch {
+        webhookSecret = null;
+      }
+      const res = await deliverOnce({ url: h.url, secret: webhookSecret, event, body });
           await sql`
             update public.webhooks
             set
@@ -338,7 +345,13 @@ export async function processWebhookDeliveries(opts?: {
       `;
 
       const body = buildBody(r.event, r.payload);
-      const res = await deliverOnce({ url: r.url, secret: r.secret, event: r.event, body });
+      let webhookSecret: string | null = null;
+      try {
+        webhookSecret = decryptWebhookSecretForUse(r.secret);
+      } catch {
+        webhookSecret = null;
+      }
+      const res = await deliverOnce({ url: r.url, secret: webhookSecret, event: r.event, body });
 
       const nextAttempt = r.attempt_count + 1;
       const shouldDead = !res.ok && nextAttempt >= maxAttempts;

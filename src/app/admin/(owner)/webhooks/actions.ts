@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { sql } from "@/lib/db";
 import { requireUser } from "@/lib/authz";
 import { normalizeWebhookEvents, normalizeWebhookUrl, processWebhookDeliveries } from "@/lib/webhooks";
+import { encryptWebhookSecretForStorage } from "@/lib/webhookSecrets";
 
 function parseEvents(formData: FormData): string[] {
   const raw = formData.getAll("events").map((v) => String(v || "").trim()).filter(Boolean);
@@ -17,7 +18,8 @@ export async function createWebhookAction(formData: FormData): Promise<void> {
 
   const name = String(formData.get("name") || "").trim();
   const url = normalizeWebhookUrl(String(formData.get("url") || "").trim());
-  const secret = String(formData.get("secret") || "").trim() || null;
+  const plainSecret = String(formData.get("secret") || "").trim();
+  const secret = plainSecret ? encryptWebhookSecretForStorage(plainSecret) : null;
   const enabledRaw = String(formData.get("enabled") || "");
   const enabled = enabledRaw === "on" || enabledRaw === "true" || enabledRaw === "1";
   const events = parseEvents(formData);
@@ -39,13 +41,31 @@ export async function updateWebhookAction(formData: FormData): Promise<void> {
   const id = String(formData.get("id") || "").trim();
   const name = String(formData.get("name") || "").trim();
   const url = normalizeWebhookUrl(String(formData.get("url") || "").trim());
-  const secret = String(formData.get("secret") || "").trim() || null;
+  const plainSecret = String(formData.get("secret") || "").trim();
+  const clearSecretRaw = String(formData.get("clear_secret") || "").trim().toLowerCase();
+  const clearSecret = clearSecretRaw === "on" || clearSecretRaw === "true" || clearSecretRaw === "1";
   const enabledRaw = String(formData.get("enabled") || "");
   const enabled = enabledRaw === "on" || enabledRaw === "true" || enabledRaw === "1";
   const events = parseEvents(formData);
 
   if (!id) throw new Error("Missing id.");
   if (!name) throw new Error("Missing name.");
+
+  const existingRows = (await sql`
+    select secret
+    from public.webhooks
+    where id = ${id}::uuid
+      and owner_id = ${u.id}::uuid
+    limit 1
+  `) as unknown as Array<{ secret: string | null }>;
+  if (!existingRows.length) throw new Error("Webhook not found.");
+  const existingSecret = existingRows[0].secret ?? null;
+
+  const secret = clearSecret
+    ? null
+    : plainSecret
+      ? encryptWebhookSecretForStorage(plainSecret)
+      : existingSecret;
 
   await sql`
     update public.webhooks
