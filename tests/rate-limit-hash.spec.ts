@@ -41,4 +41,32 @@ test.describe("rate limit stableHash", () => {
     delete process.env.DEV_ALLOW_INSECURE_FALLBACK;
     expect(() => stableHash("abc")).toThrow("Missing hashing secret");
   });
+
+  test("falls back to NEXTAUTH_SECRET when VIEW_SALT is missing", () => {
+    delete process.env.VIEW_SALT;
+    process.env.NEXTAUTH_SECRET = "nextauth-secret";
+    const a = stableHash("abc");
+    const b = stableHash("abc");
+    expect(a).toBe(b);
+    expect(a).toHaveLength(32);
+  });
+
+  test("uses explicit salt env key when provided", () => {
+    delete process.env.VIEW_SALT;
+    delete process.env.NEXTAUTH_SECRET;
+    process.env.CUSTOM_HASH_SALT = "custom-salt";
+    const a = stableHash("abc", "CUSTOM_HASH_SALT");
+    const b = stableHash("abc", "CUSTOM_HASH_SALT");
+    expect(a).toBe(b);
+    expect(a).toHaveLength(32);
+    delete process.env.CUSTOM_HASH_SALT;
+  });
+
+  test("does not allow insecure fallback in production", () => {
+    delete process.env.VIEW_SALT;
+    delete process.env.NEXTAUTH_SECRET;
+    process.env.NODE_ENV = "production";
+    process.env.DEV_ALLOW_INSECURE_FALLBACK = "1";
+    expect(() => stableHash("abc")).toThrow("Missing hashing secret");
+  });
 });
