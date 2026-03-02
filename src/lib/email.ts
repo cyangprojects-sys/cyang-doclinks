@@ -56,6 +56,34 @@ export async function sendShareEmail(p: ShareEmailParams) {
   });
 }
 
+export async function sendAccountActivationEmail(args: { to: string; activationUrl: string }) {
+  const resend = new Resend(mustEnv("RESEND_API_KEY"));
+  const from = mustEnv("EMAIL_FROM");
+
+  const subject = "Activate your cyang.io account";
+  const text =
+    `Welcome to cyang.io.\n\n` +
+    `Activate your account by clicking this link:\n${args.activationUrl}\n\n` +
+    `This activation link expires in 24 hours.\n`;
+
+  const html = `
+    <div style="font-family:Arial,sans-serif;line-height:1.5">
+      <p>Welcome to cyang.io.</p>
+      <p>Activate your account by clicking the link below:</p>
+      <p><a href="${args.activationUrl}">${args.activationUrl}</a></p>
+      <p style="color:#666;font-size:12px">This activation link expires in 24 hours.</p>
+    </div>
+  `;
+
+  await resend.emails.send({
+    from,
+    to: args.to,
+    subject,
+    text,
+    html,
+  });
+}
+
 function esc(s: string) {
   return s
     .replaceAll("&", "&amp;")

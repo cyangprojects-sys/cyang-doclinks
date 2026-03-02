@@ -1,6 +1,8 @@
 import type { NextAuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 import Credentials from "next-auth/providers/credentials";
+import { sql } from "@/lib/db";
+import { hasSignupConsentCookie, recordTermsAcceptance, verifyManualCredentials } from "@/lib/signup";
 
 /**
  * Auth (NextAuth v4)
@@ -153,11 +155,22 @@ export const authOptions: NextAuthOptions = {
 
   providers: [
     Credentials({
-      id: "disabled",
-      name: "Disabled",
-      credentials: {},
-      async authorize() {
-        return null;
+      id: "manual-password",
+      name: "Email and Password",
+      credentials: {
+        email: { label: "Email", type: "email" },
+        password: { label: "Password", type: "password" },
+      },
+      async authorize(credentials) {
+        const email = String(credentials?.email || "").trim().toLowerCase();
+        const password = String(credentials?.password || "");
+        const user = await verifyManualCredentials(email, password);
+        if (!user) return null;
+        return {
+          id: user.email,
+          email: user.email,
+          name: user.name,
+        };
       },
     }),
 
@@ -180,6 +193,45 @@ export const authOptions: NextAuthOptions = {
   session: { strategy: "jwt" },
 
   callbacks: {
+    async signIn({ user, account }) {
+      const email = String((user as any)?.email || "").trim().toLowerCase();
+      const provider = String(account?.provider || "");
+      if (!email) return false;
+
+      if (provider === "manual-password") {
+        return true;
+      }
+
+      if (provider === "google" || provider === "enterprise-sso") {
+        let userExists = false;
+        try {
+          const rows = (await sql`
+            select 1
+            from public.users
+            where lower(email) = lower(${email})
+            limit 1
+          `) as unknown as Array<{ "?column?": number }>;
+          userExists = rows.length > 0;
+        } catch {
+          userExists = false;
+        }
+
+        if (!userExists) {
+          const hasConsent = await hasSignupConsentCookie();
+          if (!hasConsent) {
+            return "/signup?error=terms_required";
+          }
+          try {
+            await recordTermsAcceptance(email, provider);
+          } catch {
+            // Non-blocking if legal acceptance table has not been rolled out yet.
+          }
+        }
+      }
+
+      return true;
+    },
+
     async jwt({ token, user }) {
       // On first sign-in, `user` is present. Afterwards rely on token.email.
       const email = (user as any)?.email ?? (token as any)?.email ?? null;

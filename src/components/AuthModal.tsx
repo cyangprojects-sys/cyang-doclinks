@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { signIn } from "next-auth/react";
+import Link from "next/link";
 
 export default function AuthModal({
   open,
@@ -107,6 +108,13 @@ export default function AuthModal({
         >
           Cancel
         </button>
+
+        <div className="mt-3 text-xs text-white/60">
+          New here?{" "}
+          <Link href="/signup" onClick={onClose} className="text-white underline hover:text-cyan-200">
+            Create account
+          </Link>
+        </div>
       </div>
     </div>
   );

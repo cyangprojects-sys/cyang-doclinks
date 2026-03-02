@@ -24,11 +24,18 @@ export default function LoginPage() {
                     </button>
 
 <button
-    onClick={() => signIn("enterprise-oidc", { callbackUrl: "/admin" })}
+    onClick={() => signIn("enterprise-sso", { callbackUrl: "/admin" })}
     className="mt-3 w-full rounded-2xl bg-white/10 px-5 py-3 text-sm font-medium text-white hover:bg-white/15"
 >
     Sign in with Enterprise SSO
 </button>
+
+                    <Link
+                        href="/signup"
+                        className="mt-3 inline-flex w-full items-center justify-center rounded-2xl bg-white/5 px-5 py-3 text-sm font-medium text-white hover:bg-white/10"
+                    >
+                        Create account
+                    </Link>
 
                     <div className="mt-6 text-xs text-white/50">
                         <p>

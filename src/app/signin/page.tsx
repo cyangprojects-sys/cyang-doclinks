@@ -1,6 +1,7 @@
 "use client";
 
 import { signIn } from "next-auth/react";
+import Link from "next/link";
 
 // UI toggles only (no secrets). These help the page display the right enabled/disabled state.
 const googleConfigured =
@@ -46,6 +47,21 @@ export default function SignInPage() {
               {enterpriseConfigured ? "Organization-managed identity (OIDC)" : "Enterprise SSO not configured"}
             </div>
           </button>
+        </div>
+
+        <div className="mt-6 rounded-xl border border-white/15 bg-white/5 p-3">
+          <div className="text-xs text-white/60">Need a new account?</div>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <Link href="/signup" className="rounded-lg border border-white/20 bg-white/10 px-3 py-1.5 text-xs text-white hover:bg-white/15">
+              Sign up
+            </Link>
+            <Link href="/signin/manual" className="rounded-lg border border-white/20 bg-white/10 px-3 py-1.5 text-xs text-white hover:bg-white/15">
+              Manual sign in
+            </Link>
+            <Link href="/signup/manual" className="rounded-lg border border-white/20 bg-white/10 px-3 py-1.5 text-xs text-white hover:bg-white/15">
+              Manual sign up
+            </Link>
+          </div>
         </div>
 
         <p className="mt-6 text-xs text-white/50">
