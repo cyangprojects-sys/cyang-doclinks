@@ -531,6 +531,53 @@ test.describe("security state enforcement", () => {
     }
   });
 
+  test("alias raw honors dl=1 as attachment path", async ({ request }) => {
+    const databaseUrl = String(process.env.DATABASE_URL || "").trim();
+    test.skip(!databaseUrl, "DATABASE_URL not available");
+    const sql = neon(databaseUrl);
+
+    const hasDocAliases = await tableExists(sql, "doc_aliases");
+    test.skip(!hasDocAliases, "doc_aliases table not available");
+
+    const doc = await pickServableDoc(sql);
+    test.skip(!doc, "No servable docs available for fixture setup");
+    if (!doc) return;
+
+    const alias = `a-dl-${randSuffix()}`.toLowerCase();
+    await sql`
+      insert into public.doc_aliases (alias, doc_id, is_active, expires_at)
+      values (${alias}, ${doc.id}::uuid, true, null)
+    `;
+
+    try {
+      const rawResp = await request.get(`/d/${alias}/raw?dl=1`, { maxRedirects: 0 });
+      if (rawResp.status() === 429) {
+        test.skip(true, "Rate-limited in environment; cannot validate alias dl=1 attachment behavior");
+      }
+      expect(rawResp.status()).toBe(302);
+      const ticketLocation = rawResp.headers()["location"] || "";
+      expect(ticketLocation).toContain("/t/");
+
+      const ticketUrl = new URL(ticketLocation, process.env.PLAYWRIGHT_BASE_URL || "http://127.0.0.1:3000");
+      const ticketPath = `${ticketUrl.pathname}${ticketUrl.search}`;
+      const navResp = await request.get(ticketPath, {
+        headers: {
+          "sec-fetch-dest": "document",
+          "sec-fetch-mode": "navigate",
+          "sec-fetch-user": "?1",
+        },
+      });
+      if (navResp.status() === 403) {
+        const body = await navResp.text();
+        expect(body).not.toContain("Direct open is disabled for this protected document.");
+      } else {
+        expect([200, 206, 404, 410, 500]).toContain(navResp.status());
+      }
+    } finally {
+      await sql`delete from public.doc_aliases where alias = ${alias}`;
+    }
+  });
+
   test("expired and revoked shares are blocked", async ({ request }) => {
     const databaseUrl = String(process.env.DATABASE_URL || "").trim();
     test.skip(!databaseUrl, "DATABASE_URL not available");

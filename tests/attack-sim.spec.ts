@@ -194,6 +194,33 @@ test.describe("attack simulation", () => {
     expect([403, 404, 429, 503]).toContain(r.status());
   });
 
+  test("serve route rejects mismatched docId even with a valid token", async ({ request }) => {
+    const databaseUrl = String(process.env.DATABASE_URL || "").trim();
+    test.skip(!databaseUrl, "DATABASE_URL not available");
+    const sql = neon(databaseUrl);
+
+    const docId = await pickDocId(sql);
+    test.skip(!docId, "No doc available for fixture setup");
+    if (!docId) return;
+
+    const token = `tok_attack_docid_mismatch_${randSuffix()}`.slice(0, 64);
+    await sql`
+      insert into public.share_tokens (token, doc_id, max_views, views_count)
+      values (${token}, ${docId}::uuid, null, 0)
+    `;
+
+    try {
+      const wrongDocId = "00000000-0000-0000-0000-000000000000";
+      const r = await request.get(`/serve/${wrongDocId}?token=${encodeURIComponent(token)}`);
+      if (r.status() === 429) {
+        test.skip(true, "Rate limited in environment");
+      }
+      expect(r.status()).toBe(404);
+    } finally {
+      await sql`delete from public.share_tokens where token = ${token}`;
+    }
+  });
+
   test("share raw path does not expose direct object-store URL", async ({ request }) => {
     const databaseUrl = String(process.env.DATABASE_URL || "").trim();
     test.skip(!databaseUrl, "DATABASE_URL not available");
