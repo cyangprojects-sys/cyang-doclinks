@@ -28,6 +28,15 @@ test.describe("share auth helpers", () => {
     process.env.NEXTAUTH_SECRET = snap.NEXTAUTH_SECRET;
   });
 
+  test("fails closed when no signing secret is configured", () => {
+    delete process.env.SHARE_COOKIE_SECRET;
+    delete process.env.VIEW_SALT;
+    delete process.env.NEXTAUTH_SECRET;
+    expect(() => makeUnlockCookieValue("tok_missing_secret")).toThrow(
+      "Missing SHARE_COOKIE_SECRET"
+    );
+  });
+
   test("exposes expected cookie names and options", () => {
     expect(shareUnlockCookieName()).toBe("cyang_share_unlock");
     expect(deviceTrustCookieName()).toBe("cyang_trusted_device");
