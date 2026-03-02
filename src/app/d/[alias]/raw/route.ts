@@ -16,6 +16,7 @@ import { isAliasServingDisabled, isSecurityTestNoDbMode } from "@/lib/securityPo
 import { getRouteTimeoutMs, isRouteTimeoutError, withRouteTimeout } from "@/lib/routeTimeout";
 import { assertRuntimeEnv, isRuntimeEnvError } from "@/lib/runtimeEnv";
 import { detectFileFamily, isMicrosoftOfficeDocument } from "@/lib/fileFamily";
+import { resolvePublicAppBaseUrl } from "@/lib/publicBaseUrl";
 
 function normAlias(alias: string): string {
   return decodeURIComponent(String(alias || "")).trim().toLowerCase();
@@ -353,10 +354,17 @@ if (shouldCountView(req)) {
       });
     }
 
+    let appBaseUrl: string;
+    try {
+      appBaseUrl = resolvePublicAppBaseUrl(req.url);
+    } catch {
+      return new Response("Unavailable", { status: 503 });
+    }
+
         return new Response(null, {
           status: 302,
           headers: {
-            Location: new URL(`/t/${ticketId}`, req.url).toString(),
+            Location: new URL(`/t/${ticketId}`, appBaseUrl).toString(),
             ...rateLimitHeaders(ipRl),
             "Cache-Control": "private, no-store",
           },

@@ -18,6 +18,7 @@ import { isGlobalServeDisabled, isSecurityTestNoDbMode } from "@/lib/securityPol
 import { getRouteTimeoutMs, isRouteTimeoutError, withRouteTimeout } from "@/lib/routeTimeout";
 import { enforceIpAbuseBlock, logDbErrorEvent, logSecurityEvent, maybeBlockIpOnAbuse } from "@/lib/securityTelemetry";
 import { assertRuntimeEnv, isRuntimeEnvError } from "@/lib/runtimeEnv";
+import { resolvePublicAppBaseUrl } from "@/lib/publicBaseUrl";
 
 function getClientIp(req: NextRequest) {
   const xff = req.headers.get("x-forwarded-for") || "";
@@ -302,10 +303,17 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ docId: stri
     });
   }
 
+  let appBaseUrl: string;
+  try {
+    appBaseUrl = resolvePublicAppBaseUrl(req.url);
+  } catch {
+    return new Response("Unavailable", { status: 503 });
+  }
+
         return new Response(null, {
           status: 302,
           headers: {
-            Location: new URL(`/t/${ticketId}`, req.url).toString(),
+            Location: new URL(`/t/${ticketId}`, appBaseUrl).toString(),
             ...rateLimitHeaders(ipRl),
           },
         });

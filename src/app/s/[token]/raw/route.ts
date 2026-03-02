@@ -21,6 +21,7 @@ import {
 } from "@/lib/securityTelemetry";
 import { assertRuntimeEnv, isRuntimeEnvError } from "@/lib/runtimeEnv";
 import { detectFileFamily, isMicrosoftOfficeDocument } from "@/lib/fileFamily";
+import { resolvePublicAppBaseUrl } from "@/lib/publicBaseUrl";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -352,12 +353,19 @@ export async function GET(
     return await deny("maxed", 410, "Max views reached");
   }
 
+  let appBaseUrl: string;
+  try {
+    appBaseUrl = resolvePublicAppBaseUrl(req.url);
+  } catch {
+    return new NextResponse("Unavailable", { status: 503 });
+  }
+
   // If share is password protected, require an active unlock record (set by /s/[token] gate)
   if (share.password_hash) {
     const unlocked = await isUnlocked(token);
     if (!unlocked) {
       if (shouldRedirectToGate(req)) {
-        const url = new URL(`/s/${token}`, req.url);
+        const url = new URL(`/s/${token}`, appBaseUrl);
         return NextResponse.redirect(url);
       }
       return await deny("password_required", 401, "Unauthorized");
@@ -499,7 +507,7 @@ export async function GET(
         return new NextResponse(null, {
           status: 302,
           headers: {
-            Location: new URL(`/t/${ticketId}`, req.url).toString(),
+            Location: new URL(`/t/${ticketId}`, appBaseUrl).toString(),
             ...rateLimitHeaders(ipRl),
             "Cache-Control": "private, no-store",
           },

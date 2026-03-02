@@ -3,6 +3,7 @@ import { resolveShareMeta } from "@/lib/resolveDoc";
 import { sql } from "@/lib/db";
 import { isMicrosoftOfficeDocument } from "@/lib/fileFamily";
 import { enforceGlobalApiRateLimit } from "@/lib/securityTelemetry";
+import { resolvePublicAppBaseUrl } from "@/lib/publicBaseUrl";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -56,7 +57,14 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ token: stri
     return new NextResponse("Download is disabled for this shared document.", { status: 403 });
   }
 
-  const url = new URL(`/s/${encodeURIComponent(t)}/raw`, req.url);
+  let appBaseUrl: string;
+  try {
+    appBaseUrl = resolvePublicAppBaseUrl(req.url);
+  } catch {
+    return new NextResponse("Unavailable", { status: 503 });
+  }
+
+  const url = new URL(`/s/${encodeURIComponent(t)}/raw`, appBaseUrl);
   url.searchParams.set("disposition", "attachment");
   return NextResponse.redirect(url, { status: 302 });
 }

@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { ORG_COOKIE_NAME, ORG_INVITE_COOKIE_NAME } from "@/lib/tenant";
 import { getOrgBySlug } from "@/lib/orgs";
 import { enforceGlobalApiRateLimit } from "@/lib/securityTelemetry";
+import { resolvePublicAppBaseUrl } from "@/lib/publicBaseUrl";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -34,17 +35,24 @@ export async function GET(req: NextRequest, ctx: RouteCtx) {
   const slug = String(params?.slug || "").trim().toLowerCase();
   const provider = String(params?.provider || "").trim();
 
+  let appBaseUrl: string;
+  try {
+    appBaseUrl = resolvePublicAppBaseUrl(req.url);
+  } catch {
+    return NextResponse.json({ ok: false, error: "ENV_MISCONFIGURED" }, { status: 500 });
+  }
+
   if (!slug || !SLUG_RE.test(slug)) {
-    return NextResponse.redirect(new URL("/login", req.url));
+    return NextResponse.redirect(new URL("/login", appBaseUrl));
   }
 
   const org = await getOrgBySlug(slug);
   if (!org) {
-    return NextResponse.redirect(new URL("/login", req.url));
+    return NextResponse.redirect(new URL("/login", appBaseUrl));
   }
 
   if (!ALLOWED.has(provider)) {
-    return NextResponse.redirect(new URL(`/org/${encodeURIComponent(slug)}/login`, req.url));
+    return NextResponse.redirect(new URL(`/org/${encodeURIComponent(slug)}/login`, appBaseUrl));
   }
 
   const inviteToken = String(new URL(req.url).searchParams.get("invite") || "").trim().slice(0, INVITE_TOKEN_MAX);
@@ -53,7 +61,7 @@ export async function GET(req: NextRequest, ctx: RouteCtx) {
   const res = NextResponse.redirect(
     new URL(
       `/api/auth/signin/${encodeURIComponent(provider)}?callbackUrl=${encodeURIComponent("/admin/dashboard")}`,
-      req.url
+      appBaseUrl
     )
   );
 
