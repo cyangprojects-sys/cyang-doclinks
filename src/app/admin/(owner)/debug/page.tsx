@@ -2,9 +2,10 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 import Link from "next/link";
-import { cookies, headers } from "next/headers";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { requireRole } from "@/lib/authz";
+import { resolveConfiguredPublicAppBaseUrl } from "@/lib/publicBaseUrl";
 
 type DebugResponse =
   | {
@@ -31,13 +32,6 @@ function Row({ k, v }: { k: string; v: unknown }) {
   );
 }
 
-async function getOrigin() {
-  const h = await headers();
-  const proto = h.get("x-forwarded-proto") ?? "https";
-  const host = h.get("x-forwarded-host") ?? h.get("host") ?? "www.cyang.io";
-  return `${proto}://${host}`;
-}
-
 export default async function AdminDebugPage({
   searchParams,
 }: {
@@ -55,7 +49,7 @@ export default async function AdminDebugPage({
   let data: DebugResponse | null = null;
 
   if (alias) {
-    const origin = await getOrigin();
+    const origin = resolveConfiguredPublicAppBaseUrl();
     const url = new URL("/api/admin/debug", origin);
     url.searchParams.set("alias", alias);
 
