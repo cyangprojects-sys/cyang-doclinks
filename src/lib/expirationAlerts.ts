@@ -61,7 +61,7 @@ async function tryUpsertNotification(p: {
   shareToken?: string | null;
   title?: string | null;
   expiresAt: string; // ISO text
-  payload?: any;
+  payload?: Record<string, unknown>;
 }) {
   const dedupeKey = [
     p.ownerId,
@@ -94,7 +94,7 @@ async function tryUpsertNotification(p: {
         ${p.shareToken ?? null},
         ${p.title ?? null},
         ${p.expiresAt}::timestamptz,
-        ${(p.payload ?? {}) as any}::jsonb,
+        ${p.payload ?? {}}::jsonb,
         ${dedupeKey}
       )
       on conflict (dedupe_key) do nothing
