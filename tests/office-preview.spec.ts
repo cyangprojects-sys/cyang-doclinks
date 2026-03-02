@@ -49,4 +49,25 @@ test.describe("office preview conversion", () => {
       expect((out.html.match(/<td>/g) || []).length).toBe(1000 * 30);
     }
   });
+
+  test("rejects legacy xls preview explicitly", async () => {
+    const out = await convertOfficeBytes({
+      bytes: Buffer.from("legacy-xls", "utf8"),
+      mimeType: "application/vnd.ms-excel",
+    });
+    expect(out.ok).toBeFalsy();
+    if (!out.ok) {
+      expect(out.error).toBe("XLS_PREVIEW_UNSUPPORTED");
+      expect(out.message.toLowerCase()).toContain("not supported");
+    }
+  });
+
+  test("fails closed on invalid xlsx payload", async () => {
+    const out = await convertOfficeBytes({
+      bytes: Buffer.from("not-a-zip-xlsx", "utf8"),
+      mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
+    expect(out.ok).toBeFalsy();
+    if (!out.ok) expect(out.error).toBe("SHEET_CONVERSION_FAILED");
+  });
 });
