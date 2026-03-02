@@ -20,9 +20,10 @@ export async function revokeExpiredSharesBatch(limit: number = 1000): Promise<{ 
       returning st.token
     `) as unknown as Array<{ token: string }>;
     return { revoked: rows.length };
-  } catch (e: any) {
-    if (String(e?.code || "") === "42P01") return { revoked: 0 };
+  } catch (e: unknown) {
+    if (typeof e === "object" && e !== null && "code" in e && String((e as { code?: string }).code || "") === "42P01") {
+      return { revoked: 0 };
+    }
     throw e;
   }
 }
-
