@@ -13,6 +13,9 @@ test.describe("geo, cookie, and view helpers", () => {
 
     const h3 = new Headers({ "cf-ipcountry": "U1" });
     expect(getCountryFromHeaders(h3)).toBeNull();
+
+    const h4 = new Headers({ "x-vercel-ip-country": "ca", "cf-ipcountry": "us" });
+    expect(getCountryFromHeaders(h4)).toBe("CA");
   });
 
   test("evaluates country allow/block lists", () => {
@@ -20,6 +23,9 @@ test.describe("geo, cookie, and view helpers", () => {
     expect(isCountryAllowed({ country: "US", allowedCountries: ["US", "CA"], blockedCountries: [] })).toBeTruthy();
     expect(isCountryAllowed({ country: "US", allowedCountries: ["CA"], blockedCountries: [] })).toBeFalsy();
     expect(isCountryAllowed({ country: "US", blockedCountries: ["US"] })).toBeFalsy();
+    expect(
+      isCountryAllowed({ country: "US", allowedCountries: ["US", "INVALID", "ZZZ"], blockedCountries: ["bad"] })
+    ).toBeTruthy();
   });
 
   test("builds and parses cookie headers", () => {
