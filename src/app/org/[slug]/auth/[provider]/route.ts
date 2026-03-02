@@ -2,11 +2,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ORG_COOKIE_NAME, ORG_INVITE_COOKIE_NAME } from "@/lib/tenant";
 import { getOrgBySlug } from "@/lib/orgs";
+import { enforceGlobalApiRateLimit } from "@/lib/securityTelemetry";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const ALLOWED = new Set(["google", "enterprise-oidc"]);
+const SLUG_RE = /^[a-z0-9][a-z0-9-]{0,63}$/i;
+const INVITE_TOKEN_MAX = 512;
 
 type RouteCtx = {
   // Next.js typings changed in recent versions: `params` may be a Promise.
@@ -14,11 +17,24 @@ type RouteCtx = {
 };
 
 export async function GET(req: NextRequest, ctx: RouteCtx) {
+  const rl = await enforceGlobalApiRateLimit({
+    req,
+    scope: "ip:org_auth_start",
+    limit: Number(process.env.RATE_LIMIT_ORG_AUTH_START_IP_PER_MIN || 30),
+    windowSeconds: 60,
+  });
+  if (!rl.ok) {
+    return NextResponse.json(
+      { ok: false, error: "RATE_LIMIT", message: "Too many requests. Try again shortly." },
+      { status: rl.status, headers: { "Retry-After": String(rl.retryAfterSeconds) } }
+    );
+  }
+
   const params = await Promise.resolve(ctx.params);
   const slug = String(params?.slug || "").trim().toLowerCase();
   const provider = String(params?.provider || "").trim();
 
-  if (!slug) {
+  if (!slug || !SLUG_RE.test(slug)) {
     return NextResponse.redirect(new URL("/login", req.url));
   }
 
@@ -31,7 +47,7 @@ export async function GET(req: NextRequest, ctx: RouteCtx) {
     return NextResponse.redirect(new URL(`/org/${encodeURIComponent(slug)}/login`, req.url));
   }
 
-  const inviteToken = String(new URL(req.url).searchParams.get("invite") || "").trim();
+  const inviteToken = String(new URL(req.url).searchParams.get("invite") || "").trim().slice(0, INVITE_TOKEN_MAX);
 
   // Bind org to this browser (httpOnly so JS can't tamper with it).
   const res = NextResponse.redirect(

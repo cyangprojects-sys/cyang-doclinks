@@ -4,6 +4,9 @@ export const dynamic = "force-dynamic";
 
 import { NextRequest } from "next/server";
 import { createGoogleAuthRequest } from "@/lib/oauth-google";
+import { enforceGlobalApiRateLimit } from "@/lib/securityTelemetry";
+
+const ALIAS_RE = /^[a-z0-9][a-z0-9_-]{1,127}$/i;
 
 function setCookie(headers: Headers, name: string, value: string, maxAgeSeconds: number) {
   const secure = process.env.APP_URL?.startsWith("https://") ? "; Secure" : "";
@@ -16,10 +19,23 @@ function setCookie(headers: Headers, name: string, value: string, maxAgeSeconds:
 // Note: include `ctx` with params even if unused.
 // This satisfies Next's route handler type validator during `next build`.
 export async function GET(req: NextRequest, _ctx: { params: Promise<Record<string, never>> }) {
+  const rl = await enforceGlobalApiRateLimit({
+    req,
+    scope: "ip:auth_google_start",
+    limit: Number(process.env.RATE_LIMIT_AUTH_GOOGLE_START_IP_PER_MIN || 30),
+    windowSeconds: 60,
+  });
+  if (!rl.ok) {
+    return new Response("Too many requests. Please try again shortly.", {
+      status: rl.status,
+      headers: { "Retry-After": String(rl.retryAfterSeconds) },
+    });
+  }
+
   const url = new URL(req.url);
   const alias = (url.searchParams.get("alias") || "").trim();
 
-  if (!alias) return new Response("Missing alias", { status: 400 });
+  if (!alias || !ALIAS_RE.test(alias)) return new Response("Missing or invalid alias", { status: 400 });
 
   const { authorizationUrl, codeVerifier, state, nonce } = await createGoogleAuthRequest(alias);
 

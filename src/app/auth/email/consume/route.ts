@@ -1,6 +1,11 @@
 import { sql } from "@/lib/db";
 import { cookieHeader } from "@/lib/cookies";
 import { hmacSha256Hex, signPayload } from "@/lib/crypto";
+import { NextRequest } from "next/server";
+import { enforceGlobalApiRateLimit } from "@/lib/securityTelemetry";
+
+const TOKEN_RE = /^[A-Za-z0-9_-]{20,256}$/;
+const ALIAS_RE = /^[a-z0-9][a-z0-9_-]{1,127}$/i;
 
 type LoginTokenRow = {
   id: number;
@@ -15,12 +20,27 @@ type LoginTokenRow = {
 type DocAliasRow = { doc_id: string; is_active: boolean };
 type GrantRow = { id: number };
 
-export async function GET(req: Request) {
+export async function GET(req: NextRequest) {
+  const rl = await enforceGlobalApiRateLimit({
+    req,
+    scope: "ip:auth_email_consume",
+    limit: Number(process.env.RATE_LIMIT_AUTH_EMAIL_CONSUME_IP_PER_MIN || 20),
+    windowSeconds: 60,
+  });
+  if (!rl.ok) {
+    return new Response("Too many requests. Please try again shortly.", {
+      status: rl.status,
+      headers: { "Retry-After": String(rl.retryAfterSeconds) },
+    });
+  }
+
   const url = new URL(req.url);
   const token = (url.searchParams.get("t") || "").trim();
   const alias = (url.searchParams.get("alias") || "").trim();
 
-  if (!token || !alias) return new Response("Bad request", { status: 400 });
+  if (!token || !alias || !TOKEN_RE.test(token) || !ALIAS_RE.test(alias)) {
+    return new Response("Bad request", { status: 400 });
+  }
 
   const tokenHash = hmacSha256Hex(token);
 
