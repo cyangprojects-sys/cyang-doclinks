@@ -104,10 +104,10 @@ export async function testWebhookAction(formData: FormData): Promise<void> {
 
     // Try to deliver immediately for nicer UX.
     await processWebhookDeliveries({ maxBatch: 5, maxAttempts: 8 });
-  } catch (e: any) {
+  } catch (e: unknown) {
     await sql`
       update public.webhooks
-      set last_error = ${String(e?.message || e || "Failed to enqueue test")}
+      set last_error = ${String(e instanceof Error ? e.message : e || "Failed to enqueue test")}
       where id = ${id}::uuid and owner_id = ${u.id}::uuid
     `;
   }
