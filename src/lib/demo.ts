@@ -4,4 +4,5 @@
  * Keep all demo CTAs pointing here so you can rotate the token in one place.
  */
 export const DEMO_DOC_URL =
-  "https://www.cyang.io/s/6c43c2e90e5a3e8da971d44397b825bc" as const;
+  "https://www.cyang.io/s/e7601639ef9e473fb38659988e4eaa18" as const;
+
