@@ -19,6 +19,12 @@ test.describe("security policy primitives", () => {
     expect(isSecurityTestNoDbMode()).toBeTruthy();
     process.env.SECURITY_TEST_NO_DB = "true";
     expect(isSecurityTestNoDbMode()).toBeTruthy();
+    process.env.SECURITY_TEST_NO_DB = "YES";
+    expect(isSecurityTestNoDbMode()).toBeTruthy();
+    process.env.SECURITY_TEST_NO_DB = "on";
+    expect(isSecurityTestNoDbMode()).toBeTruthy();
+    process.env.SECURITY_TEST_NO_DB = "y";
+    expect(isSecurityTestNoDbMode()).toBeTruthy();
   });
 
   test("security test no-db mode parses falsy/empty values", () => {
@@ -27,6 +33,10 @@ test.describe("security policy primitives", () => {
     process.env.SECURITY_TEST_NO_DB = "0";
     expect(isSecurityTestNoDbMode()).toBeFalsy();
     process.env.SECURITY_TEST_NO_DB = "off";
+    expect(isSecurityTestNoDbMode()).toBeFalsy();
+    process.env.SECURITY_TEST_NO_DB = "n";
+    expect(isSecurityTestNoDbMode()).toBeFalsy();
+    process.env.SECURITY_TEST_NO_DB = "garbage";
     expect(isSecurityTestNoDbMode()).toBeFalsy();
   });
 });
