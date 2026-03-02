@@ -24,6 +24,12 @@ function stripeSignature(payload: unknown, secret: string, timestamp?: number): 
   return `t=${ts},v1=${v1}`;
 }
 
+function stripeSignatureRaw(raw: string, secret: string, timestamp?: number): string {
+  const ts = Number.isFinite(timestamp) ? Number(timestamp) : Math.floor(Date.now() / 1000);
+  const v1 = crypto.createHmac("sha256", secret).update(`${ts}.${raw}`).digest("hex");
+  return `t=${ts},v1=${v1}`;
+}
+
 function randSuffix(): string {
   return `${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
 }
@@ -314,6 +320,36 @@ test.describe("attack simulation", () => {
     }
   });
 
+  test("serve route prioritizes token over alias when both are provided", async ({ request }) => {
+    const databaseUrl = String(process.env.DATABASE_URL || "").trim();
+    test.skip(!databaseUrl, "DATABASE_URL not available");
+    const sql = neon(databaseUrl);
+
+    const docId = await pickDocId(sql);
+    test.skip(!docId, "No doc available for fixture setup");
+    if (!docId) return;
+
+    const token = `tok_attack_token_precedence_${randSuffix()}`.slice(0, 64);
+    await sql`
+      insert into public.share_tokens (token, doc_id, max_views, views_count)
+      values (${token}, ${docId}::uuid, null, 0)
+    `;
+
+    try {
+      const r = await request.get(
+        `/serve/${docId}?token=${encodeURIComponent(token)}&alias=${encodeURIComponent("not-a-real-alias")}`,
+        { maxRedirects: 0 }
+      );
+      if (r.status() === 429) {
+        test.skip(true, "Rate limited in environment");
+      }
+      expect(r.status()).toBe(302);
+      expect(r.headers()["location"] || "").toContain("/t/");
+    } finally {
+      await sql`delete from public.share_tokens where token = ${token}`;
+    }
+  });
+
   test("share raw path does not expose direct object-store URL", async ({ request }) => {
     const databaseUrl = String(process.env.DATABASE_URL || "").trim();
     test.skip(!databaseUrl, "DATABASE_URL not available");
@@ -540,6 +576,21 @@ test.describe("attack simulation", () => {
     expect([400, 403, 429, 503]).toContain(r.status());
   });
 
+  test("stripe webhook rejects malformed signature headers", async ({ request }) => {
+    const payload = {
+      id: "evt_attack_sim_bad_header",
+      type: "invoice.payment_failed",
+      data: { object: { customer: "cus_fake", subscription: "sub_fake" } },
+    };
+    const r = await request.post("/api/stripe/webhook", {
+      data: payload,
+      headers: {
+        "stripe-signature": "v1=deadbeef", // missing required timestamp token
+      },
+    });
+    expect([400, 403, 429, 503]).toContain(r.status());
+  });
+
   test("stripe webhook rejects signatures with stale timestamps", async ({ request }) => {
     const webhookSecret = String(process.env.STRIPE_WEBHOOK_SECRET || "").trim();
     test.skip(!webhookSecret, "STRIPE_WEBHOOK_SECRET not available in test runtime");
@@ -554,6 +605,22 @@ test.describe("attack simulation", () => {
     const r = await request.post("/api/stripe/webhook", {
       data: payload,
       headers: { "stripe-signature": stripeSignature(payload, webhookSecret, staleTs) },
+    });
+    expect([400, 403, 429, 503]).toContain(r.status());
+  });
+
+  test("stripe webhook rejects signed malformed JSON payloads", async ({ request }) => {
+    const webhookSecret = String(process.env.STRIPE_WEBHOOK_SECRET || "").trim();
+    test.skip(!webhookSecret, "STRIPE_WEBHOOK_SECRET not available in test runtime");
+
+    const raw = "{ malformed json";
+    const r = await request.fetch("/api/stripe/webhook", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "stripe-signature": stripeSignatureRaw(raw, webhookSecret),
+      },
+      data: raw,
     });
     expect([400, 403, 429, 503]).toContain(r.status());
   });

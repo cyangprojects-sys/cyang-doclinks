@@ -151,6 +151,41 @@ test.describe("security freeze controls", () => {
     }
   });
 
+  test("global freeze blocks alias raw serving", async ({ request }) => {
+    const databaseUrl = String(process.env.DATABASE_URL || "").trim();
+    test.skip(!databaseUrl, "DATABASE_URL not available");
+    const sql = neon(databaseUrl);
+
+    const hasDocAliases = await tableExists(sql, "doc_aliases");
+    test.skip(!hasDocAliases, "doc_aliases table not available");
+
+    const docId = await pickDocId(sql);
+    test.skip(!docId, "No docs available for fixture setup");
+    if (!docId) return;
+
+    const alias = `freeze-global-a-${randSuffix()}`.toLowerCase();
+    const original = await readFreeze(sql);
+
+    await sql`
+      insert into public.doc_aliases (alias, doc_id, is_active)
+      values (${alias}, ${docId}::uuid, true)
+    `;
+
+    try {
+      await writeFreeze(sql, {
+        globalServeDisabled: true,
+        shareServeDisabled: false,
+        aliasServeDisabled: false,
+        ticketServeDisabled: false,
+      });
+      const resp = await request.get(`/d/${alias}/raw`);
+      expect(resp.status()).toBe(503);
+    } finally {
+      await writeFreeze(sql, original);
+      await sql`delete from public.doc_aliases where alias = ${alias}`;
+    }
+  });
+
   test("ticket freeze blocks ticket route before ticket lookup", async ({ request }) => {
     const databaseUrl = String(process.env.DATABASE_URL || "").trim();
     test.skip(!databaseUrl, "DATABASE_URL not available");
@@ -165,6 +200,26 @@ test.describe("security freeze controls", () => {
         ticketServeDisabled: true,
       });
       const resp = await request.get(`/t/does-not-exist-${randSuffix()}`);
+      expect(resp.status()).toBe(503);
+    } finally {
+      await writeFreeze(sql, original);
+    }
+  });
+
+  test("global freeze blocks ticket route before ticket lookup", async ({ request }) => {
+    const databaseUrl = String(process.env.DATABASE_URL || "").trim();
+    test.skip(!databaseUrl, "DATABASE_URL not available");
+    const sql = neon(databaseUrl);
+    const original = await readFreeze(sql);
+
+    try {
+      await writeFreeze(sql, {
+        globalServeDisabled: true,
+        shareServeDisabled: false,
+        aliasServeDisabled: false,
+        ticketServeDisabled: false,
+      });
+      const resp = await request.get(`/t/does-not-exist-global-${randSuffix()}`);
       expect(resp.status()).toBe(503);
     } finally {
       await writeFreeze(sql, original);

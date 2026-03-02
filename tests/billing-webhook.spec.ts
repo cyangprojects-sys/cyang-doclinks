@@ -27,6 +27,42 @@ async function canUseBillingTables(sql: Sql): Promise<boolean> {
 }
 
 test.describe("billing webhook integration", () => {
+  test("rejects stale signed webhook timestamps", async ({ request }) => {
+    const webhookSecret = String(process.env.STRIPE_WEBHOOK_SECRET || "").trim();
+    test.skip(!webhookSecret, "STRIPE_WEBHOOK_SECRET not available");
+
+    const payload = {
+      id: `evt_billing_stale_${randSuffix()}`,
+      type: "invoice.payment_failed",
+      data: { object: { customer: "cus_stale", subscription: "sub_stale" } },
+    };
+    const staleTs = Math.floor(Date.now() / 1000) - 60 * 60; // 1h old
+
+    const resp = await request.post("/api/stripe/webhook", {
+      data: payload,
+      headers: {
+        "stripe-signature": stripeSignature(payload, webhookSecret, staleTs),
+      },
+    });
+    expect([400, 403, 429, 503]).toContain(resp.status());
+  });
+
+  test("rejects malformed signed webhook events (missing id/type)", async ({ request }) => {
+    const webhookSecret = String(process.env.STRIPE_WEBHOOK_SECRET || "").trim();
+    test.skip(!webhookSecret, "STRIPE_WEBHOOK_SECRET not available");
+
+    const payload = {
+      data: { object: { customer: "cus_bad", subscription: "sub_bad" } },
+    };
+    const resp = await request.post("/api/stripe/webhook", {
+      data: payload,
+      headers: {
+        "stripe-signature": stripeSignature(payload, webhookSecret),
+      },
+    });
+    expect([400, 403, 429, 503]).toContain(resp.status());
+  });
+
   test("transitions payment_failed -> past_due and payment_succeeded -> active", async ({ request }) => {
     const webhookSecret = String(process.env.STRIPE_WEBHOOK_SECRET || "").trim();
     const databaseUrl = String(process.env.DATABASE_URL || "").trim();
