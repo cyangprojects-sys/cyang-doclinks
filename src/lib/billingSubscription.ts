@@ -447,13 +447,15 @@ export function classifyBillingEntitlement(sub: BillingSubscriptionSnapshot): Bi
   const graceUntil = sub.graceUntil ? Date.parse(sub.graceUntil) : Number.NaN;
   const periodEnd = sub.currentPeriodEnd ? Date.parse(sub.currentPeriodEnd) : Number.NaN;
 
-  if (status === "active" || status === "trialing") return "active";
+  if (status === "active" || status === "trialing") {
+    if (Number.isFinite(periodEnd) && periodEnd <= now) return "at_risk";
+    return "active";
+  }
   if ((status === "past_due" || status === "grace") && Number.isFinite(graceUntil) && graceUntil > now) {
     return "grace";
   }
   if (status === "incomplete" || status === "incomplete_expired" || status === "unpaid") return "at_risk";
   if (status === "canceled" || status === "grace_expired") return "downgraded";
-  if (status === "active" && Number.isFinite(periodEnd) && periodEnd <= now) return "at_risk";
 
   return "at_risk";
 }
