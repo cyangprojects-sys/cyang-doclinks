@@ -17,7 +17,7 @@ function encodeFormBody(body: Record<string, string>): string {
   return params.toString();
 }
 
-export async function stripeApi(path: string, opts?: StripeRequestOptions): Promise<any> {
+export async function stripeApi(path: string, opts?: StripeRequestOptions): Promise<Record<string, unknown>> {
   const key = mustGetStripeSecretKey();
   const method = opts?.method || "POST";
   const body = opts?.body || {};
@@ -33,15 +33,17 @@ export async function stripeApi(path: string, opts?: StripeRequestOptions): Prom
   });
 
   const text = await r.text();
-  let json: any = null;
+  let json: Record<string, unknown> = {};
   try {
-    json = text ? JSON.parse(text) : null;
+    const parsed = text ? (JSON.parse(text) as unknown) : null;
+    json = parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>) : {};
   } catch {
-    json = null;
+    json = {};
   }
 
   if (!r.ok) {
-    const msg = String(json?.error?.message || text || `Stripe API ${path} failed`);
+    const errorObj = (json.error && typeof json.error === "object" ? json.error : {}) as Record<string, unknown>;
+    const msg = String(errorObj.message || text || `Stripe API ${path} failed`);
     throw new Error(msg);
   }
 
@@ -68,4 +70,3 @@ export async function ensureStripeCustomer(args: {
   if (!customerId) throw new Error("Stripe customer creation returned no id");
   return customerId;
 }
-
