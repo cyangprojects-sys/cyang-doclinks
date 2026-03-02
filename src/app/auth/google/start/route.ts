@@ -5,11 +5,12 @@ export const dynamic = "force-dynamic";
 import { NextRequest } from "next/server";
 import { createGoogleAuthRequest } from "@/lib/oauth-google";
 import { enforceGlobalApiRateLimit } from "@/lib/securityTelemetry";
+import { shouldUseSecureCookies } from "@/lib/cookies";
 
 const ALIAS_RE = /^[a-z0-9][a-z0-9_-]{1,127}$/i;
 
 function setCookie(headers: Headers, name: string, value: string, maxAgeSeconds: number) {
-  const secure = process.env.APP_URL?.startsWith("https://") ? "; Secure" : "";
+  const secure = shouldUseSecureCookies() ? "; Secure" : "";
   headers.append(
     "Set-Cookie",
     `${name}=${encodeURIComponent(value)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAgeSeconds}${secure}`

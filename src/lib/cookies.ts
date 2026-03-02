@@ -31,6 +31,22 @@ export function deleteCookieHeader(name: string) {
   return cookieHeader(name, "", { maxAgeSeconds: 0 });
 }
 
+export function shouldUseSecureCookies(env: NodeJS.ProcessEnv = process.env): boolean {
+  const appUrl = String(env.APP_URL || "").toLowerCase();
+  const nextAuthUrl = String(env.NEXTAUTH_URL || "").toLowerCase();
+  const vercel = String(env.VERCEL || "").toLowerCase();
+  const vercelEnv = String(env.VERCEL_ENV || "").toLowerCase();
+  const nodeEnv = String(env.NODE_ENV || "").toLowerCase();
+  return (
+    appUrl.startsWith("https://") ||
+    nextAuthUrl.startsWith("https://") ||
+    vercel === "1" ||
+    vercel === "true" ||
+    vercelEnv.length > 0 ||
+    nodeEnv === "production"
+  );
+}
+
 export function getCookie(req: Request, name: string): string | null {
   const raw = req.headers.get("cookie") || "";
   const cookies = raw.split(";").map((v) => v.trim());

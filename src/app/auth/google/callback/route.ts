@@ -1,7 +1,7 @@
 export const runtime = "nodejs";
 
 import { sql } from "@/lib/db";
-import { cookieHeader, getCookie } from "@/lib/cookies";
+import { cookieHeader, getCookie, shouldUseSecureCookies } from "@/lib/cookies";
 import { signPayload } from "@/lib/crypto";
 import { exchangeGoogleCode } from "@/lib/oauth-google";
 import { NextRequest } from "next/server";
@@ -15,7 +15,7 @@ type AliasLookupRow = { doc_id: string; target_url: string; is_active: boolean }
 type GrantRow = { id: number };
 
 function clearCookie(headers: Headers, name: string) {
-  const secure = process.env.APP_URL?.startsWith("https://") ? "; Secure" : "";
+  const secure = shouldUseSecureCookies() ? "; Secure" : "";
   headers.append("Set-Cookie", `${name}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${secure}`);
 }
 
