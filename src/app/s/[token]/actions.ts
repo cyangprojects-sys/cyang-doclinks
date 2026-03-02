@@ -248,7 +248,7 @@ export async function verifySharePasswordAction(formData: FormData): Promise<voi
     const res = await verifySharePasswordCore(formData);
 
     if (res.ok) {
-        redirect(`/s/${encodeURIComponent(token)}/raw`);
+        redirect(`/s/${encodeURIComponent(token)}/view`);
     }
 
     redirect(`/s/${encodeURIComponent(token)}?error=${encodeURIComponent(res.message)}`);
