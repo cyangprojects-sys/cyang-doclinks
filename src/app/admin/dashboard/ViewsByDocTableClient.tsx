@@ -16,6 +16,7 @@ export type ViewsByDocRow = {
   doc_id: string;
   doc_title: string | null;
   alias: string | null;
+  scan_status: string | null;
   views: number;
   unique_ips: number;
   last_view: string | null;
@@ -26,6 +27,10 @@ function fmtDate(s: string | null) {
   const d = new Date(s);
   if (Number.isNaN(d.getTime())) return s;
   return d.toLocaleString();
+}
+
+function isShareReady(scanStatus: string | null): boolean {
+  return String(scanStatus || "").toLowerCase() === "clean";
 }
 
 export default function ViewsByDocTableClient(props: { rows: ViewsByDocRow[] }) {
@@ -190,7 +195,6 @@ export default function ViewsByDocTableClient(props: { rows: ViewsByDocRow[] }) 
                     </td>
                     <td className="px-4 py-3">
                       <div className="text-white">{r.doc_title || "Untitled"}</div>
-                      <div className="font-mono text-xs text-white/55">{r.doc_id}</div>
                       <div className="mt-1 text-xs">
                         <Link href={`/admin/docs/${encodeURIComponent(r.doc_id)}`} className="text-cyan-200 hover:underline">
                           Investigate
@@ -199,12 +203,18 @@ export default function ViewsByDocTableClient(props: { rows: ViewsByDocRow[] }) 
                     </td>
                     <td className="px-4 py-3">
                       {r.alias ? (
-                        <Link
-                          href={`/d/${r.alias}`}
-                          className="inline-flex rounded-md border border-cyan-500/35 bg-cyan-500/15 px-2 py-0.5 text-xs text-cyan-100 hover:bg-cyan-500/25"
-                        >
-                          Share
-                        </Link>
+                        isShareReady(r.scan_status) ? (
+                          <Link
+                            href={`/d/${r.alias}`}
+                            className="inline-flex rounded-md border border-cyan-500/35 bg-cyan-500/15 px-2 py-0.5 text-xs text-cyan-100 hover:bg-cyan-500/25"
+                          >
+                            Share
+                          </Link>
+                        ) : (
+                          <span className="inline-flex rounded-md border border-amber-500/35 bg-amber-500/15 px-2 py-0.5 text-xs text-amber-100">
+                            Pending scan
+                          </span>
+                        )
                       ) : (
                         <span className="text-white/55">-</span>
                       )}

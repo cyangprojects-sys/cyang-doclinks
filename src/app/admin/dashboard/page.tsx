@@ -145,6 +145,7 @@ const docFilter = sql`${orgFilter} ${ownerFilter}`;
           d.id::text as doc_id,
           d.title::text as doc_title,
           a.alias::text as alias,
+          coalesce(d.scan_status::text, 'unscanned') as scan_status,
           count(v.id)::int as views,
           count(distinct v.ip_hash)::int as unique_ips,
           max(v.created_at)::text as last_view

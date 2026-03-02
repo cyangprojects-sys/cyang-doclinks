@@ -215,7 +215,7 @@ export default function UnifiedDocsTableClient(props: {
     });
   }
 
-  function scanBadge(scanStatus: string | null) {
+function scanBadge(scanStatus: string | null) {
     const s = String(scanStatus || "unscanned").toLowerCase();
     const cls =
       s === "clean"
@@ -226,6 +226,10 @@ export default function UnifiedDocsTableClient(props: {
         ? "border-rose-500/25 bg-rose-500/10 text-rose-100"
         : "ui-badge";
     return <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] ${cls}`}>{s}</span>;
+  }
+
+  function isShareReady(scanStatus: string | null): boolean {
+    return String(scanStatus || "").toLowerCase() === "clean";
   }
 
   function toggleSort(k: SortKey) {
@@ -340,14 +344,19 @@ export default function UnifiedDocsTableClient(props: {
                           {r.doc_title || "Untitled"}
                         </Link>
                         <div className="flex flex-wrap items-center gap-2 text-xs text-white/60">
-                          <span className="font-mono">{r.doc_id}</span>
                           {r.alias ? (
-                            <Link
-                              href={`/d/${r.alias}`}
-                              className="inline-flex rounded-md border border-cyan-500/35 bg-cyan-500/15 px-2 py-0.5 text-[11px] text-cyan-100 hover:bg-cyan-500/25"
-                            >
-                              Share
-                            </Link>
+                            isShareReady(r.scan_status) ? (
+                              <Link
+                                href={`/d/${r.alias}`}
+                                className="inline-flex rounded-md border border-cyan-500/35 bg-cyan-500/15 px-2 py-0.5 text-[11px] text-cyan-100 hover:bg-cyan-500/25"
+                              >
+                                Share
+                              </Link>
+                            ) : (
+                              <span className="inline-flex rounded-md border border-amber-500/35 bg-amber-500/15 px-2 py-0.5 text-[11px] text-amber-100">
+                                Pending scan
+                              </span>
+                            )
                           ) : null}
                         </div>
                       </div>
