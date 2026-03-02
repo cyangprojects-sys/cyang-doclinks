@@ -6,6 +6,12 @@ import {
   ticketTtlSeconds,
 } from "../src/lib/accessTicket";
 
+function setEnv(name: string, value: string | undefined) {
+  const env = process.env as Record<string, string | undefined>;
+  if (typeof value === "undefined") delete env[name];
+  else env[name] = value;
+}
+
 test.describe("access ticket helpers", () => {
   const snap = {
     VIEW_SALT: process.env.VIEW_SALT,
@@ -20,7 +26,7 @@ test.describe("access ticket helpers", () => {
     process.env.VIEW_SALT = snap.VIEW_SALT;
     process.env.NEXTAUTH_SECRET = snap.NEXTAUTH_SECRET;
     process.env.DEV_ALLOW_INSECURE_FALLBACK = snap.DEV_ALLOW_INSECURE_FALLBACK;
-    process.env.NODE_ENV = snap.NODE_ENV;
+    setEnv("NODE_ENV", snap.NODE_ENV);
     process.env.ACCESS_TICKET_TTL_SECONDS = snap.ACCESS_TICKET_TTL_SECONDS;
     process.env.ACCESS_TICKET_SIGNED_URL_TTL_SECONDS = snap.ACCESS_TICKET_SIGNED_URL_TTL_SECONDS;
   });
@@ -47,14 +53,14 @@ test.describe("access ticket helpers", () => {
     delete process.env.VIEW_SALT;
     delete process.env.NEXTAUTH_SECRET;
     delete process.env.DEV_ALLOW_INSECURE_FALLBACK;
-    process.env.NODE_ENV = "development";
+    setEnv("NODE_ENV", "development");
     expect(() => hashIpForTicket("1.2.3.4")).toThrow("Missing VIEW_SALT or NEXTAUTH_SECRET");
   });
 
   test("uses dev fallback when explicitly enabled", () => {
     delete process.env.VIEW_SALT;
     delete process.env.NEXTAUTH_SECRET;
-    process.env.NODE_ENV = "development";
+    setEnv("NODE_ENV", "development");
     process.env.DEV_ALLOW_INSECURE_FALLBACK = "1";
     const out = hashUserAgent("Mozilla/5.0");
     expect(out).toHaveLength(32);
@@ -72,7 +78,7 @@ test.describe("access ticket helpers", () => {
   test("does not allow dev fallback in production", () => {
     delete process.env.VIEW_SALT;
     delete process.env.NEXTAUTH_SECRET;
-    process.env.NODE_ENV = "production";
+    setEnv("NODE_ENV", "production");
     process.env.DEV_ALLOW_INSECURE_FALLBACK = "1";
     expect(() => hashUserAgent("Mozilla/5.0")).toThrow("Missing VIEW_SALT or NEXTAUTH_SECRET");
   });

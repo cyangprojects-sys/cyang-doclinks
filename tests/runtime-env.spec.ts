@@ -21,6 +21,12 @@ const ENV_KEYS = [
 
 type Snapshot = Record<string, string | undefined>;
 
+function setEnv(name: string, value: string | undefined) {
+  const env = process.env as Record<string, string | undefined>;
+  if (typeof value === "undefined") delete env[name];
+  else env[name] = value;
+}
+
 function takeSnapshot(): Snapshot {
   const out: Snapshot = {};
   for (const k of ENV_KEYS) out[k] = process.env[k];
@@ -30,8 +36,7 @@ function takeSnapshot(): Snapshot {
 function restoreSnapshot(s: Snapshot) {
   for (const k of ENV_KEYS) {
     const v = s[k];
-    if (typeof v === "undefined") delete process.env[k];
-    else process.env[k] = v;
+    setEnv(k, v);
   }
 }
 
@@ -47,14 +52,14 @@ test.describe("runtime env validation", () => {
   });
 
   test("does nothing when strict validation is disabled", () => {
-    delete process.env.NODE_ENV;
+    setEnv("NODE_ENV", undefined);
     delete process.env.ENABLE_STRICT_ENV_VALIDATION;
     delete process.env.DATABASE_URL;
     expect(() => assertRuntimeEnv("serve")).not.toThrow();
   });
 
   test("throws RuntimeEnvError with missing keys when strict mode is enabled", () => {
-    process.env.NODE_ENV = "development";
+    setEnv("NODE_ENV", "development");
     process.env.ENABLE_STRICT_ENV_VALIDATION = "1";
     delete process.env.DATABASE_URL;
     delete process.env.VIEW_SALT;
@@ -79,7 +84,7 @@ test.describe("runtime env validation", () => {
   });
 
   test("passes when required vars for stripe_webhook are set", () => {
-    process.env.NODE_ENV = "development";
+    setEnv("NODE_ENV", "development");
     process.env.ENABLE_STRICT_ENV_VALIDATION = "true";
     process.env.DATABASE_URL = "postgres://test";
     process.env.STRIPE_WEBHOOK_SECRET = "whsec_test";
@@ -88,7 +93,7 @@ test.describe("runtime env validation", () => {
   });
 
   test("enforces upload_presign required envs", () => {
-    process.env.NODE_ENV = "development";
+    setEnv("NODE_ENV", "development");
     process.env.ENABLE_STRICT_ENV_VALIDATION = "true";
     process.env.DATABASE_URL = "postgres://test";
     process.env.DOC_MASTER_KEYS = "v1:base64key";
@@ -105,7 +110,7 @@ test.describe("runtime env validation", () => {
   });
 
   test("enforces upload_complete required envs including PDF_MAX_PAGES", () => {
-    process.env.NODE_ENV = "development";
+    setEnv("NODE_ENV", "development");
     process.env.ENABLE_STRICT_ENV_VALIDATION = "true";
     process.env.DATABASE_URL = "postgres://test";
     process.env.DOC_MASTER_KEYS = "v1:base64key";
@@ -123,7 +128,7 @@ test.describe("runtime env validation", () => {
   });
 
   test("enforces stripe_admin required envs", () => {
-    process.env.NODE_ENV = "development";
+    setEnv("NODE_ENV", "development");
     process.env.ENABLE_STRICT_ENV_VALIDATION = "true";
     process.env.DATABASE_URL = "postgres://test";
     delete process.env.STRIPE_SECRET_KEY;
