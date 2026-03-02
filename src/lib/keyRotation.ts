@@ -7,14 +7,26 @@ function parseIds(raw: string): string[] {
     .filter(Boolean);
 }
 
-export async function runAutomatedKeyRotation() {
+export function parseAutomatedKeyRotationConfig(env: NodeJS.ProcessEnv = process.env): {
+  enabled: boolean;
+  fromIds: string[];
+  limit: number;
+} {
   const enabled = ["1", "true", "yes", "on"].includes(
-    String(process.env.AUTO_KEY_ROTATION_ENABLED || "").trim().toLowerCase()
+    String(env.AUTO_KEY_ROTATION_ENABLED || "").trim().toLowerCase()
   );
-  if (!enabled) return { enabled: false, processed: 0, results: [] as Array<{ from: string; rotated: number; error?: string }> };
 
-  const fromIds = parseIds(String(process.env.AUTO_KEY_ROTATE_FROM || ""));
-  const limit = Math.max(1, Math.min(2000, Number(process.env.AUTO_KEY_ROTATE_BATCH || 250)));
+  const fromIds = parseIds(String(env.AUTO_KEY_ROTATE_FROM || ""));
+
+  const rawLimit = Number(env.AUTO_KEY_ROTATE_BATCH || 250);
+  const limit = Number.isFinite(rawLimit) ? Math.max(1, Math.min(2000, Math.floor(rawLimit))) : 250;
+
+  return { enabled, fromIds, limit };
+}
+
+export async function runAutomatedKeyRotation() {
+  const { enabled, fromIds, limit } = parseAutomatedKeyRotationConfig();
+  if (!enabled) return { enabled: false, processed: 0, results: [] as Array<{ from: string; rotated: number; error?: string }> };
   const results: Array<{ from: string; rotated: number; error?: string }> = [];
   let processed = 0;
 
