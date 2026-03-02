@@ -108,8 +108,9 @@ export async function POST(req: Request) {
     });
 
     return NextResponse.json({ ok: true, mode: "sync", rotated: res.rotated, failed: res.failed, scanned: res.scanned, remaining: res.remaining });
-  } catch (e: any) {
-    const status = e?.message === "FORBIDDEN" || e?.message === "UNAUTHENTICATED" ? 403 : 500;
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : "";
+    const status = message === "FORBIDDEN" || message === "UNAUTHENTICATED" ? 403 : 500;
     return NextResponse.json({ ok: false, error: status === 403 ? "FORBIDDEN" : "SERVER_ERROR" }, { status });
   }
 }
