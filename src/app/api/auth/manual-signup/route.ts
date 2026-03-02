@@ -7,6 +7,7 @@ import {
   SIGNUP_TERMS_VERSION,
   validatePasswordComplexity,
 } from "@/lib/signup";
+import { resolvePublicAppBaseUrl } from "@/lib/publicBaseUrl";
 
 export const runtime = "nodejs";
 
@@ -24,12 +25,6 @@ type Payload = {
 
 function isEmail(value: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
-}
-
-function appUrl(req: Request): string {
-  const configured = (process.env.APP_URL || process.env.NEXTAUTH_URL || "").trim();
-  if (configured) return configured.replace(/\/+$/, "");
-  return new URL(req.url).origin;
 }
 
 export async function POST(req: NextRequest) {
@@ -86,7 +81,7 @@ export async function POST(req: NextRequest) {
       country,
     });
 
-    const activationUrl = `${appUrl(req)}/signup/activate?token=${encodeURIComponent(token)}&email=${encodeURIComponent(email)}`;
+    const activationUrl = `${resolvePublicAppBaseUrl(req.url)}/signup/activate?token=${encodeURIComponent(token)}&email=${encodeURIComponent(email)}`;
     await sendAccountActivationEmail({ to: email, activationUrl });
     await recordTermsAcceptance(email, `manual_signup:${SIGNUP_TERMS_VERSION}`);
   } catch (e: unknown) {
