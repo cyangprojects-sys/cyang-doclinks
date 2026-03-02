@@ -86,6 +86,21 @@ async function pickDocId(sql: Sql): Promise<string | null> {
   }
 }
 
+async function tableExists(sql: Sql, tableName: string): Promise<boolean> {
+  try {
+    const rows = (await sql`
+      select 1
+      from information_schema.tables
+      where table_schema = 'public'
+        and table_name = ${tableName}
+      limit 1
+    `) as unknown as Array<{ "?column?": number }>;
+    return rows.length > 0;
+  } catch {
+    return false;
+  }
+}
+
 test.describe("attack simulation", () => {
   test("raw docId access is not a public capability", async ({ request }) => {
     const r = await request.get("/serve/00000000-0000-0000-0000-000000000000");
@@ -194,6 +209,22 @@ test.describe("attack simulation", () => {
     expect([403, 404, 429, 503]).toContain(r.status());
   });
 
+  test("serve route with real docId still requires privileged auth", async ({ request }) => {
+    const databaseUrl = String(process.env.DATABASE_URL || "").trim();
+    test.skip(!databaseUrl, "DATABASE_URL not available");
+    const sql = neon(databaseUrl);
+
+    const docId = await pickDocId(sql);
+    test.skip(!docId, "No doc available for fixture setup");
+    if (!docId) return;
+
+    const r = await request.get(`/serve/${docId}`);
+    if (r.status() === 429) {
+      test.skip(true, "Rate limited in environment");
+    }
+    expect(r.status()).toBe(403);
+  });
+
   test("serve route rejects mismatched docId even with a valid token", async ({ request }) => {
     const databaseUrl = String(process.env.DATABASE_URL || "").trim();
     test.skip(!databaseUrl, "DATABASE_URL not available");
@@ -218,6 +249,36 @@ test.describe("attack simulation", () => {
       expect(r.status()).toBe(404);
     } finally {
       await sql`delete from public.share_tokens where token = ${token}`;
+    }
+  });
+
+  test("serve route rejects mismatched docId even with a valid alias", async ({ request }) => {
+    const databaseUrl = String(process.env.DATABASE_URL || "").trim();
+    test.skip(!databaseUrl, "DATABASE_URL not available");
+    const sql = neon(databaseUrl);
+
+    const hasDocAliases = await tableExists(sql, "doc_aliases");
+    test.skip(!hasDocAliases, "doc_aliases table not available");
+
+    const docId = await pickDocId(sql);
+    test.skip(!docId, "No doc available for fixture setup");
+    if (!docId) return;
+
+    const alias = `a-serve-mismatch-${randSuffix()}`.toLowerCase();
+    await sql`
+      insert into public.doc_aliases (alias, doc_id, is_active, expires_at)
+      values (${alias}, ${docId}::uuid, true, null)
+    `;
+
+    try {
+      const wrongDocId = "00000000-0000-0000-0000-000000000000";
+      const r = await request.get(`/serve/${wrongDocId}?alias=${encodeURIComponent(alias)}`);
+      if (r.status() === 429) {
+        test.skip(true, "Rate limited in environment");
+      }
+      expect(r.status()).toBe(404);
+    } finally {
+      await sql`delete from public.doc_aliases where alias = ${alias}`;
     }
   });
 
