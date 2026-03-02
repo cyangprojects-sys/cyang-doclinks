@@ -1,10 +1,11 @@
 import { rotateDocKeys } from "@/lib/masterKeys";
 
 function parseIds(raw: string): string[] {
-  return raw
+  const ids = raw
     .split(",")
     .map((v) => v.trim())
     .filter(Boolean);
+  return Array.from(new Set(ids));
 }
 
 export function parseAutomatedKeyRotationConfig(env: NodeJS.ProcessEnv = process.env): {

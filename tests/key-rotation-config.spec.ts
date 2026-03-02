@@ -5,7 +5,7 @@ test.describe("automated key rotation config parsing", () => {
   test("parses enable flag and from-id list", () => {
     const out = parseAutomatedKeyRotationConfig({
       AUTO_KEY_ROTATION_ENABLED: "yes",
-      AUTO_KEY_ROTATE_FROM: " k1, k2 ,, k3 ",
+      AUTO_KEY_ROTATE_FROM: " k1, k2 ,, k3, k2, k1 ",
     } as NodeJS.ProcessEnv);
     expect(out.enabled).toBeTruthy();
     expect(out.fromIds).toEqual(["k1", "k2", "k3"]);
