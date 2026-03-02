@@ -61,6 +61,13 @@ test.describe("geo, cookie, and view helpers", () => {
     expect(header).not.toContain("Secure");
   });
 
+  test("rejects invalid cookie names and CRLF cookie values", () => {
+    expect(() => cookieHeader("", "v")).toThrow("INVALID_COOKIE_NAME");
+    expect(() => cookieHeader("bad name", "v")).toThrow("INVALID_COOKIE_NAME");
+    expect(() => cookieHeader("bad;name", "v")).toThrow("INVALID_COOKIE_NAME");
+    expect(() => cookieHeader("session", "abc\r\ndef")).toThrow("INVALID_COOKIE_VALUE");
+  });
+
   test("parses cookie values containing equals sign", () => {
     const req = new Request("http://localhost", {
       headers: { cookie: "a=1; token=abc=def=ghi; b=2" },

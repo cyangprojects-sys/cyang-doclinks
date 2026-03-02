@@ -9,7 +9,16 @@ export function cookieHeader(
     maxAgeSeconds?: number;
   }
 ) {
-  const parts = [`${name}=${value}`];
+  const n = String(name || "").trim();
+  const v = String(value || "");
+  if (!n || /[\r\n;]/.test(n) || /[\s,]/.test(n)) {
+    throw new Error("INVALID_COOKIE_NAME");
+  }
+  if (/[\r\n]/.test(v)) {
+    throw new Error("INVALID_COOKIE_VALUE");
+  }
+
+  const parts = [`${n}=${v}`];
   parts.push(`Path=${opts?.path ?? "/"}`);
   if (opts?.httpOnly ?? true) parts.push("HttpOnly");
   if (opts?.secure ?? true) parts.push("Secure");
