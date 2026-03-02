@@ -164,10 +164,16 @@ export function makeEmailProofToken(args: {
 export function verifyEmailProofToken(value: string | undefined | null) {
     if (!value) return { ok: false as const, reason: "missing" as const };
     const parts = value.split(".");
-    // v1.shareId.token.email.exp.sig => 6 parts
-    if (parts.length !== 6) return { ok: false as const, reason: "format" as const };
+    // Format: v1.shareId.token.email.exp.sig
+    // Email may contain dots, so parse from both ends instead of fixed part count.
+    if (parts.length < 6) return { ok: false as const, reason: "format" as const };
 
-    const [v, shareId, token, email, expStr, sig] = parts;
+    const v = parts[0] || "";
+    const shareId = parts[1] || "";
+    const token = parts[2] || "";
+    const sig = parts[parts.length - 1] || "";
+    const expStr = parts[parts.length - 2] || "";
+    const email = parts.slice(3, parts.length - 2).join(".");
     if (v !== "v1") return { ok: false as const, reason: "format" as const };
 
     const exp = Number(expStr);
