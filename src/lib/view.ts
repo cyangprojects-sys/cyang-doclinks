@@ -7,8 +7,22 @@ export function hashIp(ip: string | null | undefined) {
 }
 
 export function getClientIp(req: Request) {
-    // Vercel provides x-forwarded-for with client,proxy chain
+    const cf = (req.headers.get("cf-connecting-ip") || "").trim();
+    if (cf) return cf;
+
+    // Vercel/common proxy chain: client, proxy1, proxy2...
     const fwd = req.headers.get("x-forwarded-for");
-    if (fwd) return fwd.split(",")[0].trim();
-    return req.headers.get("x-real-ip") || null;
+    if (fwd) {
+        const first = fwd.split(",")[0]?.trim();
+        if (first) return first;
+    }
+
+    const vercel = req.headers.get("x-vercel-forwarded-for");
+    if (vercel) {
+        const first = vercel.split(",")[0]?.trim();
+        if (first) return first;
+    }
+
+    const real = (req.headers.get("x-real-ip") || "").trim();
+    return real || null;
 }

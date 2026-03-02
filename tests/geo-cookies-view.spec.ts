@@ -87,6 +87,16 @@ test.describe("geo, cookie, and view helpers", () => {
     });
     expect(getClientIp(req2)).toBe("9.8.7.6");
 
+    const req3 = new Request("http://localhost", {
+      headers: { "cf-connecting-ip": "7.7.7.7", "x-forwarded-for": "1.1.1.1, 2.2.2.2" },
+    });
+    expect(getClientIp(req3)).toBe("7.7.7.7");
+
+    const req4 = new Request("http://localhost", {
+      headers: { "x-vercel-forwarded-for": "8.8.8.8, 4.4.4.4" },
+    });
+    expect(getClientIp(req4)).toBe("8.8.8.8");
+
     const h1 = hashIp("1.2.3.4");
     const h2 = hashIp("1.2.3.4");
     expect(h1).toBe(h2);
