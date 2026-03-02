@@ -3,6 +3,10 @@ import { sql } from "@/lib/db";
 import { rateLimit } from "@/lib/rateLimit";
 import { appendImmutableAudit } from "@/lib/immutableAudit";
 
+function logTelemetryFailure(message: string) {
+  console.warn(message);
+}
+
 function securityTelemetryDbEnabled(): boolean {
   const explicit = String(process.env.SECURITY_TELEMETRY_DB_ENABLED || "").trim().toLowerCase();
   if (explicit === "0" || explicit === "false" || explicit === "off" || explicit === "no") return false;
@@ -257,7 +261,7 @@ export async function logSecurityEvent(
     });
   } catch (err) {
     // best-effort; do not crash request paths
-    console.error("Failed to log security event:", err);
+    logTelemetryFailure("Failed to log security event.");
   }
 }
 
@@ -325,7 +329,7 @@ export async function logDecryptEvent(docId: string, ip?: string) {
       )
     `
     } catch (err) {
-        console.error("Failed to log decrypt event:", err)
+        logTelemetryFailure("Failed to log decrypt event.");
     }
 }
 
