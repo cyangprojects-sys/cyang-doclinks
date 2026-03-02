@@ -14,7 +14,7 @@ type RouteCtx = {
 };
 
 export async function GET(req: NextRequest, ctx: RouteCtx) {
-  const params = await Promise.resolve(ctx?.params as any);
+  const params = await Promise.resolve(ctx.params);
   const slug = String(params?.slug || "").trim().toLowerCase();
   const provider = String(params?.provider || "").trim();
 
