@@ -29,14 +29,14 @@ export async function GET() {
       })(),
       timeoutMs
     );
-  } catch (e: any) {
+  } catch (e: unknown) {
     if (isRuntimeEnvError(e)) {
       return NextResponse.json({ ok: false, error: "ENV_MISCONFIGURED" }, { status: 503 });
     }
     if (isRouteTimeoutError(e)) {
       return NextResponse.json({ ok: false, error: "TIMEOUT" }, { status: 504 });
     }
-    const msg = String(e?.message || e || "failed");
+    const msg = e instanceof Error ? e.message : String(e || "failed");
     if (msg === "FORBIDDEN" || msg === "UNAUTHENTICATED") {
       return NextResponse.json({ ok: false, error: "FORBIDDEN" }, { status: 403 });
     }
