@@ -69,6 +69,12 @@ test.describe("share auth helpers", () => {
     if (!out.ok) expect(out.reason).toBe("sig");
   });
 
+  test("rejects malformed unlock cookie format", () => {
+    const out = verifyUnlockCookieValue("bad-format");
+    expect(out.ok).toBeFalsy();
+    if (!out.ok) expect(out.reason).toBe("format");
+  });
+
   test("round-trips device trust cookie value", () => {
     const value = makeDeviceTrustCookieValue("share_1", "device_hash_1");
     const out = verifyDeviceTrustCookieValue(value);
@@ -108,5 +114,23 @@ test.describe("share auth helpers", () => {
     const out = verifyEmailProofToken(tok);
     expect(out.ok).toBeFalsy();
     if (!out.ok) expect(out.reason).toBe("expired");
+  });
+
+  test("rejects malformed email proof token format", () => {
+    const out = verifyEmailProofToken("bad.token");
+    expect(out.ok).toBeFalsy();
+    if (!out.ok) expect(out.reason).toBe("format");
+  });
+
+  test("rejects tampered email proof token signature", () => {
+    const tok = makeEmailProofToken({
+      shareId: "share_sig",
+      token: "tok_sig",
+      email: "u@example.com",
+      ttlSec: 600,
+    });
+    const out = verifyEmailProofToken(`${tok}x`);
+    expect(out.ok).toBeFalsy();
+    if (!out.ok) expect(out.reason).toBe("sig");
   });
 });
