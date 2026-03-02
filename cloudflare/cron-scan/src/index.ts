@@ -9,11 +9,13 @@ export interface Env {
   CRON_SECRET: string; // stored as a Cloudflare secret
 }
 
-export default {
+const worker = {
   async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
     ctx.waitUntil(runScheduled(event, env));
   },
 };
+
+export default worker;
 
 async function runScheduled(event: ScheduledEvent, env: Env) {
   const cron = String(event.cron || "").trim();
