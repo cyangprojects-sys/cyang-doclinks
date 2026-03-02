@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { resolveShareMeta } from "@/lib/resolveDoc";
 import { sql } from "@/lib/db";
 import { isMicrosoftOfficeDocument } from "@/lib/fileFamily";
+import { enforceGlobalApiRateLimit } from "@/lib/securityTelemetry";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,6 +18,19 @@ function isMaxed(viewCount: number, maxViews: number | null) {
 }
 
 export async function GET(req: NextRequest, ctx: { params: Promise<{ token: string }> }) {
+  const rl = await enforceGlobalApiRateLimit({
+    req,
+    scope: "ip:share_download",
+    limit: Number(process.env.RATE_LIMIT_SHARE_DOWNLOAD_IP_PER_MIN || 120),
+    windowSeconds: 60,
+  });
+  if (!rl.ok) {
+    return new NextResponse("Too Many Requests", {
+      status: rl.status,
+      headers: { "Retry-After": String(rl.retryAfterSeconds) },
+    });
+  }
+
   const { token } = await ctx.params;
   const t = (token || "").trim();
   if (!t) return new NextResponse("Not found", { status: 404 });
