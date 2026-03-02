@@ -1,7 +1,7 @@
 // src/app/admin/DeleteDocForm.tsx
 "use client";
 
-import { useTransition } from "react";
+import { useState } from "react";
 
 export default function DeleteDocForm({
   docId,
@@ -12,16 +12,21 @@ export default function DeleteDocForm({
   title: string;
   action: (formData: FormData) => Promise<void>;
 }) {
-  const [pending, startTransition] = useTransition();
+  const [pending, setPending] = useState(false);
 
   return (
     <form
-      action={(fd) => {
+      action={async (fd) => {
         const ok = window.confirm(
           `Delete this document?\n\n${title}\n\nThis removes the file from R2 and deletes database records.`
         );
         if (!ok) return;
-        startTransition(() => action(fd));
+        setPending(true);
+        try {
+          await action(fd);
+        } finally {
+          setPending(false);
+        }
       }}
       className="inline-flex"
     >

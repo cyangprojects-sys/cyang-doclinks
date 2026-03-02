@@ -242,11 +242,11 @@ export default function ViewerUploadsTableClient({ rows }: { rows: ViewerUploadR
             Disable selected
           </button>
           <form
-            action={(fd) => {
+            action={async (fd) => {
               if (!selectedIds.length) return;
               if (!window.confirm(`Revoke all shares for ${selectedIds.length} selected docs?`)) return;
               fd.set("docIds", JSON.stringify(selectedIds));
-              startTransition(() => bulkRevokeAllSharesForDocsAction(fd));
+              await bulkRevokeAllSharesForDocsAction(fd);
             }}
           >
             <input type="hidden" name="docIds" value="[]" />
@@ -255,13 +255,13 @@ export default function ViewerUploadsTableClient({ rows }: { rows: ViewerUploadR
             </button>
           </form>
           <form
-            action={(fd) => {
+            action={async (fd) => {
               if (!selectedIds.length) return;
               const confirm = window.prompt(`Type DELETE ${selectedIds.length} to confirm bulk deletion.`);
               if (confirm !== `DELETE ${selectedIds.length}`) return;
               fd.set("docIds", JSON.stringify(selectedIds));
               fd.set("reason", reason || "");
-              startTransition(() => bulkDeleteDocsAction(fd));
+              await bulkDeleteDocsAction(fd);
             }}
           >
             <input type="hidden" name="docIds" value="[]" />
@@ -328,20 +328,20 @@ export default function ViewerUploadsTableClient({ rows }: { rows: ViewerUploadR
                     <button aria-label={`Quarantine upload ${r.title || r.doc_id}`} type="button" onClick={() => runAbuseAction("quarantine_doc", [r.doc_id])} className="rounded-md border border-amber-700/50 bg-amber-700/20 px-2 py-1 text-xs text-amber-100">Quarantine</button>
                     <button aria-label={`Disable upload ${r.title || r.doc_id}`} type="button" onClick={() => runAbuseAction("disable_doc", [r.doc_id])} className="rounded-md border border-amber-700/50 bg-amber-700/10 px-2 py-1 text-xs text-amber-100">Disable</button>
                     <form
-                      action={(fd) => {
+                      action={async (fd) => {
                         if (!window.confirm("Revoke all shares for this document?")) return;
-                        startTransition(() => revokeAllSharesForDocAction(fd));
+                        await revokeAllSharesForDocAction(fd);
                       }}
                     >
                       <input type="hidden" name="docId" value={r.doc_id} />
                       <button aria-label={`Revoke all shares for upload ${r.title || r.doc_id}`} type="submit" className="rounded-md border border-neutral-700 bg-white/5 px-2 py-1 text-xs">Revoke shares</button>
                     </form>
                     <form
-                      action={(fd) => {
+                      action={async (fd) => {
                         const confirm = window.prompt(`Type DELETE to remove "${r.title || r.doc_id}".`);
                         if (confirm !== "DELETE") return;
                         fd.set("reason", reason || "");
-                        startTransition(() => deleteDocAction(fd));
+                        await deleteDocAction(fd);
                       }}
                     >
                       <input type="hidden" name="docId" value={r.doc_id} />
