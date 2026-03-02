@@ -192,13 +192,13 @@ type SecurityEventInput = {
   docId?: string | null;
   scope?: string | null;
   message?: string | null;
-  meta?: Record<string, any> | null;
+  meta?: Record<string, unknown> | null;
 };
 
 // Back-compat overload: old signature (type, details, ip?)
 export async function logSecurityEvent(
   typeOrEvent: string | SecurityEventInput,
-  details?: Record<string, any>,
+  details?: Record<string, unknown>,
   ip?: string
 ) {
   if (!securityTelemetryDbEnabled()) return;
@@ -232,9 +232,9 @@ export async function logSecurityEvent(
         ${ev.type},
         ${ev.severity},
         ${ev.ip ? hashIp(ev.ip) : null},
-        ${ev.actorUserId ? (ev.actorUserId as any) : null}::uuid,
-        ${ev.orgId ? (ev.orgId as any) : null}::uuid,
-        ${ev.docId ? (ev.docId as any) : null}::uuid,
+        ${ev.actorUserId ? (ev.actorUserId as unknown) : null}::uuid,
+        ${ev.orgId ? (ev.orgId as unknown) : null}::uuid,
+        ${ev.docId ? (ev.docId as unknown) : null}::uuid,
         ${ev.scope ?? null},
         ${ev.message ?? null},
         ${ev.meta ? JSON.stringify(ev.meta) : null}::jsonb

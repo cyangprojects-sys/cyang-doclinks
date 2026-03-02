@@ -102,7 +102,7 @@ function enterpriseOidcProvider() {
     authorization: { params: { scope: "openid email profile" } },
     idToken: true,
     checks: ["pkce", "state"],
-    profile(profile: any) {
+    profile(profile: Record<string, unknown>) {
       return {
         id: profile.sub ?? profile.id ?? profile.user_id ?? profile.oid ?? profile.uid,
         name:
@@ -117,6 +117,8 @@ function enterpriseOidcProvider() {
     },
   } as const;
 }
+
+type NextAuthProvider = NonNullable<NextAuthOptions["providers"]>[number];
 
 export const authOptions: NextAuthOptions = {
   // Make cookie security explicit (prod-safe defaults).
@@ -183,7 +185,7 @@ export const authOptions: NextAuthOptions = {
         ]
       : []),
 
-    ...(isEnterpriseSsoConfigured ? [enterpriseOidcProvider() as any] : []),
+    ...(isEnterpriseSsoConfigured ? [enterpriseOidcProvider() as unknown as NextAuthProvider] : []),
   ],
 
   pages: {
@@ -194,7 +196,7 @@ export const authOptions: NextAuthOptions = {
 
   callbacks: {
     async signIn({ user, account }) {
-      const email = String((user as any)?.email || "").trim().toLowerCase();
+      const email = String((user as { email?: string | null } | undefined)?.email || "").trim().toLowerCase();
       const provider = String(account?.provider || "");
       if (!email) return false;
 
@@ -234,14 +236,16 @@ export const authOptions: NextAuthOptions = {
 
     async jwt({ token, user }) {
       // On first sign-in, `user` is present. Afterwards rely on token.email.
-      const email = (user as any)?.email ?? (token as any)?.email ?? null;
-      (token as any).role = computeRole(email);
+      const tokenLike = token as { email?: string | null; role?: "owner" | "viewer" };
+      const email = (user as { email?: string | null } | undefined)?.email ?? tokenLike.email ?? null;
+      tokenLike.role = computeRole(email);
       return token;
     },
 
     async session({ session, token }) {
       // Expose role to server components (layouts) and client UI if needed.
-      (session.user as any).role = (token as any).role ?? "viewer";
+      const tokenLike = token as { role?: "owner" | "viewer" };
+      (session.user as { role?: "owner" | "viewer" }).role = tokenLike.role ?? "viewer";
       return session;
     },
 

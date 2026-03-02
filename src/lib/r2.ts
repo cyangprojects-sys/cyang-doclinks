@@ -37,19 +37,16 @@ let cachedClient: S3Client | null = null;
 
 function getR2Client(): S3Client {
   if (cachedClient) return cachedClient;
-  cachedClient = new S3Client({
+  const cfg: ConstructorParameters<typeof S3Client>[0] = {
     region: "auto",
     endpoint: requireEnv("R2_ENDPOINT"),
     credentials: {
       accessKeyId: requireEnv("R2_ACCESS_KEY_ID"),
       secretAccessKey: requireEnv("R2_SECRET_ACCESS_KEY"),
     },
+  };
 
-    // Prevent AWS SDK from injecting checksum requirements into presigned PUT URLs.
-    // (If unsupported by this SDK version at runtime, it will be ignored.)
-    requestChecksumCalculation: "NEVER",
-    responseChecksumValidation: "NEVER",
-  } as any);
+  cachedClient = new S3Client(cfg);
   return cachedClient;
 }
 

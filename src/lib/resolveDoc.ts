@@ -66,7 +66,7 @@ export type ShareMeta =
         docModerationStatus?: string;
         scanStatus?: string;
         riskLevel?: string;
-        riskFlags?: any;
+        riskFlags?: unknown;
         isActive?: boolean;
     }
     | { ok: false };
@@ -392,7 +392,7 @@ export async function resolveShareMeta(tokenInput: string): Promise<ShareMeta> {
             doc_moderation_status: string;
             scan_status: string;
             risk_level: string;
-            risk_flags: any;
+            risk_flags: unknown;
             is_active: boolean;
         }>;
 
@@ -463,7 +463,7 @@ export async function resolveShareMeta(tokenInput: string): Promise<ShareMeta> {
                 doc_moderation_status: string;
                 scan_status: string;
                 risk_level: string;
-                risk_flags: any;
+                risk_flags: unknown;
             }>;
 
             const r = rows?.[0];

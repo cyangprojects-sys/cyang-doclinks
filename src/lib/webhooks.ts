@@ -34,7 +34,7 @@ type DeliveryRow = {
   url: string;
   secret: string | null;
   event: string;
-  payload: any;
+  payload: unknown;
   attempt_count: number;
 };
 
@@ -72,7 +72,7 @@ async function listEnabledWebhooks(): Promise<WebhookRow[]> {
   return hooks || [];
 }
 
-function buildBody(event: string, payload: any): string {
+function buildBody(event: string, payload: unknown): string {
   return JSON.stringify({
     event,
     sent_at: new Date().toISOString(),
@@ -100,12 +100,12 @@ async function deliverOnce(args: {
 
     if (res.ok) return { ok: true, status: res.status, error: null };
     return { ok: false, status: res.status, error: `HTTP ${res.status}` };
-  } catch (e: any) {
-    return { ok: false, status: null, error: String(e?.message || e || "unknown error") };
+  } catch (e: unknown) {
+    return { ok: false, status: null, error: e instanceof Error ? e.message : String(e || "unknown error") };
   }
 }
 
-async function enqueueDeliveries(event: WebhookEvent, payload: any): Promise<boolean> {
+async function enqueueDeliveries(event: WebhookEvent, payload: unknown): Promise<boolean> {
   // Returns true if queued, false if queue unavailable.
   const hooks = await listEnabledWebhooks();
   if (!hooks.length) return true;
@@ -132,7 +132,7 @@ async function enqueueDeliveries(event: WebhookEvent, payload: any): Promise<boo
   }
 }
 
-async function deliverSyncBestEffort(event: WebhookEvent, payload: any) {
+async function deliverSyncBestEffort(event: WebhookEvent, payload: unknown) {
   // Best-effort, never throws.
   try {
     const hooks = await listEnabledWebhooks();
@@ -165,7 +165,7 @@ async function deliverSyncBestEffort(event: WebhookEvent, payload: any) {
  * - Enqueues into webhook_deliveries when available.
  * - Falls back to sync best-effort if queue isn't available.
  */
-export async function emitWebhook(event: WebhookEvent, payload: any) {
+export async function emitWebhook(event: WebhookEvent, payload: unknown) {
   try {
     const queued = await enqueueDeliveries(event, payload);
     if (!queued) {
@@ -290,7 +290,7 @@ export async function processWebhookDeliveries(opts?: {
     }
 
     return { ok: true, processed, succeeded, dead, failed };
-  } catch (e: any) {
-    return { ok: false, error: String(e?.message || e || "unknown error") };
+  } catch (e: unknown) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e || "unknown error") };
   }
 }

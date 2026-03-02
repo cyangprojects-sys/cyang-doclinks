@@ -283,8 +283,8 @@ export async function ensureUserByEmail(emailRaw: string, ctx: EnsureUserCtx): P
       }
 
       return { id: u.id, email: u.email, role: u.role, orgId: u.org_id ?? orgId, orgSlug };
-    } catch (e: any) {
-      const msg = String(e?.message || "").toLowerCase();
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message.toLowerCase() : "";
       const missingOrgIdCol = msg.includes("column") && msg.includes("org_id") && msg.includes("does not exist");
       if (!missingOrgIdCol) throw e;
 
@@ -306,8 +306,8 @@ export async function ensureUserByEmail(emailRaw: string, ctx: EnsureUserCtx): P
       if (!u?.id) throw new Error("Failed to upsert user.");
       return { id: u.id, email: u.email, role: u.role, orgId: null, orgSlug: null };
     }
-  } catch (e: any) {
-    const msg = String(e?.message || "").toLowerCase();
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message.toLowerCase() : "";
 
     if (msg.includes("org_mismatch")) {
       throw new Error("This email is already bound to a different organization.");
@@ -349,12 +349,14 @@ export async function ensureUserByEmail(emailRaw: string, ctx: EnsureUserCtx): P
  * The NextAuth route binds org context into the JWT (orgId/orgSlug).
  */
 export async function getAuthedUser(): Promise<AuthedUser | null> {
-  const session = (await getServerSession(authOptions)) as any;
+  type SessionUserLike = { email?: string | null; orgId?: string | null; orgSlug?: string | null };
+  type SessionLike = { user?: SessionUserLike | null };
+  const session = (await getServerSession(authOptions)) as SessionLike | null;
   const email = normEmail(session?.user?.email || "");
   if (!email) return null;
 
-  const orgId = (session?.user as any)?.orgId ?? null;
-  const orgSlug = (session?.user as any)?.orgSlug ?? null;
+  const orgId = session?.user?.orgId ?? null;
+  const orgSlug = session?.user?.orgSlug ?? null;
 
   try {
     return await ensureUserByEmail(email, { orgId, orgSlug });
@@ -463,8 +465,8 @@ export async function requireDocWrite(docIdRaw: string): Promise<void> {
     if (!ownsById && !ownsByEmail) throw new Error("FORBIDDEN");
     if (docOrgId && u.orgId && docOrgId !== u.orgId) throw new Error("FORBIDDEN");
     return;
-  } catch (e: any) {
-    const msg = String(e?.message || "").toLowerCase();
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message.toLowerCase() : "";
     const missingOwnerIdCol =
       msg.includes("column") && msg.includes("owner_id") && msg.includes("does not exist");
     if (missingOwnerIdCol) {

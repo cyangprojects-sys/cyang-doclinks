@@ -146,8 +146,7 @@ async function deleteOlderThan(args: {
       // Try the next column candidate.
       const msg = e instanceof Error ? e.message : String(e);
       // If table doesn't exist, surface it immediately.
-      const anyErr = e as any;
-      if (anyErr?.code === "42P01") {
+      if (isPgErrCode(e, "42P01")) {
         return { table, ok: false, error: "Table not found (SQLSTATE 42P01)." };
       }
       // Continue to next column candidate.
@@ -187,8 +186,7 @@ async function deleteExpiredShareTokens(args: { graceDays: number }): Promise<Re
     `) as unknown as Array<{ deleted: number }>;
     return { table: "public.share_tokens", ok: true, deleted: res?.[0]?.deleted ?? 0 };
   } catch (e) {
-    const anyErr = e as any;
-    if (anyErr?.code === "42P01") {
+    if (isPgErrCode(e, "42P01")) {
       return { table: "public.share_tokens", ok: false, error: "Table not found (SQLSTATE 42P01)." };
     }
     const msg = e instanceof Error ? e.message : String(e);
@@ -212,16 +210,20 @@ async function auditR2OrphanedObjects(args: {
     let truncated = false;
 
     while (listed.length < maxObjects) {
-      const listRes: any = await r2Client.send(
+      const listRes = (await r2Client.send(
         new ListObjectsV2Command({
           Bucket: bucket,
           Prefix: prefix,
           ContinuationToken: continuationToken,
           MaxKeys: Math.min(1000, maxObjects - listed.length),
         })
-      );
+      )) as {
+        Contents?: Array<{ Key?: string }>;
+        IsTruncated?: boolean;
+        NextContinuationToken?: string;
+      };
       const keys = (listRes.Contents || [])
-        .map((o: any) => String(o.Key || "").trim())
+        .map((o) => String(o.Key || "").trim())
         .filter(Boolean);
       listed.push(...keys);
       if (!listRes.IsTruncated || !listRes.NextContinuationToken) {
@@ -257,7 +259,7 @@ async function auditR2OrphanedObjects(args: {
       const chunkSize = 1000;
       for (let i = 0; i < orphans.length; i += chunkSize) {
         const chunk = orphans.slice(i, i + chunkSize);
-        const del: any = await r2Client.send(
+        const del = (await r2Client.send(
           new DeleteObjectsCommand({
             Bucket: bucket,
             Delete: {
@@ -265,7 +267,7 @@ async function auditR2OrphanedObjects(args: {
               Quiet: true,
             },
           })
-        );
+        )) as { Deleted?: Array<unknown> };
         removed += (del.Deleted || []).length;
       }
     }
@@ -285,6 +287,15 @@ async function auditR2OrphanedObjects(args: {
     const msg = e instanceof Error ? e.message : String(e);
     return { table: "r2.orphaned_objects", ok: false, error: msg };
   }
+}
+
+function isPgErrCode(err: unknown, code: string): boolean {
+  return (
+    !!err &&
+    typeof err === "object" &&
+    "code" in err &&
+    String((err as { code?: unknown }).code || "") === code
+  );
 }
 
 export async function runR2OrphanSweep(args?: {

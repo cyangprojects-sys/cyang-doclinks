@@ -278,7 +278,11 @@ export async function syncUserPlanFromSubscription(userId: string | null): Promi
   return nextPlan;
 }
 
-export async function beginWebhookEvent(eventId: string, eventType: string, payload: any): Promise<"new" | "duplicate"> {
+export async function beginWebhookEvent(
+  eventId: string,
+  eventType: string,
+  payload: Record<string, unknown>
+): Promise<"new" | "duplicate"> {
   if (!(await billingTableExists())) return "new";
   const idempotencyKey = `stripe:${eventId}`;
   const eventCreatedUnix = Number.isFinite(Number(payload?.created))
@@ -300,7 +304,7 @@ export async function beginWebhookEvent(eventId: string, eventType: string, payl
         ${idempotencyKey},
         ${eventType},
         ${eventCreatedUnix}::bigint,
-        ${payload as any}::jsonb,
+        ${payload}::jsonb,
         'processing',
         now()
       )
@@ -326,7 +330,7 @@ export async function beginWebhookEvent(eventId: string, eventType: string, payl
           ${idempotencyKey},
           ${eventType},
           ${eventCreatedUnix}::bigint,
-          ${payload as any}::jsonb,
+          ${payload}::jsonb,
           'processing',
           now()
         )
@@ -348,7 +352,7 @@ export async function beginWebhookEvent(eventId: string, eventType: string, payl
     try {
       const rows = (await sql`
         insert into public.billing_webhook_events (event_id, event_type, payload, status, received_at)
-        values (${eventId}, ${eventType}, ${payload as any}::jsonb, 'processing', now())
+        values (${eventId}, ${eventType}, ${payload}::jsonb, 'processing', now())
         on conflict (event_id) do nothing
         returning event_id
       `) as unknown as Array<{ event_id: string }>;

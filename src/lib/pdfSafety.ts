@@ -87,13 +87,19 @@ async function readRange(args: { bucket: string; key: string; range: string }): 
     })
   );
 
-  const body: any = (res as any).Body;
+  const body = (res as { Body?: unknown }).Body;
   if (!body) return Buffer.alloc(0);
 
   // In Node.js, Body is a stream.
   const chunks: Buffer[] = [];
-  for await (const chunk of body as any) {
-    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  for await (const chunk of body as AsyncIterable<unknown>) {
+    if (Buffer.isBuffer(chunk)) {
+      chunks.push(chunk);
+    } else if (chunk instanceof Uint8Array) {
+      chunks.push(Buffer.from(chunk));
+    } else if (typeof chunk === "string") {
+      chunks.push(Buffer.from(chunk));
+    }
   }
   return Buffer.concat(chunks);
 }
@@ -185,7 +191,7 @@ export async function validatePdfInR2(args: {
 
   try {
     const head = await r2Client.send(new HeadObjectCommand({ Bucket: args.bucket, Key: args.key }));
-    const size = Number((head as any)?.ContentLength ?? 0);
+    const size = Number((head as { ContentLength?: unknown }).ContentLength ?? 0);
 
     if (!Number.isFinite(size) || size <= 0) {
       return { ok: false, error: "UNREADABLE", message: "Object size is invalid." };

@@ -46,6 +46,11 @@ function asInt(v: unknown, fallback: number) {
   return Math.floor(n);
 }
 
+function asSettingsObject(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== "object") return null;
+  return value as Record<string, unknown>;
+}
+
 export async function getRetentionSettings(): Promise<
   | { ok: true; settings: RetentionSettings }
   | { ok: false; error: string }
@@ -56,10 +61,10 @@ export async function getRetentionSettings(): Promise<
       from public.app_settings
       where key = 'retention'
       limit 1
-    `) as unknown as Array<{ value: any }>;
+    `) as unknown as Array<{ value: unknown }>;
 
-    const value = rows?.[0]?.value ?? null;
-    if (!value || typeof value !== "object") {
+    const value = asSettingsObject(rows?.[0]?.value ?? null);
+    if (!value) {
       return { ok: true, settings: { ...DEFAULT_RETENTION } };
     }
 
@@ -98,7 +103,7 @@ export async function setRetentionSettings(next: Partial<RetentionSettings>): Pr
   try {
     await sql`
       insert into public.app_settings (key, value)
-      values ('retention', ${merged as any}::jsonb)
+      values ('retention', ${merged}::jsonb)
       on conflict (key) do update set value = excluded.value
     `;
     return { ok: true, settings: merged };
@@ -118,10 +123,10 @@ export async function getExpirationAlertSettings(): Promise<
       from public.app_settings
       where key = 'expiration_alerts'
       limit 1
-    `) as unknown as Array<{ value: any }>;
+    `) as unknown as Array<{ value: unknown }>;
 
-    const value = rows?.[0]?.value ?? null;
-    if (!value || typeof value !== "object") {
+    const value = asSettingsObject(rows?.[0]?.value ?? null);
+    if (!value) {
       return { ok: true, settings: { ...DEFAULT_EXPIRATION_ALERTS } };
     }
 
@@ -160,7 +165,7 @@ export async function setExpirationAlertSettings(next: Partial<ExpirationAlertSe
   try {
     await sql`
       insert into public.app_settings (key, value)
-      values ('expiration_alerts', ${merged as any}::jsonb)
+      values ('expiration_alerts', ${merged}::jsonb)
       on conflict (key) do update set value = excluded.value
     `;
     return { ok: true, settings: merged };
@@ -215,10 +220,10 @@ export async function getBillingFlags(): Promise<
       from public.app_settings
       where key = 'billing_flags'
       limit 1
-    `) as unknown as Array<{ value: any }>;
+    `) as unknown as Array<{ value: unknown }>;
 
-    const value = rows?.[0]?.value ?? null;
-    if (!value || typeof value !== "object") {
+    const value = asSettingsObject(rows?.[0]?.value ?? null);
+    if (!value) {
       return { ok: true, flags: { ...envDefaults } };
     }
 
@@ -252,7 +257,7 @@ export async function setBillingFlags(next: Partial<BillingFlags>): Promise<
   try {
     await sql`
       insert into public.app_settings (key, value)
-      values ('billing_flags', ${merged as any}::jsonb)
+      values ('billing_flags', ${merged}::jsonb)
       on conflict (key) do update set value = excluded.value
     `;
     return { ok: true, flags: merged };
@@ -288,10 +293,10 @@ export async function getSecurityFreezeSettings(): Promise<
       from public.app_settings
       where key = 'security_freeze'
       limit 1
-    `) as unknown as Array<{ value: any }>;
+    `) as unknown as Array<{ value: unknown }>;
 
-    const value = rows?.[0]?.value ?? null;
-    if (!value || typeof value !== "object") {
+    const value = asSettingsObject(rows?.[0]?.value ?? null);
+    if (!value) {
       return { ok: true, settings: { ...DEFAULT_SECURITY_FREEZE } };
     }
 
@@ -331,7 +336,7 @@ export async function setSecurityFreezeSettings(next: Partial<SecurityFreezeSett
   try {
     await sql`
       insert into public.app_settings (key, value)
-      values ('security_freeze', ${merged as any}::jsonb)
+      values ('security_freeze', ${merged}::jsonb)
       on conflict (key) do update set value = excluded.value
     `;
     return { ok: true, settings: merged };
