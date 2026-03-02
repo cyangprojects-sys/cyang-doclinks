@@ -4,7 +4,7 @@
 import { revalidatePath } from "next/cache";
 import { sql } from "@/lib/db";
 import { requireUser } from "@/lib/authz";
-import { processWebhookDeliveries } from "@/lib/webhooks";
+import { normalizeWebhookUrl, processWebhookDeliveries } from "@/lib/webhooks";
 
 function parseEvents(formData: FormData): string[] {
   const raw = formData.getAll("events").map((v) => String(v || "").trim()).filter(Boolean);
@@ -17,14 +17,13 @@ export async function createWebhookAction(formData: FormData): Promise<void> {
   if (!(u.role === "owner" || u.role === "admin")) throw new Error("Forbidden");
 
   const name = String(formData.get("name") || "").trim();
-  const url = String(formData.get("url") || "").trim();
+  const url = normalizeWebhookUrl(String(formData.get("url") || "").trim());
   const secret = String(formData.get("secret") || "").trim() || null;
   const enabledRaw = String(formData.get("enabled") || "");
   const enabled = enabledRaw === "on" || enabledRaw === "true" || enabledRaw === "1";
   const events = parseEvents(formData);
 
   if (!name) throw new Error("Missing name.");
-  if (!url || !/^https?:\/\//i.test(url)) throw new Error("URL must start with http:// or https://");
 
   await sql`
     insert into public.webhooks (owner_id, name, url, secret, events, enabled)
@@ -40,7 +39,7 @@ export async function updateWebhookAction(formData: FormData): Promise<void> {
 
   const id = String(formData.get("id") || "").trim();
   const name = String(formData.get("name") || "").trim();
-  const url = String(formData.get("url") || "").trim();
+  const url = normalizeWebhookUrl(String(formData.get("url") || "").trim());
   const secret = String(formData.get("secret") || "").trim() || null;
   const enabledRaw = String(formData.get("enabled") || "");
   const enabled = enabledRaw === "on" || enabledRaw === "true" || enabledRaw === "1";
@@ -48,7 +47,6 @@ export async function updateWebhookAction(formData: FormData): Promise<void> {
 
   if (!id) throw new Error("Missing id.");
   if (!name) throw new Error("Missing name.");
-  if (!url || !/^https?:\/\//i.test(url)) throw new Error("URL must start with http:// or https://");
 
   await sql`
     update public.webhooks

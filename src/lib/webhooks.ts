@@ -38,6 +38,64 @@ type DeliveryRow = {
   attempt_count: number;
 };
 
+function parseIpv4(hostname: string): number[] | null {
+  const m = hostname.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (!m) return null;
+  const octets = [Number(m[1]), Number(m[2]), Number(m[3]), Number(m[4])];
+  if (octets.some((n) => !Number.isInteger(n) || n < 0 || n > 255)) return null;
+  return octets;
+}
+
+function isPrivateOrLoopbackHost(hostnameRaw: string): boolean {
+  const hostname = String(hostnameRaw || "").trim().toLowerCase();
+  if (!hostname) return true;
+  if (hostname === "localhost" || hostname.endsWith(".localhost")) return true;
+  if (hostname === "::1" || hostname === "0:0:0:0:0:0:0:1") return true;
+  if (hostname.startsWith("fe80:") || hostname.startsWith("fc") || hostname.startsWith("fd")) return true;
+
+  const ipv4 = parseIpv4(hostname);
+  if (!ipv4) return false;
+  const [a, b] = ipv4;
+  if (a === 0 || a === 10 || a === 127) return true;
+  if (a === 169 && b === 254) return true;
+  if (a === 172 && b >= 16 && b <= 31) return true;
+  if (a === 192 && b === 168) return true;
+  return false;
+}
+
+export function normalizeWebhookUrl(input: string, env: NodeJS.ProcessEnv = process.env): string {
+  const raw = String(input || "").trim();
+  if (!raw) throw new Error("Webhook URL is required.");
+
+  let u: URL;
+  try {
+    u = new URL(raw);
+  } catch {
+    throw new Error("Webhook URL is invalid.");
+  }
+
+  const protocol = u.protocol.toLowerCase();
+  const host = u.hostname.toLowerCase();
+  const isProd = String(env.NODE_ENV || "").toLowerCase() === "production";
+  const localDevHttpHost = host === "localhost" || host === "127.0.0.1" || host === "::1" || host === "0:0:0:0:0:0:0:1";
+
+  if (u.username || u.password) throw new Error("Webhook URL must not contain credentials.");
+
+  if (protocol === "http:") {
+    if (!localDevHttpHost || isProd) {
+      throw new Error("Webhook URL must use HTTPS (HTTP allowed only for localhost in non-production).");
+    }
+  } else if (protocol !== "https:") {
+    throw new Error("Webhook URL must use HTTPS.");
+  }
+
+  if (protocol === "https:" && isPrivateOrLoopbackHost(host)) {
+    throw new Error("Webhook URL host is not allowed.");
+  }
+
+  return u.toString();
+}
+
 function hmac(secret: string, body: string): string {
   return crypto.createHmac("sha256", secret).update(body).digest("hex");
 }
@@ -87,8 +145,9 @@ async function deliverOnce(args: {
   body: string;
 }): Promise<{ ok: boolean; status: number | null; error: string | null }> {
   try {
+    const safeUrl = normalizeWebhookUrl(args.url);
     const sig = args.secret ? hmac(args.secret, args.body) : null;
-    const res = await fetch(args.url, {
+    const res = await fetch(safeUrl, {
       method: "POST",
       headers: {
         "content-type": "application/json",
