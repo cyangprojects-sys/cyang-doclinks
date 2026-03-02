@@ -3,6 +3,29 @@ type StripeRequestOptions = {
   body?: Record<string, string>;
 };
 
+function isAllowedStripeHost(hostname: string): boolean {
+  const h = String(hostname || "").trim().toLowerCase();
+  return h === "stripe.com" || h.endsWith(".stripe.com");
+}
+
+export function safeStripeRedirectUrl(raw: string): string {
+  const v = String(raw || "").trim();
+  if (!v) throw new Error("Stripe redirect URL is missing");
+
+  let parsed: URL;
+  try {
+    parsed = new URL(v);
+  } catch {
+    throw new Error("Stripe redirect URL is invalid");
+  }
+
+  if (parsed.protocol !== "https:" || !isAllowedStripeHost(parsed.hostname)) {
+    throw new Error("Stripe redirect URL host is not allowed");
+  }
+
+  return parsed.toString();
+}
+
 function mustGetStripeSecretKey(): string {
   const key = String(process.env.STRIPE_SECRET_KEY || "").trim();
   if (!key) throw new Error("STRIPE_SECRET_KEY is not configured");

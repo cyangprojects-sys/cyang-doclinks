@@ -4,7 +4,7 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { requirePermission } from "@/lib/rbac";
 import { sql } from "@/lib/db";
-import { ensureStripeCustomer, stripeApi } from "@/lib/stripeClient";
+import { ensureStripeCustomer, safeStripeRedirectUrl, stripeApi } from "@/lib/stripeClient";
 import { appendImmutableAudit } from "@/lib/immutableAudit";
 import { logSecurityEvent } from "@/lib/securityTelemetry";
 import { getRouteTimeoutMs, isRouteTimeoutError, withRouteTimeout } from "@/lib/routeTimeout";
@@ -71,8 +71,7 @@ export async function POST(req: NextRequest) {
           },
         });
 
-        const portalUrl = String(portal?.url || "").trim();
-        if (!portalUrl) throw new Error("Stripe portal did not return a URL");
+        const portalUrl = safeStripeRedirectUrl(String(portal?.url || "").trim());
 
         await appendImmutableAudit({
           streamKey: `user:${u.id}:billing`,
