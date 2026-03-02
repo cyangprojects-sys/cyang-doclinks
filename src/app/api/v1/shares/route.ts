@@ -35,9 +35,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: auth.error }, { status: auth.status });
   }
 
-  let body: any = null;
+  let body: Record<string, unknown> | null = null;
   try {
-    body = await req.json();
+    const parsed: unknown = await req.json();
+    body = parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>) : null;
   } catch {
     return NextResponse.json({ ok: false, error: "INVALID_JSON" }, { status: 400 });
   }
@@ -86,7 +87,7 @@ const plan = await getPlanForUser(auth.ownerId);
   const allowedCountriesRaw = body?.allowed_countries ?? body?.allowedCountries ?? null;
 const blockedCountriesRaw = body?.blocked_countries ?? body?.blockedCountries ?? null;
 
-const normCountries = (v: any): string[] | null => {
+const normCountries = (v: unknown): string[] | null => {
   if (v == null) return null;
   const arr = Array.isArray(v) ? v : String(v).split(/[,\s]+/g);
   const out = arr
