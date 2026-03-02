@@ -97,6 +97,14 @@ test.describe("geo, cookie, and view helpers", () => {
     });
     expect(getClientIp(req4)).toBe("8.8.8.8");
 
+    const req5 = new Request("http://localhost", {
+      headers: {
+        "x-real-ip": "3.3.3.3",
+        "x-vercel-forwarded-for": "8.8.8.8, 4.4.4.4",
+      },
+    });
+    expect(getClientIp(req5)).toBe("3.3.3.3");
+
     const h1 = hashIp("1.2.3.4");
     const h2 = hashIp("1.2.3.4");
     expect(h1).toBe(h2);

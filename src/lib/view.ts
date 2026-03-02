@@ -17,12 +17,14 @@ export function getClientIp(req: Request) {
         if (first) return first;
     }
 
+    const real = (req.headers.get("x-real-ip") || "").trim();
+    if (real) return real;
+
     const vercel = req.headers.get("x-vercel-forwarded-for");
     if (vercel) {
         const first = vercel.split(",")[0]?.trim();
         if (first) return first;
     }
 
-    const real = (req.headers.get("x-real-ip") || "").trim();
-    return real || null;
+    return null;
 }
