@@ -47,6 +47,27 @@ test.describe("geo, cookie, and view helpers", () => {
     expect(getCookie(req, "missing")).toBeNull();
   });
 
+  test("supports cookie header opt-outs and custom path", () => {
+    const header = cookieHeader("session", "v", {
+      httpOnly: false,
+      secure: false,
+      sameSite: "None",
+      path: "/auth",
+    });
+    expect(header).toContain("session=v");
+    expect(header).toContain("Path=/auth");
+    expect(header).toContain("SameSite=None");
+    expect(header).not.toContain("HttpOnly");
+    expect(header).not.toContain("Secure");
+  });
+
+  test("parses cookie values containing equals sign", () => {
+    const req = new Request("http://localhost", {
+      headers: { cookie: "a=1; token=abc=def=ghi; b=2" },
+    });
+    expect(getCookie(req, "token")).toBe("abc=def=ghi");
+  });
+
   test("extracts client IP and hashes it", () => {
     process.env.VIEW_SALT = "view-test-salt";
     const req1 = new Request("http://localhost", {
