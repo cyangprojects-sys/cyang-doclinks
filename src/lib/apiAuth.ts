@@ -31,6 +31,8 @@ function extractPrefix(plaintext: string): string | null {
   if (parts[0] !== "cyk") return null;
   const p = parts[1];
   if (!/^[a-f0-9]{8}$/i.test(p)) return null;
+  const remainder = parts.slice(2).join("_").trim();
+  if (!remainder) return null;
   return `cyk_${p}`;
 }
 
