@@ -38,6 +38,13 @@ type DeliveryRow = {
   attempt_count: number;
 };
 
+function payloadDocId(payload: unknown): string | null {
+  if (!payload || typeof payload !== "object") return null;
+  const r = payload as Record<string, unknown>;
+  const docId = String(r.doc_id || r.docId || "").trim();
+  return docId || null;
+}
+
 function parseIpv4(hostname: string): number[] | null {
   const m = hostname.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
   if (!m) return null;
@@ -115,7 +122,7 @@ function backoffMs(attempt: number): number {
   return capped + jitter;
 }
 
-async function listEnabledWebhooks(): Promise<WebhookRow[]> {
+async function listEnabledWebhooks(ownerId: string): Promise<WebhookRow[]> {
   const hooks = (await sql`
     select
       id::text as id,
@@ -126,8 +133,25 @@ async function listEnabledWebhooks(): Promise<WebhookRow[]> {
       enabled
     from public.webhooks
     where enabled = true
+      and owner_id = ${ownerId}::uuid
   `) as unknown as WebhookRow[];
   return hooks || [];
+}
+
+async function resolveWebhookOwnerId(payload: unknown): Promise<string | null> {
+  const docId = payloadDocId(payload);
+  if (!docId) return null;
+  try {
+    const rows = (await sql`
+      select owner_id::text as owner_id
+      from public.docs
+      where id = ${docId}::uuid
+      limit 1
+    `) as unknown as Array<{ owner_id: string | null }>;
+    return rows?.[0]?.owner_id ?? null;
+  } catch {
+    return null;
+  }
 }
 
 function buildBody(event: string, payload: unknown): string {
@@ -164,9 +188,9 @@ async function deliverOnce(args: {
   }
 }
 
-async function enqueueDeliveries(event: WebhookEvent, payload: unknown): Promise<boolean> {
+async function enqueueDeliveries(event: WebhookEvent, ownerId: string, payload: unknown): Promise<boolean> {
   // Returns true if queued, false if queue unavailable.
-  const hooks = await listEnabledWebhooks();
+  const hooks = await listEnabledWebhooks(ownerId);
   if (!hooks.length) return true;
 
   const selected = hooks.filter((h) => {
@@ -191,10 +215,10 @@ async function enqueueDeliveries(event: WebhookEvent, payload: unknown): Promise
   }
 }
 
-async function deliverSyncBestEffort(event: WebhookEvent, payload: unknown) {
+async function deliverSyncBestEffort(event: WebhookEvent, ownerId: string, payload: unknown) {
   // Best-effort, never throws.
   try {
-    const hooks = await listEnabledWebhooks();
+    const hooks = await listEnabledWebhooks(ownerId);
     if (!hooks.length) return;
 
     const body = buildBody(event, payload);
@@ -226,9 +250,12 @@ async function deliverSyncBestEffort(event: WebhookEvent, payload: unknown) {
  */
 export async function emitWebhook(event: WebhookEvent, payload: unknown) {
   try {
-    const queued = await enqueueDeliveries(event, payload);
+    const ownerId = await resolveWebhookOwnerId(payload);
+    if (!ownerId) return;
+
+    const queued = await enqueueDeliveries(event, ownerId, payload);
     if (!queued) {
-      await deliverSyncBestEffort(event, payload);
+      await deliverSyncBestEffort(event, ownerId, payload);
     }
   } catch {
     // swallow
