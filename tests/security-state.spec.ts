@@ -266,6 +266,78 @@ test.describe("security state enforcement", () => {
     }
   });
 
+  test("preview ticket blocks top-level direct open", async ({ request }) => {
+    const databaseUrl = String(process.env.DATABASE_URL || "").trim();
+    test.skip(!databaseUrl, "DATABASE_URL not available");
+    const sql = neon(databaseUrl);
+
+    const doc = await pickServableDoc(sql);
+    test.skip(!doc, "No servable docs available for fixture setup");
+    if (!doc) return;
+
+    const token = `tok_preview_ticket_block_${randSuffix()}`.slice(0, 64);
+    await sql`
+      insert into public.share_tokens (token, doc_id, max_views, views_count)
+      values (${token}, ${doc.id}::uuid, null, 0)
+    `;
+
+    try {
+      const rawResp = await request.get(`/s/${token}/raw`, { maxRedirects: 0 });
+      if (rawResp.status() === 429) {
+        test.skip(true, "Rate-limited in environment; cannot validate preview ticket direct-open blocking");
+      }
+      expect(rawResp.status()).toBe(302);
+      const ticketLocation = rawResp.headers()["location"] || "";
+      expect(ticketLocation).toContain("/t/");
+
+      const ticketUrl = new URL(ticketLocation, process.env.PLAYWRIGHT_BASE_URL || "http://127.0.0.1:3000");
+      const ticketPath = `${ticketUrl.pathname}${ticketUrl.search}`;
+      const topLevelResp = await request.get(ticketPath, {
+        headers: {
+          "sec-fetch-dest": "document",
+          "sec-fetch-mode": "navigate",
+          "sec-fetch-user": "?1",
+        },
+      });
+      expect(topLevelResp.status()).toBe(403);
+      const body = await topLevelResp.text();
+      expect(body).toContain("Direct open is disabled for this protected document.");
+    } finally {
+      await sql`delete from public.share_tokens where token = ${token}`;
+    }
+  });
+
+  test("password-protected alias raw redirects to alias gate when trust cookie is missing", async ({ request }) => {
+    const databaseUrl = String(process.env.DATABASE_URL || "").trim();
+    test.skip(!databaseUrl, "DATABASE_URL not available");
+    const sql = neon(databaseUrl);
+
+    const hasDocAliases = await tableExists(sql, "doc_aliases");
+    const hasAliasPassword = await columnExists(sql, "doc_aliases", "password_hash");
+    test.skip(!hasDocAliases || !hasAliasPassword, "doc_aliases.password_hash not available");
+
+    const doc = await pickServableDoc(sql);
+    test.skip(!doc, "No servable docs available for fixture setup");
+    if (!doc) return;
+
+    const alias = `a-pw-${randSuffix()}`.toLowerCase();
+    await sql`
+      insert into public.doc_aliases (alias, doc_id, is_active, password_hash)
+      values (${alias}, ${doc.id}::uuid, true, 'placeholder_hash')
+    `;
+
+    try {
+      const resp = await request.get(`/d/${alias}/raw`, { maxRedirects: 0 });
+      if (resp.status() === 429) {
+        test.skip(true, "Rate-limited in environment; cannot validate alias password gate redirect");
+      }
+      expect(resp.status()).toBe(302);
+      expect(resp.headers()["location"] || "").toBe(`/d/${encodeURIComponent(alias)}`);
+    } finally {
+      await sql`delete from public.doc_aliases where alias = ${alias}`;
+    }
+  });
+
   test("expired and revoked shares are blocked", async ({ request }) => {
     const databaseUrl = String(process.env.DATABASE_URL || "").trim();
     test.skip(!databaseUrl, "DATABASE_URL not available");
