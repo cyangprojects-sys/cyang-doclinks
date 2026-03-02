@@ -25,7 +25,7 @@ export async function GET() {
       version() as version
   `;
 
-  const info = (infoRows as any[])?.[0] ?? null;
+  const info = (infoRows as unknown as Array<Record<string, unknown>>)?.[0] ?? null;
 
   const tables = {
     "public.doc_audit": await regclass("public.doc_audit"),
