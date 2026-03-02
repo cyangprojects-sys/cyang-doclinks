@@ -13,15 +13,10 @@ import { setRetentionSettings, setExpirationAlertSettings, getExpirationAlertSet
 import { generateApiKey, hashApiKey } from "@/lib/apiKeys";
 import { emitWebhook } from "@/lib/webhooks";
 import { appendImmutableAudit } from "@/lib/immutableAudit";
+import { resolveConfiguredPublicAppBaseUrl } from "@/lib/publicBaseUrl";
 
 function getBaseUrl() {
-  const explicit = process.env.BASE_URL || process.env.NEXTAUTH_URL;
-  if (explicit) return explicit.replace(/\/+$/, "");
-
-  const vercel = process.env.VERCEL_URL;
-  if (vercel) return `https://${vercel}`.replace(/\/+$/, "");
-
-  return "http://localhost:3000";
+  return resolveConfiguredPublicAppBaseUrl();
 }
 
 async function appendAdminAudit(args: {

@@ -7,6 +7,7 @@ import { randomBytes } from "crypto";
 import bcrypt from "bcryptjs";
 import { emitWebhook } from "@/lib/webhooks";
 import { assertCanCreateShare, getPlanForUser, normalizeExpiresAtForPlan, normalizeMaxViewsForPlan } from "@/lib/monetization";
+import { resolveConfiguredPublicAppBaseUrl } from "@/lib/publicBaseUrl";
 
 /**
  * NOTE:
@@ -43,14 +44,7 @@ function newToken(): string {
 }
 
 function baseUrlFromEnv(): string {
-  const u =
-    process.env.NEXT_PUBLIC_SITE_URL ||
-    process.env.NEXT_PUBLIC_BASE_URL ||
-    process.env.VERCEL_URL ||
-    "http://localhost:3000";
-
-  if (u.startsWith("http")) return u;
-  return `https://${u}`;
+  return resolveConfiguredPublicAppBaseUrl();
 }
 
 function buildShareUrl(token: string): string {

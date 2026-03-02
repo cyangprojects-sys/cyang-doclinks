@@ -4,15 +4,7 @@ function clean(input: unknown): string {
   return String(input || "").trim();
 }
 
-export function resolvePublicAppBaseUrl(reqUrl: string, env: EnvLike = process.env): string {
-  const appUrl = clean(env.APP_URL);
-  const nextAuthUrl = clean(env.NEXTAUTH_URL);
-  const vercelUrl = clean(env.VERCEL_URL);
-  const isProd = clean(env.NODE_ENV).toLowerCase() === "production";
-
-  const configured = appUrl || nextAuthUrl || (vercelUrl ? `https://${vercelUrl}` : "");
-  const candidate = configured || new URL(reqUrl).origin;
-
+function parseAndValidateBase(candidate: string, isProd: boolean): string {
   let u: URL;
   try {
     u = new URL(candidate);
@@ -31,9 +23,29 @@ export function resolvePublicAppBaseUrl(reqUrl: string, env: EnvLike = process.e
     throw new Error("APP_BASE_URL_INSECURE");
   }
 
-  if (isProd && !configured) {
-    throw new Error("APP_BASE_URL_MISSING");
-  }
-
   return u.origin.replace(/\/+$/, "");
+}
+
+export function resolveConfiguredPublicAppBaseUrl(env: EnvLike = process.env): string {
+  const appUrl = clean(env.APP_URL);
+  const nextAuthUrl = clean(env.NEXTAUTH_URL);
+  const vercelUrl = clean(env.VERCEL_URL);
+  const isProd = clean(env.NODE_ENV).toLowerCase() === "production";
+
+  const configured = appUrl || nextAuthUrl || (vercelUrl ? `https://${vercelUrl}` : "");
+  if (!configured) {
+    if (isProd) throw new Error("APP_BASE_URL_MISSING");
+    return "http://localhost:3000";
+  }
+  return parseAndValidateBase(configured, isProd);
+}
+
+export function resolvePublicAppBaseUrl(reqUrl: string, env: EnvLike = process.env): string {
+  const isProd = clean(env.NODE_ENV).toLowerCase() === "production";
+  try {
+    return resolveConfiguredPublicAppBaseUrl(env);
+  } catch (e) {
+    if (isProd) throw e;
+  }
+  return parseAndValidateBase(new URL(reqUrl).origin, false);
 }

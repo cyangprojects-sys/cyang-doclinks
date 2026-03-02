@@ -4,15 +4,10 @@
 import { sql } from "@/lib/db";
 import { sendMail } from "@/lib/email";
 import { getExpirationAlertSettings } from "@/lib/settings";
+import { resolveConfiguredPublicAppBaseUrl } from "@/lib/publicBaseUrl";
 
 function getBaseUrl() {
-  const explicit = process.env.BASE_URL || process.env.NEXTAUTH_URL;
-  if (explicit) return explicit.replace(/\/+$/, "");
-
-  const vercel = process.env.VERCEL_URL;
-  if (vercel) return `https://${vercel}`.replace(/\/+$/, "");
-
-  return "http://localhost:3000";
+  return resolveConfiguredPublicAppBaseUrl();
 }
 
 export type ExpiringAliasRow = {
