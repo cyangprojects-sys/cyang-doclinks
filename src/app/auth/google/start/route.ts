@@ -13,9 +13,9 @@ function setCookie(headers: Headers, name: string, value: string, maxAgeSeconds:
   );
 }
 
-// Note: include `ctx` with `params: Promise<{}>` even if unused.
+// Note: include `ctx` with params even if unused.
 // This satisfies Next's route handler type validator during `next build`.
-export async function GET(req: NextRequest, _ctx: { params: Promise<{}> }) {
+export async function GET(req: NextRequest, _ctx: { params: Promise<Record<string, never>> }) {
   const url = new URL(req.url);
   const alias = (url.searchParams.get("alias") || "").trim();
 
