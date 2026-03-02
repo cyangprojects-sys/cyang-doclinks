@@ -5,7 +5,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { sql } from "@/lib/db";
 import { verifyApiKeyFromRequest } from "@/lib/apiAuth";
 import { processWebhookDeliveries } from "@/lib/webhooks";
-import { enforceGlobalApiRateLimit } from "@/lib/securityTelemetry";
+import { enforceGlobalApiRateLimit, logSecurityEvent } from "@/lib/securityTelemetry";
 
 export async function POST(req: NextRequest) {
   const rl = await enforceGlobalApiRateLimit({
@@ -78,12 +78,20 @@ export async function POST(req: NextRequest) {
     const delivered = await processWebhookDeliveries({ maxBatch: 10, maxAttempts: 8 });
     return NextResponse.json({ ok: true, enqueued: hooks.length, delivered });
   } catch (e: unknown) {
+    await logSecurityEvent({
+      type: "webhook_test_queue_unavailable",
+      severity: "medium",
+      ip: req.headers.get("x-forwarded-for") || null,
+      actorUserId: auth.ownerId,
+      scope: "webhooks",
+      message: "Webhook test queue unavailable",
+    });
+    void e;
     return NextResponse.json(
       {
         ok: false,
         error: "DELIVERY_QUEUE_UNAVAILABLE",
         hint: "Run scripts/sql/webhooks.sql to create public.webhook_deliveries, and configure /api/cron/webhooks",
-        details: e instanceof Error ? e.message : String(e || "failed"),
       },
       { status: 501 }
     );
