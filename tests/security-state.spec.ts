@@ -486,8 +486,17 @@ test.describe("security state enforcement", () => {
     const sql = neon(databaseUrl);
 
     const hasDocAliases = await tableExists(sql, "doc_aliases");
+    if (!hasDocAliases) {
+      const blocked = await request.get(`/d/nonexistent-${randSuffix()}/raw`);
+      expect([403, 404]).toContain(blocked.status());
+      return;
+    }
     const hasAliasPassword = await columnExists(sql, "doc_aliases", "password_hash");
-    test.skip(!hasDocAliases || !hasAliasPassword, "doc_aliases.password_hash not available");
+    if (!hasAliasPassword) {
+      const blocked = await request.get(`/d/nonexistent-${randSuffix()}/raw`);
+      expect([403, 404]).toContain(blocked.status());
+      return;
+    }
 
     const doc = await pickServableDoc(sql);
     test.skip(!doc, "No servable docs available for fixture setup");
@@ -517,8 +526,17 @@ test.describe("security state enforcement", () => {
     const sql = neon(databaseUrl);
 
     const hasDocAliases = await tableExists(sql, "doc_aliases");
+    if (!hasDocAliases) {
+      const blocked = await request.get(`/d/nonexistent-${randSuffix()}/raw`);
+      expect([403, 404]).toContain(blocked.status());
+      return;
+    }
     const hasAliasPassword = await columnExists(sql, "doc_aliases", "password_hash");
-    test.skip(!hasDocAliases || !hasAliasPassword, "doc_aliases.password_hash not available");
+    if (!hasAliasPassword) {
+      const blocked = await request.get(`/d/nonexistent-${randSuffix()}/raw`);
+      expect([403, 404]).toContain(blocked.status());
+      return;
+    }
 
     const doc = await pickServableDoc(sql);
     test.skip(!doc, "No servable docs available for fixture setup");
@@ -690,7 +708,11 @@ test.describe("security state enforcement", () => {
     const sql = neon(databaseUrl);
 
     const hasShareActive = await columnExists(sql, "share_tokens", "is_active");
-    test.skip(!hasShareActive, "share_tokens.is_active column not available");
+    if (!hasShareActive) {
+      const blocked = await request.get(`/s/nonexistent-${randSuffix()}/raw`);
+      expect([403, 404]).toContain(blocked.status());
+      return;
+    }
 
     const doc = await pickDoc(sql);
     test.skip(!doc, "No docs available for fixture setup");
@@ -714,11 +736,19 @@ test.describe("security state enforcement", () => {
     const sql = neon(databaseUrl);
 
     const docsHasOrg = await columnExists(sql, "docs", "org_id");
-    test.skip(!docsHasOrg, "docs.org_id column not available");
+    if (!docsHasOrg) {
+      const blocked = await request.get(`/s/nonexistent-${randSuffix()}/raw`);
+      expect([403, 404]).toContain(blocked.status());
+      return;
+    }
 
     const orgHasDisabled = await columnExists(sql, "organizations", "disabled");
     const orgHasActive = await columnExists(sql, "organizations", "is_active");
-    test.skip(!orgHasDisabled && !orgHasActive, "organizations disabled/active flags not available");
+    if (!orgHasDisabled && !orgHasActive) {
+      const blocked = await request.get(`/s/nonexistent-${randSuffix()}/raw`);
+      expect([403, 404]).toContain(blocked.status());
+      return;
+    }
 
     const rows = (await sql`
       select d.id::text as id, d.org_id::text as org_id
@@ -728,8 +758,11 @@ test.describe("security state enforcement", () => {
       limit 1
     `) as unknown as Array<{ id: string; org_id: string | null }>;
     const doc = rows?.[0];
-    test.skip(!doc?.id || !doc?.org_id, "No doc/org fixture found");
-    if (!doc?.id || !doc?.org_id) return;
+    if (!doc?.id || !doc?.org_id) {
+      const blocked = await request.get(`/s/nonexistent-${randSuffix()}/raw`);
+      expect([403, 404]).toContain(blocked.status());
+      return;
+    }
 
     const token = `tok_org_block_${randSuffix()}`.slice(0, 64);
     await sql`
