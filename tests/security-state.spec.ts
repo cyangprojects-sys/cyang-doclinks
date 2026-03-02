@@ -1,10 +1,17 @@
 import { expect, test } from "@playwright/test";
 import { neon } from "@neondatabase/serverless";
+import crypto from "node:crypto";
 
 type Sql = ReturnType<typeof neon<false, false>>;
 
 function randSuffix(): string {
   return `${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+}
+
+function aliasTrustCookieNameForTest(alias: string): string {
+  const normalized = decodeURIComponent(String(alias || "")).trim().toLowerCase();
+  const key = crypto.createHash("sha256").update(normalized).digest("hex").slice(0, 24);
+  return `alias_trust_${key}`;
 }
 
 type DocRow = {
@@ -232,6 +239,43 @@ test.describe("security state enforcement", () => {
     }
   });
 
+  test("expired share unlock cookie is rejected", async ({ request }) => {
+    const databaseUrl = String(process.env.DATABASE_URL || "").trim();
+    test.skip(!databaseUrl, "DATABASE_URL not available");
+    const sql = neon(databaseUrl);
+
+    const doc = await pickServableDoc(sql);
+    test.skip(!doc, "No servable docs available for fixture setup");
+    if (!doc) return;
+
+    const token = `tok_pw_expired_unlock_${randSuffix()}`.slice(0, 64);
+    const unlockId = `unlock_${randSuffix()}`.slice(0, 64);
+    await sql`
+      insert into public.share_tokens (token, doc_id, max_views, views_count, password_hash)
+      values (${token}, ${doc.id}::uuid, null, 0, 'placeholder_hash')
+    `;
+    await sql`
+      insert into public.share_unlocks (token, unlock_id, ip_hash, expires_at)
+      values (${token}, ${unlockId}, null, now() - interval '1 minute')
+    `;
+
+    try {
+      const resp = await request.get(`/s/${token}/raw`, {
+        headers: {
+          accept: "application/pdf",
+          cookie: `share_unlock_${token}=${unlockId}`,
+        },
+      });
+      if (resp.status() === 429) {
+        test.skip(true, "Rate-limited in environment; cannot validate expired unlock rejection");
+      }
+      expect(resp.status()).toBe(401);
+    } finally {
+      await sql`delete from public.share_unlocks where token = ${token}`;
+      await sql`delete from public.share_tokens where token = ${token}`;
+    }
+  });
+
   test("download-disabled share blocks attachment disposition when flag exists", async ({ request }) => {
     const databaseUrl = String(process.env.DATABASE_URL || "").trim();
     test.skip(!databaseUrl, "DATABASE_URL not available");
@@ -444,6 +488,41 @@ test.describe("security state enforcement", () => {
       const resp = await request.get(`/d/${alias}/raw`, { maxRedirects: 0 });
       if (resp.status() === 429) {
         test.skip(true, "Rate-limited in environment; cannot validate alias password gate redirect");
+      }
+      expect(resp.status()).toBe(302);
+      expect(resp.headers()["location"] || "").toBe(`/d/${encodeURIComponent(alias)}`);
+    } finally {
+      await sql`delete from public.doc_aliases where alias = ${alias}`;
+    }
+  });
+
+  test("password-protected alias rejects malformed trust cookie", async ({ request }) => {
+    const databaseUrl = String(process.env.DATABASE_URL || "").trim();
+    test.skip(!databaseUrl, "DATABASE_URL not available");
+    const sql = neon(databaseUrl);
+
+    const hasDocAliases = await tableExists(sql, "doc_aliases");
+    const hasAliasPassword = await columnExists(sql, "doc_aliases", "password_hash");
+    test.skip(!hasDocAliases || !hasAliasPassword, "doc_aliases.password_hash not available");
+
+    const doc = await pickServableDoc(sql);
+    test.skip(!doc, "No servable docs available for fixture setup");
+    if (!doc) return;
+
+    const alias = `a-pw-malformed-${randSuffix()}`.toLowerCase();
+    await sql`
+      insert into public.doc_aliases (alias, doc_id, is_active, password_hash)
+      values (${alias}, ${doc.id}::uuid, true, 'placeholder_hash')
+    `;
+
+    try {
+      const trustCookie = `${aliasTrustCookieNameForTest(alias)}=not-a-valid-signed-payload`;
+      const resp = await request.get(`/d/${alias}/raw`, {
+        maxRedirects: 0,
+        headers: { cookie: trustCookie },
+      });
+      if (resp.status() === 429) {
+        test.skip(true, "Rate-limited in environment; cannot validate malformed alias trust cookie rejection");
       }
       expect(resp.status()).toBe(302);
       expect(resp.headers()["location"] || "").toBe(`/d/${encodeURIComponent(alias)}`);
