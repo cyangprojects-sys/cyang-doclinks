@@ -7,6 +7,7 @@ import { sql } from "@/lib/db";
 import { ORG_COOKIE_NAME, ORG_INVITE_COOKIE_NAME } from "@/lib/tenant";
 import { getOrgBySlug, orgAllowsEmail } from "@/lib/orgs";
 import { acceptInviteForUser, getActiveMembership, orgMembershipTablesReady, upsertMembership } from "@/lib/orgMembership";
+import { hasValidMfaCookie, mfaTableExists, roleRequiresMfa } from "@/lib/mfa";
 
 export type Role = "viewer" | "admin" | "owner";
 
@@ -380,6 +381,13 @@ export async function requireUser(): Promise<AuthedUser> {
   const u = await getAuthedUser();
   if (!u) throw new Error("UNAUTHENTICATED");
   await assertOrgActiveForAccess(u.orgId);
+  if (roleRequiresMfa(u.role)) {
+    if (!(await mfaTableExists())) {
+      throw new Error("MFA_CONFIG_MISSING");
+    }
+    const ok = await hasValidMfaCookie({ userId: u.id, email: u.email, role: u.role });
+    if (!ok) throw new Error("MFA_REQUIRED");
+  }
   return u;
 }
 
