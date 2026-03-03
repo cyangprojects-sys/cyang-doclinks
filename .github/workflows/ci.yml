@@ -33,6 +33,9 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Env Example Audit
+        run: npm run audit:env-example
+
       - name: Admin Route Guard Audit
         run: npm run audit:admin-routes
 

@@ -6,6 +6,7 @@ test.describe("ci workflow guardrails", () => {
     const code = readFileSync(".github/workflows/ci.yml", "utf8");
     expect(code.includes("build-lint-audit")).toBeTruthy();
     expect(code.includes("npm run lint")).toBeTruthy();
+    expect(code.includes("npm run audit:env-example")).toBeTruthy();
     expect(code.includes("npm run build")).toBeTruthy();
     expect(code.includes("npm run audit:admin-routes")).toBeTruthy();
     expect(code.includes("npm audit --omit=dev")).toBeTruthy();
