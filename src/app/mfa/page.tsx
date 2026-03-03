@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import { ensureUserByEmail } from "@/lib/authz";
 import {
+  consumeRecoveryCodesDisplayCookie,
   getMfaStatus,
   getOrCreatePendingMfaSecret,
   hasValidMfaCookie,
@@ -11,7 +12,13 @@ import {
   roleRequiresMfa,
   totpUri,
 } from "@/lib/mfa";
-import { beginMfaSetupAction, clearMfaSessionAction, enableMfaAction, verifyMfaAction } from "./actions";
+import {
+  beginMfaSetupAction,
+  clearMfaSessionAction,
+  enableMfaAction,
+  regenerateRecoveryCodesAction,
+  verifyMfaAction,
+} from "./actions";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -39,10 +46,12 @@ export default async function MfaPage({ searchParams }: { searchParams: SearchPa
   const next = nextRaw.startsWith("/") ? nextRaw : "/admin/dashboard";
   const error = String(params?.error || "").trim();
   const setupRequested = String(params?.setup || "").trim() === "1";
+  const recoveryRequested = String(params?.recovery || "").trim() === "1";
 
   const tableReady = await mfaTableExists();
   const status = await getMfaStatus(user.id);
   const cookieValid = await hasValidMfaCookie({ userId: user.id, email: user.email, role: user.role });
+  const recoveryCodes = recoveryRequested ? await consumeRecoveryCodesDisplayCookie() : null;
 
   let setupSecret: string | null = null;
   if (tableReady && !status.enabled && setupRequested) {
@@ -54,6 +63,8 @@ export default async function MfaPage({ searchParams }: { searchParams: SearchPa
       ? "Code was invalid or expired. Try again."
       : error === "table_missing"
         ? "MFA table is missing. Run the migration script first."
+        : error === "recovery_unavailable"
+          ? "Recovery codes are unavailable. Enable MFA first."
         : null;
 
   return (
@@ -78,9 +89,29 @@ export default async function MfaPage({ searchParams }: { searchParams: SearchPa
         {tableReady && status.enabled && cookieValid ? (
           <div className="mt-4 space-y-3">
             <p className="text-sm text-emerald-100">MFA verification is active for this session.</p>
+            <p className="text-xs text-white/70">
+              Recovery codes remaining: <span className="font-mono">{status.recoveryCodesCount}</span>
+            </p>
             <form action={clearMfaSessionAction}>
               <button className="rounded-xl border border-white/20 px-3 py-2 text-sm">Clear MFA session</button>
             </form>
+            <form action={regenerateRecoveryCodesAction}>
+              <input type="hidden" name="next" value={next} />
+              <button className="rounded-xl border border-white/20 px-3 py-2 text-sm">Regenerate recovery codes</button>
+            </form>
+          </div>
+        ) : null}
+
+        {recoveryCodes?.length ? (
+          <div className="mt-4 space-y-3 rounded-xl border border-amber-300/35 bg-amber-500/10 p-3">
+            <p className="text-sm text-amber-100">
+              Save these recovery codes now. They are shown only once and each code can be used a single time.
+            </p>
+            <ul className="grid grid-cols-2 gap-2">
+              {recoveryCodes.map((code) => (
+                <li key={code} className="font-mono text-sm text-amber-50">{code}</li>
+              ))}
+            </ul>
           </div>
         ) : null}
 
@@ -88,10 +119,10 @@ export default async function MfaPage({ searchParams }: { searchParams: SearchPa
           <form action={verifyMfaAction} className="mt-4 space-y-3">
             <input type="hidden" name="next" value={next} />
             <label className="block text-sm text-white/80">
-              Enter 6-digit code
+              Enter authenticator code or recovery code
               <input
                 name="code"
-                inputMode="numeric"
+                inputMode="text"
                 autoComplete="one-time-code"
                 className="mt-2 w-full rounded-xl border border-white/20 bg-black/20 px-3 py-2 text-sm text-white"
               />
@@ -137,4 +168,3 @@ export default async function MfaPage({ searchParams }: { searchParams: SearchPa
     </main>
   );
 }
-

@@ -6,10 +6,12 @@ import { authOptions } from "@/auth";
 import { ensureUserByEmail } from "@/lib/authz";
 import {
   clearMfaCookie,
+  issueRecoveryCodesDisplayCookie,
   enableMfa,
   getOrCreatePendingMfaSecret,
   issueMfaCookie,
   mfaTableExists,
+  regenerateRecoveryCodes,
   roleRequiresMfa,
   verifyMfaCode,
 } from "@/lib/mfa";
@@ -47,6 +49,11 @@ export async function enableMfaAction(formData: FormData): Promise<void> {
     redirect(`/mfa?error=invalid_code&setup=1&next=${encodeURIComponent(next)}`);
   }
   await issueMfaCookie({ userId: user.id, email: user.email, role: user.role });
+  const codes = await regenerateRecoveryCodes(user.id);
+  if (codes?.length) {
+    await issueRecoveryCodesDisplayCookie(codes);
+    redirect(`/mfa?recovery=1&next=${encodeURIComponent(next)}`);
+  }
   redirect(next.startsWith("/") ? next : "/admin/dashboard");
 }
 
@@ -67,3 +74,13 @@ export async function clearMfaSessionAction(): Promise<void> {
   redirect("/mfa");
 }
 
+export async function regenerateRecoveryCodesAction(formData: FormData): Promise<void> {
+  const next = String(formData.get("next") || "/admin/dashboard").trim() || "/admin/dashboard";
+  const user = await getPrivilegedAuthedUser();
+  const codes = await regenerateRecoveryCodes(user.id);
+  if (!codes?.length) {
+    redirect(`/mfa?error=recovery_unavailable&next=${encodeURIComponent(next)}`);
+  }
+  await issueRecoveryCodesDisplayCookie(codes);
+  redirect(`/mfa?recovery=1&next=${encodeURIComponent(next)}`);
+}

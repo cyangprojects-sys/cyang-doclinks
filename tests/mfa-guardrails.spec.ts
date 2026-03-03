@@ -26,8 +26,9 @@ test.describe("mfa guardrails", () => {
   test("mfa route and SQL migration are present", () => {
     const pageCode = readFileSync("src/app/mfa/page.tsx", "utf8");
     expect(pageCode.includes("Multi-factor authentication")).toBeTruthy();
+    expect(pageCode.includes("Regenerate recovery codes")).toBeTruthy();
     const sql = readFileSync("scripts/sql/mfa.sql", "utf8");
     expect(sql.includes("create table if not exists public.user_mfa")).toBeTruthy();
+    expect(sql.includes("recovery_code_hashes")).toBeTruthy();
   });
 });
-
