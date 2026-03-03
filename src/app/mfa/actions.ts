@@ -15,6 +15,7 @@ import {
   roleRequiresMfa,
   verifyMfaCode,
 } from "@/lib/mfa";
+import { sanitizeInternalRedirectPath } from "@/lib/redirects";
 
 async function getPrivilegedAuthedUser() {
   const session = await getServerSession(authOptions);
@@ -31,7 +32,7 @@ async function getPrivilegedAuthedUser() {
 }
 
 export async function beginMfaSetupAction(formData: FormData): Promise<void> {
-  const next = String(formData.get("next") || "/admin/dashboard").trim() || "/admin/dashboard";
+  const next = sanitizeInternalRedirectPath(String(formData.get("next") || "/admin/dashboard"));
   const user = await getPrivilegedAuthedUser();
   if (!(await mfaTableExists())) {
     redirect(`/mfa?error=table_missing&next=${encodeURIComponent(next)}`);
@@ -41,7 +42,7 @@ export async function beginMfaSetupAction(formData: FormData): Promise<void> {
 }
 
 export async function enableMfaAction(formData: FormData): Promise<void> {
-  const next = String(formData.get("next") || "/admin/dashboard").trim() || "/admin/dashboard";
+  const next = sanitizeInternalRedirectPath(String(formData.get("next") || "/admin/dashboard"));
   const code = String(formData.get("code") || "").trim();
   const user = await getPrivilegedAuthedUser();
   const ok = await enableMfa({ userId: user.id, code });
@@ -54,11 +55,11 @@ export async function enableMfaAction(formData: FormData): Promise<void> {
     await issueRecoveryCodesDisplayCookie(codes);
     redirect(`/mfa?recovery=1&next=${encodeURIComponent(next)}`);
   }
-  redirect(next.startsWith("/") ? next : "/admin/dashboard");
+  redirect(next);
 }
 
 export async function verifyMfaAction(formData: FormData): Promise<void> {
-  const next = String(formData.get("next") || "/admin/dashboard").trim() || "/admin/dashboard";
+  const next = sanitizeInternalRedirectPath(String(formData.get("next") || "/admin/dashboard"));
   const code = String(formData.get("code") || "").trim();
   const user = await getPrivilegedAuthedUser();
   const ok = await verifyMfaCode({ userId: user.id, code });
@@ -66,7 +67,7 @@ export async function verifyMfaAction(formData: FormData): Promise<void> {
     redirect(`/mfa?error=invalid_code&next=${encodeURIComponent(next)}`);
   }
   await issueMfaCookie({ userId: user.id, email: user.email, role: user.role });
-  redirect(next.startsWith("/") ? next : "/admin/dashboard");
+  redirect(next);
 }
 
 export async function clearMfaSessionAction(): Promise<void> {
@@ -75,7 +76,7 @@ export async function clearMfaSessionAction(): Promise<void> {
 }
 
 export async function regenerateRecoveryCodesAction(formData: FormData): Promise<void> {
-  const next = String(formData.get("next") || "/admin/dashboard").trim() || "/admin/dashboard";
+  const next = sanitizeInternalRedirectPath(String(formData.get("next") || "/admin/dashboard"));
   const user = await getPrivilegedAuthedUser();
   const codes = await regenerateRecoveryCodes(user.id);
   if (!codes?.length) {

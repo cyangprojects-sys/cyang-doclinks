@@ -27,6 +27,11 @@ test.describe("mfa guardrails", () => {
     const pageCode = readFileSync("src/app/mfa/page.tsx", "utf8");
     expect(pageCode.includes("Multi-factor authentication")).toBeTruthy();
     expect(pageCode.includes("Regenerate recovery codes")).toBeTruthy();
+    expect(pageCode.includes("sanitizeInternalRedirectPath")).toBeTruthy();
+    expect(pageCode.includes('startsWith("/") ? nextRaw : "/admin/dashboard"')).toBeFalsy();
+    const actionCode = readFileSync("src/app/mfa/actions.ts", "utf8");
+    expect(actionCode.includes("sanitizeInternalRedirectPath")).toBeTruthy();
+    expect(actionCode.includes('next.startsWith("/") ? next : "/admin/dashboard"')).toBeFalsy();
     const sql = readFileSync("scripts/sql/mfa.sql", "utf8");
     expect(sql.includes("create table if not exists public.user_mfa")).toBeTruthy();
     expect(sql.includes("recovery_code_hashes")).toBeTruthy();

@@ -19,6 +19,7 @@ import {
   regenerateRecoveryCodesAction,
   verifyMfaAction,
 } from "./actions";
+import { sanitizeInternalRedirectPath } from "@/lib/redirects";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -42,8 +43,7 @@ export default async function MfaPage({ searchParams }: { searchParams: SearchPa
   }
 
   const params = await searchParams;
-  const nextRaw = String(params?.next || "/admin/dashboard").trim();
-  const next = nextRaw.startsWith("/") ? nextRaw : "/admin/dashboard";
+  const next = sanitizeInternalRedirectPath(String(params?.next || "/admin/dashboard"));
   const error = String(params?.error || "").trim();
   const setupRequested = String(params?.setup || "").trim() === "1";
   const recoveryRequested = String(params?.recovery || "").trim() === "1";
