@@ -22,16 +22,80 @@ type MasterKeyEnv = {
 
 export type ActiveMasterKey = { id: string; key: Buffer };
 
-function parseMasterKeys(): MasterKeyEnv[] {
-  const raw = process.env.DOC_MASTER_KEYS;
-  if (!raw) return [];
+type MasterKeyValidation =
+  | { ok: true; keys: MasterKeyEnv[] }
+  | { ok: false; error: string };
+
+function parseMasterKeysFromRaw(raw: string | null | undefined): MasterKeyValidation {
+  const input = String(raw || "").trim();
+  if (!input) return { ok: true, keys: [] };
+
+  let parsed: unknown;
   try {
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter(Boolean) as MasterKeyEnv[];
+    parsed = JSON.parse(input);
   } catch {
-    return [];
+    return { ok: false, error: "DOC_MASTER_KEYS must be valid JSON." };
   }
+
+  if (!Array.isArray(parsed)) {
+    return { ok: false, error: "DOC_MASTER_KEYS must be a JSON array." };
+  }
+
+  const keys: MasterKeyEnv[] = [];
+  const ids = new Set<string>();
+  let activeCount = 0;
+
+  for (let i = 0; i < parsed.length; i += 1) {
+    const row = parsed[i] as Record<string, unknown> | null;
+    if (!row || typeof row !== "object") {
+      return { ok: false, error: `DOC_MASTER_KEYS[${i}] must be an object.` };
+    }
+
+    const id = String(row.id || "").trim();
+    const keyB64 = String(row.key_b64 || "").trim();
+    const active = Boolean(row.active);
+
+    if (!id) {
+      return { ok: false, error: `DOC_MASTER_KEYS[${i}].id is required.` };
+    }
+    if (!keyB64) {
+      return { ok: false, error: `DOC_MASTER_KEYS[${i}].key_b64 is required.` };
+    }
+    if (ids.has(id)) {
+      return { ok: false, error: `DOC_MASTER_KEYS has duplicate id: ${id}` };
+    }
+
+    const keyBytes = Buffer.from(keyB64, "base64");
+    if (keyBytes.length !== 32) {
+      return { ok: false, error: `Invalid master key length for ${id} (expected 32 bytes)` };
+    }
+
+    ids.add(id);
+    if (active) activeCount += 1;
+    keys.push({ id, key_b64: keyB64, active });
+  }
+
+  if (activeCount > 1) {
+    return { ok: false, error: "DOC_MASTER_KEYS can only have one active key." };
+  }
+
+  return { ok: true, keys };
+}
+
+export function validateDocMasterKeysConfig(
+  raw: string | null | undefined = process.env.DOC_MASTER_KEYS
+): { ok: true } | { ok: false; error: string } {
+  const parsed = parseMasterKeysFromRaw(raw);
+  if (!parsed.ok) return parsed;
+  return { ok: true };
+}
+
+function parseMasterKeys(): MasterKeyEnv[] {
+  const parsed = parseMasterKeysFromRaw(process.env.DOC_MASTER_KEYS);
+  if (!parsed.ok) {
+    throw new Error(parsed.error);
+  }
+  return parsed.keys;
 }
 
 export function getActiveMasterKey(): ActiveMasterKey {

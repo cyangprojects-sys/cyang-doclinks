@@ -85,10 +85,13 @@ export async function consumeAccessTicket(args: { req: Request; ticketId: string
 
   const ipHash = hashIpForTicket(ip);
   const uaHash = hashUserAgent(ua);
-  const requireIp = !["0", "false", "no", "off"].includes(String(process.env.ACCESS_TICKET_REQUIRE_IP_MATCH || "true").trim().toLowerCase());
+  const requireIpConfigured = !["0", "false", "no", "off"].includes(
+    String(process.env.ACCESS_TICKET_REQUIRE_IP_MATCH || "true").trim().toLowerCase()
+  );
+  // If we cannot derive a trusted client IP in this environment, skip hard IP matching.
+  const requireIp = requireIpConfigured && Boolean(ipHash);
   const requireUa = ["1", "true", "yes", "on"].includes(String(process.env.ACCESS_TICKET_REQUIRE_UA_MATCH || "false").trim().toLowerCase());
 
-  if (requireIp && !ipHash) return { ok: false as const };
   if (requireUa && !uaHash) return { ok: false as const };
 
   // Atomic single-use consume with binding + expiry checks.
@@ -113,8 +116,8 @@ export async function consumeAccessTicket(args: { req: Request; ticketId: string
     where id = ${args.ticketId}::uuid
       and used_at is null
       and expires_at > now()
-      ${requireIp ? sql`and ip_hash = ${ipHash}` : sql`and (ip_hash is null or ip_hash = ${ipHash})`}
-      ${requireUa ? sql`and ua_hash = ${uaHash}` : sql`and (ua_hash is null or ua_hash = ${uaHash})`}
+      ${requireIp ? sql`and ip_hash = ${ipHash}` : sql``}
+      ${requireUa ? sql`and ua_hash = ${uaHash}` : sql``}
     returning
       id::text as id,
       doc_id::text as doc_id,
@@ -164,8 +167,8 @@ export async function consumeAccessTicket(args: { req: Request; ticketId: string
           else ${replayGraceDownload}::text
         end || ' seconds'
       )::interval
-      ${requireIp ? sql`and ip_hash = ${ipHash}` : sql`and (ip_hash is null or ip_hash = ${ipHash})`}
-      ${requireUa ? sql`and ua_hash = ${uaHash}` : sql`and (ua_hash is null or ua_hash = ${uaHash})`}
+      ${requireIp ? sql`and ip_hash = ${ipHash}` : sql``}
+      ${requireUa ? sql`and ua_hash = ${uaHash}` : sql``}
     limit 1
   `) as unknown as Array<{
     id: string;

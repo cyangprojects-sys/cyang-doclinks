@@ -1,6 +1,10 @@
 import { expect, test } from "@playwright/test";
 import { assertRuntimeEnv, isRuntimeEnvError, RuntimeEnvError } from "../src/lib/runtimeEnv";
 
+const VALID_DOC_MASTER_KEYS = JSON.stringify([
+  { id: "k1", key_b64: Buffer.alloc(32, 7).toString("base64"), active: true },
+]);
+
 const ENV_KEYS = [
   "NODE_ENV",
   "ENABLE_STRICT_ENV_VALIDATION",
@@ -96,7 +100,7 @@ test.describe("runtime env validation", () => {
     setEnv("NODE_ENV", "development");
     process.env.ENABLE_STRICT_ENV_VALIDATION = "true";
     process.env.DATABASE_URL = "postgres://test";
-    process.env.DOC_MASTER_KEYS = "v1:base64key";
+    process.env.DOC_MASTER_KEYS = VALID_DOC_MASTER_KEYS;
     process.env.R2_BUCKET = "bucket";
     process.env.R2_ENDPOINT = "https://example.r2.cloudflarestorage.com";
     process.env.R2_ACCESS_KEY_ID = "key";
@@ -113,7 +117,7 @@ test.describe("runtime env validation", () => {
     setEnv("NODE_ENV", "development");
     process.env.ENABLE_STRICT_ENV_VALIDATION = "true";
     process.env.DATABASE_URL = "postgres://test";
-    process.env.DOC_MASTER_KEYS = "v1:base64key";
+    process.env.DOC_MASTER_KEYS = VALID_DOC_MASTER_KEYS;
     process.env.R2_BUCKET = "bucket";
     process.env.R2_ENDPOINT = "https://example.r2.cloudflarestorage.com";
     process.env.R2_ACCESS_KEY_ID = "key";
@@ -137,5 +141,25 @@ test.describe("runtime env validation", () => {
 
     process.env.STRIPE_SECRET_KEY = "sk_test_123";
     expect(() => assertRuntimeEnv("stripe_admin")).not.toThrow();
+  });
+
+  test("flags malformed DOC_MASTER_KEYS JSON in strict mode", () => {
+    setEnv("NODE_ENV", "development");
+    process.env.ENABLE_STRICT_ENV_VALIDATION = "true";
+    process.env.DATABASE_URL = "postgres://test";
+    process.env.VIEW_SALT = "salt";
+    process.env.DOC_MASTER_KEYS = '{"id":"broken"}';
+
+    let caught: unknown = null;
+    try {
+      assertRuntimeEnv("serve");
+    } catch (e: unknown) {
+      caught = e;
+    }
+
+    expect(caught).toBeInstanceOf(RuntimeEnvError);
+    if (caught instanceof RuntimeEnvError) {
+      expect(caught.missing).toContain("DOC_MASTER_KEYS_JSON");
+    }
   });
 });

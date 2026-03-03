@@ -30,7 +30,7 @@ test.describe("audit helper primitives", () => {
       "x-real-ip": "7.7.7.7",
       "x-vercel-forwarded-for": "8.8.8.8, 4.4.4.4",
     });
-    expect(getClientIpFromHeaders(h3)).toBe("7.7.7.7");
+    expect(getClientIpFromHeaders(h3)).toBe("8.8.8.8");
 
     const h4 = new Headers({ "x-vercel-forwarded-for": "8.8.8.8, 4.4.4.4" });
     expect(getClientIpFromHeaders(h4)).toBe("8.8.8.8");

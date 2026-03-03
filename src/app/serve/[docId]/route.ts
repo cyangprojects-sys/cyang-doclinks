@@ -20,11 +20,6 @@ import { enforceIpAbuseBlock, logDbErrorEvent, logSecurityEvent, maybeBlockIpOnA
 import { assertRuntimeEnv, isRuntimeEnvError } from "@/lib/runtimeEnv";
 import { resolvePublicAppBaseUrl } from "@/lib/publicBaseUrl";
 
-function getClientIp(req: NextRequest) {
-  const xff = req.headers.get("x-forwarded-for") || "";
-  return xff.split(",")[0]?.trim() || "";
-}
-
 function hashIp(ip: string) {
   const salt = process.env.VIEW_SALT || "";
   if (!salt || !ip) return null;
@@ -244,7 +239,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ docId: stri
 
   // Analytics (best-effort)
   try {
-    const ip = getClientIp(req);
+    const ip = getClientIpFromHeaders(req.headers);
     const ipHash = hashIp(ip);
     const ua = req.headers.get("user-agent") || null;
     const ref = req.headers.get("referer") || null;

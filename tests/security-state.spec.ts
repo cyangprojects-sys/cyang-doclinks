@@ -61,6 +61,64 @@ async function pickServableDoc(sql: Sql): Promise<DocRow | null> {
   }
 }
 
+async function pickPreviewableServableDoc(sql: Sql): Promise<DocRow | null> {
+  try {
+    const pdfRows = (await sql`
+      select
+        d.id::text as id,
+        coalesce(d.moderation_status::text, 'active') as moderation_status,
+        coalesce(d.scan_status::text, 'clean') as scan_status,
+        coalesce(d.risk_level::text, 'low') as risk_level
+      from public.docs d
+      where coalesce(d.status::text, 'ready') <> 'deleted'
+        and coalesce(d.moderation_status::text, 'active') = 'active'
+        and coalesce(d.scan_status::text, 'clean') = 'clean'
+        and (
+          coalesce(d.content_type::text, '') ilike 'application/pdf%'
+          or coalesce(d.original_filename::text, '') ilike '%.pdf'
+        )
+      order by d.created_at desc
+      limit 1
+    `) as unknown as DocRow[];
+    if (pdfRows?.[0]) return pdfRows[0];
+
+    const safeInlineRows = (await sql`
+      select
+        d.id::text as id,
+        coalesce(d.moderation_status::text, 'active') as moderation_status,
+        coalesce(d.scan_status::text, 'clean') as scan_status,
+        coalesce(d.risk_level::text, 'low') as risk_level
+      from public.docs d
+      where coalesce(d.status::text, 'ready') <> 'deleted'
+        and coalesce(d.moderation_status::text, 'active') = 'active'
+        and coalesce(d.scan_status::text, 'clean') = 'clean'
+        and not (
+          coalesce(d.content_type::text, '') ilike 'application/vnd.ms-%'
+          or coalesce(d.content_type::text, '') ilike 'application/msword%'
+          or coalesce(d.content_type::text, '') ilike 'application/vnd.openxmlformats-officedocument.%'
+          or coalesce(d.content_type::text, '') ilike 'application/zip%'
+          or coalesce(d.content_type::text, '') ilike 'application/x-%compressed%'
+          or coalesce(d.original_filename::text, '') ilike '%.doc'
+          or coalesce(d.original_filename::text, '') ilike '%.docx'
+          or coalesce(d.original_filename::text, '') ilike '%.xls'
+          or coalesce(d.original_filename::text, '') ilike '%.xlsx'
+          or coalesce(d.original_filename::text, '') ilike '%.ppt'
+          or coalesce(d.original_filename::text, '') ilike '%.pptx'
+          or coalesce(d.original_filename::text, '') ilike '%.zip'
+          or coalesce(d.original_filename::text, '') ilike '%.7z'
+          or coalesce(d.original_filename::text, '') ilike '%.rar'
+          or coalesce(d.original_filename::text, '') ilike '%.tar'
+          or coalesce(d.original_filename::text, '') ilike '%.gz'
+        )
+      order by d.created_at desc
+      limit 1
+    `) as unknown as DocRow[];
+    return safeInlineRows?.[0] ?? null;
+  } catch {
+    return null;
+  }
+}
+
 async function columnExists(
   sql: Sql,
   tableName: string,
@@ -102,7 +160,7 @@ test.describe("security state enforcement", () => {
     test.skip(!databaseUrl, "DATABASE_URL not available");
     const sql = neon(databaseUrl);
 
-    const doc = await pickServableDoc(sql);
+    const doc = await pickPreviewableServableDoc(sql);
     test.skip(!doc, "No servable docs available for fixture setup");
     if (!doc) return;
 

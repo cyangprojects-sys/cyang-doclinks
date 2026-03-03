@@ -8,25 +8,10 @@
 import crypto from "crypto";
 import { sql } from "@/lib/db";
 import { appendImmutableAudit } from "@/lib/immutableAudit";
+import { getTrustedClientIpFromHeaders } from "@/lib/clientIp";
 
 export function getClientIpFromHeaders(h: Headers): string {
-  // Keep this consistent with src/lib/securityTelemetry.ts (single source of truth for IP extraction)
-  // Cloudflare
-  const cf = (h.get("cf-connecting-ip") || "").trim();
-  if (cf) return cf;
-
-  // Common reverse-proxy headers
-  const xff = (h.get("x-forwarded-for") || "").trim();
-  if (xff) return xff.split(",")[0]?.trim() || "";
-
-  const realIp = (h.get("x-real-ip") || "").trim();
-  if (realIp) return realIp;
-
-  // Vercel
-  const vercel = (h.get("x-vercel-forwarded-for") || "").trim();
-  if (vercel) return vercel.split(",")[0]?.trim() || "";
-
-  return "";
+  return getTrustedClientIpFromHeaders(h) || "";
 }
 
 export function getUserAgentFromHeaders(h: Headers): string {

@@ -1,3 +1,5 @@
+import { validateDocMasterKeysConfig } from "@/lib/encryption";
+
 export type RuntimeEnvScope =
   | "serve"
   | "share_raw"
@@ -46,6 +48,13 @@ function requiredForScope(scope: RuntimeEnvScope): string[] {
   const requireAny = (names: string[], label: string) => {
     if (!hasAnyEnv(names)) missing.add(label);
   };
+  const requireDocMasterKeys = () => {
+    require("DOC_MASTER_KEYS");
+    const raw = process.env.DOC_MASTER_KEYS;
+    if (!raw) return;
+    const valid = validateDocMasterKeysConfig(raw);
+    if (!valid.ok) missing.add("DOC_MASTER_KEYS_JSON");
+  };
 
   // Most runtime server routes require DB.
   if (scope !== "upload_presign") {
@@ -60,10 +69,10 @@ function requiredForScope(scope: RuntimeEnvScope): string[] {
     case "alias_raw":
     case "ticket_serve":
       requireAny(["VIEW_SALT", "NEXTAUTH_SECRET"], "VIEW_SALT|NEXTAUTH_SECRET");
-      require("DOC_MASTER_KEYS");
+      requireDocMasterKeys();
       break;
     case "upload_complete":
-      require("DOC_MASTER_KEYS");
+      requireDocMasterKeys();
       require("R2_BUCKET");
       require("R2_ENDPOINT");
       require("R2_ACCESS_KEY_ID");
@@ -72,7 +81,7 @@ function requiredForScope(scope: RuntimeEnvScope): string[] {
       require("PDF_MAX_PAGES");
       break;
     case "upload_presign":
-      require("DOC_MASTER_KEYS");
+      requireDocMasterKeys();
       require("R2_BUCKET");
       require("R2_ENDPOINT");
       require("R2_ACCESS_KEY_ID");

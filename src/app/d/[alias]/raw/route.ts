@@ -221,9 +221,7 @@ export async function GET(
     }
 
     // --- Rate limiting (best-effort) ---
-    const xff = req.headers.get("x-forwarded-for") || "";
-    const ipFromXff = xff.split(",")[0]?.trim() || "";
-    const ipKey = stableHash(ipFromXff, "VIEW_SALT");
+    const ipKey = stableHash(ip, "VIEW_SALT");
     const ipRl = await rateLimit({
       scope: "ip:alias_raw",
       id: ipKey,
@@ -307,7 +305,6 @@ if (shouldCountView(req)) {
   try {
     const ua = req.headers.get("user-agent") || null;
     const ref = req.headers.get("referer") || null;
-    const ip = (req.headers.get("x-forwarded-for") || "").split(",")[0]?.trim() || "";
     const ipHash = hashIp(ip);
 
     try {

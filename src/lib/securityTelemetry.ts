@@ -2,6 +2,7 @@ import crypto from "crypto";
 import { sql } from "@/lib/db";
 import { rateLimit } from "@/lib/rateLimit";
 import { appendImmutableAudit } from "@/lib/immutableAudit";
+import { getTrustedClientIpFromHeaders } from "@/lib/clientIp";
 
 function logTelemetryFailure(message: string) {
   console.warn(message);
@@ -27,6 +28,17 @@ function securityTelemetryDbEnabled(): boolean {
  * Hash IP address (privacy safe logging)
  */
 export function hashIp(ip: string): string {
+  const key = String(
+    process.env.SECURITY_TELEMETRY_HASH_KEY ||
+      process.env.VIEW_SALT ||
+      process.env.NEXTAUTH_SECRET ||
+      process.env.APP_SECRET ||
+      ""
+  ).trim();
+  if (key) {
+    return crypto.createHmac("sha256", key).update(ip).digest("hex");
+  }
+
   const hash = crypto.createHash("sha256");
   hash.update(ip);
   return hash.digest("hex");
@@ -37,39 +49,7 @@ export function hashIp(ip: string): string {
  * We prefer edge / proxy headers (Cloudflare + Vercel) then fall back.
  */
 export function clientIpKey(req: Request): { ip: string; ipHash: string } {
-  const h = req.headers;
-  const strictProxyTrust = String(process.env.TRUST_PROXY_HEADERS || "").trim().toLowerCase();
-  const allowUntrustedProxyHeaders =
-    strictProxyTrust === "1" ||
-    strictProxyTrust === "true" ||
-    strictProxyTrust === "yes" ||
-    strictProxyTrust === "on" ||
-    process.env.NODE_ENV !== "production";
-
-  // Cloudflare
-  const cf = h.get("cf-connecting-ip");
-  if (cf) return { ip: cf, ipHash: hashIp(cf) };
-  // Vercel edge forwarding
-  const vercel = h.get("x-vercel-forwarded-for");
-  if (vercel) {
-    const first = vercel.split(",")[0]?.trim();
-    if (first) return { ip: first, ipHash: hashIp(first) };
-  }
-
-  // Only trust generic proxy headers when explicitly allowed.
-  if (allowUntrustedProxyHeaders) {
-    const xff = h.get("x-forwarded-for");
-    if (xff) {
-      const first = xff.split(",")[0]?.trim();
-      if (first) return { ip: first, ipHash: hashIp(first) };
-    }
-
-    const xri = h.get("x-real-ip");
-    if (xri) return { ip: xri, ipHash: hashIp(xri) };
-  }
-
-  // Final fallback (unknown)
-  const ip = "0.0.0.0";
+  const ip = getTrustedClientIpFromHeaders(req.headers) || "0.0.0.0";
   return { ip, ipHash: hashIp(ip) };
 }
 

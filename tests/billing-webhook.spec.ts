@@ -213,6 +213,154 @@ test.describe("billing webhook integration", () => {
     await sql`delete from public.billing_webhook_events where event_id = ${eventId}`;
   });
 
+  test("applies customer.subscription.updated plan and cancel-at-period-end state", async ({ request }) => {
+    const webhookSecret = String(process.env.STRIPE_WEBHOOK_SECRET || "").trim();
+    const databaseUrl = String(process.env.DATABASE_URL || "").trim();
+    test.skip(!webhookSecret, "STRIPE_WEBHOOK_SECRET not available");
+    test.skip(!databaseUrl, "DATABASE_URL not available");
+
+    const proPriceId = String(process.env.STRIPE_PRO_PRICE_IDS || "")
+      .split(",")
+      .map((v) => v.trim())
+      .filter(Boolean)[0];
+    test.skip(!proPriceId, "STRIPE_PRO_PRICE_IDS not configured");
+
+    const sql = neon(databaseUrl);
+    const ready = await canUseBillingTables(sql);
+    test.skip(!ready, "billing_subscriptions table not available");
+
+    const subId = `sub_test_sub_updated_${randSuffix()}`;
+    const customerId = `cus_test_sub_updated_${randSuffix()}`;
+    const eventId = `evt_sub_updated_${randSuffix()}`;
+
+    await sql`
+      insert into public.billing_subscriptions
+        (user_id, stripe_customer_id, stripe_subscription_id, status, plan_id, current_period_end, cancel_at_period_end, grace_until, updated_at)
+      values
+        (null, ${customerId}, ${subId}, 'active', 'free', now() + interval '30 days', false, null, now())
+      on conflict (stripe_subscription_id)
+      do update set
+        stripe_customer_id = excluded.stripe_customer_id,
+        status = excluded.status,
+        plan_id = excluded.plan_id,
+        current_period_end = excluded.current_period_end,
+        cancel_at_period_end = excluded.cancel_at_period_end,
+        grace_until = excluded.grace_until,
+        updated_at = now()
+    `;
+
+    const payload = {
+      id: eventId,
+      type: "customer.subscription.updated",
+      created: Math.floor(Date.now() / 1000),
+      data: {
+        object: {
+          id: subId,
+          customer: customerId,
+          status: "active",
+          cancel_at_period_end: true,
+          current_period_end: Math.floor(Date.now() / 1000) + 86_400,
+          items: { data: [{ price: { id: proPriceId } }] },
+          metadata: {},
+        },
+      },
+    };
+
+    const resp = await request.post("/api/stripe/webhook", {
+      data: payload,
+      headers: {
+        "stripe-signature": stripeSignature(payload, webhookSecret),
+      },
+    });
+    test.skip(resp.status() === 403, "Webhook processing blocked by environment abuse controls");
+    expect(resp.status()).toBe(200);
+
+    const rows = (await sql`
+      select
+        status::text as status,
+        plan_id::text as plan_id,
+        cancel_at_period_end::boolean as cancel_at_period_end
+      from public.billing_subscriptions
+      where stripe_subscription_id = ${subId}
+      limit 1
+    `) as unknown as Array<{ status: string; plan_id: string; cancel_at_period_end: boolean }>;
+
+    expect(rows.length).toBe(1);
+    expect(rows[0].status).toBe("active");
+    expect(rows[0].plan_id).toBe("pro");
+    expect(Boolean(rows[0].cancel_at_period_end)).toBeTruthy();
+
+    await sql`delete from public.billing_subscriptions where stripe_subscription_id = ${subId}`;
+    await sql`delete from public.billing_webhook_events where event_id = ${eventId}`;
+  });
+
+  test("applies customer.subscription.deleted as canceled", async ({ request }) => {
+    const webhookSecret = String(process.env.STRIPE_WEBHOOK_SECRET || "").trim();
+    const databaseUrl = String(process.env.DATABASE_URL || "").trim();
+    test.skip(!webhookSecret, "STRIPE_WEBHOOK_SECRET not available");
+    test.skip(!databaseUrl, "DATABASE_URL not available");
+
+    const sql = neon(databaseUrl);
+    const ready = await canUseBillingTables(sql);
+    test.skip(!ready, "billing_subscriptions table not available");
+
+    const subId = `sub_test_sub_deleted_${randSuffix()}`;
+    const customerId = `cus_test_sub_deleted_${randSuffix()}`;
+    const eventId = `evt_sub_deleted_${randSuffix()}`;
+
+    await sql`
+      insert into public.billing_subscriptions
+        (user_id, stripe_customer_id, stripe_subscription_id, status, plan_id, current_period_end, cancel_at_period_end, grace_until, updated_at)
+      values
+        (null, ${customerId}, ${subId}, 'active', 'pro', now() + interval '30 days', false, null, now())
+      on conflict (stripe_subscription_id)
+      do update set
+        stripe_customer_id = excluded.stripe_customer_id,
+        status = excluded.status,
+        plan_id = excluded.plan_id,
+        current_period_end = excluded.current_period_end,
+        cancel_at_period_end = excluded.cancel_at_period_end,
+        grace_until = excluded.grace_until,
+        updated_at = now()
+    `;
+
+    const payload = {
+      id: eventId,
+      type: "customer.subscription.deleted",
+      created: Math.floor(Date.now() / 1000),
+      data: {
+        object: {
+          id: subId,
+          customer: customerId,
+          current_period_end: Math.floor(Date.now() / 1000),
+          metadata: {},
+        },
+      },
+    };
+
+    const resp = await request.post("/api/stripe/webhook", {
+      data: payload,
+      headers: {
+        "stripe-signature": stripeSignature(payload, webhookSecret),
+      },
+    });
+    test.skip(resp.status() === 403, "Webhook processing blocked by environment abuse controls");
+    expect(resp.status()).toBe(200);
+
+    const rows = (await sql`
+      select status::text as status
+      from public.billing_subscriptions
+      where stripe_subscription_id = ${subId}
+      limit 1
+    `) as unknown as Array<{ status: string }>;
+
+    expect(rows.length).toBe(1);
+    expect(rows[0].status).toBe("canceled");
+
+    await sql`delete from public.billing_subscriptions where stripe_subscription_id = ${subId}`;
+    await sql`delete from public.billing_webhook_events where event_id = ${eventId}`;
+  });
+
   test("ignores stale out-of-order payment_failed after newer payment_succeeded", async ({ request }) => {
     const webhookSecret = String(process.env.STRIPE_WEBHOOK_SECRET || "").trim();
     const databaseUrl = String(process.env.DATABASE_URL || "").trim();

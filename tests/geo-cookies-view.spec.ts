@@ -103,7 +103,7 @@ test.describe("geo, cookie, and view helpers", () => {
         "x-vercel-forwarded-for": "8.8.8.8, 4.4.4.4",
       },
     });
-    expect(getClientIp(req5)).toBe("3.3.3.3");
+    expect(getClientIp(req5)).toBe("8.8.8.8");
 
     const h1 = hashIp("1.2.3.4");
     const h2 = hashIp("1.2.3.4");

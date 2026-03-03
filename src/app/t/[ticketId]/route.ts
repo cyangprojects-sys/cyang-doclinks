@@ -21,8 +21,7 @@ export const revalidate = 0;
 function isBlockedTopLevelTicketOpen(req: NextRequest): boolean {
   const dest = (req.headers.get("sec-fetch-dest") || "").toLowerCase();
   const mode = (req.headers.get("sec-fetch-mode") || "").toLowerCase();
-  const user = (req.headers.get("sec-fetch-user") || "").toLowerCase();
-  return dest === "document" && mode === "navigate" && user === "?1";
+  return dest === "document" && mode === "navigate";
 }
 
 function isDownloadTicket(
@@ -172,6 +171,36 @@ export async function GET(
   }
 
   const { ticketId } = await params;
+  const topLevelOpen = isBlockedTopLevelTicketOpen(req);
+
+  if (topLevelOpen) {
+    try {
+      const rows = (await sql`
+        select
+          purpose::text as purpose,
+          response_content_disposition::text as response_content_disposition
+        from public.access_tickets
+        where id = ${ticketId}::uuid
+          and expires_at > now()
+        limit 1
+      `) as unknown as Array<{
+        purpose: string | null;
+        response_content_disposition: string | null;
+      }>;
+      const previewBlocked = !isDownloadTicket(rows?.[0] ?? null);
+      if (previewBlocked) {
+        return new NextResponse("Direct open is disabled for this protected document.", {
+          status: 403,
+          headers: secureDocHeaders(),
+        });
+      }
+    } catch {
+      return new NextResponse("Direct open is disabled for this protected document.", {
+        status: 403,
+        headers: secureDocHeaders(),
+      });
+    }
+  }
 
   // Throttle ticket exchange (prevents hotlink storms)
   const ticketRl = await enforceGlobalApiRateLimit({
@@ -209,7 +238,7 @@ export async function GET(
   const shouldPdfWatermarkDownload = downloadTicket && looksLikePdf(t.response_content_type, t.r2_key);
   const requestIpHash = hashIpForTicket(clientIpKey(req).ip)?.slice(0, 10) || null;
   const requestUaHash = hashUserAgent(req.headers.get("user-agent"))?.slice(0, 10) || null;
-  if (isBlockedTopLevelTicketOpen(req) && !downloadTicket) {
+  if (topLevelOpen && !downloadTicket) {
     return new NextResponse("Direct open is disabled for this protected document.", {
       status: 403,
       headers: secureDocHeaders(),
