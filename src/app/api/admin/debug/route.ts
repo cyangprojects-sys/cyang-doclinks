@@ -4,6 +4,7 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { requireRole } from "@/lib/authz";
+import { isDebugApiEnabled } from "@/lib/debugAccess";
 
 import { HeadObjectCommand } from "@aws-sdk/client-s3";
 import { getR2Bucket, r2Client } from "@/lib/r2";
@@ -15,8 +16,11 @@ type AliasRow = {
   expires_at: string | null;
   created_at?: string | null;
 };
-function boolEnv(name: string) {
-  return Boolean(process.env[name] && String(process.env[name]).trim().length > 0);
+
+function isExpiredAt(raw: string | null | undefined): boolean {
+  if (!raw) return false;
+  const ts = Date.parse(raw);
+  return Number.isFinite(ts) && ts <= Date.now();
 }
 
 async function tableExists(regclass: string) {
@@ -29,10 +33,7 @@ async function tableExists(regclass: string) {
 export async function GET(req: NextRequest) {
   try {
     const r2Bucket = getR2Bucket();
-    const enabled =
-      process.env.NODE_ENV !== "production" ||
-      ["1", "true", "yes", "on"].includes(String(process.env.ADMIN_DEBUG_ENABLED || "").trim().toLowerCase());
-    if (!enabled) {
+    if (!isDebugApiEnabled()) {
       return NextResponse.json({ ok: false, error: "NOT_FOUND" }, { status: 404 });
     }
 
@@ -52,17 +53,17 @@ export async function GET(req: NextRequest) {
 
     const notes: string[] = [];
     if (hasDocuments && hasDocs) {
-      notes.push("Both public.docs and public.documents exist. Make sure your /serve route reads from the same table your uploader writes to.");
+      notes.push("Multiple document tables detected.");
     } else if (hasDocuments && !hasDocs) {
-      notes.push("public.docs does NOT exist but public.documents does. Your newer upload routes (presign/complete) look like they write to public.docs.");
+      notes.push("Legacy documents table detected without docs table.");
     } else if (hasDocs && !hasDocuments) {
-      notes.push("public.documents does NOT exist but public.docs does. If /serve is still querying public.documents, it will return Not Found.");
+      notes.push("Primary docs table detected.");
     } else {
-      notes.push("Neither public.docs nor public.documents exists (unexpected). Check your DB connection / migrations.");
+      notes.push("No expected document table found.");
     }
 
     if (!hasDocAliases) {
-      notes.push("public.doc_aliases does NOT exist. /d/[alias] cannot resolve anything without it.");
+      notes.push("Alias table missing.");
     }
 
     // Read alias row (always from public.doc_aliases, when present)
@@ -84,10 +85,10 @@ export async function GET(req: NextRequest) {
       aliasRow = rows?.[0] ?? null;
 
       if (!aliasRow) {
-        notes.push("Alias row NOT found in public.doc_aliases for this alias.");
+        notes.push("Alias row not found.");
       } else {
-        if (aliasRow.revoked_at) notes.push("Alias is revoked (revoked_at is set).");
-        if (aliasRow.expires_at) notes.push("Alias has an expires_at value; if it's in the past it will be treated as expired.");
+        if (aliasRow.revoked_at) notes.push("Alias is revoked.");
+        if (isExpiredAt(aliasRow.expires_at)) notes.push("Alias is expired.");
       }
     }
 
@@ -106,7 +107,6 @@ export async function GET(req: NextRequest) {
             size_bytes,
             r2_bucket,
             r2_key,
-            created_by_email,
             status,
             created_at
           from public.docs
@@ -114,7 +114,7 @@ export async function GET(req: NextRequest) {
           limit 1
         `;
         docRow = (rows as Array<Record<string, unknown>>)?.[0] ?? null;
-        if (!docRow) notes.push("No row found in public.docs for doc_id (alias points to missing doc).");
+        if (!docRow) notes.push("Document row missing in docs table.");
       } else if (hasDocuments) {
         const rows = await sql`
           select
@@ -127,7 +127,7 @@ export async function GET(req: NextRequest) {
           limit 1
         `;
         docRow = (rows as Array<Record<string, unknown>>)?.[0] ?? null;
-        if (!docRow) notes.push("No row found in public.documents for doc_id (alias points to missing doc).");
+        if (!docRow) notes.push("Document row missing in legacy table.");
       }
     }
 
@@ -146,8 +146,7 @@ export async function GET(req: NextRequest) {
         );
         r2Head = {
           ok: true,
-          bucket,
-          key: docKeyVal,
+          object_present: true,
           contentLength: head.ContentLength ?? null,
           contentType: head.ContentType ?? null,
           etag: head.ETag ?? null,
@@ -155,26 +154,28 @@ export async function GET(req: NextRequest) {
         };
       } catch (e: unknown) {
         const err = e as { name?: string };
-        r2Head = { ok: false, error: err?.name ?? "HEAD_FAILED", message: "Object HEAD failed" };
-        notes.push("R2 HEAD failed (bucket/key may be wrong, or credentials missing).");
+        r2Head = { ok: false, object_present: false, error: err?.name ?? "HEAD_FAILED" };
+        notes.push("Object storage HEAD check failed.");
       }
     } else if (docRow && hasDocs) {
-      notes.push("Doc row exists in public.docs but r2_key is empty/null (serve cannot fetch from R2).");
+      notes.push("Document row missing object key.");
     }
 
-    const env = {
-      NEXT_PUBLIC_SITE_URL: boolEnv("NEXT_PUBLIC_SITE_URL"),
-      DATABASE_URL: boolEnv("DATABASE_URL"),
-      OWNER_EMAIL: boolEnv("OWNER_EMAIL"),
-      AUTH_SECRET: boolEnv("AUTH_SECRET"),
-      GOOGLE_CLIENT_ID: boolEnv("GOOGLE_CLIENT_ID"),
-      GOOGLE_CLIENT_SECRET: boolEnv("GOOGLE_CLIENT_SECRET"),
-      R2_ACCOUNT_ID: boolEnv("R2_ACCOUNT_ID"),
-      R2_ACCESS_KEY_ID: boolEnv("R2_ACCESS_KEY_ID"),
-      R2_SECRET_ACCESS_KEY: boolEnv("R2_SECRET_ACCESS_KEY"),
-      R2_BUCKET: boolEnv("R2_BUCKET"),
-      R2_PREFIX: boolEnv("R2_PREFIX"),
-      VIEW_SALT: boolEnv("VIEW_SALT"),
+    const aliasStatus = aliasRow
+      ? {
+          exists: true,
+          revoked: Boolean(aliasRow.revoked_at),
+          expired: isExpiredAt(aliasRow.expires_at),
+          created_at: aliasRow.created_at ?? null,
+        }
+      : { exists: false, revoked: false, expired: false, created_at: null };
+
+    const documentStatus = {
+      exists: Boolean(docRow),
+      status: typeof docRow?.status === "string" ? docRow.status : null,
+      content_type: typeof docRow?.content_type === "string" ? docRow.content_type : null,
+      size_bytes: typeof docRow?.size_bytes === "number" ? docRow.size_bytes : null,
+      has_object_key: Boolean(docKeyVal),
     };
 
     return NextResponse.json({
@@ -187,10 +188,9 @@ export async function GET(req: NextRequest) {
         "public.doc_aliases": hasDocAliases,
         "public.doc_views": hasDocViews,
       },
-      env,
-      alias_row: aliasRow,
-      doc_row: docRow,
-      r2_head: r2Head,
+      alias_status: aliasStatus,
+      document_status: documentStatus,
+      storage_status: r2Head,
       notes,
     });
   } catch (err: unknown) {

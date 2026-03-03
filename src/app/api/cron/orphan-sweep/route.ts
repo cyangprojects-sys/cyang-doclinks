@@ -8,14 +8,7 @@ import { runR2OrphanSweep } from "@/lib/retention";
 
 export async function GET(req: NextRequest) {
   if (!isCronAuthorized(req)) {
-    return NextResponse.json(
-      {
-        ok: false,
-        error: "UNAUTHORIZED",
-        hint: "Set CRON_SECRET in Vercel env vars.",
-      },
-      { status: 401 }
-    );
+    return NextResponse.json({ ok: false, error: "UNAUTHORIZED" }, { status: 401 });
   }
 
   const startedAt = Date.now();

@@ -7,9 +7,10 @@ test.describe("api route access controls (static)", () => {
     expect(code.includes("export async function GET")).toBeTruthy();
   });
 
-  test("debug alias endpoint requires authenticated admin", () => {
+  test("debug alias endpoint requires authenticated owner and debug gate", () => {
     const code = readFileSync("src/app/api/debug/alias/[alias]/route.ts", "utf8");
-    expect(code.includes('await requireRole("admin")')).toBeTruthy();
+    expect(code.includes('await requireRole("owner")')).toBeTruthy();
+    expect(code.includes("isDebugApiEnabled()")).toBeTruthy();
     expect(code.includes("UNAUTHENTICATED")).toBeTruthy();
     expect(code.includes("FORBIDDEN")).toBeTruthy();
   });

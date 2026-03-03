@@ -19,15 +19,7 @@ function isAuthorized(req: NextRequest): boolean {
 
 export async function GET(req: NextRequest) {
   if (!isAuthorized(req)) {
-    return NextResponse.json(
-      {
-        ok: false,
-        error: "UNAUTHORIZED",
-        hint:
-          "Set CRON_SECRET in Vercel env vars. Vercel will send it as the Authorization header for cron invocations.",
-      },
-      { status: 401 }
-    );
+    return NextResponse.json({ ok: false, error: "UNAUTHORIZED" }, { status: 401 });
   }
 
   const startedAt = Date.now();

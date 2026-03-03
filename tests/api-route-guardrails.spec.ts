@@ -65,11 +65,24 @@ test.describe("api route guardrails", () => {
     expect(officePreview.includes("enforceGlobalApiRateLimit(")).toBeTruthy();
   });
 
-  test("debug alias lookup route requires admin role", () => {
+  test("debug alias lookup route requires owner role and debug gate", () => {
     const code = src("src/app/api/debug/alias/[alias]/route.ts");
-    expect(code.includes('await requireRole("admin")')).toBeTruthy();
+    expect(code.includes('await requireRole("owner")')).toBeTruthy();
+    expect(code.includes("isDebugApiEnabled()")).toBeTruthy();
     expect(code.includes("UNAUTHENTICATED")).toBeTruthy();
     expect(code.includes("FORBIDDEN")).toBeTruthy();
+  });
+
+  test("cron unauthorized responses do not include setup hints", () => {
+    const files = routeFiles().filter((f) => f.includes("src/app/api/cron/"));
+    const findings: string[] = [];
+    for (const f of files) {
+      const code = src(f);
+      if (code.includes('error: "UNAUTHORIZED"') && code.includes("hint")) {
+        findings.push(f);
+      }
+    }
+    expect(findings).toEqual([]);
   });
 
   test("viewer office preview fetch stays scoped to raw document paths", () => {

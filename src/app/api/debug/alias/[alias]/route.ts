@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { requireRole } from "@/lib/authz";
+import { isDebugApiEnabled } from "@/lib/debugAccess";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -19,8 +20,12 @@ export async function GET(
   _req: Request,
   context: { params: Promise<{ alias: string }> }
 ) {
+  if (!isDebugApiEnabled()) {
+    return NextResponse.json({ ok: false, error: "NOT_FOUND" }, { status: 404 });
+  }
+
   try {
-    await requireRole("admin");
+    await requireRole("owner");
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "";
     if (msg === "UNAUTHENTICATED") {
@@ -38,10 +43,6 @@ export async function GET(
       { status: 400 }
     );
   }
-
-  const dbInfo = await sql`
-    select current_database() as db, current_schema() as schema
-  `;
 
   let rowDocAliases: AliasLookupRow[] = [];
   try {
@@ -84,12 +85,20 @@ export async function GET(
   }
 
   const row = rowDocAliases?.[0] ?? rowDocumentAliases?.[0] ?? null;
+  const expiresAt = row?.expires_at ? Date.parse(row.expires_at) : NaN;
+  const expired = Number.isFinite(expiresAt) && expiresAt <= Date.now();
 
   return NextResponse.json({
     ok: true,
     alias,
-    db: dbInfo?.[0] ?? null,
     found: !!row,
-    row,
+    source_table: row?.source_table ?? null,
+    state: row
+      ? {
+          active: row.is_active ?? null,
+          revoked: Boolean(row.revoked_at),
+          expired,
+        }
+      : null,
   });
 }
