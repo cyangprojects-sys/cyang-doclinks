@@ -21,4 +21,12 @@ test.describe("platform security config guardrails", () => {
     expect(code.includes('source: "/((?!serve|d|t).*)"')).toBeTruthy();
     expect(code.includes('value: "DENY"')).toBeTruthy();
   });
+
+  test("CSP connect-src env tokens are sanitized to prevent directive injection", () => {
+    const code = readFileSync("next.config.ts", "utf8");
+    expect(code.includes("normalizeConnectSourceToken")).toBeTruthy();
+    expect(code.includes("/['\"`;]/")).toBeTruthy();
+    expect(code.includes("schemeHostSourcePattern")).toBeTruthy();
+    expect(code.includes("hostSourcePattern")).toBeTruthy();
+  });
 });

@@ -21,17 +21,45 @@ function cspValue(frameAncestors: string) {
     "wasm-unsafe-eval",
   ]);
 
-  for (const rawToken of String(process.env.CSP_CONNECT_SRC || "").split(/[\s,]+/)) {
-    const token = rawToken.trim();
-    if (!token) continue;
+  const schemeSources = new Set(["https:", "http:", "wss:", "ws:", "data:", "blob:"]);
+
+  const schemeHostSourcePattern =
+    /^(https?|wss?):\/\/(\*\.)?([a-z0-9.-]+|\[[0-9a-f:.]+\])(?::\d{1,5})?$/i;
+  const hostSourcePattern = /^(\*\.)?([a-z0-9.-]+|\[[0-9a-f:.]+\])(?::\d{1,5})?$/i;
+
+  function normalizeConnectSourceToken(raw: string): string | null {
+    const token = raw.trim();
+    if (!token) return null;
+
     const dequoted = token.replace(/^['"]|['"]$/g, "");
-    if (!dequoted) continue;
+    if (!dequoted) return null;
+
+    // Prevent CSP directive/source-list injection via env tokens.
+    // The split already strips spaces/commas, but semicolons and quotes can still break directives.
+    if (/['"`;]/.test(dequoted)) return null;
+
     const lower = dequoted.toLowerCase();
-    if (keywordSources.has(lower)) {
-      connectSources.add(`'${lower}'`);
-    } else {
-      connectSources.add(dequoted);
+    if (keywordSources.has(lower)) return `'${lower}'`;
+    if (schemeSources.has(lower)) return lower;
+
+    if (schemeHostSourcePattern.test(lower)) return lower;
+    if (hostSourcePattern.test(lower)) return lower;
+
+    // Allow full URLs but normalize to origin only.
+    try {
+      const u = new URL(dequoted);
+      if (!["https:", "http:", "wss:", "ws:"].includes(u.protocol)) return null;
+      if (u.username || u.password) return null;
+      return u.origin;
+    } catch {
+      return null;
     }
+  }
+
+  for (const rawToken of String(process.env.CSP_CONNECT_SRC || "").split(/[\s,]+/)) {
+    const normalized = normalizeConnectSourceToken(rawToken);
+    if (!normalized) continue;
+    connectSources.add(normalized);
   }
 
   const r2Endpoint = String(process.env.R2_ENDPOINT || "").trim();
