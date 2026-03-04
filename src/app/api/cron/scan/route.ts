@@ -126,13 +126,21 @@ export async function GET(req: NextRequest) {
           ? "quarantined"
           : "quarantined";
 
-      // Update doc (trigger will auto-quarantine on risk_level='high')
+      // Update doc status from scanner result.
+      // Important: if scanner returns clean + non-high risk, clear stale quarantine
+      // unless the doc is explicitly disabled/deleted by policy.
       await sql`
         update public.docs
         set
           scan_status = ${scanStatus}::text,
           risk_level = ${verdict.riskLevel}::text,
-          risk_flags = ${JSON.stringify({ flags: verdict.flags, meta: verdict.meta ?? null, source: "malware_scan" })}::jsonb
+          risk_flags = ${JSON.stringify({ flags: verdict.flags, meta: verdict.meta ?? null, source: "malware_scan" })}::jsonb,
+          moderation_status = case
+            when lower(coalesce(moderation_status, 'active')) in ('disabled', 'deleted') then moderation_status
+            when ${scanStatus}::text = 'clean' and ${verdict.riskLevel}::text <> 'high' then 'active'
+            when ${scanStatus}::text = 'quarantined' or ${verdict.riskLevel}::text = 'high' then 'quarantined'
+            else moderation_status
+          end
         where id = ${job.doc_id}::uuid
       `;
 

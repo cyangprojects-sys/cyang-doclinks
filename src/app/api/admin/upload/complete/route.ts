@@ -490,7 +490,11 @@ export async function POST(req: NextRequest) {
         enc_wrapped_key = ${encWrappedKey},
         enc_wrap_iv = ${encWrapIv},
         enc_wrap_tag = ${encWrapTag},
-        moderation_status = case when ${riskLevel}::text = 'high' then 'quarantined' else coalesce(moderation_status, 'active') end
+        moderation_status = case
+          when ${riskLevel}::text = 'high' then 'quarantined'
+          when lower(coalesce(moderation_status, 'active')) in ('disabled', 'deleted') then moderation_status
+          else 'active'
+        end
       where id = ${docId}::uuid
     `;
 

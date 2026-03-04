@@ -10,6 +10,7 @@ import { appendImmutableAudit } from "@/lib/immutableAudit";
 
 type Action =
   | { action: "disable_doc"; docId: string; reason?: string | null; reportId?: string | null }
+  // Backward-compat alias: manual quarantine has been retired; treated as disable_doc.
   | { action: "quarantine_doc"; docId: string; reason?: string | null; reportId?: string | null }
   | { action: "override_quarantine"; docId: string; reason?: string | null; ttlMinutes?: number; confirm: string }
   | { action: "revoke_override"; docId: string; reason?: string | null; confirm: string }
@@ -71,15 +72,19 @@ export async function POST(req: NextRequest) {
   if (act === "disable_doc" || act === "quarantine_doc") {
     const docId = bodyString(rawBody, "docId");
     if (!docId) return NextResponse.json({ ok: false, error: "MISSING_DOC" }, { status: 400 });
+    const appliedAction = "disable_doc";
+    const normalizedReason =
+      act === "quarantine_doc"
+        ? (reason ? `[from_quarantine_action] ${reason}` : "Manual quarantine action deprecated; doc disabled instead")
+        : reason;
 
     await sql`
       update public.docs
       set
-        moderation_status = ${act === "disable_doc" ? "disabled" : "quarantined"},
-        scan_status = ${act === "quarantine_doc" ? "quarantined" : sql`scan_status`},
+        moderation_status = 'disabled',
         disabled_at = now(),
         disabled_by = ${user.id}::uuid,
-        disabled_reason = ${reason}
+        disabled_reason = ${normalizedReason}
       where id = ${docId}::uuid
     `;
 
@@ -95,12 +100,12 @@ export async function POST(req: NextRequest) {
     }
 
     await logSecurityEvent({
-      type: act === "disable_doc" ? "doc_disabled" : "doc_quarantined",
+      type: "doc_disabled",
       severity: "high",
       ip: ipInfo.ip,
       docId,
       scope: "admin_abuse",
-      message: reason || "Admin moderation action",
+      message: normalizedReason || "Admin moderation action",
     });
     await appendImmutableAudit({
       streamKey: `admin:${user.id}`,
@@ -109,10 +114,10 @@ export async function POST(req: NextRequest) {
       orgId: user.orgId ?? null,
       docId,
       ipHash: ipInfo.ipHash,
-      payload: { action: act, reason, reportId: rawBody.reportId ?? null },
+      payload: { requestedAction: act, appliedAction, reason: normalizedReason, reportId: rawBody.reportId ?? null },
     });
 
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, action: appliedAction });
   }
 
   if (act === "override_quarantine") {

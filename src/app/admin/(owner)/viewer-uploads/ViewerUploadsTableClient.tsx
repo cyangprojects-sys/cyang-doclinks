@@ -116,7 +116,7 @@ export default function ViewerUploadsTableClient({ rows }: { rows: ViewerUploadR
     });
   }
 
-  async function runAbuseAction(action: "quarantine_doc" | "disable_doc", docIds: string[]) {
+  async function runAbuseAction(action: "disable_doc", docIds: string[]) {
     setError(null);
     if (!docIds.length) return;
     startTransition(async () => {
@@ -235,9 +235,6 @@ export default function ViewerUploadsTableClient({ rows }: { rows: ViewerUploadR
 
       <div className="glass-card-strong rounded-2xl p-3">
         <div className="flex flex-wrap gap-2">
-          <button type="button" disabled={isPending || !selectedIds.length} onClick={() => runAbuseAction("quarantine_doc", selectedIds)} className="rounded-md border border-amber-600/40 bg-amber-500/20 px-3 py-1.5 text-sm text-amber-100 disabled:opacity-50">
-            Quarantine selected
-          </button>
           <button type="button" disabled={isPending || !selectedIds.length} onClick={() => runAbuseAction("disable_doc", selectedIds)} className="rounded-md border border-amber-600/40 bg-amber-500/10 px-3 py-1.5 text-sm text-amber-100 disabled:opacity-50">
             Disable selected
           </button>
@@ -325,7 +322,6 @@ export default function ViewerUploadsTableClient({ rows }: { rows: ViewerUploadR
                 <td className="px-3 py-2 text-right">
                   <div className="flex flex-wrap justify-end gap-2">
                     <Link aria-label={`Open upload ${r.title || r.doc_id}`} href={`/admin/docs/${r.doc_id}`} className="rounded-md border border-white/20 bg-white/10 px-2 py-1 text-xs">Open</Link>
-                    <button aria-label={`Quarantine upload ${r.title || r.doc_id}`} type="button" onClick={() => runAbuseAction("quarantine_doc", [r.doc_id])} className="rounded-md border border-amber-700/50 bg-amber-700/20 px-2 py-1 text-xs text-amber-100">Quarantine</button>
                     <button aria-label={`Disable upload ${r.title || r.doc_id}`} type="button" onClick={() => runAbuseAction("disable_doc", [r.doc_id])} className="rounded-md border border-amber-700/50 bg-amber-700/10 px-2 py-1 text-xs text-amber-100">Disable</button>
                     <form
                       action={async (fd) => {

@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { unstable_noStore as noStore } from "next/cache";
 import ShareForm from "./ShareForm";
 import AliasPasswordGate from "./AliasPasswordGate";
+import BackButton from "./BackButton";
 import { resolveDoc } from "@/lib/resolveDoc";
 
 import { getServerSession } from "next-auth";
@@ -373,6 +374,9 @@ export default async function SharePage({
     const viewMeta = await getDocViewMeta(bypass.docId);
     return (
       <main className="mx-auto max-w-5xl px-4 py-10">
+        <div className="mb-4">
+          <BackButton fallbackHref="/admin/dashboard" />
+        </div>
         <ShareForm docId={bypass.docId} canEditTitle={canEditTitle} planId={planId} />
         <DocumentViewer alias={alias} contentType={viewMeta.contentType} filename={viewMeta.filename} availabilityHint={availabilityHint} />
       </main>
@@ -391,6 +395,9 @@ export default async function SharePage({
     if (!unlocked) {
       return (
         <main className="mx-auto max-w-lg px-4 py-12">
+          <div className="mb-4">
+            <BackButton />
+          </div>
           <h1 className="text-xl font-semibold">Protected link</h1>
           <p className="mt-2 text-sm text-neutral-400">
             Enter the password to view this document. We’ll remember this device for 8 hours.
@@ -408,6 +415,9 @@ export default async function SharePage({
 
   return (
     <main className="mx-auto max-w-5xl px-4 py-10">
+      <div className="mb-4">
+        <BackButton />
+      </div>
       <DocumentViewer alias={alias} contentType={resolved.contentType} filename={null} />
     </main>
   );

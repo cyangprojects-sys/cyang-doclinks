@@ -98,14 +98,16 @@ export async function POST(req: NextRequest) {
 
   const noticeId = rows?.[0]?.id ?? null;
 
-  // Put doc into quarantine while pending review (if we could resolve it).
+  // Put doc into disabled pending review (if we could resolve it).
+  // Manual quarantine is deprecated; quarantine should come from high-risk scan policy only.
   if (docId) {
     await sql`
       update public.docs
       set
         dmca_status = 'pending',
         dmca_last_notice_id = ${noticeId ? sql`${noticeId}::uuid` : sql`null`},
-        moderation_status = 'quarantined',
+        moderation_status = 'disabled',
+        disabled_at = now(),
         disabled_reason = coalesce(disabled_reason, 'dmca:pending')
       where id = ${docId}::uuid
     `;

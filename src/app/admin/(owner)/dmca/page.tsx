@@ -56,8 +56,8 @@ export default async function DmcaPage() {
           <div className="text-xs text-white/60">Owner</div>
           <h1 className="mt-1 text-xl font-semibold text-white">DMCA / takedown notices</h1>
           <div className="mt-1 text-sm text-white/60">
-            New notices auto-quarantine the referenced doc (if resolvable). High-risk docs remain quarantined until
-            reviewed.
+            New notices disable the referenced doc while pending review (if resolvable). High-risk docs can still be
+            quarantined automatically by scan policy.
           </div>
         </div>
       </div>
