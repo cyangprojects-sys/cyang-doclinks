@@ -33,7 +33,6 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/admin/webhooks", label: "Webhooks", ownerOnly: true },
   { href: "/admin/abuse", label: "Abuse", ownerOnly: true },
   { href: "/admin/dmca", label: "DMCA", ownerOnly: true },
-  { href: "/admin/db-debug", label: "DB Debug", ownerOnly: true },
   { href: "/admin/debug", label: "Debug", ownerOnly: true },
 ];
 
