@@ -518,8 +518,8 @@ export default function ShareForm({
   );
 
   return (
-    <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-4 shadow-sm">
-      <div className="flex flex-col gap-4">
+    <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-3 shadow-sm sm:p-4">
+      <div className="flex flex-col gap-3 sm:gap-4">
         <div>
           <h2 className="text-sm font-semibold text-neutral-200">Choose a protection preset</h2>
           <p className="mt-1 text-xs text-neutral-500">
@@ -933,7 +933,7 @@ export default function ShareForm({
           </details>
         )}
 
-        <div className="sticky bottom-0 z-10 -mx-4 border-t border-neutral-800 bg-neutral-950/95 px-4 py-3 backdrop-blur">
+        <div className="sticky bottom-0 z-10 -mx-3 border-t border-neutral-800 bg-neutral-950/95 px-3 py-3 backdrop-blur sm:-mx-4 sm:px-4">
           <div className="flex items-center gap-3">
             <button
               onClick={onCreate}

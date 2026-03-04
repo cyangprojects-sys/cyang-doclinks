@@ -378,7 +378,7 @@ export default async function SharePage({
           <BackButton fallbackHref="/admin/dashboard" />
         </div>
         <div className="grid gap-4 xl:gap-6 lg:grid-cols-[minmax(420px,44vw)_minmax(0,1fr)] 2xl:grid-cols-[minmax(520px,760px)_minmax(0,1fr)]">
-          <section className="lg:max-h-[calc(100dvh-7.5rem)] lg:overflow-y-auto lg:pr-1 xl:pr-2">
+          <section className="lg:pr-1 xl:pr-2">
             <ShareForm docId={bypass.docId} canEditTitle={canEditTitle} planId={planId} />
           </section>
           <aside className="lg:sticky lg:top-4 lg:self-start">
