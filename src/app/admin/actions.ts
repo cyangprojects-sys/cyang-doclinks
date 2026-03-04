@@ -675,11 +675,11 @@ export async function extendAliasExpirationAction(formData: FormData): Promise<v
 }
 
 export async function extendShareExpirationAction(formData: FormData): Promise<void> {
-  await requireRole("admin");
   const token = String(formData.get("token") || "").trim();
   const days = Number(formData.get("days") || 0);
   if (!token) throw new Error("Missing token.");
   if (!Number.isFinite(days) || days <= 0) throw new Error("Invalid days.");
+  await requireShareWrite(token);
 
   await sql`
     update public.share_tokens
@@ -692,10 +692,10 @@ export async function extendShareExpirationAction(formData: FormData): Promise<v
 }
 
 export async function setShareMaxViewsAction(formData: FormData): Promise<void> {
-  await requireRole("admin");
   const token = String(formData.get("token") || "").trim();
   const maxViewsRaw = String(formData.get("maxViews") || "").trim();
   if (!token) throw new Error("Missing token.");
+  await requireShareWrite(token);
 
   const maxViews = maxViewsRaw === "" ? null : Number(maxViewsRaw);
   if (maxViews !== null && (!Number.isFinite(maxViews) || maxViews < 0)) {
@@ -713,9 +713,9 @@ export async function setShareMaxViewsAction(formData: FormData): Promise<void> 
 }
 
 export async function resetShareViewsCountAction(formData: FormData): Promise<void> {
-  await requireRole("admin");
   const token = String(formData.get("token") || "").trim();
   if (!token) throw new Error("Missing token.");
+  await requireShareWrite(token);
 
   await sql`
     update public.share_tokens
@@ -728,9 +728,9 @@ export async function resetShareViewsCountAction(formData: FormData): Promise<vo
 }
 
 export async function forceSharePasswordResetAction(formData: FormData): Promise<void> {
-  await requireRole("admin");
   const token = String(formData.get("token") || "").trim();
   if (!token) throw new Error("Missing token.");
+  await requireShareWrite(token);
 
   await sql`
     update public.share_tokens

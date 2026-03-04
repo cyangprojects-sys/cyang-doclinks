@@ -68,10 +68,11 @@ function statusBadge(status: Exclude<Status, "all">) {
   }
 }
 
-export default function SharesTableClient(props: { shares: ShareRow[]; nowTs: number }) {
+export default function SharesTableClient(props: { shares: ShareRow[]; nowTs: number; canManageBulk?: boolean }) {
   const sp = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
+  const canManageBulk = Boolean(props.canManageBulk);
 
   const [selected, setSelected] = useState<Record<string, boolean>>({});
 
@@ -338,30 +339,34 @@ export default function SharesTableClient(props: { shares: ShareRow[]; nowTs: nu
       <div className="mt-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <div className="text-xs text-white/60">Selected: <span className="text-white">{selectedTokens.length}</span></div>
         <div className="flex flex-wrap gap-2">
-          <form action={bulkRevokeSharesAction} onSubmit={(e) => { if (!anySelected) e.preventDefault(); }}>
-            <input type="hidden" name="tokens" value={JSON.stringify(selectedTokens)} />
-            <button type="submit" disabled={!anySelected} className="btn-base btn-danger rounded-xl px-3 py-2 text-sm disabled:opacity-40">Revoke selected</button>
-          </form>
-          <form
-            action={bulkExtendSharesAction}
-            onSubmit={(e) => {
-              if (!anySelected) {
-                e.preventDefault();
-                return;
-              }
-              const days = window.prompt("Extend expiration by how many days?", "7");
-              if (days === null) {
-                e.preventDefault();
-                return;
-              }
-              const d = (e.currentTarget.querySelector('input[name="days"]') as HTMLInputElement) || null;
-              if (d) d.value = days.trim();
-            }}
-          >
-            <input type="hidden" name="tokens" value={JSON.stringify(selectedTokens)} />
-            <input type="hidden" name="days" defaultValue="7" />
-            <button type="submit" disabled={!anySelected} className="btn-base btn-secondary rounded-xl px-3 py-2 text-sm disabled:opacity-40">Extend selected</button>
-          </form>
+          {canManageBulk ? (
+            <>
+              <form action={bulkRevokeSharesAction} onSubmit={(e) => { if (!anySelected) e.preventDefault(); }}>
+                <input type="hidden" name="tokens" value={JSON.stringify(selectedTokens)} />
+                <button type="submit" disabled={!anySelected} className="btn-base btn-danger rounded-xl px-3 py-2 text-sm disabled:opacity-40">Revoke selected</button>
+              </form>
+              <form
+                action={bulkExtendSharesAction}
+                onSubmit={(e) => {
+                  if (!anySelected) {
+                    e.preventDefault();
+                    return;
+                  }
+                  const days = window.prompt("Extend expiration by how many days?", "7");
+                  if (days === null) {
+                    e.preventDefault();
+                    return;
+                  }
+                  const d = (e.currentTarget.querySelector('input[name="days"]') as HTMLInputElement) || null;
+                  if (d) d.value = days.trim();
+                }}
+              >
+                <input type="hidden" name="tokens" value={JSON.stringify(selectedTokens)} />
+                <input type="hidden" name="days" defaultValue="7" />
+                <button type="submit" disabled={!anySelected} className="btn-base btn-secondary rounded-xl px-3 py-2 text-sm disabled:opacity-40">Extend selected</button>
+              </form>
+            </>
+          ) : null}
           <button type="button" disabled={!anySelected} onClick={() => { if (anySelected) downloadCsvForSelected(); }} className="btn-base btn-secondary rounded-xl px-3 py-2 text-sm disabled:opacity-40">
             Export CSV
           </button>

@@ -271,7 +271,7 @@ const docFilter = sql`${orgFilter} ${ownerFilter}`;
       {/* Shares */}
       <section id="shares" className="space-y-3">
         <h2 className="text-lg font-semibold">Shares</h2>
-        <SharesTableClient shares={shares} nowTs={nowTs} />
+        <SharesTableClient shares={shares} nowTs={nowTs} canManageBulk={canSeeAll} />
       </section>
     </div>
   );
