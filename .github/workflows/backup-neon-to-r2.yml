@@ -1,0 +1,73 @@
+name: backup-neon-to-r2
+
+on:
+  schedule:
+    # Daily at 03:17 UTC (off-peak, free-tier friendly cadence)
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Install Postgres client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Create dump
+        env:
+          NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+        run: |
+          set -euo pipefail
+          if [ -z "${NEON_DATABASE_URL:-}" ]; then
+            echo "Missing required secret: NEON_DATABASE_URL" >&2
+            exit 1
+          fi
+          TS="$(date -u +%Y%m%dT%H%M%SZ)"
+          FILE="neon-${TS}.dump"
+          pg_dump \
+            --dbname="${NEON_DATABASE_URL}" \
+            --format=custom \
+            --compress=9 \
+            --no-owner \
+            --no-privileges \
+            --file="${FILE}"
+          sha256sum "${FILE}" > "${FILE}.sha256"
+          echo "BACKUP_FILE=${FILE}" >> "$GITHUB_ENV"
+
+      - name: Upload dump to Cloudflare R2
+        env:
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_BACKUP_BUCKET: ${{ secrets.R2_BACKUP_BUCKET }}
+          R2_BACKUP_PREFIX: ${{ vars.R2_BACKUP_PREFIX }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+        run: |
+          set -euo pipefail
+          if [ -z "${R2_ENDPOINT:-}" ] || [ -z "${R2_BACKUP_BUCKET:-}" ] || [ -z "${AWS_ACCESS_KEY_ID:-}" ] || [ -z "${AWS_SECRET_ACCESS_KEY:-}" ]; then
+            echo "Missing required R2 secrets. Need: R2_ENDPOINT, R2_BACKUP_BUCKET, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY" >&2
+            exit 1
+          fi
+          PREFIX="${R2_BACKUP_PREFIX:-db-backups/neon}"
+          aws s3 cp "${BACKUP_FILE}" "s3://${R2_BACKUP_BUCKET}/${PREFIX}/${BACKUP_FILE}" --endpoint-url "${R2_ENDPOINT}"
+          aws s3 cp "${BACKUP_FILE}.sha256" "s3://${R2_BACKUP_BUCKET}/${PREFIX}/${BACKUP_FILE}.sha256" --endpoint-url "${R2_ENDPOINT}"
+          echo "Uploaded: s3://${R2_BACKUP_BUCKET}/${PREFIX}/${BACKUP_FILE}"
+
+      - name: Optional status webhook (for dashboard telemetry)
+        if: ${{ vars.BACKUP_STATUS_WEBHOOK_URL != '' }}
+        env:
+          BACKUP_STATUS_WEBHOOK_URL: ${{ vars.BACKUP_STATUS_WEBHOOK_URL }}
+          BACKUP_STATUS_WEBHOOK_TOKEN: ${{ secrets.BACKUP_STATUS_WEBHOOK_TOKEN }}
+        run: |
+          set -euo pipefail
+          curl -fsS -X POST "${BACKUP_STATUS_WEBHOOK_URL}" \
+            -H "content-type: application/json" \
+            -H "authorization: Bearer ${BACKUP_STATUS_WEBHOOK_TOKEN}" \
+            --data "{\"status\":\"ok\",\"source\":\"github-actions\",\"backup_file\":\"${BACKUP_FILE}\"}"
+

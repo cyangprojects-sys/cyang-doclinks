@@ -20,6 +20,34 @@ Last updated: February 26, 2026
    - view/download
 5. Cut over production only after validation.
 
+### Low-cost automation: Neon -> R2 (GitHub Actions)
+Use `.github/workflows/backup-neon-to-r2.yml` for daily logical backups on free/low-cost infrastructure.
+
+Required GitHub Secrets:
+- `NEON_DATABASE_URL` (Neon Postgres connection string)
+- `R2_ENDPOINT` (e.g. `https://<accountid>.r2.cloudflarestorage.com`)
+- `R2_BACKUP_BUCKET`
+- `R2_ACCESS_KEY_ID`
+- `R2_SECRET_ACCESS_KEY`
+
+Optional GitHub Variables:
+- `R2_BACKUP_PREFIX` (default: `db-backups/neon`)
+- `BACKUP_STATUS_WEBHOOK_URL` (optional callback URL)
+
+Optional GitHub Secret:
+- `BACKUP_STATUS_WEBHOOK_TOKEN` (Bearer token for status webhook)
+
+Recommended free-tier posture:
+1. Keep cadence daily.
+2. Set an R2 lifecycle rule on backup prefix (e.g. auto-delete after 30 days).
+3. Keep Neon native restore window as your fast recovery path, and use dump backups for longer-range recovery.
+
+Manual restore test (from a dump file):
+1. Download dump from R2.
+2. Restore into a non-production Neon branch:
+   - `pg_restore --clean --if-exists --no-owner --no-privileges --dbname "$TARGET_DATABASE_URL" <dump-file>`
+3. Run smoke checks before any cutover.
+
 ## 2) R2 Object Recovery
 1. Confirm bucket retention/versioning configuration in Cloudflare dashboard.
 2. For accidental overwrite/delete:
