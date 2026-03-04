@@ -2,8 +2,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { createAndEmailShareToken, getShareStatsByToken } from "./actions";
-import type { CreateShareResult, ShareStatsResult } from "./actions";
+import { createAndEmailShareToken } from "./actions";
+import type { CreateShareResult } from "./actions";
 import {
   DEFAULT_PACK_ID,
   DEFAULT_SHARE_SETTINGS,
@@ -187,31 +187,6 @@ function SettingChip({
   );
 }
 
-function RecipientField({
-  value,
-  onChange,
-}: {
-  value: string;
-  onChange: (next: string) => void;
-}) {
-  return (
-    <div>
-      <label className="text-sm font-medium text-neutral-300">
-        Recipient email (optional)
-      </label>
-      <div className="mt-1 text-xs text-neutral-500">
-        If set, access is restricted to this recipient email.
-      </div>
-      <input
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder="recipient@example.com"
-        className="mt-2 w-full rounded-lg border border-neutral-800 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 placeholder:text-neutral-500 focus:border-neutral-600 focus:outline-none focus:ring-2 focus:ring-neutral-700 transition"
-      />
-    </div>
-  );
-}
-
 export default function ShareForm({
   docId,
   alias,
@@ -238,6 +213,14 @@ export default function ShareForm({
   const [shareTitle, setShareTitle] = useState("");
   const [toEmail, setToEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [restrictRecipientEmail, setRestrictRecipientEmail] = useState(false);
+  const [requirePasswordProtection, setRequirePasswordProtection] = useState(false);
+  const [showQrCode, setShowQrCode] = useState(false);
+  const [createdShareSummary, setCreatedShareSummary] = useState<{
+    expiresAt: string | null;
+    allowDownload: boolean;
+    watermarkEnabled: boolean;
+  } | null>(null);
   const [overrideAllowDownload, setOverrideAllowDownload] = useState<boolean | null>(null);
   const [overrideWatermarkEnabled, setOverrideWatermarkEnabled] = useState<boolean | null>(null);
   const [overrideMaxViews, setOverrideMaxViews] = useState<string>("");
@@ -248,9 +231,7 @@ export default function ShareForm({
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [uiMessage, setUiMessage] = useState<string | null>(null);
-  const [token, setToken] = useState<string | null>(null);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
-  const [stats, setStats] = useState<ShareStatsResult | null>(null);
   const [createdPackId, setCreatedPackId] = useState<PackId | null>(null);
   const [adjustedForPlan, setAdjustedForPlan] = useState(false);
   const [proPackNotice, setProPackNotice] = useState<string | null>(null);
@@ -341,6 +322,24 @@ export default function ShareForm({
       : "Light"
     : "Off";
 
+  const createdExpiresLabel = fmtIso(createdShareSummary?.expiresAt ?? preview.expiresAt);
+  const createdDownloadLabel = (createdShareSummary?.allowDownload ?? preview.allowDownload) ? "allowed" : "view-only";
+  const createdWatermarkLabel = (createdShareSummary?.watermarkEnabled ?? preview.watermarkEnabled) ? "on" : "off";
+  const qrCodeSrc = shareUrl
+    ? `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(shareUrl)}`
+    : "";
+
+  function buildSuggestedPassword(length: number = 14): string {
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$%*_-";
+    const out: string[] = [];
+    const bytes = new Uint8Array(length);
+    window.crypto.getRandomValues(bytes);
+    for (let i = 0; i < bytes.length; i += 1) {
+      out.push(chars[bytes[i] % chars.length]);
+    }
+    return out.join("");
+  }
+
   function clearOverrides() {
     setOverrideAllowDownload(null);
     setOverrideWatermarkEnabled(null);
@@ -430,7 +429,17 @@ export default function ShareForm({
   async function onCreate() {
     setErr(null);
     setUiMessage(null);
-    setStats(null);
+    setShowQrCode(false);
+    const nextToEmail = restrictRecipientEmail ? toEmail.trim().toLowerCase() : "";
+    const nextPassword = requirePasswordProtection ? password : "";
+    if (restrictRecipientEmail && !nextToEmail) {
+      setErr("Enter a recipient email or turn off recipient restriction.");
+      return;
+    }
+    if (requirePasswordProtection && !nextPassword.trim()) {
+      setErr("Enter a password or turn off password protection.");
+      return;
+    }
     setBusy(true);
     try {
       const fd = new FormData();
@@ -440,8 +449,8 @@ export default function ShareForm({
       if (canEditTitle) {
         fd.set("shareTitle", shareTitle.trim() ? shareTitle.trim() : "");
       }
-      fd.set("toEmail", toEmail.trim() ? toEmail.trim() : "");
-      fd.set("password", password);
+      fd.set("toEmail", nextToEmail);
+      fd.set("password", nextPassword);
 
       if (overrideAllowDownload != null) {
         fd.set("overrideAllowDownload", overrideAllowDownload ? "1" : "0");
@@ -464,7 +473,6 @@ export default function ShareForm({
         }
         return;
       }
-      setToken(res.token);
       if (isPackId(res.packId)) {
         setCreatedPackId(res.packId);
       } else {
@@ -475,26 +483,12 @@ export default function ShareForm({
         (typeof res.url === "string" && res.url.trim()) ||
         `${window.location.origin}/s/${encodeURIComponent(String(res.token || ""))}`;
       setShareUrl(resolvedUrl);
+      setCreatedShareSummary({
+        expiresAt: preview.expiresAt,
+        allowDownload: preview.allowDownload,
+        watermarkEnabled: preview.watermarkEnabled,
+      });
       setUiMessage("Protected link created.");
-    } catch (e: unknown) {
-      setErr(errorMessage(e) || "Unexpected error.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function onStats() {
-    if (!token) return;
-    setErr(null);
-    setUiMessage(null);
-    setBusy(true);
-    try {
-      const res: ShareStatsResult = await getShareStatsByToken(token);
-      if (!res.ok) {
-        setErr(res.message || res.error || "Failed to load stats.");
-        return;
-      }
-      setStats(res);
     } catch (e: unknown) {
       setErr(errorMessage(e) || "Unexpected error.");
     } finally {
@@ -510,6 +504,20 @@ export default function ShareForm({
     } catch {
       setErr("Unable to copy link. Copy manually from the field.");
     }
+  }
+
+  function onEmailShare() {
+    if (!shareUrl) return;
+    const subject = encodeURIComponent("Protected document link");
+    const body = encodeURIComponent(`Here is the protected link:\n\n${shareUrl}`);
+    window.location.href = `mailto:?subject=${subject}&body=${body}`;
+  }
+
+  function onGeneratePassword() {
+    const generated = buildSuggestedPassword();
+    setPassword(generated);
+    setRequirePasswordProtection(true);
+    setUiMessage("Generated a strong password.");
   }
 
   function onSaveDefaultPack() {
@@ -552,16 +560,16 @@ export default function ShareForm({
     clearOverrides();
     setToEmail("");
     setPassword("");
+    setRestrictRecipientEmail(false);
+    setRequirePasswordProtection(false);
+    setShowQrCode(false);
     if (canEditTitle) setShareTitle("");
   }
 
-  const createdWithPack = stats?.ok
-    ? getPackById(stats.row.pack_id || createdPackId || DEFAULT_PACK_ID).label
-    : createdPackId
-      ? getPackById(createdPackId).label
-      : null;
+  const createdWithPack = createdPackId
+    ? getPackById(createdPackId).label
+    : null;
 
-  const isRentalPromptPack = Boolean(selectedPack.settings.collectRecipient);
   const visibleQuickPresets = QUICK_PRESETS;
 
   return (
@@ -856,9 +864,6 @@ export default function ShareForm({
                 </label>
               </div>
 
-              {isRentalPromptPack ? (
-                <RecipientField value={toEmail} onChange={setToEmail} />
-              ) : null}
             </div>
           </div>
         ) : (
@@ -884,26 +889,6 @@ export default function ShareForm({
                     />
                   </div>
                 ) : null}
-
-                {!isRentalPromptPack ? (
-                  <RecipientField value={toEmail} onChange={setToEmail} />
-                ) : null}
-
-                <div>
-                  <label className="text-sm font-medium text-neutral-300">
-                    Password (optional)
-                  </label>
-                  <div className="mt-1 text-xs text-neutral-500">
-                    If set, a password is required (in addition to recipient email, if enabled).
-                  </div>
-                  <input
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Set a password"
-                    type="password"
-                    className="mt-2 w-full rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm text-neutral-100 placeholder:text-neutral-500 focus:border-neutral-600 focus:outline-none focus:ring-2 focus:ring-neutral-700 transition"
-                  />
-                </div>
 
                 <label className="flex items-start gap-3 rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm text-neutral-200">
                   <input
@@ -1077,32 +1062,115 @@ export default function ShareForm({
         ) : null}
 
         {shareUrl ? (
-          <div>
-            <label className="text-sm font-medium text-neutral-300">Share link</label>
-            <div className="mt-1 text-xs text-neutral-500">
-              Created share URL for this document.
-            </div>
+          <div className="rounded-lg border border-emerald-700/30 bg-emerald-950/15 p-3">
+            <div className="text-sm font-semibold text-emerald-100">✅ Protected link created</div>
             <div className="mt-2 flex flex-wrap gap-2">
-              <input
-                readOnly
-                value={shareUrl}
-                className="min-w-0 flex-1 rounded-lg border border-neutral-800 bg-neutral-900 px-3 py-2 text-sm text-neutral-100"
-              />
               <button
                 type="button"
                 onClick={onCopyShareUrl}
-                className="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-200 hover:bg-neutral-800"
+                className="rounded-lg bg-neutral-100 px-3 py-2 text-sm font-medium text-neutral-950 hover:bg-white"
               >
                 Copy link
               </button>
               <button
-                onClick={onStats}
-                disabled={busy || !token}
-                className="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-200 hover:bg-neutral-800 disabled:opacity-50"
+                type="button"
+                onClick={onEmailShare}
+                className="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-200 hover:bg-neutral-800"
               >
-                Load stats
+                Email link
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowQrCode((prev) => !prev)}
+                className="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-200 hover:bg-neutral-800"
+              >
+                {showQrCode ? "Hide QR code" : "QR code"}
               </button>
             </div>
+            <input
+              readOnly
+              value={shareUrl}
+              className="mt-2 w-full rounded-lg border border-neutral-800 bg-neutral-900 px-3 py-2 text-sm text-neutral-100"
+            />
+            <div className="mt-2 text-xs text-neutral-300">
+              Link expires: {createdExpiresLabel} • Download: {createdDownloadLabel} • Watermark: {createdWatermarkLabel}
+            </div>
+
+            {showQrCode && qrCodeSrc ? (
+              <div className="mt-3 w-fit rounded-lg border border-neutral-800 bg-neutral-900 p-2">
+                <img src={qrCodeSrc} alt="QR code for share link" className="h-44 w-44 rounded bg-white p-1" />
+              </div>
+            ) : null}
+
+            <div className="mt-4 rounded-lg border border-neutral-800 bg-neutral-900 p-3">
+              <div className="text-sm font-medium text-neutral-200">Optional security</div>
+              <div className="mt-2 space-y-3">
+                <label className="flex items-center gap-2 text-sm text-neutral-200">
+                  <input
+                    type="checkbox"
+                    checked={restrictRecipientEmail}
+                    onChange={(e) => {
+                      const enabled = e.target.checked;
+                      setRestrictRecipientEmail(enabled);
+                      if (!enabled) setToEmail("");
+                    }}
+                    className="h-4 w-4 rounded border-neutral-700 bg-neutral-950 text-cyan-400 focus:ring-cyan-500"
+                  />
+                  Restrict to recipient email
+                </label>
+                {restrictRecipientEmail ? (
+                  <input
+                    value={toEmail}
+                    onChange={(e) => setToEmail(e.target.value)}
+                    type="email"
+                    placeholder="recipient@example.com"
+                    className="w-full rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm text-neutral-100 placeholder:text-neutral-500 focus:border-neutral-600 focus:outline-none focus:ring-2 focus:ring-neutral-700 transition"
+                  />
+                ) : null}
+
+                <label className="flex items-center gap-2 text-sm text-neutral-200">
+                  <input
+                    type="checkbox"
+                    checked={requirePasswordProtection}
+                    onChange={(e) => {
+                      const enabled = e.target.checked;
+                      setRequirePasswordProtection(enabled);
+                      if (!enabled) setPassword("");
+                    }}
+                    className="h-4 w-4 rounded border-neutral-700 bg-neutral-950 text-cyan-400 focus:ring-cyan-500"
+                  />
+                  Add password
+                </label>
+                {requirePasswordProtection ? (
+                  <div className="flex flex-wrap gap-2">
+                    <input
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="Set a password"
+                      type="text"
+                      className="min-w-0 flex-1 rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm text-neutral-100 placeholder:text-neutral-500 focus:border-neutral-600 focus:outline-none focus:ring-2 focus:ring-neutral-700 transition"
+                    />
+                    <button
+                      type="button"
+                      onClick={onGeneratePassword}
+                      className="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-200 hover:bg-neutral-800"
+                    >
+                      Generate password
+                    </button>
+                  </div>
+                ) : null}
+
+                <button
+                  type="button"
+                  onClick={onCreate}
+                  disabled={busy || !docId}
+                  className="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 hover:bg-neutral-800 disabled:opacity-50"
+                >
+                  {busy ? "Generating..." : "Generate updated link"}
+                </button>
+              </div>
+            </div>
+
             {createdWithPack ? (
               <div className="mt-2 text-xs text-neutral-400">
                 Created with: <span className="text-neutral-200">{createdWithPack}</span>
@@ -1114,37 +1182,6 @@ export default function ShareForm({
         {err ? (
           <div className="rounded-lg border border-red-900/40 bg-red-950/30 p-3 text-sm text-red-200">
             {err}
-          </div>
-        ) : null}
-
-        {stats?.ok ? (
-          <div className="rounded-lg border border-neutral-800 bg-neutral-950 p-3 text-sm text-neutral-200">
-            <div className="grid grid-cols-1 gap-1 md:grid-cols-2">
-              <div>
-                <span className="text-neutral-500">Created:</span>{" "}
-                {fmtIso(stats.row.created_at)}
-              </div>
-              <div>
-                <span className="text-neutral-500">Expires:</span>{" "}
-                {fmtIso(stats.row.expires_at)}
-              </div>
-              <div>
-                <span className="text-neutral-500">Max Views:</span>{" "}
-                {stats.row.max_views ?? "No cap"}
-              </div>
-              <div>
-                <span className="text-neutral-500">Views:</span>{" "}
-                {stats.row.view_count ?? 0}
-              </div>
-              <div className="md:col-span-2">
-                <span className="text-neutral-500">Recipient:</span>{" "}
-                {stats.row.to_email || "Public"}
-              </div>
-              <div className="md:col-span-2">
-                <span className="text-neutral-500">Created with:</span>{" "}
-                {getPackById(stats.row.pack_id || createdPackId || DEFAULT_PACK_ID).label}
-              </div>
-            </div>
           </div>
         ) : null}
       </div>
