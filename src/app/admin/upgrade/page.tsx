@@ -26,7 +26,7 @@ export default async function ViewerUpgradePage(props: {
   const error = Array.isArray(params.error) ? params.error[0] : params.error;
 
   return (
-    <div className="mx-auto max-w-5xl space-y-5 text-white">
+    <div className="w-full space-y-5 text-white">
       <div>
         <h1 className="text-3xl font-semibold tracking-tight">Upgrade to Pro</h1>
         <p className="mt-2 text-sm text-white/70">

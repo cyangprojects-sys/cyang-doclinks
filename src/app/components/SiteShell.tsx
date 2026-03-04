@@ -8,14 +8,14 @@ export function SiteShell(props: {
 }) {
   const maxWidthClass =
     props.maxWidth === "4xl"
-      ? "max-w-4xl"
+      ? "max-w-[1280px]"
       : props.maxWidth === "full"
-        ? "max-w-[1760px]"
-        : "max-w-6xl";
+        ? "max-w-[2200px]"
+        : "max-w-[1680px]";
 
   return (
     <main className="marketing-shell min-h-screen text-white">
-      <div className={`relative mx-auto ${maxWidthClass} px-5 py-7 sm:px-7 sm:py-10`}>
+      <div className={`relative mx-auto w-full ${maxWidthClass} px-3 py-6 sm:px-4 sm:py-8 lg:px-6 lg:py-9 xl:px-8`}>
         <SiteHeader />
         {props.children}
         <SiteFooter />

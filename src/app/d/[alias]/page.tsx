@@ -373,12 +373,12 @@ export default async function SharePage({
     const availabilityHint = await getDocAvailabilityHint(bypass.docId);
     const viewMeta = await getDocViewMeta(bypass.docId);
     return (
-      <main className="mx-auto max-w-6xl px-4 py-10">
+      <main className="mx-auto w-full max-w-[2200px] px-3 py-8 sm:px-4 lg:px-6 2xl:px-8">
         <div className="mb-4">
           <BackButton fallbackHref="/admin/dashboard" />
         </div>
-        <div className="grid gap-4 lg:grid-cols-[minmax(360px,460px)_minmax(0,1fr)]">
-          <section className="lg:max-h-[calc(100vh-9rem)] lg:overflow-y-auto lg:pr-1">
+        <div className="grid gap-4 xl:gap-6 lg:grid-cols-[minmax(420px,44vw)_minmax(0,1fr)] 2xl:grid-cols-[minmax(520px,760px)_minmax(0,1fr)]">
+          <section className="lg:max-h-[calc(100dvh-7.5rem)] lg:overflow-y-auto lg:pr-1 xl:pr-2">
             <ShareForm docId={bypass.docId} canEditTitle={canEditTitle} planId={planId} />
           </section>
           <aside className="lg:sticky lg:top-4 lg:self-start">
@@ -401,7 +401,7 @@ export default async function SharePage({
 
     if (!unlocked) {
       return (
-        <main className="mx-auto max-w-lg px-4 py-12">
+        <main className="mx-auto w-full max-w-[860px] px-4 py-12 sm:px-6">
           <div className="mb-4">
             <BackButton />
           </div>
@@ -421,7 +421,7 @@ export default async function SharePage({
   if (!resolved.ok) notFound();
 
   return (
-    <main className="mx-auto max-w-5xl px-4 py-10">
+    <main className="mx-auto w-full max-w-[2200px] px-3 py-8 sm:px-4 lg:px-6 2xl:px-8">
       <div className="mb-4">
         <BackButton />
       </div>
@@ -450,7 +450,7 @@ function DocumentViewer({
   const forensicTag = `alias:${alias.slice(0, 12)} | ${new Date().toISOString().replace("T", " ").slice(0, 19)}Z`;
 
   return (
-    <div className="mt-4">
+    <div className="mt-3 lg:mt-0">
       <div className="mb-3 flex flex-wrap items-center gap-2 text-xs text-white/80">
         <span className="rounded-full border border-white/20 bg-white/10 px-2.5 py-1 font-semibold tracking-wide">
           {typeLabel}
@@ -500,7 +500,7 @@ function DocumentViewer({
               watermarkText="cyang.io"
               watermarkAssetUrl="/branding/cyang_watermark.svg"
               forensicTag={forensicTag}
-              className="h-[78vh]"
+              className="h-[64vh] sm:h-[70vh] lg:h-[calc(100dvh-10rem)] xl:h-[calc(100dvh-9rem)]"
             />
           )}
         </div>

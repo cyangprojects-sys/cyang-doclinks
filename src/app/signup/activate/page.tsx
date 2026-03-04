@@ -32,7 +32,7 @@ export default async function SignupActivatePage(props: {
   }
 
   return (
-    <main className="mx-auto max-w-2xl px-4 py-16">
+    <main className="mx-auto w-full max-w-[1000px] px-4 py-16 sm:px-6">
       <div className="glass-card-strong rounded-2xl p-8">
         <h1 className="text-2xl font-semibold text-white">{title}</h1>
         <p className="mt-3 text-sm text-white/70">{detail}</p>

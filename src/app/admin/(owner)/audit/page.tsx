@@ -160,7 +160,7 @@ export default async function AuditPage() {
   } catch { }
 
   return (
-    <div className="mx-auto max-w-7xl p-6 text-white">
+    <div className="w-full p-6 text-white">
       <div className="mb-8 flex items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold">Audit Logs</h1>
         <div className="flex flex-wrap items-center justify-end gap-2">

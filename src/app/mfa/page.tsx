@@ -68,7 +68,7 @@ export default async function MfaPage({ searchParams }: { searchParams: SearchPa
         : null;
 
   return (
-    <main className="mx-auto max-w-xl p-6 text-white">
+    <main className="mx-auto w-full max-w-[980px] p-6 text-white">
       <div className="rounded-2xl border border-white/10 bg-black/30 p-6">
         <h1 className="text-2xl font-semibold">Multi-factor authentication</h1>
         <p className="mt-2 text-sm text-white/70">

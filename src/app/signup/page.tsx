@@ -38,7 +38,7 @@ export default function SignupPage() {
   }
 
   return (
-    <main className="mx-auto max-w-3xl px-4 py-12">
+    <main className="mx-auto w-full max-w-[1200px] px-4 py-12 sm:px-6">
       <div className="glass-card-strong rounded-2xl p-6 md:p-8">
         <div className="text-xs uppercase tracking-[0.16em] text-cyan-200/80">Sign up</div>
         <h1 className="mt-2 text-3xl font-semibold text-white">Create your DocLinks account</h1>

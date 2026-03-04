@@ -9,7 +9,7 @@ export default function DmcaPage() {
   const supportEmail = getSupportEmail();
 
   return (
-    <main className="mx-auto max-w-3xl px-4 py-10">
+    <main className="mx-auto w-full max-w-[1500px] px-3 py-8 sm:px-4 lg:px-6">
       <div className="flex items-center justify-between">
         <div>
           <div className="text-xs text-white/60">cyang.io</div>
@@ -85,4 +85,3 @@ export default function DmcaPage() {
     </main>
   );
 }
-

@@ -128,7 +128,7 @@ export default async function WebhooksPage() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl p-4 text-white md:p-6">
+    <div className="w-full p-4 text-white md:p-6">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold tracking-tight">Webhooks</h1>
       </div>

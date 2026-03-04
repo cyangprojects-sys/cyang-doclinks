@@ -43,7 +43,7 @@ export default function ManualSignupPage() {
 
   if (state === "sent") {
     return (
-      <main className="mx-auto max-w-2xl px-4 py-12">
+      <main className="mx-auto w-full max-w-[1000px] px-4 py-12 sm:px-6">
         <div className="glass-card-strong rounded-2xl p-6 md:p-8">
           <h1 className="text-2xl font-semibold text-white">Check your email</h1>
           <p className="mt-2 text-sm text-white/70">
@@ -66,7 +66,7 @@ export default function ManualSignupPage() {
   }
 
   return (
-    <main className="mx-auto max-w-3xl px-4 py-12">
+    <main className="mx-auto w-full max-w-[1400px] px-4 py-12 sm:px-6">
       <div className="glass-card-strong rounded-2xl p-6 md:p-8">
         <div className="text-xs uppercase tracking-[0.16em] text-cyan-200/80">Manual sign up</div>
         <h1 className="mt-2 text-3xl font-semibold text-white">Create account with email and password</h1>

@@ -20,7 +20,7 @@ export default async function OrgLoginPage(
   if (!org) {
     return (
       <main className="min-h-screen bg-black text-white">
-        <div className="mx-auto max-w-md px-6 py-16">
+        <div className="mx-auto w-full max-w-[820px] px-6 py-16">
           <div className="rounded-3xl bg-white/5 p-8 ring-1 ring-white/10">
             <div className="text-xs text-white/60">cyang.io</div>
             <h1 className="mt-2 text-2xl font-semibold">Organization not found</h1>
@@ -46,7 +46,7 @@ export default async function OrgLoginPage(
 
   return (
     <main className="min-h-screen bg-black text-white">
-      <div className="mx-auto max-w-md px-6 py-16">
+      <div className="mx-auto w-full max-w-[820px] px-6 py-16">
         <div className="rounded-3xl bg-white/5 p-8 ring-1 ring-white/10">
           <div className="text-xs text-white/60">cyang.io</div>
           <h1 className="mt-2 text-2xl font-semibold">

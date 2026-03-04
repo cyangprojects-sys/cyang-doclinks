@@ -62,7 +62,7 @@ export default function AdminShell({ email, isOwner, showPricingUi, children }: 
 
   return (
     <div className="app-shell min-h-screen">
-      <div className="mx-auto flex w-full max-w-[1760px] gap-5 px-4 py-4 md:px-6 md:py-6 xl:px-8">
+      <div className="mx-auto flex w-full max-w-[2200px] gap-4 px-3 py-4 sm:px-4 md:py-5 lg:gap-6 lg:px-6 xl:px-8 2xl:px-10">
         <aside className="glass-card-strong hidden w-64 shrink-0 overflow-hidden rounded-2xl md:flex md:flex-col">
           <div className="border-b border-white/10 px-5 py-5">
             <div className="flex items-center gap-2">

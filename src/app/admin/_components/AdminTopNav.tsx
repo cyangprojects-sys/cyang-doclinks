@@ -30,7 +30,7 @@ export default function AdminTopNav({
 }) {
   return (
     <header className="sticky top-0 z-50 border-b border-white/10 bg-black/60 backdrop-blur">
-      <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
+      <div className="mx-auto flex w-full max-w-[2200px] items-center justify-between px-3 py-3 sm:px-4 lg:px-6 xl:px-8">
         <div className="flex items-center gap-3">
           <Link href="/" className="font-semibold tracking-tight">
             CYANG.IO

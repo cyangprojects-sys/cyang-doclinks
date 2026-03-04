@@ -11,7 +11,7 @@ export default async function PrivacyPage() {
 
   return (
     <SiteShell maxWidth="full">
-      <main className="mx-auto w-full max-w-5xl px-4 py-10">
+      <main className="mx-auto w-full max-w-[1700px] px-3 py-8 sm:px-4 lg:px-6">
         <div className="mb-6 flex items-center justify-between gap-3">
           <div>
             <div className="text-xs text-white/60">cyang.io</div>
@@ -30,4 +30,3 @@ export default async function PrivacyPage() {
     </SiteShell>
   );
 }
-

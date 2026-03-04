@@ -38,7 +38,7 @@ export default function AdminHeader() {
 
   return (
     <header className="sticky top-0 z-50 bg-background border-b border-border">
-      <div className="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between">
+      <div className="mx-auto flex w-full max-w-[2200px] items-center justify-between px-3 py-3 sm:px-4 lg:px-6 xl:px-8">
         <div className="flex items-center gap-6">
           <Link href="/admin/dashboard" className="font-semibold text-lg">
             CYANG.IO

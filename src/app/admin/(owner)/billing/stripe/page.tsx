@@ -169,7 +169,7 @@ export default async function StripeBillingPage(props: {
   }).length;
 
   return (
-    <div className="mx-auto max-w-6xl p-6 text-white">
+    <div className="w-full p-6 text-white">
       <div className="overflow-hidden rounded-2xl border border-white/10 bg-[radial-gradient(120%_140%_at_0%_0%,rgba(14,165,233,0.20),rgba(10,10,10,0.90)_45%,rgba(10,10,10,1)_100%)] p-6 shadow-[0_20px_60px_rgba(0,0,0,0.35)]">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>

@@ -67,7 +67,7 @@ export default async function AdminDebugPage({
   }
 
   return (
-    <div className="mx-auto max-w-4xl p-6 text-white">
+    <div className="w-full p-6 text-white">
       <div className="flex items-center justify-between gap-4">
         <h1 className="text-xl font-semibold">Admin Debug</h1>
         <Link className="text-sm text-white/70 hover:text-white" href="/admin">

@@ -15,7 +15,7 @@ const AFTER_SIGN_IN = "/admin/dashboard";
 export default function SignInPage() {
   return (
     <div className="min-h-[calc(100vh-64px)] flex items-center justify-center px-4">
-      <div className="w-full max-w-md rounded-2xl border border-white/10 bg-black/30 backdrop-blur p-6 shadow-lg">
+      <div className="w-full max-w-[820px] rounded-2xl border border-white/10 bg-black/30 p-6 shadow-lg backdrop-blur">
         <h1 className="text-2xl font-semibold tracking-tight">Sign in</h1>
         <p className="mt-2 text-sm text-white/70">Access your controlled delivery workspace.</p>
 

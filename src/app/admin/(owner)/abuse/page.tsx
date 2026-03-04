@@ -102,7 +102,7 @@ export default async function AbuseReportsPage() {
   }
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-8">
+    <main className="w-full px-4 py-8">
       <div className="flex items-center justify-between gap-3">
         <div>
           <div className="text-xs text-white/60">Owner</div>
