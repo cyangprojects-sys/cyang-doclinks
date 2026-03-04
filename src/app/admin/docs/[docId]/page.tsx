@@ -368,12 +368,16 @@ export default async function AdminDocDetailPage({
               </button>
             </form>
 
-            <form action={disableAliasForDocAction}>
-              <input type="hidden" name="docId" value={docId} />
-              <button type="submit" className="rounded-md border border-red-900 bg-red-950/40 px-2 py-1 text-xs text-red-200">
-                Disable alias
-              </button>
-            </form>
+            {canSeeAll ? (
+              <form action={disableAliasForDocAction}>
+                <input type="hidden" name="docId" value={docId} />
+                <button type="submit" className="rounded-md border border-red-900 bg-red-950/40 px-2 py-1 text-xs text-red-200">
+                  Disable alias
+                </button>
+              </form>
+            ) : (
+              <div className="text-xs text-white/55">Admin-only alias controls are hidden for viewers.</div>
+            )}
           </div>
         </div>
 
