@@ -66,5 +66,12 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ token: stri
 
   const url = new URL(`/s/${encodeURIComponent(t)}/raw`, appBaseUrl);
   url.searchParams.set("disposition", "attachment");
-  return NextResponse.redirect(url, { status: 302 });
+  return NextResponse.redirect(url, {
+    status: 302,
+    headers: {
+      "Cache-Control": "private, no-store, max-age=0",
+      Pragma: "no-cache",
+      Expires: "0",
+    },
+  });
 }

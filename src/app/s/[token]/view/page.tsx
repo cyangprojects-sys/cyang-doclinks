@@ -136,9 +136,12 @@ export default async function ShareTokenViewPage(props: {
             Back to Doclinks
           </Link>
           {meta.allowDownload !== false || isArchive || isMicrosoftOffice ? (
-            <Link href={`/s/${encodeURIComponent(t)}/download`} className="btn-base btn-secondary rounded-xl px-4 py-2 text-sm">
+            <a
+              href={`/s/${encodeURIComponent(t)}/download`}
+              className="btn-base btn-secondary rounded-xl px-4 py-2 text-sm"
+            >
               Download file
-            </Link>
+            </a>
           ) : null}
         </div>
 

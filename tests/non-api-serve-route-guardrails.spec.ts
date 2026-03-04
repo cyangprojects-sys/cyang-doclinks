@@ -43,4 +43,11 @@ test.describe("non-api serving route guardrails", () => {
     expect(code.includes("enforceGlobalApiRateLimit(")).toBeTruthy();
     expect(code.includes("RATE_LIMIT_SHARE_DOWNLOAD_IP_PER_MIN")).toBeTruthy();
   });
+
+  test("/s/[token]/view download action uses a plain anchor (no prefetch)", () => {
+    const code = src("src/app/s/[token]/view/page.tsx");
+    expect(code.includes('href={`/s/${encodeURIComponent(t)}/download`}')).toBeTruthy();
+    expect(code.includes("<a")).toBeTruthy();
+    expect(code.includes("<Link href={`/s/${encodeURIComponent(t)}/download`}")).toBeFalsy();
+  });
 });
