@@ -265,7 +265,7 @@ const docFilter = sql`${orgFilter} ${ownerFilter}`;
             jump to shares →
           </a>
         </div>
-        <ViewsByDocTableClient rows={viewsRows} />
+        <ViewsByDocTableClient rows={viewsRows} canManageShares={canSeeAll} />
       </section>
 
       {/* Shares */}

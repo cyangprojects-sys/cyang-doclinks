@@ -33,10 +33,11 @@ function isShareReady(scanStatus: string | null): boolean {
   return String(scanStatus || "").toLowerCase() === "clean";
 }
 
-export default function ViewsByDocTableClient(props: { rows: ViewsByDocRow[] }) {
+export default function ViewsByDocTableClient(props: { rows: ViewsByDocRow[]; canManageShares?: boolean }) {
   const sp = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
+  const canManageShares = Boolean(props.canManageShares);
 
   const qFromUrl = (sp.get("viewQ") || "").trim();
   const limRaw = (sp.get("viewLimit") || "").trim();
@@ -235,19 +236,27 @@ export default function ViewsByDocTableClient(props: { rows: ViewsByDocRow[] }) 
                         >
                           Copy link
                         </button>
-                        <form action={revokeAllSharesForDocAction}>
-                          <input type="hidden" name="docId" value={r.doc_id} />
-                          <button aria-label={`Revoke shares for ${r.doc_title || r.doc_id}`} type="submit" className="btn-base btn-secondary rounded-lg px-2.5 py-1.5 text-xs">Revoke shares</button>
-                        </form>
-                        <form action={extendAliasExpirationAction}>
-                          <input type="hidden" name="docId" value={r.doc_id} />
-                          <input type="hidden" name="days" value="7" />
-                          <button aria-label={`Extend alias seven days for ${r.doc_title || r.doc_id}`} type="submit" className="btn-base btn-secondary rounded-lg px-2.5 py-1.5 text-xs">+7d</button>
-                        </form>
-                        <form action={disableAliasForDocAction}>
-                          <input type="hidden" name="docId" value={r.doc_id} />
-                          <button aria-label={`Disable alias for ${r.doc_title || r.doc_id}`} type="submit" className="btn-base btn-danger rounded-lg px-2.5 py-1.5 text-xs">Disable alias</button>
-                        </form>
+                        {canManageShares ? (
+                          <>
+                            <form action={revokeAllSharesForDocAction}>
+                              <input type="hidden" name="docId" value={r.doc_id} />
+                              <button aria-label={`Revoke shares for ${r.doc_title || r.doc_id}`} type="submit" className="btn-base btn-secondary rounded-lg px-2.5 py-1.5 text-xs">Revoke shares</button>
+                            </form>
+                            <form action={extendAliasExpirationAction}>
+                              <input type="hidden" name="docId" value={r.doc_id} />
+                              <input type="hidden" name="days" value="7" />
+                              <button aria-label={`Extend alias seven days for ${r.doc_title || r.doc_id}`} type="submit" className="btn-base btn-secondary rounded-lg px-2.5 py-1.5 text-xs">+7d</button>
+                            </form>
+                            <form action={disableAliasForDocAction}>
+                              <input type="hidden" name="docId" value={r.doc_id} />
+                              <button aria-label={`Disable alias for ${r.doc_title || r.doc_id}`} type="submit" className="btn-base btn-danger rounded-lg px-2.5 py-1.5 text-xs">Disable alias</button>
+                            </form>
+                          </>
+                        ) : (
+                          <span className="inline-flex items-center rounded-md border border-white/15 px-2 py-0.5 text-[11px] text-white/60">
+                            Admin only
+                          </span>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -261,14 +270,18 @@ export default function ViewsByDocTableClient(props: { rows: ViewsByDocRow[] }) 
       <div className="mt-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <div className="text-xs text-white/60">Selected: <span className="text-white">{selectedIds.length}</span></div>
         <div className="flex flex-wrap gap-2">
-          <form action={bulkRevokeAllSharesForDocsAction} onSubmit={(e) => { if (!anySelected) e.preventDefault(); }}>
-            <input type="hidden" name="docIds" value={JSON.stringify(selectedIds)} />
-            <button type="submit" disabled={!anySelected} className="btn-base btn-secondary rounded-xl px-3 py-2 text-sm disabled:opacity-40">Revoke all shares</button>
-          </form>
-          <form action={bulkDisableAliasesForDocsAction} onSubmit={(e) => { if (!anySelected) e.preventDefault(); }}>
-            <input type="hidden" name="docIds" value={JSON.stringify(selectedIds)} />
-            <button type="submit" disabled={!anySelected} className="btn-base btn-danger rounded-xl px-3 py-2 text-sm disabled:opacity-40">Disable aliases</button>
-          </form>
+          {canManageShares ? (
+            <>
+              <form action={bulkRevokeAllSharesForDocsAction} onSubmit={(e) => { if (!anySelected) e.preventDefault(); }}>
+                <input type="hidden" name="docIds" value={JSON.stringify(selectedIds)} />
+                <button type="submit" disabled={!anySelected} className="btn-base btn-secondary rounded-xl px-3 py-2 text-sm disabled:opacity-40">Revoke all shares</button>
+              </form>
+              <form action={bulkDisableAliasesForDocsAction} onSubmit={(e) => { if (!anySelected) e.preventDefault(); }}>
+                <input type="hidden" name="docIds" value={JSON.stringify(selectedIds)} />
+                <button type="submit" disabled={!anySelected} className="btn-base btn-danger rounded-xl px-3 py-2 text-sm disabled:opacity-40">Disable aliases</button>
+              </form>
+            </>
+          ) : null}
           <button
             type="button"
             disabled={!anySelected}
