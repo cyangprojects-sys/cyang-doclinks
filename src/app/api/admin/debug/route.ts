@@ -23,6 +23,14 @@ function isExpiredAt(raw: string | null | undefined): boolean {
   return Number.isFinite(ts) && ts <= Date.now();
 }
 
+function isAdminDebugGateEnabledInThisRoute(): boolean {
+  const enabled = String(process.env.ADMIN_DEBUG_ENABLED || "").trim().toLowerCase();
+  if (!(enabled === "1" || enabled === "true" || enabled === "yes" || enabled === "on")) return false;
+  if (process.env.NODE_ENV !== "production") return true;
+  const allowProd = String(process.env.ADMIN_DEBUG_ALLOW_PROD || "").trim().toLowerCase();
+  return allowProd === "1" || allowProd === "true" || allowProd === "yes" || allowProd === "on";
+}
+
 async function tableExists(regclass: string) {
   const rows = (await sql`
     select to_regclass(${regclass})::text as reg
@@ -33,7 +41,7 @@ async function tableExists(regclass: string) {
 export async function GET(req: NextRequest) {
   try {
     const r2Bucket = getR2Bucket();
-    if (!isDebugApiEnabled()) {
+    if (!isDebugApiEnabled() || !isAdminDebugGateEnabledInThisRoute()) {
       return NextResponse.json({ ok: false, error: "NOT_FOUND" }, { status: 404 });
     }
 
