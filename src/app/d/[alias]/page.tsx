@@ -374,11 +374,11 @@ export default async function SharePage({
     const viewMeta = await getDocViewMeta(bypass.docId);
     return (
       <main className="mx-auto w-full max-w-[2200px] px-3 py-8 sm:px-4 lg:px-6 2xl:px-8">
-        <div className="mb-4">
-          <BackButton fallbackHref="/admin/dashboard" />
-        </div>
         <div className="grid gap-4 xl:gap-6 lg:grid-cols-[minmax(420px,44vw)_minmax(0,1fr)] 2xl:grid-cols-[minmax(520px,760px)_minmax(0,1fr)]">
           <section className="lg:pr-1 xl:pr-2">
+            <div className="mb-4">
+              <BackButton fallbackHref="/admin/dashboard" />
+            </div>
             <ShareForm docId={bypass.docId} canEditTitle={canEditTitle} planId={planId} />
           </section>
           <aside className="lg:sticky lg:top-4 lg:self-start">
