@@ -240,12 +240,24 @@ export default async function AnalyticsWidgets({ ownerId }: { ownerId?: string; 
   let cronFreshHealthy = 0;
   let cronFreshTotal = 0;
   let backupLastStatus: string | null = null;
+  let backupLastCreatedAt: string | null = null;
+  let backupRunCount = 0;
   let backupHoursSinceLastSuccess: number | null = null;
   let backupFreshOk = false;
   let topSecurityTypes: Array<{ type: string; c: number }> = [];
   let unencryptedDocs = 0;
   let encryptedMissingKeyVersion = 0;
   let lastSecurityEventAt: string | null = null;
+  let nightlyLastOkAt: string | null = null;
+  const backupAutomationEnabled = ["1", "true", "yes", "y", "on"].includes(
+    String(process.env.BACKUP_AUTOMATION_ENABLED || "").trim().toLowerCase()
+  );
+  const backupWebhookConfigured = String(process.env.BACKUP_WEBHOOK_URL || "").trim().length > 0;
+  const backupMaxAgeHoursRaw = Number(process.env.BACKUP_MAX_AGE_HOURS || 30);
+  const backupMaxAgeHours =
+    Number.isFinite(backupMaxAgeHoursRaw) && backupMaxAgeHoursRaw > 0
+      ? Math.floor(backupMaxAgeHoursRaw)
+      : 30;
 
   if (hasSecurityEvents) {
     try {
@@ -341,6 +353,7 @@ export default async function AnalyticsWidgets({ ownerId }: { ownerId?: string; 
       const seen = new Set(rows.map((r) => r.job));
       cronFreshTotal = expectedJobs.length;
       cronFreshHealthy = expectedJobs.filter((j) => seen.has(j)).length;
+      nightlyLastOkAt = rows.find((r) => r.job === "nightly")?.last_run ?? null;
     } catch {
       // ignore
     }
@@ -349,12 +362,22 @@ export default async function AnalyticsWidgets({ ownerId }: { ownerId?: string; 
   if (hasBackupRuns) {
     try {
       const rows = (await sql`
-        select status::text as status
+        select status::text as status, created_at::text as created_at
         from public.backup_runs
         order by created_at desc
         limit 1
-      `) as unknown as Array<{ status: string }>;
+      `) as unknown as Array<{ status: string; created_at: string }>;
       backupLastStatus = rows?.[0]?.status ?? null;
+      backupLastCreatedAt = rows?.[0]?.created_at ?? null;
+    } catch {
+      // ignore
+    }
+    try {
+      const rows = (await sql`
+        select count(*)::int as c
+        from public.backup_runs
+      `) as unknown as Array<{ c: number }>;
+      backupRunCount = Number(rows?.[0]?.c ?? 0);
     } catch {
       // ignore
     }
@@ -370,7 +393,7 @@ export default async function AnalyticsWidgets({ ownerId }: { ownerId?: string; 
       backupFreshOk =
         backupHoursSinceLastSuccess != null &&
         Number.isFinite(backupHoursSinceLastSuccess) &&
-        backupHoursSinceLastSuccess <= Number(process.env.BACKUP_MAX_AGE_HOURS || 30);
+        backupHoursSinceLastSuccess <= backupMaxAgeHours;
     } catch {
       // ignore
     }
@@ -466,7 +489,13 @@ export default async function AnalyticsWidgets({ ownerId }: { ownerId?: string; 
                 {unencryptedDocs === 0 ? "Encryption OK" : "Encryption needs attention"}
               </div>
               <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-white/80">
-                {hasBackupRuns ? (backupFreshOk ? "Backups healthy" : "Backups need attention") : "Backups not configured"}
+                {!hasBackupRuns
+                  ? "Backups not configured"
+                  : backupRunCount === 0
+                  ? "Backups not started"
+                  : backupFreshOk
+                  ? "Backups healthy"
+                  : "Backups need attention"}
               </div>
             </div>
           </summary>
@@ -499,6 +528,41 @@ export default async function AnalyticsWidgets({ ownerId }: { ownerId?: string; 
               ) : null}
             </div>
           </div>
+          {!isViewerScoped ? (
+            <div className="mt-3 rounded-xl border border-cyan-400/20 bg-cyan-500/[0.06] p-3 text-xs text-white/80">
+              <div className="font-medium text-white">Owner: Backup setup check</div>
+              <div className="mt-1 text-white/65">Use this to diagnose why backup health is not green.</div>
+              <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
+                <div className="rounded-lg border border-white/10 bg-black/20 px-3 py-2">
+                  Automation: {backupAutomationEnabled ? "Enabled" : "Disabled"}
+                </div>
+                <div className="rounded-lg border border-white/10 bg-black/20 px-3 py-2">
+                  Backup destination: {backupWebhookConfigured ? "Configured" : "Missing BACKUP_WEBHOOK_URL"}
+                </div>
+                <div className="rounded-lg border border-white/10 bg-black/20 px-3 py-2">
+                  Backup telemetry table: {hasBackupRuns ? "Ready" : "Missing public.backup_runs"}
+                </div>
+                <div className="rounded-lg border border-white/10 bg-black/20 px-3 py-2">
+                  Recorded runs: {hasBackupRuns ? fmtInt(backupRunCount) : "0"}
+                </div>
+                <div className="rounded-lg border border-white/10 bg-black/20 px-3 py-2">
+                  Last backup run: {backupLastCreatedAt ? `${backupLastStatus || "unknown"} (${fmtMinsAgo(backupLastCreatedAt)})` : "No run yet"}
+                </div>
+                <div className="rounded-lg border border-white/10 bg-black/20 px-3 py-2">
+                  Last successful backup: {backupHoursSinceLastSuccess == null ? "No success yet" : `${backupHoursSinceLastSuccess.toFixed(1)}h ago`}
+                </div>
+                <div className="rounded-lg border border-white/10 bg-black/20 px-3 py-2">
+                  Freshness threshold: {backupMaxAgeHours}h
+                </div>
+                <div className="rounded-lg border border-white/10 bg-black/20 px-3 py-2">
+                  Nightly cron: {nightlyLastOkAt ? `OK (${fmtMinsAgo(nightlyLastOkAt)})` : "No recent nightly cron ok event"}
+                </div>
+              </div>
+              <div className="mt-3 rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-white/75">
+                Next step: set `BACKUP_AUTOMATION_ENABLED=true`, set `BACKUP_WEBHOOK_URL`, verify cron secret wiring, then run `/api/cron/nightly` once and confirm at least one `ok` row in `public.backup_runs`.
+              </div>
+            </div>
+          ) : null}
         </details>
       </div>
     </section>
