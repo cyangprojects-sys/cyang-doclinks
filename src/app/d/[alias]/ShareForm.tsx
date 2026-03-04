@@ -23,7 +23,7 @@ type Mode = "simple" | "advanced";
 type WatermarkStrength = "light" | "strong";
 type WatermarkPlacement = "diagonal" | "center";
 type SimpleExpiryChoice = "pack" | "none" | "24h" | "72h" | "7d" | "14d" | "30d" | "custom";
-type QuickPresetId = "email_safe" | "confidential" | "client_share" | "legal_hold";
+type QuickPresetId = "general_secure" | "email_safe" | "client_share";
 type QuickPreset = {
   id: QuickPresetId;
   label: string;
@@ -40,29 +40,29 @@ type QuickPreset = {
 
 const QUICK_PRESETS: readonly QuickPreset[] = [
   {
+    id: "general_secure",
+    label: "General Secure Link",
+    description: "Default experience for most shares.",
+    badge: "Most common",
+    packId: "general_secure_link",
+    watermarkEnabled: false,
+    allowDownload: true,
+    maxViews: null,
+    expiryChoice: "pack",
+    watermarkStrength: "light",
+    watermarkPlacement: "diagonal",
+  },
+  {
     id: "email_safe",
     label: "Email-safe",
     description: "Light watermark for everyday sharing.",
-    badge: "Most common",
+    badge: "Recommended",
     packId: "general_secure_link",
     watermarkEnabled: true,
     allowDownload: true,
     maxViews: null,
     expiryChoice: "14d",
     watermarkStrength: "light",
-    watermarkPlacement: "diagonal",
-  },
-  {
-    id: "confidential",
-    label: "Confidential",
-    description: "Strong watermark + strict sharing defaults.",
-    badge: "Recommended",
-    packId: "legal_confidential",
-    watermarkEnabled: true,
-    allowDownload: false,
-    maxViews: 3,
-    expiryChoice: "7d",
-    watermarkStrength: "strong",
     watermarkPlacement: "diagonal",
   },
   {
@@ -75,18 +75,6 @@ const QUICK_PRESETS: readonly QuickPreset[] = [
     maxViews: null,
     expiryChoice: "7d",
     watermarkStrength: "light",
-    watermarkPlacement: "center",
-  },
-  {
-    id: "legal_hold",
-    label: "Legal hold",
-    description: "No expiry + strong watermark defaults.",
-    packId: "general_secure_link",
-    watermarkEnabled: true,
-    allowDownload: false,
-    maxViews: null,
-    expiryChoice: "none",
-    watermarkStrength: "strong",
     watermarkPlacement: "center",
   },
 ];
@@ -214,7 +202,6 @@ export default function ShareForm({
   const [adjustedForPlan, setAdjustedForPlan] = useState(false);
   const [proPackNotice, setProPackNotice] = useState<string | null>(null);
   const isFreePlan = String(planId || "").trim().toLowerCase() === "free";
-  const [showProPresets, setShowProPresets] = useState(false);
   const [showMorePresets, setShowMorePresets] = useState(false);
 
   useEffect(() => {
@@ -247,10 +234,6 @@ export default function ShareForm({
       // ignore storage failures
     }
   }, [selectedPackId]);
-
-  useEffect(() => {
-    if (!isFreePlan) setShowProPresets(true);
-  }, [isFreePlan]);
 
   const selectedPack = useMemo(() => getPackById(selectedPackId), [selectedPackId]);
 
@@ -508,14 +491,7 @@ export default function ShareForm({
       : null;
 
   const isRentalPromptPack = Boolean(selectedPack.settings.collectRecipient);
-  const visibleQuickPresets = useMemo(
-    () =>
-      QUICK_PRESETS.filter((preset) => {
-        if (showProPresets) return true;
-        return getPackById(preset.packId).minPlan !== "pro";
-      }),
-    [showProPresets]
-  );
+  const visibleQuickPresets = QUICK_PRESETS;
 
   return (
     <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-3 shadow-sm sm:p-4">
@@ -525,18 +501,7 @@ export default function ShareForm({
           <p className="mt-1 text-xs text-neutral-500">
             Start with a preset outcome, then tweak only what you need.
           </p>
-          {isFreePlan ? (
-            <div className="mt-2 flex items-center justify-between gap-2 rounded-lg border border-neutral-800 bg-neutral-900 px-3 py-2">
-              <span className="text-xs text-neutral-400">Most common presets are shown by default.</span>
-              <button
-                type="button"
-                onClick={() => setShowProPresets((v) => !v)}
-                className="text-xs font-medium text-neutral-200 underline underline-offset-2 hover:text-white"
-              >
-                {showProPresets ? "Hide Pro presets" : "Show Pro presets"}
-              </button>
-            </div>
-          ) : null}
+          <div className="mt-2 text-xs text-neutral-400">Most common presets</div>
           <div className="mt-2 grid grid-cols-1 gap-2 md:grid-cols-2">
             {visibleQuickPresets.map((preset) => {
               const selected = selectedPresetId === preset.id;
