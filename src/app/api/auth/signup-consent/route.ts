@@ -10,6 +10,7 @@ export async function POST(req: NextRequest) {
     scope: "ip:signup_consent",
     limit: Number(process.env.RATE_LIMIT_SIGNUP_CONSENT_IP_PER_MIN || 30),
     windowSeconds: 60,
+    strict: true,
   });
   if (!rl.ok) {
     return NextResponse.json(

@@ -8,6 +8,7 @@ import {
   billingTablesReady,
   completeWebhookEvent,
   getUserIdByStripeCustomerId,
+  resolveUserIdForStripeWebhookEvent,
   markWebhookEventDuplicate,
   markPaymentFailure,
   markPaymentSucceeded,
@@ -17,6 +18,7 @@ import {
 } from "@/lib/billingSubscription";
 import { appendImmutableAudit } from "@/lib/immutableAudit";
 import {
+  clientIpKey,
   enforceGlobalApiRateLimit,
   enforceIpAbuseBlock,
   logDbErrorEvent,
@@ -53,6 +55,7 @@ function getGraceDays(): number {
 
 export async function POST(req: NextRequest) {
   const timeoutMs = getRouteTimeoutMs("ROUTE_TIMEOUT_STRIPE_WEBHOOK_MS", 15_000);
+  const requestIp = clientIpKey(req).ip;
   try {
     return await withRouteTimeout(
       (async () => {
@@ -88,17 +91,16 @@ export async function POST(req: NextRequest) {
         });
 
         if (!verified.ok) {
-          const ip = req.headers.get("x-forwarded-for") || null;
           await logSecurityEvent({
             type: "stripe_webhook_invalid_signature",
             severity: "high",
-            ip,
+            ip: requestIp,
             scope: "billing_webhook",
             message: verified.error,
           });
-          if (ip) {
+          if (requestIp) {
             await maybeBlockIpOnAbuse({
-              ip,
+              ip: requestIp,
               category: "stripe_webhook_invalid_signature",
               scope: "billing_webhook",
               threshold: Number(process.env.ABUSE_BLOCK_STRIPE_SIG_THRESHOLD || 15),
@@ -143,27 +145,45 @@ export async function POST(req: NextRequest) {
             const stripeCustomerId = String(obj?.customer || "").trim() || null;
             const metadata = (obj.metadata && typeof obj.metadata === "object" ? obj.metadata : {}) as Record<string, unknown>;
             const metadataUserId = String(metadata.user_id || "").trim() || null;
-            const userId = metadataUserId || (await getUserIdByStripeCustomerId(stripeCustomerId));
-
-            const status = String(obj?.status || (eventType.endsWith(".deleted") ? "canceled" : "incomplete")).toLowerCase();
-            const planId = planFromStripePriceId(getSubPriceId(obj));
-            const currentPeriodEnd = unixToIso(obj?.current_period_end);
-            const cancelAtPeriodEnd = Boolean(obj?.cancel_at_period_end);
-
-            await upsertStripeSubscription({
-              userId,
-              stripeCustomerId,
+            const binding = await resolveUserIdForStripeWebhookEvent({
               stripeSubscriptionId,
-              status,
-              planId,
-              currentPeriodEnd,
-              cancelAtPeriodEnd,
-              graceUntil: null,
-              eventCreatedUnix,
+              stripeCustomerId,
+              metadataUserId,
             });
+            if (!binding.ok) {
+              webhookStatus = "ignored";
+              webhookMessage = binding.error;
+              await logSecurityEvent({
+                type: "stripe_webhook_binding_rejected",
+                severity: "high",
+                ip: requestIp,
+                scope: "billing_webhook",
+                message: binding.error,
+                meta: { eventType, eventId: verified.eventId, stripeSubscriptionId, stripeCustomerId },
+              });
+            } else {
+              const userId = binding.userId;
 
-            if (userId) {
-              await syncUserPlanFromSubscription(userId);
+              const status = String(obj?.status || (eventType.endsWith(".deleted") ? "canceled" : "incomplete")).toLowerCase();
+              const planId = planFromStripePriceId(getSubPriceId(obj));
+              const currentPeriodEnd = unixToIso(obj?.current_period_end);
+              const cancelAtPeriodEnd = Boolean(obj?.cancel_at_period_end);
+
+              await upsertStripeSubscription({
+                userId,
+                stripeCustomerId,
+                stripeSubscriptionId,
+                status,
+                planId,
+                currentPeriodEnd,
+                cancelAtPeriodEnd,
+                graceUntil: null,
+                eventCreatedUnix,
+              });
+
+              if (userId) {
+                await syncUserPlanFromSubscription(userId);
+              }
             }
           } else if (eventType === "invoice.payment_failed") {
             const stripeSubscriptionId = String(obj?.subscription || "").trim() || null;
@@ -205,13 +225,13 @@ export async function POST(req: NextRequest) {
           await logDbErrorEvent({
             scope: "billing_webhook",
             message: webhookMessage,
-            ip: req.headers.get("x-forwarded-for") || null,
+            ip: requestIp,
             meta: { route: "/api/stripe/webhook", eventType, eventId: verified.eventId },
           });
           await logSecurityEvent({
             type: "stripe_webhook_processing_failed",
             severity: "high",
-            ip: req.headers.get("x-forwarded-for") || null,
+            ip: requestIp,
             scope: "billing_webhook",
             message: webhookMessage,
             meta: { eventType, eventId: verified.eventId },
@@ -233,7 +253,7 @@ export async function POST(req: NextRequest) {
       await logDbErrorEvent({
         scope: "billing_webhook",
         message: e.message,
-        ip: req.headers.get("x-forwarded-for") || null,
+        ip: requestIp,
         meta: { route: "/api/stripe/webhook" },
       });
     }
@@ -244,7 +264,7 @@ export async function POST(req: NextRequest) {
       await logSecurityEvent({
         type: "stripe_webhook_timeout",
         severity: "high",
-        ip: req.headers.get("x-forwarded-for") || null,
+        ip: requestIp,
         scope: "billing_webhook",
         message: "Stripe webhook processing exceeded timeout",
         meta: { timeoutMs },

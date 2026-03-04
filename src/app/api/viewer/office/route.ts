@@ -24,6 +24,7 @@ export async function POST(req: NextRequest) {
       scope: "ip:viewer_office_preview",
       limit: Number(process.env.RATE_LIMIT_VIEWER_OFFICE_PREVIEW_IP_PER_MIN || 20),
       windowSeconds: 60,
+      strict: true,
     });
     if (!rl.ok) {
       return NextResponse.json(
@@ -63,7 +64,7 @@ export async function POST(req: NextRequest) {
 
     if (!upstream.ok) {
       return NextResponse.json(
-        { ok: false, error: "SOURCE_UNAVAILABLE", message: `Source unavailable (${upstream.status}).` },
+        { ok: false, error: "SOURCE_UNAVAILABLE", message: "Source unavailable." },
         { status: 409 }
       );
     }

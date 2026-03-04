@@ -3,12 +3,12 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse, type NextRequest } from "next/server";
 import { runRetention } from "@/lib/retention";
-import { isCronAuthorized } from "@/lib/cronAuth";
+import { cronUnauthorizedResponse, isCronAuthorized } from "@/lib/cronAuth";
 import { logCronRun } from "@/lib/cronTelemetry";
 
 export async function GET(req: NextRequest) {
   if (!isCronAuthorized(req)) {
-    return NextResponse.json({ ok: false, error: "UNAUTHORIZED" }, { status: 401 });
+    return cronUnauthorizedResponse();
   }
 
   const startedAt = Date.now();

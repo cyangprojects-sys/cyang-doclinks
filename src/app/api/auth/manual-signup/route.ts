@@ -33,6 +33,7 @@ export async function POST(req: NextRequest) {
     scope: "ip:manual_signup",
     limit: Number(process.env.RATE_LIMIT_MANUAL_SIGNUP_IP_PER_MIN || 8),
     windowSeconds: 60,
+    strict: true,
   });
   if (!rl.ok) {
     return NextResponse.json(

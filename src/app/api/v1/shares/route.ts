@@ -23,6 +23,7 @@ export async function POST(req: NextRequest) {
     scope: "ip:api",
     limit: Number(process.env.RATE_LIMIT_API_IP_PER_MIN || 240),
     windowSeconds: 60,
+    strict: true,
   });
   if (!rl.ok) {
     return NextResponse.json(

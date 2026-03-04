@@ -2,24 +2,13 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 import { NextResponse, type NextRequest } from "next/server";
+import { cronUnauthorizedResponse, isCronAuthorized } from "@/lib/cronAuth";
 import { processWebhookDeliveries } from "@/lib/webhooks";
 import { logCronRun } from "@/lib/cronTelemetry";
 
-function isAuthorized(req: NextRequest): boolean {
-  const secret = (process.env.CRON_SECRET || "").trim();
-  if (!secret) return false;
-
-  const auth = (req.headers.get("authorization") || "").trim();
-  if (!auth) return false;
-
-  if (auth === secret) return true;
-  if (auth.toLowerCase().startsWith("bearer ") && auth.slice(7).trim() === secret) return true;
-  return false;
-}
-
 export async function GET(req: NextRequest) {
-  if (!isAuthorized(req)) {
-    return NextResponse.json({ ok: false, error: "UNAUTHORIZED" }, { status: 401 });
+  if (!isCronAuthorized(req)) {
+    return cronUnauthorizedResponse();
   }
 
   const startedAt = Date.now();

@@ -51,6 +51,82 @@ export async function getUserIdByStripeCustomerId(customerId: string | null): Pr
   }
 }
 
+export async function getUserIdByStripeSubscriptionId(subscriptionId: string | null): Promise<string | null> {
+  const id = String(subscriptionId || "").trim();
+  if (!id) return null;
+  if (!(await billingTableExists())) return null;
+  try {
+    const rows = (await sql`
+      select user_id::text as user_id
+      from public.billing_subscriptions
+      where stripe_subscription_id = ${id}
+      limit 1
+    `) as unknown as Array<{ user_id: string | null }>;
+    return rows?.[0]?.user_id ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export async function resolveUserIdForStripeWebhookEvent(args: {
+  stripeSubscriptionId: string | null;
+  stripeCustomerId: string | null;
+  metadataUserId: string | null;
+}): Promise<{ ok: true; userId: string | null } | { ok: false; error: string }> {
+  const subscriptionId = String(args.stripeSubscriptionId || "").trim() || null;
+  const customerId = String(args.stripeCustomerId || "").trim() || null;
+  const metadataUserId = String(args.metadataUserId || "").trim() || null;
+
+  const [subscriptionUserId, customerUserId] = await Promise.all([
+    getUserIdByStripeSubscriptionId(subscriptionId),
+    getUserIdByStripeCustomerId(customerId),
+  ]);
+
+  if (subscriptionUserId && customerUserId && subscriptionUserId !== customerUserId) {
+    return { ok: false, error: "BILLING_BINDING_CONFLICT_SUBSCRIPTION_CUSTOMER" };
+  }
+  if (subscriptionUserId && metadataUserId && subscriptionUserId !== metadataUserId) {
+    return { ok: false, error: "BILLING_BINDING_CONFLICT_SUBSCRIPTION_METADATA" };
+  }
+  if (customerUserId && metadataUserId && customerUserId !== metadataUserId) {
+    return { ok: false, error: "BILLING_BINDING_CONFLICT_CUSTOMER_METADATA" };
+  }
+
+  const pinnedUserId = subscriptionUserId || customerUserId;
+  if (pinnedUserId) return { ok: true, userId: pinnedUserId };
+  if (!metadataUserId) return { ok: true, userId: null };
+
+  try {
+    const rows = (await sql`
+      select
+        id::text as id,
+        stripe_customer_id::text as stripe_customer_id
+      from public.users
+      where id = ${metadataUserId}::uuid
+      limit 1
+    `) as unknown as Array<{ id: string; stripe_customer_id: string | null }>;
+
+    const row = rows?.[0];
+    if (!row?.id) return { ok: false, error: "BILLING_BINDING_METADATA_USER_NOT_FOUND" };
+
+    const existingUserCustomer = String(row.stripe_customer_id || "").trim() || null;
+    if (customerId && existingUserCustomer && existingUserCustomer !== customerId) {
+      return { ok: false, error: "BILLING_BINDING_METADATA_USER_CUSTOMER_MISMATCH" };
+    }
+
+    if (customerId) {
+      const ownerOfCustomer = await getUserIdByStripeCustomerId(customerId);
+      if (ownerOfCustomer && ownerOfCustomer !== metadataUserId) {
+        return { ok: false, error: "BILLING_BINDING_CUSTOMER_ALREADY_ASSIGNED" };
+      }
+    }
+  } catch {
+    return { ok: false, error: "BILLING_BINDING_LOOKUP_FAILED" };
+  }
+
+  return { ok: true, userId: metadataUserId };
+}
+
 export async function upsertStripeSubscription(args: StripeSubUpsertArgs): Promise<void> {
   if (!(await billingTableExists())) return;
   if (!args.userId && !args.stripeCustomerId) return;
@@ -85,7 +161,7 @@ export async function upsertStripeSubscription(args: StripeSubUpsertArgs): Promi
       )
       on conflict (stripe_subscription_id)
       do update set
-        user_id = excluded.user_id,
+        user_id = coalesce(excluded.user_id, public.billing_subscriptions.user_id),
         stripe_customer_id = excluded.stripe_customer_id,
         status = excluded.status,
         plan_id = excluded.plan_id,
@@ -122,7 +198,7 @@ export async function upsertStripeSubscription(args: StripeSubUpsertArgs): Promi
       )
       on conflict (stripe_subscription_id)
       do update set
-        user_id = excluded.user_id,
+        user_id = coalesce(excluded.user_id, public.billing_subscriptions.user_id),
         stripe_customer_id = excluded.stripe_customer_id,
         status = excluded.status,
         plan_id = excluded.plan_id,
@@ -504,34 +580,56 @@ export async function getBillingSnapshotForUser(userId: string): Promise<{
       }
     : null;
 
-  const evRows = (await sql`
-    select
-      event_id::text as event_id,
-      event_type::text as event_type,
-      status::text as status,
-      message::text as message,
-      received_at::text as received_at,
-      processed_at::text as processed_at
-    from public.billing_webhook_events
-    order by received_at desc
-    limit 20
-  `) as unknown as Array<{
-    event_id: string;
-    event_type: string;
-    status: string;
-    message: string | null;
-    received_at: string;
-    processed_at: string | null;
-  }>;
+  const subId = String(sub?.stripeSubscriptionId || "").trim();
+  const customerId = String(sub?.stripeCustomerId || "").trim();
+  let events: BillingWebhookEventRow[] = [];
+  if (subId || customerId) {
+    try {
+      const evRows = (await sql`
+        select
+          event_id::text as event_id,
+          event_type::text as event_type,
+          status::text as status,
+          message::text as message,
+          received_at::text as received_at,
+          processed_at::text as processed_at
+        from public.billing_webhook_events
+        where
+          (
+            ${subId} <> ''
+            and (
+              coalesce(payload #>> '{data,object,id}', '') = ${subId}
+              or coalesce(payload #>> '{data,object,subscription}', '') = ${subId}
+            )
+          )
+          or (
+            ${customerId} <> ''
+            and coalesce(payload #>> '{data,object,customer}', '') = ${customerId}
+          )
+          or coalesce(payload #>> '{data,object,metadata,user_id}', '') = ${userId}
+        order by received_at desc
+        limit 20
+      `) as unknown as Array<{
+        event_id: string;
+        event_type: string;
+        status: string;
+        message: string | null;
+        received_at: string;
+        processed_at: string | null;
+      }>;
 
-  const events: BillingWebhookEventRow[] = evRows.map((r) => ({
-    eventId: r.event_id,
-    eventType: r.event_type,
-    status: r.status,
-    message: r.message ?? null,
-    receivedAt: r.received_at,
-    processedAt: r.processed_at ?? null,
-  }));
+      events = evRows.map((r) => ({
+        eventId: r.event_id,
+        eventType: r.event_type,
+        status: r.status,
+        message: r.message ?? null,
+        receivedAt: r.received_at,
+        processedAt: r.processed_at ?? null,
+      }));
+    } catch {
+      events = [];
+    }
+  }
 
   return { subscription: sub, events };
 }
@@ -659,19 +757,83 @@ export async function runBillingMaintenance(args?: { maxUsers?: number }): Promi
     // non-fatal
   }
 
-  const userRows = (await sql`
+  async function readCursor(): Promise<string | null> {
+    try {
+      const rows = (await sql`
+        select value
+        from public.app_settings
+        where key = 'billing_maintenance_cursor'
+        limit 1
+      `) as unknown as Array<{ value: { last_user_id?: unknown } | null }>;
+      const raw = rows?.[0]?.value?.last_user_id;
+      const value = String(raw || "").trim();
+      return value || null;
+    } catch {
+      return null;
+    }
+  }
+
+  async function writeCursor(lastUserId: string | null): Promise<void> {
+    try {
+      await sql`
+        insert into public.app_settings (key, value)
+        values (
+          'billing_maintenance_cursor',
+          ${JSON.stringify({
+            last_user_id: lastUserId,
+            updated_at: new Date().toISOString(),
+          })}::jsonb
+        )
+        on conflict (key)
+        do update set value = excluded.value
+      `;
+    } catch {
+      // best-effort
+    }
+  }
+
+  const cursor = await readCursor();
+  const firstBatch = (await sql`
     select distinct user_id::text as user_id
     from public.billing_subscriptions
     where user_id is not null
+      and (${cursor || ""} = '' or user_id::text > ${cursor || ""})
     order by user_id
     limit ${maxUsers}
   `) as unknown as Array<{ user_id: string }>;
+
+  const seen = new Set<string>();
+  const allRows: Array<{ user_id: string }> = [];
+  for (const row of firstBatch) {
+    const uid = String(row.user_id || "").trim();
+    if (!uid || seen.has(uid)) continue;
+    seen.add(uid);
+    allRows.push({ user_id: uid });
+  }
+
+  if (allRows.length < maxUsers) {
+    const remaining = maxUsers - allRows.length;
+    const wrapBatch = (await sql`
+      select distinct user_id::text as user_id
+      from public.billing_subscriptions
+      where user_id is not null
+      order by user_id
+      limit ${remaining}
+    `) as unknown as Array<{ user_id: string }>;
+
+    for (const row of wrapBatch) {
+      const uid = String(row.user_id || "").trim();
+      if (!uid || seen.has(uid)) continue;
+      seen.add(uid);
+      allRows.push({ user_id: uid });
+    }
+  }
 
   let usersScanned = 0;
   let downgradedToFree = 0;
   let errors = 0;
 
-  for (const row of userRows) {
+  for (const row of allRows) {
     const uid = String(row.user_id || "").trim();
     if (!uid) continue;
     usersScanned += 1;
@@ -682,6 +844,9 @@ export async function runBillingMaintenance(args?: { maxUsers?: number }): Promi
       errors += 1;
     }
   }
+
+  const nextCursor = allRows.length ? allRows[allRows.length - 1].user_id : null;
+  await writeCursor(nextCursor);
 
   return { ok: true, usersScanned, downgradedToFree, errors };
 }

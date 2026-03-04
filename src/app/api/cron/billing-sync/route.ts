@@ -2,13 +2,13 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 import { NextResponse, type NextRequest } from "next/server";
-import { isCronAuthorized } from "@/lib/cronAuth";
+import { cronUnauthorizedResponse, isCronAuthorized } from "@/lib/cronAuth";
 import { runBillingMaintenance } from "@/lib/billingSubscription";
 import { logCronRun } from "@/lib/cronTelemetry";
 
 export async function GET(req: NextRequest) {
   if (!isCronAuthorized(req)) {
-    return NextResponse.json({ ok: false, error: "UNAUTHORIZED" }, { status: 401 });
+    return cronUnauthorizedResponse();
   }
 
   const startedAt = Date.now();

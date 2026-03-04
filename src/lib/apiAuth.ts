@@ -57,10 +57,10 @@ export async function verifyApiKeyFromRequest(req: Request): Promise<ApiAuthResu
   `) as unknown as Array<{ id: string; owner_id: string; key_hash: string }>;
 
   const row = rows?.[0];
-  if (!row) return { ok: false, status: 401, error: "API_KEY_NOT_FOUND" };
+  if (!row) return { ok: false, status: 401, error: "INVALID_API_KEY" };
 
   if (!constantTimeEqual(row.key_hash, keyHash)) {
-    return { ok: false, status: 401, error: "API_KEY_MISMATCH" };
+    return { ok: false, status: 401, error: "INVALID_API_KEY" };
   }
 
   // Best-effort last_used_at update

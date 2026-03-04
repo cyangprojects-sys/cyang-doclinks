@@ -3,7 +3,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 import { NextResponse, type NextRequest } from "next/server";
-import { isCronAuthorized } from "@/lib/cronAuth";
+import { cronUnauthorizedResponse, isCronAuthorized } from "@/lib/cronAuth";
 import { sql } from "@/lib/db";
 import { scanR2Object } from "@/lib/malwareScan";
 import { logSecurityEvent, detectScanFailureSpike } from "@/lib/securityTelemetry";
@@ -23,7 +23,7 @@ const SCANNER_VERSION = "v3-external-clam-only";
 
 export async function GET(req: NextRequest) {
   if (!isCronAuthorized(req)) {
-    return NextResponse.json({ ok: false, error: "UNAUTHORIZED" }, { status: 401 });
+    return cronUnauthorizedResponse();
   }
 
   const startedAt = Date.now();

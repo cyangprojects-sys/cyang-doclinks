@@ -38,6 +38,7 @@ export async function POST(req: NextRequest) {
       scope: "ip:abuse_report",
       limit: Number(process.env.RATE_LIMIT_ABUSE_REPORT_IP_PER_MIN || 10),
       windowSeconds: 60,
+      strict: true,
     });
     if (!rl.ok) {
       return NextResponse.json(

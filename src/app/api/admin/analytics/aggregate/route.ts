@@ -24,14 +24,6 @@ export async function GET() {
     const res = await aggregateDocViewDaily({ daysBack });
     return NextResponse.json(res);
   } catch {
-    return NextResponse.json(
-      {
-        ok: false,
-        error: "SERVER_ERROR",
-        hint:
-          "Ensure public.doc_view_daily exists (scripts/sql/doc_view_daily.sql) and public.doc_views exists.",
-      },
-      { status: 500 }
-    );
+    return NextResponse.json({ ok: false, error: "SERVER_ERROR" }, { status: 500 });
   }
 }
