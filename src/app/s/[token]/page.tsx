@@ -4,6 +4,7 @@ import PasswordGate from "./passwordGate";
 import { isShareUnlockedAction, verifySharePasswordAction } from "./actions";
 import { resolveShareMeta } from "@/lib/resolveDoc";
 import { ShareBadge, ShareShell } from "./ShareShell";
+import { getPackById } from "@/lib/packs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -79,6 +80,7 @@ export default async function ShareTokenPage(props: {
 
   const requireEmail = !!meta.toEmail;
   const expiresLabel = fmtDate(meta.expiresAt);
+  const createdWithPack = meta.packId ? getPackById(meta.packId).label : null;
 
   return (
     <ShareShell token={t} title="Secure Share Link" subtitle="Review access requirements, then open the document.">
@@ -93,6 +95,9 @@ export default async function ShareTokenPage(props: {
           {requireEmail ? <ShareBadge tone="warn">Recipient restricted</ShareBadge> : null}
           {meta.hasPassword ? <ShareBadge tone="warn">Password protected</ShareBadge> : null}
         </div>
+        {createdWithPack ? (
+          <div className="text-xs text-white/60">Created with: {createdWithPack}</div>
+        ) : null}
 
         {errorText ? (
           <div className="rounded-xl border border-red-400/35 bg-red-500/10 px-3 py-2 text-sm text-red-100">

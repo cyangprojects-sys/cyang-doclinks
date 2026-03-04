@@ -5,6 +5,7 @@ import { resolveShareMeta } from "@/lib/resolveDoc";
 import { detectFileFamily, fileFamilyLabel, isMicrosoftOfficeDocument } from "@/lib/fileFamily";
 import { ShareBadge, ShareShell } from "../ShareShell";
 import { sql } from "@/lib/db";
+import { getPackById } from "@/lib/packs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -117,6 +118,7 @@ export default async function ShareTokenViewPage(props: {
     sharedByEmail: meta.sharedByEmail ?? null,
     openedBy: meta.toEmail ?? null,
   });
+  const createdWithPack = meta.packId ? getPackById(meta.packId).label : null;
 
   return (
     <ShareShell token={t} title="Secure Document" subtitle="Access-controlled delivery with policy enforcement.">
@@ -130,6 +132,9 @@ export default async function ShareTokenViewPage(props: {
           ) : null}
           <ShareBadge tone={risky ? "warn" : "good"}>Scan: {clean ? "Clean" : scanStatus}</ShareBadge>
         </div>
+        {createdWithPack ? (
+          <div className="text-xs text-white/60">Created with: {createdWithPack}</div>
+        ) : null}
 
         <div className="flex flex-wrap items-center gap-2">
           <Link href="/" className="btn-base btn-secondary rounded-xl px-4 py-2 text-sm">

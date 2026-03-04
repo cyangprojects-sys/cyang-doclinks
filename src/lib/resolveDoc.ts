@@ -60,6 +60,8 @@ export type ShareMeta =
         watermarkEnabled?: boolean;
         watermarkText?: string | null;
         allowDownload?: boolean;
+        packId?: string | null;
+        packVersion?: number | null;
         sharedByEmail?: string | null;
 
         // Doc moderation / safety snapshot
@@ -363,6 +365,8 @@ export async function resolveShareMeta(tokenInput: string): Promise<ShareMeta> {
         coalesce(st.watermark_enabled, false) as watermark_enabled,
         st.watermark_text,
         coalesce(st.allow_download, true) as allow_download,
+        st.pack_id::text as pack_id,
+        st.pack_version::int as pack_version,
         u.email::text as shared_by_email,
         coalesce(d.moderation_status::text, 'active') as doc_moderation_status,
         coalesce(d.scan_status::text, 'unscanned') as scan_status,
@@ -388,6 +392,8 @@ export async function resolveShareMeta(tokenInput: string): Promise<ShareMeta> {
             watermark_enabled: boolean;
             watermark_text: string | null;
             allow_download: boolean;
+            pack_id: string | null;
+            pack_version: number | null;
             shared_by_email: string | null;
             doc_moderation_status: string;
             scan_status: string;
@@ -417,6 +423,8 @@ export async function resolveShareMeta(tokenInput: string): Promise<ShareMeta> {
             watermarkEnabled: Boolean(r.watermark_enabled),
             watermarkText: r.watermark_text ?? null,
             allowDownload: Boolean(r.allow_download),
+            packId: r.pack_id ?? null,
+            packVersion: r.pack_version ?? null,
             sharedByEmail: r.shared_by_email ?? null,
             docModerationStatus: r.doc_moderation_status ?? "active",
             scanStatus: r.scan_status ?? "unscanned",
@@ -486,6 +494,8 @@ export async function resolveShareMeta(tokenInput: string): Promise<ShareMeta> {
                 watermarkEnabled: false,
                 watermarkText: null,
                 allowDownload: true,
+                packId: null,
+                packVersion: null,
                 sharedByEmail: r.shared_by_email ?? null,
                 docModerationStatus: r.doc_moderation_status ?? "active",
                 scanStatus: r.scan_status ?? "unscanned",

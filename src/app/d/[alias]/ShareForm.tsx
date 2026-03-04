@@ -1,12 +1,24 @@
 // src/app/d/[alias]/ShareForm.tsx
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createAndEmailShareToken, getShareStatsByToken } from "./actions";
 import type { CreateShareResult, ShareStatsResult } from "./actions";
+import {
+  DEFAULT_PACK_ID,
+  DEFAULT_SHARE_SETTINGS,
+  PACKS,
+  applyPack,
+  getPackById,
+  isPackId,
+  type PackId,
+} from "@/lib/packs";
+
+const DEFAULT_PACK_STORAGE_KEY = "doclinks.default_pack_id";
+const LAST_PACK_STORAGE_KEY = "doclinks.last_pack_id";
 
 function fmtIso(iso: string | null) {
-  if (!iso) return "—";
+  if (!iso) return "No expiration";
   try {
     const d = new Date(iso);
     return d.toLocaleString();
@@ -18,10 +30,56 @@ function fmtIso(iso: string | null) {
 function toIsoFromDatetimeLocal(v: string): string | "" {
   const s = (v || "").trim();
   if (!s) return "";
-  // datetime-local returns "YYYY-MM-DDTHH:mm"
   const d = new Date(s);
   if (Number.isNaN(d.getTime())) return "";
   return d.toISOString();
+}
+
+function maxViewsFromInput(raw: string): number | null {
+  const v = raw.trim();
+  if (!v) return null;
+  if (!/^\d+$/.test(v)) return null;
+  return Number(v);
+}
+
+function SettingChip({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-lg border border-neutral-800 bg-neutral-900 px-3 py-2">
+      <div className="text-[11px] uppercase tracking-wide text-neutral-500">{label}</div>
+      <div className="mt-1 text-sm font-medium text-neutral-200">{value}</div>
+    </div>
+  );
+}
+
+function RecipientField({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (next: string) => void;
+}) {
+  return (
+    <div>
+      <label className="text-sm font-medium text-neutral-300">
+        Recipient email (optional)
+      </label>
+      <div className="mt-1 text-xs text-neutral-500">
+        If set, access is restricted to this recipient email.
+      </div>
+      <input
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="recipient@example.com"
+        className="mt-2 w-full rounded-lg border border-neutral-800 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 placeholder:text-neutral-500 focus:border-neutral-600 focus:outline-none focus:ring-2 focus:ring-neutral-700 transition"
+      />
+    </div>
+  );
 }
 
 export default function ShareForm({
@@ -36,18 +94,91 @@ export default function ShareForm({
   function errorMessage(e: unknown): string {
     return e instanceof Error ? e.message : String(e);
   }
+
+  const [selectedPackId, setSelectedPackId] = useState<PackId>(DEFAULT_PACK_ID);
+  const [defaultPackId, setDefaultPackId] = useState<PackId | null>(null);
+
   const [shareTitle, setShareTitle] = useState("");
   const [toEmail, setToEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [allowDownload, setAllowDownload] = useState(true);
-  const [maxViews, setMaxViews] = useState<string>("");
-  const [expiresLocal, setExpiresLocal] = useState<string>(""); // datetime-local
+  const [overrideAllowDownload, setOverrideAllowDownload] = useState<boolean | null>(null);
+  const [overrideWatermarkEnabled, setOverrideWatermarkEnabled] = useState<boolean | null>(null);
+  const [overrideMaxViews, setOverrideMaxViews] = useState<string>("");
+  const [hasMaxViewsOverride, setHasMaxViewsOverride] = useState(false);
+  const [overrideExpiresLocal, setOverrideExpiresLocal] = useState<string>("");
+  const [hasExpiresOverride, setHasExpiresOverride] = useState(false);
+  const [showCustomize, setShowCustomize] = useState(false);
 
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [stats, setStats] = useState<ShareStatsResult | null>(null);
+  const [createdPackId, setCreatedPackId] = useState<PackId | null>(null);
+  const [adjustedForPlan, setAdjustedForPlan] = useState(false);
+
+  useEffect(() => {
+    try {
+      const savedDefault = String(window.localStorage.getItem(DEFAULT_PACK_STORAGE_KEY) || "").trim();
+      const savedLast = String(window.localStorage.getItem(LAST_PACK_STORAGE_KEY) || "").trim();
+      if (isPackId(savedDefault)) {
+        setDefaultPackId(savedDefault);
+        setSelectedPackId(savedDefault);
+        return;
+      }
+      if (isPackId(savedLast)) {
+        setSelectedPackId(savedLast);
+      }
+    } catch {
+      // ignore storage failures
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(LAST_PACK_STORAGE_KEY, selectedPackId);
+    } catch {
+      // ignore storage failures
+    }
+  }, [selectedPackId]);
+
+  const selectedPack = useMemo(() => getPackById(selectedPackId), [selectedPackId]);
+
+  const packedDefaults = useMemo(
+    () => applyPack(DEFAULT_SHARE_SETTINGS, selectedPack.id),
+    [selectedPack.id]
+  );
+
+  const preview = useMemo(() => {
+    const next = { ...packedDefaults };
+    if (overrideAllowDownload != null) next.allowDownload = overrideAllowDownload;
+    if (overrideWatermarkEnabled != null) next.watermarkEnabled = overrideWatermarkEnabled;
+    if (hasMaxViewsOverride) next.maxViews = maxViewsFromInput(overrideMaxViews);
+    if (hasExpiresOverride) {
+      next.expiresAt = toIsoFromDatetimeLocal(overrideExpiresLocal) || null;
+      next.expiresInSeconds = null;
+    }
+    return next;
+  }, [
+    hasExpiresOverride,
+    hasMaxViewsOverride,
+    overrideAllowDownload,
+    overrideExpiresLocal,
+    overrideMaxViews,
+    overrideWatermarkEnabled,
+    packedDefaults,
+  ]);
+
+  function selectPack(packId: PackId) {
+    setSelectedPackId(packId);
+    setOverrideAllowDownload(null);
+    setOverrideWatermarkEnabled(null);
+    setOverrideMaxViews("");
+    setHasMaxViewsOverride(false);
+    setOverrideExpiresLocal("");
+    setHasExpiresOverride(false);
+    setAdjustedForPlan(false);
+  }
 
   async function onCreate() {
     setErr(null);
@@ -57,14 +188,25 @@ export default function ShareForm({
       const fd = new FormData();
       fd.set("docId", docId);
       fd.set("alias", alias || "");
+      fd.set("packId", selectedPack.id);
       if (canEditTitle) {
         fd.set("shareTitle", shareTitle.trim() ? shareTitle.trim() : "");
       }
       fd.set("toEmail", toEmail.trim() ? toEmail.trim() : "");
-      fd.set("password", password); // may be blank
-      fd.set("allowDownload", allowDownload ? "1" : "0");
-      fd.set("expiresAt", toIsoFromDatetimeLocal(expiresLocal));
-      fd.set("maxViews", maxViews.trim() ? maxViews.trim() : "");
+      fd.set("password", password);
+
+      if (overrideAllowDownload != null) {
+        fd.set("overrideAllowDownload", overrideAllowDownload ? "1" : "0");
+      }
+      if (overrideWatermarkEnabled != null) {
+        fd.set("overrideWatermarkEnabled", overrideWatermarkEnabled ? "1" : "0");
+      }
+      if (hasExpiresOverride) {
+        fd.set("overrideExpiresAt", toIsoFromDatetimeLocal(overrideExpiresLocal));
+      }
+      if (hasMaxViewsOverride) {
+        fd.set("overrideMaxViews", overrideMaxViews.trim());
+      }
 
       const res: CreateShareResult = await createAndEmailShareToken(fd);
       if (!res.ok) {
@@ -72,6 +214,12 @@ export default function ShareForm({
         return;
       }
       setToken(res.token);
+      if (isPackId(res.packId)) {
+        setCreatedPackId(res.packId);
+      } else {
+        setCreatedPackId(selectedPack.id);
+      }
+      setAdjustedForPlan(Boolean(res.adjustedForPlan));
       const resolvedUrl =
         (typeof res.url === "string" && res.url.trim()) ||
         `${window.location.origin}/s/${encodeURIComponent(String(res.token || ""))}`;
@@ -110,114 +258,251 @@ export default function ShareForm({
     }
   }
 
+  function onSaveDefaultPack() {
+    try {
+      window.localStorage.setItem(DEFAULT_PACK_STORAGE_KEY, selectedPack.id);
+      setDefaultPackId(selectedPack.id);
+    } catch {
+      setErr("Unable to save default pack on this browser.");
+    }
+  }
+
+  const createdWithPack = stats?.ok
+    ? getPackById(stats.row.pack_id || createdPackId || DEFAULT_PACK_ID).label
+    : createdPackId
+      ? getPackById(createdPackId).label
+      : null;
+
+  const isRentalPromptPack = Boolean(selectedPack.settings.collectRecipient);
+
   return (
     <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-4 shadow-sm">
-      <div className="flex flex-col gap-3">
-        {canEditTitle ? (
-          <div>
-            <label className="text-sm font-medium text-neutral-300">
-              Title before sharing (optional)
-            </label>
-            <div className="mt-1 text-xs text-neutral-500">
-              If set, updates this document title before creating the share link.
-            </div>
-            <input
-              value={shareTitle}
-              onChange={(e) => setShareTitle(e.target.value)}
-              placeholder="Leave blank to keep current title"
-              className="mt-2 w-full rounded-lg border border-neutral-800 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 placeholder:text-neutral-500 focus:border-neutral-600 focus:outline-none focus:ring-2 focus:ring-neutral-700 transition"
-            />
+      <div className="flex flex-col gap-4">
+        <div>
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="text-sm font-semibold text-neutral-200">Choose a sharing pack</h2>
+            <button
+              type="button"
+              onClick={onSaveDefaultPack}
+              className="rounded-md border border-neutral-700 bg-neutral-900 px-2 py-1 text-xs text-neutral-200 hover:bg-neutral-800"
+            >
+              Make this my default pack
+            </button>
           </div>
+          <div className="mt-2 grid grid-cols-1 gap-2 md:grid-cols-2">
+            {PACKS.map((pack) => {
+              const selected = pack.id === selectedPack.id;
+              return (
+                <button
+                  key={pack.id}
+                  type="button"
+                  onClick={() => selectPack(pack.id)}
+                  className={`rounded-lg border p-3 text-left transition ${selected
+                    ? "border-cyan-500/50 bg-cyan-500/10"
+                    : "border-neutral-800 bg-neutral-900 hover:border-neutral-700"
+                    }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-neutral-100">{pack.label}</span>
+                    {defaultPackId === pack.id ? (
+                      <span className="rounded-full border border-neutral-700 bg-neutral-800 px-2 py-0.5 text-[10px] text-neutral-300">
+                        default
+                      </span>
+                    ) : null}
+                  </div>
+                  <div className="mt-1 text-xs text-neutral-400">{pack.description}</div>
+                  {pack.recommendedFor?.length ? (
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {pack.recommendedFor.map((tag) => (
+                        <span
+                          key={`${pack.id}-${tag}`}
+                          className="rounded-full border border-neutral-700 bg-neutral-800 px-2 py-0.5 text-[10px] text-neutral-300"
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+          <SettingChip label="Expires" value={fmtIso(preview.expiresAt)} />
+          <SettingChip label="Watermark" value={preview.watermarkEnabled ? "On" : "Off"} />
+          <SettingChip label="Access" value={preview.allowDownload ? "Download allowed" : "View-only"} />
+        </div>
+
+        {isRentalPromptPack ? (
+          <RecipientField value={toEmail} onChange={setToEmail} />
         ) : null}
 
-        <div>
-          <label className="text-sm font-medium text-neutral-300">
-            Recipient Email (optional)
-          </label>
-          <div className="mt-1 text-xs text-neutral-500">
-            If set, access is restricted to this recipient email.
-          </div>
-          <input
-            value={toEmail}
-            onChange={(e) => setToEmail(e.target.value)}
-            placeholder="recipient@example.com"
-            className="mt-2 w-full rounded-lg border border-neutral-800 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 placeholder:text-neutral-500 focus:border-neutral-600 focus:outline-none focus:ring-2 focus:ring-neutral-700 transition"
-          />
-        </div>
+        <button
+          onClick={onCreate}
+          disabled={busy || !docId}
+          className="rounded-lg bg-neutral-100 px-3 py-2 text-sm font-medium text-neutral-950 hover:bg-white disabled:opacity-50"
+        >
+          {busy ? "Creating..." : "Create secure link"}
+        </button>
 
-        <div>
-          <label className="text-sm font-medium text-neutral-300">
-            Password (optional)
-          </label>
-          <div className="mt-1 text-xs text-neutral-500">
-            If set, a password is required (in addition to recipient email, if enabled).
-          </div>
-          <input
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="Set a password"
-            type="password"
-            className="mt-2 w-full rounded-lg border border-neutral-800 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 placeholder:text-neutral-500 focus:border-neutral-600 focus:outline-none focus:ring-2 focus:ring-neutral-700 transition"
-          />
-        </div>
+        <details
+          open={showCustomize}
+          onToggle={(e) => setShowCustomize((e.currentTarget as HTMLDetailsElement).open)}
+          className="rounded-lg border border-neutral-800 bg-neutral-900"
+        >
+          <summary className="cursor-pointer list-none px-3 py-2 text-sm font-medium text-neutral-200">
+            Customize
+          </summary>
+          <div className="border-t border-neutral-800 p-3">
+            <div className="flex flex-col gap-3">
+              {canEditTitle ? (
+                <div>
+                  <label className="text-sm font-medium text-neutral-300">
+                    Title before sharing (optional)
+                  </label>
+                  <div className="mt-1 text-xs text-neutral-500">
+                    If set, updates this document title before creating the share link.
+                  </div>
+                  <input
+                    value={shareTitle}
+                    onChange={(e) => setShareTitle(e.target.value)}
+                    placeholder="Leave blank to keep current title"
+                    className="mt-2 w-full rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm text-neutral-100 placeholder:text-neutral-500 focus:border-neutral-600 focus:outline-none focus:ring-2 focus:ring-neutral-700 transition"
+                  />
+                </div>
+              ) : null}
 
-        <label className="flex items-start gap-3 rounded-lg border border-neutral-800 bg-neutral-900 px-3 py-2 text-sm text-neutral-200">
-          <input
-            type="checkbox"
-            checked={allowDownload}
-            onChange={(e) => setAllowDownload(e.target.checked)}
-            className="mt-0.5 h-4 w-4 rounded border-neutral-700 bg-neutral-950 text-cyan-400 focus:ring-cyan-500"
-          />
-            <span>
-              <span className="font-medium text-neutral-200">Allow recipient download</span>
-              <span className="mt-1 block text-xs text-neutral-500">
-              If disabled, recipients can preview but cannot download.
-              </span>
-            </span>
-        </label>
+              {!isRentalPromptPack ? (
+                <RecipientField value={toEmail} onChange={setToEmail} />
+              ) : null}
 
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-          <div>
-            <label className="text-sm font-medium text-neutral-300">
-              Max Views (optional)
-            </label>
-            <div className="mt-1 text-xs text-neutral-500">
-              Leave blank for no share-level cap. Use 1 for single-view delivery.
+              <div>
+                <label className="text-sm font-medium text-neutral-300">
+                  Password (optional)
+                </label>
+                <div className="mt-1 text-xs text-neutral-500">
+                  If set, a password is required (in addition to recipient email, if enabled).
+                </div>
+                <input
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Set a password"
+                  type="password"
+                  className="mt-2 w-full rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm text-neutral-100 placeholder:text-neutral-500 focus:border-neutral-600 focus:outline-none focus:ring-2 focus:ring-neutral-700 transition"
+                />
+              </div>
+
+              <label className="flex items-start gap-3 rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm text-neutral-200">
+                <input
+                  type="checkbox"
+                  checked={preview.allowDownload}
+                  onChange={(e) => setOverrideAllowDownload(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded border-neutral-700 bg-neutral-950 text-cyan-400 focus:ring-cyan-500"
+                />
+                <span>
+                  <span className="font-medium text-neutral-200">Allow recipient download</span>
+                  <span className="mt-1 block text-xs text-neutral-500">
+                    If disabled, recipients can preview but cannot download.
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setOverrideAllowDownload(null)}
+                    className="mt-1 text-[11px] text-cyan-300 hover:underline"
+                  >
+                    Use pack default
+                  </button>
+                </span>
+              </label>
+
+              <label className="flex items-start gap-3 rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm text-neutral-200">
+                <input
+                  type="checkbox"
+                  checked={preview.watermarkEnabled}
+                  onChange={(e) => setOverrideWatermarkEnabled(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded border-neutral-700 bg-neutral-950 text-cyan-400 focus:ring-cyan-500"
+                />
+                <span>
+                  <span className="font-medium text-neutral-200">Enable watermark</span>
+                  <span className="mt-1 block text-xs text-neutral-500">
+                    Adds share-level watermark overlay for inline previews.
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setOverrideWatermarkEnabled(null)}
+                    className="mt-1 text-[11px] text-cyan-300 hover:underline"
+                  >
+                    Use pack default
+                  </button>
+                </span>
+              </label>
+
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                <div>
+                  <label className="text-sm font-medium text-neutral-300">
+                    Max Views (optional)
+                  </label>
+                  <div className="mt-1 text-xs text-neutral-500">
+                    Leave blank for no share-level cap. Use 1 for single-view delivery.
+                  </div>
+                  <input
+                    value={hasMaxViewsOverride ? overrideMaxViews : ""}
+                    onChange={(e) => {
+                      setHasMaxViewsOverride(true);
+                      setOverrideMaxViews(e.target.value);
+                    }}
+                    placeholder={
+                      packedDefaults.maxViews == null ? "Pack default: unlimited" : `Pack default: ${packedDefaults.maxViews}`
+                    }
+                    inputMode="numeric"
+                    className="mt-2 w-full rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm text-neutral-100 placeholder:text-neutral-500 focus:border-neutral-600 focus:outline-none focus:ring-2 focus:ring-neutral-700 transition"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setHasMaxViewsOverride(false);
+                      setOverrideMaxViews("");
+                    }}
+                    className="mt-1 text-[11px] text-cyan-300 hover:underline"
+                  >
+                    Use pack default
+                  </button>
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium text-neutral-300">
+                    Expiration (optional)
+                  </label>
+                  <div className="mt-1 text-xs text-neutral-500">
+                    When set, access stops at this exact time.
+                  </div>
+                  <input
+                    value={hasExpiresOverride ? overrideExpiresLocal : ""}
+                    onChange={(e) => {
+                      setHasExpiresOverride(true);
+                      setOverrideExpiresLocal(e.target.value);
+                    }}
+                    type="datetime-local"
+                    className="mt-2 w-full rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm text-neutral-100 placeholder:text-neutral-500 focus:border-neutral-600 focus:outline-none focus:ring-2 focus:ring-neutral-700 transition"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setHasExpiresOverride(false);
+                      setOverrideExpiresLocal("");
+                    }}
+                    className="mt-1 text-[11px] text-cyan-300 hover:underline"
+                  >
+                    Use pack default
+                  </button>
+                </div>
+              </div>
             </div>
-            <input
-              value={maxViews}
-              onChange={(e) => setMaxViews(e.target.value)}
-              placeholder="e.g. 3"
-              inputMode="numeric"
-              className="mt-2 w-full rounded-lg border border-neutral-800 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 placeholder:text-neutral-500 focus:border-neutral-600 focus:outline-none focus:ring-2 focus:ring-neutral-700 transition"
-            />
           </div>
-
-          <div>
-            <label className="text-sm font-medium text-neutral-300">
-              Expiration (optional)
-            </label>
-            <div className="mt-1 text-xs text-neutral-500">
-              When set, access stops at this exact time.
-            </div>
-            <input
-              value={expiresLocal}
-              onChange={(e) => setExpiresLocal(e.target.value)}
-              type="datetime-local"
-              className="mt-2 w-full rounded-lg border border-neutral-800 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 placeholder:text-neutral-500 focus:border-neutral-600 focus:outline-none focus:ring-2 focus:ring-neutral-700 transition"
-            />
-          </div>
-        </div>
+        </details>
 
         <div className="flex flex-wrap gap-2">
-          <button
-            onClick={onCreate}
-            disabled={busy || !docId}
-            className="rounded-lg bg-neutral-100 px-3 py-2 text-sm font-medium text-neutral-950 hover:bg-white disabled:opacity-50"
-          >
-            {busy ? "Creating..." : "Create share link"}
-          </button>
-
           <button
             onClick={onStats}
             disabled={busy || !token}
@@ -226,6 +511,12 @@ export default function ShareForm({
             Load stats
           </button>
         </div>
+
+        {adjustedForPlan ? (
+          <div className="rounded-lg border border-amber-700/40 bg-amber-950/30 p-3 text-sm text-amber-100">
+            Adjusted for your current plan limits.
+          </div>
+        ) : null}
 
         {shareUrl ? (
           <div>
@@ -247,6 +538,11 @@ export default function ShareForm({
                 Copy link
               </button>
             </div>
+            {createdWithPack ? (
+              <div className="mt-2 text-xs text-neutral-400">
+                Created with: <span className="text-neutral-200">{createdWithPack}</span>
+              </div>
+            ) : null}
           </div>
         ) : null}
 
@@ -269,7 +565,7 @@ export default function ShareForm({
               </div>
               <div>
                 <span className="text-neutral-500">Max Views:</span>{" "}
-                {stats.row.max_views ?? "—"}
+                {stats.row.max_views ?? "No cap"}
               </div>
               <div>
                 <span className="text-neutral-500">Views:</span>{" "}
@@ -277,7 +573,11 @@ export default function ShareForm({
               </div>
               <div className="md:col-span-2">
                 <span className="text-neutral-500">Recipient:</span>{" "}
-                {stats.row.to_email || "—"}
+                {stats.row.to_email || "Public"}
+              </div>
+              <div className="md:col-span-2">
+                <span className="text-neutral-500">Created with:</span>{" "}
+                {getPackById(stats.row.pack_id || createdPackId || DEFAULT_PACK_ID).label}
               </div>
             </div>
           </div>
