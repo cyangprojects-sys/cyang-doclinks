@@ -1,9 +1,15 @@
 export type PackId =
   | "general_secure_link"
   | "job_search"
-  | "rental"
-  | "marketplace";
+  | "marketplace_sale"
+  | "internal_review"
+  | "one_time_share"
+  | "id_verification"
+  | "client_delivery"
+  | "legal_confidential"
+  | "executive_brief";
 
+export type PackTier = "free" | "pro";
 export type PasswordMode = "user" | "generated";
 
 export type ShareSettings = {
@@ -24,11 +30,17 @@ export type ShareSettingsPatch = Partial<ShareSettings>;
 export type PackDefinition = {
   id: PackId;
   version: number;
+  minPlan: PackTier;
   label: string;
   description: string;
   settings: ShareSettingsPatch;
   recommendedFor?: string[];
 };
+
+export const PRO_PACK_UPSELL_MESSAGE =
+  "This pack requires Pro because it enables stricter controls (one-time view / highly restricted sharing).";
+
+export const PRO_PACK_UPSELL_CTA = "Upgrade to use this pack.";
 
 export const DEFAULT_PACK_ID: PackId = "general_secure_link";
 
@@ -49,47 +61,123 @@ export const PACKS: readonly PackDefinition[] = [
   {
     id: "general_secure_link",
     version: 1,
+    minPlan: "free",
     label: "General Secure Link",
-    description: "Default balanced settings for most secure shares.",
+    description: "Default experience for most shares.",
     settings: {},
     recommendedFor: ["General use"],
   },
   {
     id: "job_search",
     version: 1,
-    label: "Job Search Pack",
-    description: "Longer expiry and clean presentation for portfolio sharing.",
+    minPlan: "free",
+    label: "Job Search",
+    description: "Longer window for resume, portfolio, and hiring flows.",
     settings: {
       expiresInSeconds: 30 * 24 * 60 * 60,
       watermarkEnabled: false,
       allowDownload: true,
+      maxViews: null,
     },
     recommendedFor: ["Portfolio", "Recruiters"],
   },
   {
-    id: "rental",
+    id: "marketplace_sale",
     version: 1,
-    label: "Rental Pack",
-    description: "Expires in 7 days, watermarked, view-only, with recipient prompt.",
-    settings: {
-      expiresInSeconds: 7 * 24 * 60 * 60,
-      watermarkEnabled: true,
-      allowDownload: false,
-      collectRecipient: true,
-    },
-    recommendedFor: ["Leasing", "Property docs"],
-  },
-  {
-    id: "marketplace",
-    version: 1,
-    label: "Marketplace Pack",
-    description: "Expires in 3 days, watermarked, view-only, optimized for quick shares.",
+    minPlan: "free",
+    label: "Marketplace Sale",
+    description: "Short-lived, watermarked, view-only sharing for listings.",
     settings: {
       expiresInSeconds: 3 * 24 * 60 * 60,
       watermarkEnabled: true,
       allowDownload: false,
+      maxViews: null,
     },
-    recommendedFor: ["Listings", "One-off sends"],
+    recommendedFor: ["Listings", "High-frequency sends"],
+  },
+  {
+    id: "internal_review",
+    version: 1,
+    minPlan: "free",
+    label: "Internal Review",
+    description: "Low-friction team review mode.",
+    settings: {
+      expiresInSeconds: 14 * 24 * 60 * 60,
+      watermarkEnabled: false,
+      allowDownload: true,
+      maxViews: null,
+    },
+    recommendedFor: ["Team review", "Feedback pass"],
+  },
+  {
+    id: "one_time_share",
+    version: 1,
+    minPlan: "pro",
+    label: "One-Time Share",
+    description: "Share once and automatically close access.",
+    settings: {
+      expiresInSeconds: 24 * 60 * 60,
+      watermarkEnabled: true,
+      allowDownload: false,
+      maxViews: 1,
+    },
+    recommendedFor: ["Strict handoff", "One-time access"],
+  },
+  {
+    id: "id_verification",
+    version: 1,
+    minPlan: "pro",
+    label: "ID / Verification",
+    description: "Secure sharing for IDs, paystubs, onboarding, and applications.",
+    settings: {
+      expiresInSeconds: 7 * 24 * 60 * 60,
+      watermarkEnabled: true,
+      allowDownload: false,
+      maxViews: 10,
+    },
+    recommendedFor: ["Onboarding", "Application docs"],
+  },
+  {
+    id: "client_delivery",
+    version: 1,
+    minPlan: "pro",
+    label: "Client Delivery",
+    description: "Longer-lived links for final deliverables clients keep.",
+    settings: {
+      expiresInSeconds: 30 * 24 * 60 * 60,
+      watermarkEnabled: false,
+      allowDownload: true,
+      maxViews: null,
+    },
+    recommendedFor: ["Freelancer handoff", "Final files"],
+  },
+  {
+    id: "legal_confidential",
+    version: 1,
+    minPlan: "pro",
+    label: "Legal / Confidential",
+    description: "Serious mode for sensitive legal and HR documents.",
+    settings: {
+      expiresInSeconds: 7 * 24 * 60 * 60,
+      watermarkEnabled: true,
+      allowDownload: false,
+      maxViews: 3,
+    },
+    recommendedFor: ["Legal disputes", "Sensitive HR"],
+  },
+  {
+    id: "executive_brief",
+    version: 1,
+    minPlan: "pro",
+    label: "Executive Brief",
+    description: "Tight-window sharing for executive and board docs.",
+    settings: {
+      expiresInSeconds: 72 * 60 * 60,
+      watermarkEnabled: true,
+      allowDownload: false,
+      maxViews: 5,
+    },
+    recommendedFor: ["Board review", "Executive updates"],
   },
 ];
 
@@ -101,14 +189,40 @@ const PACK_BY_ID: Readonly<Record<PackId, PackDefinition>> = PACKS.reduce(
   {} as Record<PackId, PackDefinition>
 );
 
+const LEGACY_PACK_ID_MAP: Readonly<Record<string, PackId>> = {
+  marketplace: "marketplace_sale",
+};
+
+function normalizePackId(raw: string): string {
+  const v = raw.trim().toLowerCase();
+  return LEGACY_PACK_ID_MAP[v] ?? v;
+}
+
+function normalizePlanTier(planId: string | null | undefined): PackTier {
+  const v = String(planId || "").trim().toLowerCase();
+  return v === "free" ? "free" : "pro";
+}
+
 export function isPackId(value: string): value is PackId {
-  return Object.prototype.hasOwnProperty.call(PACK_BY_ID, value);
+  const v = value.trim().toLowerCase();
+  return Object.prototype.hasOwnProperty.call(PACK_BY_ID, v);
 }
 
 export function getPackById(packId: string | null | undefined): PackDefinition {
-  const raw = String(packId || "").trim();
-  if (isPackId(raw)) return PACK_BY_ID[raw];
+  const raw = normalizePackId(String(packId || ""));
+  if (Object.prototype.hasOwnProperty.call(PACK_BY_ID, raw)) {
+    return PACK_BY_ID[raw as PackId];
+  }
   return PACK_BY_ID[DEFAULT_PACK_ID];
+}
+
+export function isPackAvailableForPlan(
+  packIdOrPack: string | PackDefinition,
+  planId: string | null | undefined
+): boolean {
+  const pack = typeof packIdOrPack === "string" ? getPackById(packIdOrPack) : packIdOrPack;
+  if (pack.minPlan === "free") return true;
+  return normalizePlanTier(planId) === "pro";
 }
 
 export function applyPack(

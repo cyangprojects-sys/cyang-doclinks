@@ -8,7 +8,7 @@ import bcrypt from "bcryptjs";
 import { emitWebhook } from "@/lib/webhooks";
 import { assertCanCreateShare, getPlanForUser, normalizeExpiresAtForPlan, normalizeMaxViewsForPlan } from "@/lib/monetization";
 import { resolveConfiguredPublicAppBaseUrl } from "@/lib/publicBaseUrl";
-import { DEFAULT_SHARE_SETTINGS, applyPack, getPackById } from "@/lib/packs";
+import { DEFAULT_SHARE_SETTINGS, PRO_PACK_UPSELL_MESSAGE, applyPack, getPackById, isPackAvailableForPlan } from "@/lib/packs";
 
 /**
  * NOTE:
@@ -221,6 +221,9 @@ export async function createAndEmailShareToken(
       if (!shareAllowed.ok) {
         return { ok: false, error: shareAllowed.error, message: shareAllowed.message };
       }
+    }
+    if (ownerPlan && !isPackAvailableForPlan(selectedPack, ownerPlan.id)) {
+      return { ok: false, error: "PACK_REQUIRES_PRO", message: PRO_PACK_UPSELL_MESSAGE };
     }
 
     // Free plan cannot mutate document title from share creation flow.

@@ -11,7 +11,7 @@ import crypto from "crypto";
 import { clientIpKey, enforceGlobalApiRateLimit } from "@/lib/securityTelemetry";
 import { appendImmutableAudit } from "@/lib/immutableAudit";
 import { resolvePublicAppBaseUrl } from "@/lib/publicBaseUrl";
-import { DEFAULT_SHARE_SETTINGS, applyPack, getPackById } from "@/lib/packs";
+import { DEFAULT_SHARE_SETTINGS, PRO_PACK_UPSELL_MESSAGE, applyPack, getPackById, isPackAvailableForPlan } from "@/lib/packs";
 
 function newToken(): string {
   return crypto.randomBytes(16).toString("hex");
@@ -121,6 +121,12 @@ export async function POST(req: NextRequest) {
   };
 
   const selectedPack = getPackById(String(body?.pack_id ?? body?.packId ?? "").trim());
+  if (!isPackAvailableForPlan(selectedPack, plan.id)) {
+    return NextResponse.json(
+      { ok: false, error: "PACK_REQUIRES_PRO", message: PRO_PACK_UPSELL_MESSAGE },
+      { status: 402 }
+    );
+  }
   let resolvedSettings = applyPack(DEFAULT_SHARE_SETTINGS, selectedPack.id);
 
   const expiresFieldPresent =

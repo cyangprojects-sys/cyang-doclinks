@@ -8,8 +8,11 @@ import {
   DEFAULT_PACK_ID,
   DEFAULT_SHARE_SETTINGS,
   PACKS,
+  PRO_PACK_UPSELL_CTA,
+  PRO_PACK_UPSELL_MESSAGE,
   applyPack,
   getPackById,
+  isPackAvailableForPlan,
   isPackId,
   type PackId,
 } from "@/lib/packs";
@@ -86,10 +89,12 @@ export default function ShareForm({
   docId,
   alias,
   canEditTitle = true,
+  planId = "pro",
 }: {
   docId: string;
   alias?: string;
   canEditTitle?: boolean;
+  planId?: string;
 }) {
   function errorMessage(e: unknown): string {
     return e instanceof Error ? e.message : String(e);
@@ -116,23 +121,31 @@ export default function ShareForm({
   const [stats, setStats] = useState<ShareStatsResult | null>(null);
   const [createdPackId, setCreatedPackId] = useState<PackId | null>(null);
   const [adjustedForPlan, setAdjustedForPlan] = useState(false);
+  const [proPackNotice, setProPackNotice] = useState<string | null>(null);
+  const isFreePlan = String(planId || "").trim().toLowerCase() === "free";
 
   useEffect(() => {
+    const canUsePack = (packId: string) => isPackAvailableForPlan(packId, planId);
     try {
       const savedDefault = String(window.localStorage.getItem(DEFAULT_PACK_STORAGE_KEY) || "").trim();
       const savedLast = String(window.localStorage.getItem(LAST_PACK_STORAGE_KEY) || "").trim();
-      if (isPackId(savedDefault)) {
+      if (isPackId(savedDefault) && canUsePack(savedDefault)) {
         setDefaultPackId(savedDefault);
         setSelectedPackId(savedDefault);
         return;
       }
-      if (isPackId(savedLast)) {
+      if (isPackId(savedLast) && canUsePack(savedLast)) {
         setSelectedPackId(savedLast);
+        if (isPackId(savedDefault) && canUsePack(savedDefault)) {
+          setDefaultPackId(savedDefault);
+        }
+        return;
       }
+      setSelectedPackId(DEFAULT_PACK_ID);
     } catch {
       // ignore storage failures
     }
-  }, []);
+  }, [planId]);
 
   useEffect(() => {
     try {
@@ -170,6 +183,12 @@ export default function ShareForm({
   ]);
 
   function selectPack(packId: PackId) {
+    if (!isPackAvailableForPlan(packId, planId)) {
+      setProPackNotice(PRO_PACK_UPSELL_MESSAGE);
+      return;
+    }
+
+    setProPackNotice(null);
     setSelectedPackId(packId);
     setOverrideAllowDownload(null);
     setOverrideWatermarkEnabled(null);
@@ -211,6 +230,9 @@ export default function ShareForm({
       const res: CreateShareResult = await createAndEmailShareToken(fd);
       if (!res.ok) {
         setErr(res.message || res.error || "Failed to create token.");
+        if (res.error === "PACK_REQUIRES_PRO") {
+          setProPackNotice(PRO_PACK_UPSELL_MESSAGE);
+        }
         return;
       }
       setToken(res.token);
@@ -292,6 +314,7 @@ export default function ShareForm({
           <div className="mt-2 grid grid-cols-1 gap-2 md:grid-cols-2">
             {PACKS.map((pack) => {
               const selected = pack.id === selectedPack.id;
+              const available = isPackAvailableForPlan(pack, planId);
               return (
                 <button
                   key={pack.id}
@@ -299,11 +322,18 @@ export default function ShareForm({
                   onClick={() => selectPack(pack.id)}
                   className={`rounded-lg border p-3 text-left transition ${selected
                     ? "border-cyan-500/50 bg-cyan-500/10"
-                    : "border-neutral-800 bg-neutral-900 hover:border-neutral-700"
+                    : available
+                      ? "border-neutral-800 bg-neutral-900 hover:border-neutral-700"
+                      : "border-amber-700/40 bg-amber-950/25 hover:border-amber-600/50"
                     }`}
                 >
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-medium text-neutral-100">{pack.label}</span>
+                    {pack.minPlan === "pro" ? (
+                      <span className="rounded-full border border-amber-700/40 bg-amber-950/40 px-2 py-0.5 text-[10px] text-amber-100">
+                        Pro
+                      </span>
+                    ) : null}
                     {defaultPackId === pack.id ? (
                       <span className="rounded-full border border-neutral-700 bg-neutral-800 px-2 py-0.5 text-[10px] text-neutral-300">
                         default
@@ -311,6 +341,11 @@ export default function ShareForm({
                     ) : null}
                   </div>
                   <div className="mt-1 text-xs text-neutral-400">{pack.description}</div>
+                  {!available ? (
+                    <div className="mt-2 text-[11px] text-amber-100/90">
+                      Available on Pro.
+                    </div>
+                  ) : null}
                   {pack.recommendedFor?.length ? (
                     <div className="mt-2 flex flex-wrap gap-1">
                       {pack.recommendedFor.map((tag) => (
@@ -328,6 +363,14 @@ export default function ShareForm({
             })}
           </div>
         </div>
+        {isFreePlan && proPackNotice ? (
+          <div className="rounded-lg border border-amber-700/40 bg-amber-950/30 p-3 text-sm text-amber-100">
+            <div>{proPackNotice}</div>
+            <a href="/admin/upgrade" className="mt-1 inline-block text-sm font-medium text-amber-50 underline">
+              {PRO_PACK_UPSELL_CTA}
+            </a>
+          </div>
+        ) : null}
 
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
           <SettingChip label="Expires" value={fmtIso(preview.expiresAt)} />
@@ -514,7 +557,7 @@ export default function ShareForm({
 
         {adjustedForPlan ? (
           <div className="rounded-lg border border-amber-700/40 bg-amber-950/30 p-3 text-sm text-amber-100">
-            Adjusted for your current plan limits.
+            {isFreePlan ? "Adjusted for Free tier." : "Adjusted for your current plan limits."}
           </div>
         ) : null}
 

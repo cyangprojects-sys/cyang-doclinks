@@ -367,12 +367,13 @@ export default async function SharePage({
     (u ? roleAtLeast(u.role, "admin") || (await userOwnsDoc(u.id, bypass.docId)) : false);
 
   if (isPrivileged) {
-    const canEditTitle = u ? (await getPlanForUser(u.id)).id !== "free" : ownerEmail;
+    const planId = u ? (await getPlanForUser(u.id)).id : "pro";
+    const canEditTitle = ownerEmail || planId !== "free";
     const availabilityHint = await getDocAvailabilityHint(bypass.docId);
     const viewMeta = await getDocViewMeta(bypass.docId);
     return (
       <main className="mx-auto max-w-5xl px-4 py-10">
-        <ShareForm docId={bypass.docId} canEditTitle={canEditTitle} />
+        <ShareForm docId={bypass.docId} canEditTitle={canEditTitle} planId={planId} />
         <DocumentViewer alias={alias} contentType={viewMeta.contentType} filename={viewMeta.filename} availabilityHint={availabilityHint} />
       </main>
     );
