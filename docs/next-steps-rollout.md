@@ -1,6 +1,6 @@
 # Next Steps Rollout
 
-Last updated: March 1, 2026
+Last updated: March 3, 2026
 
 This is the exact rollout sequence for the latest hardening changes (billing idempotency, alias lifecycle defaults, abuse dashboards, orphan sweeps).
 
@@ -38,7 +38,7 @@ New recommended defaults:
 - `ORPHAN_SWEEP_WEEKDAY_UTC=0` (Sunday)
 - `ORPHAN_SWEEP_DELETE=true` (set false for audit-only weekly runs)
 - `ORPHAN_SWEEP_MAX_OBJECTS=10000`
-- `ACCESS_TICKET_REPLAY_ENABLED=true`
+- `ACCESS_TICKET_REPLAY_ENABLED=false`
 - `ACCESS_TICKET_REPLAY_GRACE_SECONDS_DOWNLOAD=0`
 - `ACCESS_TICKET_REPLAY_GRACE_SECONDS_PREVIEW=20`
 - `RATE_LIMIT_STRIPE_WEBHOOK_IP_PER_MIN=300`

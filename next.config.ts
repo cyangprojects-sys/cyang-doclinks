@@ -8,12 +8,52 @@ const isProd = process.env.NODE_ENV === "production";
 // If you later embed docs in iframes, you'll need to relax frame-ancestors / X-Frame-Options.
 
 function cspValue(frameAncestors: string) {
-  const connectExtra = String(process.env.CSP_CONNECT_SRC || "")
-    .split(",")
-    .map((v) => v.trim())
-    .filter(Boolean)
-    .join(" ");
-  const connectSrc = connectExtra ? `connect-src 'self' ${connectExtra}` : "connect-src 'self'";
+  const connectSources = new Set(["'self'"]);
+
+  const keywordSources = new Set([
+    "self",
+    "none",
+    "unsafe-inline",
+    "unsafe-eval",
+    "strict-dynamic",
+    "report-sample",
+    "unsafe-hashes",
+    "wasm-unsafe-eval",
+  ]);
+
+  for (const rawToken of String(process.env.CSP_CONNECT_SRC || "").split(/[\s,]+/)) {
+    const token = rawToken.trim();
+    if (!token) continue;
+    const dequoted = token.replace(/^['"]|['"]$/g, "");
+    if (!dequoted) continue;
+    const lower = dequoted.toLowerCase();
+    if (keywordSources.has(lower)) {
+      connectSources.add(`'${lower}'`);
+    } else {
+      connectSources.add(dequoted);
+    }
+  }
+
+  const r2Endpoint = String(process.env.R2_ENDPOINT || "").trim();
+  if (r2Endpoint) {
+    try {
+      const endpointUrl = new URL(r2Endpoint);
+      connectSources.add(endpointUrl.origin);
+
+      const bucket = String(process.env.R2_BUCKET || process.env.R2_BUCKET_NAME || "").trim();
+      if (
+        bucket &&
+        endpointUrl.hostname.endsWith(".r2.cloudflarestorage.com") &&
+        !endpointUrl.hostname.startsWith(`${bucket}.`)
+      ) {
+        connectSources.add(`${endpointUrl.protocol}//${bucket}.${endpointUrl.hostname}`);
+      }
+    } catch {
+      // Ignore malformed endpoint in CSP assembly; runtime env validation handles required format.
+    }
+  }
+
+  const connectSrc = `connect-src ${Array.from(connectSources).join(" ")}`;
 
   // Keep this CSP compatible with Next.js + PDF rendering.
   // Keep script/style sources tight and add explicit hosts via CSP_CONNECT_SRC when needed.

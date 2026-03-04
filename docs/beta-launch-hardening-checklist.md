@@ -25,7 +25,7 @@ Core:
 
 - `DATABASE_URL`
 - `DOC_MASTER_KEYS`
-- `UPLOAD_ABSOLUTE_MAX_BYTES=26214400`
+- `UPLOAD_ABSOLUTE_MAX_BYTES=104857600` (100MB)
 - `PDF_MAX_PAGES` (recommended: `500`)
 - `R2_BUCKET`
 - `R2_ENDPOINT`
@@ -39,6 +39,8 @@ Billing:
 - `STRIPE_PRO_PRICE_IDS` (comma-separated)
 - `STRIPE_GRACE_DAYS` (recommended: `7`)
 - `STRIPE_ENFORCE_ENTITLEMENT=1`
+- `STRIPE_ALLOW_TRIALING_ENTITLEMENT=0`
+- `STRIPE_ALLOW_GRACE_ENTITLEMENT=0`
 
 Rate limiting:
 
@@ -73,7 +75,7 @@ Retention/backup:
 Alias/access safety defaults:
 
 - `ALIAS_DEFAULT_TTL_DAYS=30`
-- `ACCESS_TICKET_REPLAY_ENABLED=true`
+- `ACCESS_TICKET_REPLAY_ENABLED=false`
 - `ACCESS_TICKET_REPLAY_GRACE_SECONDS_PREVIEW=20`
 - `ACCESS_TICKET_REPLAY_GRACE_SECONDS_DOWNLOAD=0`
 
@@ -99,7 +101,7 @@ Pass condition: `0`.
 
 ### Upload abuse controls
 
-1. Attempt upload >25MB in UI and via direct API.
+1. Attempt upload >100MB in UI and via direct API.
 2. Expected response: `413` with `FILE_TOO_LARGE` or `object_too_large`.
 3. Confirm rejected object is removed from R2.
 
