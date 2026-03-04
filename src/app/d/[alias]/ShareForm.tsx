@@ -19,6 +19,85 @@ import {
 
 const DEFAULT_PACK_STORAGE_KEY = "doclinks.default_pack_id";
 const LAST_PACK_STORAGE_KEY = "doclinks.last_pack_id";
+type Mode = "simple" | "advanced";
+type WatermarkStrength = "light" | "strong";
+type WatermarkPlacement = "diagonal" | "center";
+type SimpleExpiryChoice = "pack" | "none" | "24h" | "72h" | "7d" | "14d" | "30d" | "custom";
+type QuickPresetId = "email_safe" | "confidential" | "client_share" | "legal_hold";
+type QuickPreset = {
+  id: QuickPresetId;
+  label: string;
+  description: string;
+  badge?: string;
+  packId: PackId;
+  watermarkEnabled: boolean;
+  allowDownload: boolean;
+  maxViews?: number | null;
+  expiryChoice: SimpleExpiryChoice;
+  watermarkStrength: WatermarkStrength;
+  watermarkPlacement: WatermarkPlacement;
+};
+
+const QUICK_PRESETS: readonly QuickPreset[] = [
+  {
+    id: "email_safe",
+    label: "Email-safe",
+    description: "Light watermark for everyday sharing.",
+    badge: "Most common",
+    packId: "general_secure_link",
+    watermarkEnabled: true,
+    allowDownload: true,
+    maxViews: null,
+    expiryChoice: "14d",
+    watermarkStrength: "light",
+    watermarkPlacement: "diagonal",
+  },
+  {
+    id: "confidential",
+    label: "Confidential",
+    description: "Strong watermark + strict sharing defaults.",
+    badge: "Recommended",
+    packId: "legal_confidential",
+    watermarkEnabled: true,
+    allowDownload: false,
+    maxViews: 3,
+    expiryChoice: "7d",
+    watermarkStrength: "strong",
+    watermarkPlacement: "diagonal",
+  },
+  {
+    id: "client_share",
+    label: "Client share",
+    description: "Download-friendly with a 7-day expiry.",
+    packId: "internal_review",
+    watermarkEnabled: false,
+    allowDownload: true,
+    maxViews: null,
+    expiryChoice: "7d",
+    watermarkStrength: "light",
+    watermarkPlacement: "center",
+  },
+  {
+    id: "legal_hold",
+    label: "Legal hold",
+    description: "No expiry + strong watermark defaults.",
+    packId: "general_secure_link",
+    watermarkEnabled: true,
+    allowDownload: false,
+    maxViews: null,
+    expiryChoice: "none",
+    watermarkStrength: "strong",
+    watermarkPlacement: "center",
+  },
+];
+
+const EXPIRY_SECONDS_BY_CHOICE: Readonly<Record<"24h" | "72h" | "7d" | "14d" | "30d", number>> = {
+  "24h": 24 * 60 * 60,
+  "72h": 72 * 60 * 60,
+  "7d": 7 * 24 * 60 * 60,
+  "14d": 14 * 24 * 60 * 60,
+  "30d": 30 * 24 * 60 * 60,
+};
 
 function fmtIso(iso: string | null) {
   if (!iso) return "No expiration";
@@ -36,6 +115,13 @@ function toIsoFromDatetimeLocal(v: string): string | "" {
   const d = new Date(s);
   if (Number.isNaN(d.getTime())) return "";
   return d.toISOString();
+}
+
+function toDatetimeLocalFromIso(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 function maxViewsFromInput(raw: string): number | null {
@@ -100,8 +186,13 @@ export default function ShareForm({
     return e instanceof Error ? e.message : String(e);
   }
 
+  const [mode, setMode] = useState<Mode>("simple");
   const [selectedPackId, setSelectedPackId] = useState<PackId>(DEFAULT_PACK_ID);
   const [defaultPackId, setDefaultPackId] = useState<PackId | null>(null);
+  const [selectedPresetId, setSelectedPresetId] = useState<QuickPresetId | null>(null);
+  const [watermarkStrength, setWatermarkStrength] = useState<WatermarkStrength>("light");
+  const [watermarkPlacement, setWatermarkPlacement] = useState<WatermarkPlacement>("diagonal");
+  const [simpleExpiryChoice, setSimpleExpiryChoice] = useState<SimpleExpiryChoice>("pack");
 
   const [shareTitle, setShareTitle] = useState("");
   const [toEmail, setToEmail] = useState("");
@@ -112,10 +203,10 @@ export default function ShareForm({
   const [hasMaxViewsOverride, setHasMaxViewsOverride] = useState(false);
   const [overrideExpiresLocal, setOverrideExpiresLocal] = useState<string>("");
   const [hasExpiresOverride, setHasExpiresOverride] = useState(false);
-  const [showCustomize, setShowCustomize] = useState(false);
 
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [uiMessage, setUiMessage] = useState<string | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [stats, setStats] = useState<ShareStatsResult | null>(null);
@@ -182,6 +273,35 @@ export default function ShareForm({
     packedDefaults,
   ]);
 
+  const estimatedOutcome = useMemo(() => {
+    const lines: string[] = [];
+    if (preview.watermarkEnabled) {
+      lines.push(`Will add visible watermark (${watermarkStrength}, ${watermarkPlacement}).`);
+    } else {
+      lines.push("No visible watermark overlay will be added.");
+    }
+    lines.push(preview.allowDownload ? "Recipients can download the file." : "Recipients are limited to view-only access.");
+    lines.push(preview.expiresAt ? `Link expires ${fmtIso(preview.expiresAt)}.` : "Link has no expiration.");
+    if (preview.maxViews != null) {
+      lines.push(`Access is capped at ${preview.maxViews} views.`);
+    }
+    return lines.join(" ");
+  }, [preview.allowDownload, preview.expiresAt, preview.maxViews, preview.watermarkEnabled, watermarkPlacement, watermarkStrength]);
+
+  function clearOverrides() {
+    setOverrideAllowDownload(null);
+    setOverrideWatermarkEnabled(null);
+    setOverrideMaxViews("");
+    setHasMaxViewsOverride(false);
+    setOverrideExpiresLocal("");
+    setHasExpiresOverride(false);
+    setSimpleExpiryChoice("pack");
+    setSelectedPresetId(null);
+    setWatermarkStrength("light");
+    setWatermarkPlacement("diagonal");
+    setAdjustedForPlan(false);
+  }
+
   function selectPack(packId: PackId) {
     if (!isPackAvailableForPlan(packId, planId)) {
       setProPackNotice(PRO_PACK_UPSELL_MESSAGE);
@@ -189,18 +309,67 @@ export default function ShareForm({
     }
 
     setProPackNotice(null);
+    setUiMessage(null);
     setSelectedPackId(packId);
-    setOverrideAllowDownload(null);
-    setOverrideWatermarkEnabled(null);
-    setOverrideMaxViews("");
-    setHasMaxViewsOverride(false);
-    setOverrideExpiresLocal("");
-    setHasExpiresOverride(false);
+    clearOverrides();
+  }
+
+  function applySimpleExpiry(choice: SimpleExpiryChoice) {
+    setSimpleExpiryChoice(choice);
+    if (choice === "pack") {
+      setHasExpiresOverride(false);
+      setOverrideExpiresLocal("");
+      return;
+    }
+    if (choice === "none") {
+      setHasExpiresOverride(true);
+      setOverrideExpiresLocal("");
+      return;
+    }
+    if (choice === "custom") {
+      setHasExpiresOverride(true);
+      if (!overrideExpiresLocal.trim()) {
+        const defaultIso = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+        setOverrideExpiresLocal(toDatetimeLocalFromIso(defaultIso));
+      }
+      return;
+    }
+    const seconds = EXPIRY_SECONDS_BY_CHOICE[choice];
+    const iso = new Date(Date.now() + seconds * 1000).toISOString();
+    setHasExpiresOverride(true);
+    setOverrideExpiresLocal(toDatetimeLocalFromIso(iso));
+  }
+
+  function applyQuickPreset(presetId: QuickPresetId) {
+    const preset = QUICK_PRESETS.find((p) => p.id === presetId);
+    if (!preset) return;
+    if (!isPackAvailableForPlan(preset.packId, planId)) {
+      setProPackNotice(PRO_PACK_UPSELL_MESSAGE);
+      return;
+    }
+    setProPackNotice(null);
+    setErr(null);
+    setUiMessage(null);
+    setSelectedPresetId(preset.id);
+    setSelectedPackId(preset.packId);
+    setOverrideAllowDownload(preset.allowDownload);
+    setOverrideWatermarkEnabled(preset.watermarkEnabled);
+    if (preset.maxViews !== undefined) {
+      setHasMaxViewsOverride(true);
+      setOverrideMaxViews(preset.maxViews == null ? "" : String(preset.maxViews));
+    } else {
+      setHasMaxViewsOverride(false);
+      setOverrideMaxViews("");
+    }
+    setWatermarkStrength(preset.watermarkStrength);
+    setWatermarkPlacement(preset.watermarkPlacement);
+    applySimpleExpiry(preset.expiryChoice);
     setAdjustedForPlan(false);
   }
 
   async function onCreate() {
     setErr(null);
+    setUiMessage(null);
     setStats(null);
     setBusy(true);
     try {
@@ -246,6 +415,7 @@ export default function ShareForm({
         (typeof res.url === "string" && res.url.trim()) ||
         `${window.location.origin}/s/${encodeURIComponent(String(res.token || ""))}`;
       setShareUrl(resolvedUrl);
+      setUiMessage("Protected link created.");
     } catch (e: unknown) {
       setErr(errorMessage(e) || "Unexpected error.");
     } finally {
@@ -256,6 +426,7 @@ export default function ShareForm({
   async function onStats() {
     if (!token) return;
     setErr(null);
+    setUiMessage(null);
     setBusy(true);
     try {
       const res: ShareStatsResult = await getShareStatsByToken(token);
@@ -275,6 +446,7 @@ export default function ShareForm({
     if (!shareUrl) return;
     try {
       await navigator.clipboard.writeText(shareUrl);
+      setUiMessage("Share link copied.");
     } catch {
       setErr("Unable to copy link. Copy manually from the field.");
     }
@@ -284,9 +456,43 @@ export default function ShareForm({
     try {
       window.localStorage.setItem(DEFAULT_PACK_STORAGE_KEY, selectedPack.id);
       setDefaultPackId(selectedPack.id);
+      setUiMessage(`Saved "${selectedPack.label}" as your default pack.`);
     } catch {
       setErr("Unable to save default pack on this browser.");
     }
+  }
+
+  async function onExportConfig() {
+    const payload = {
+      mode,
+      packId: selectedPack.id,
+      preview,
+      watermarkProfile: {
+        strength: watermarkStrength,
+        placement: watermarkPlacement,
+      },
+      overrides: {
+        allowDownload: overrideAllowDownload,
+        watermarkEnabled: overrideWatermarkEnabled,
+        maxViews: hasMaxViewsOverride ? maxViewsFromInput(overrideMaxViews) : "pack-default",
+        expiresAt: hasExpiresOverride ? (toIsoFromDatetimeLocal(overrideExpiresLocal) || null) : "pack-default",
+      },
+    };
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(payload, null, 2));
+      setUiMessage("Config copied to clipboard.");
+    } catch {
+      setErr("Unable to export config from this browser.");
+    }
+  }
+
+  function onResetAll() {
+    setErr(null);
+    setUiMessage(null);
+    clearOverrides();
+    setToEmail("");
+    setPassword("");
+    if (canEditTitle) setShareTitle("");
   }
 
   const createdWithPack = stats?.ok
@@ -301,25 +507,19 @@ export default function ShareForm({
     <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-4 shadow-sm">
       <div className="flex flex-col gap-4">
         <div>
-          <div className="flex items-center justify-between gap-2">
-            <h2 className="text-sm font-semibold text-neutral-200">Choose a sharing pack</h2>
-            <button
-              type="button"
-              onClick={onSaveDefaultPack}
-              className="rounded-md border border-neutral-700 bg-neutral-900 px-2 py-1 text-xs text-neutral-200 hover:bg-neutral-800"
-            >
-              Make this my default pack
-            </button>
-          </div>
+          <h2 className="text-sm font-semibold text-neutral-200">Choose a protection preset</h2>
+          <p className="mt-1 text-xs text-neutral-500">
+            Start with a preset outcome, then tweak only what you need.
+          </p>
           <div className="mt-2 grid grid-cols-1 gap-2 md:grid-cols-2">
-            {PACKS.map((pack) => {
-              const selected = pack.id === selectedPack.id;
-              const available = isPackAvailableForPlan(pack, planId);
+            {QUICK_PRESETS.map((preset) => {
+              const selected = selectedPresetId === preset.id;
+              const available = isPackAvailableForPlan(preset.packId, planId);
               return (
                 <button
-                  key={pack.id}
+                  key={preset.id}
                   type="button"
-                  onClick={() => selectPack(pack.id)}
+                  onClick={() => applyQuickPreset(preset.id)}
                   className={`rounded-lg border p-3 text-left transition ${selected
                     ? "border-cyan-500/50 bg-cyan-500/10"
                     : available
@@ -328,34 +528,22 @@ export default function ShareForm({
                     }`}
                 >
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-neutral-100">{pack.label}</span>
-                    {pack.minPlan === "pro" ? (
+                    <span className="text-sm font-medium text-neutral-100">{preset.label}</span>
+                    {preset.badge ? (
+                      <span className="rounded-full border border-neutral-700 bg-neutral-800 px-2 py-0.5 text-[10px] text-neutral-300">
+                        {preset.badge}
+                      </span>
+                    ) : null}
+                    {getPackById(preset.packId).minPlan === "pro" ? (
                       <span className="rounded-full border border-amber-700/40 bg-amber-950/40 px-2 py-0.5 text-[10px] text-amber-100">
                         Pro
                       </span>
                     ) : null}
-                    {defaultPackId === pack.id ? (
-                      <span className="rounded-full border border-neutral-700 bg-neutral-800 px-2 py-0.5 text-[10px] text-neutral-300">
-                        default
-                      </span>
-                    ) : null}
                   </div>
-                  <div className="mt-1 text-xs text-neutral-400">{pack.description}</div>
+                  <div className="mt-1 text-xs text-neutral-400">{preset.description}</div>
                   {!available ? (
                     <div className="mt-2 text-[11px] text-amber-100/90">
-                      Available on Pro.
-                    </div>
-                  ) : null}
-                  {pack.recommendedFor?.length ? (
-                    <div className="mt-2 flex flex-wrap gap-1">
-                      {pack.recommendedFor.map((tag) => (
-                        <span
-                          key={`${pack.id}-${tag}`}
-                          className="rounded-full border border-neutral-700 bg-neutral-800 px-2 py-0.5 text-[10px] text-neutral-300"
-                        >
-                          {tag}
-                        </span>
-                      ))}
+                      Upgrade to use this preset.
                     </div>
                   ) : null}
                 </button>
@@ -363,6 +551,77 @@ export default function ShareForm({
             })}
           </div>
         </div>
+
+        <div className="inline-flex w-fit rounded-lg border border-neutral-800 bg-neutral-900 p-1">
+          <button
+            type="button"
+            onClick={() => setMode("simple")}
+            className={`rounded-md px-3 py-1.5 text-xs font-medium transition ${mode === "simple" ? "bg-neutral-100 text-neutral-950" : "text-neutral-300 hover:text-neutral-100"}`}
+          >
+            Simple mode
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode("advanced")}
+            className={`rounded-md px-3 py-1.5 text-xs font-medium transition ${mode === "advanced" ? "bg-neutral-100 text-neutral-950" : "text-neutral-300 hover:text-neutral-100"}`}
+          >
+            Advanced mode
+          </button>
+        </div>
+
+        {mode === "advanced" ? (
+          <div>
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="text-sm font-semibold text-neutral-200">Full pack catalog</h2>
+              <button
+                type="button"
+                onClick={onSaveDefaultPack}
+                className="rounded-md border border-neutral-700 bg-neutral-900 px-2 py-1 text-xs text-neutral-200 hover:bg-neutral-800"
+              >
+                Make this my default pack
+              </button>
+            </div>
+            <div className="mt-2 grid grid-cols-1 gap-2 md:grid-cols-2">
+              {PACKS.map((pack) => {
+                const selected = pack.id === selectedPack.id;
+                const available = isPackAvailableForPlan(pack, planId);
+                return (
+                  <button
+                    key={pack.id}
+                    type="button"
+                    onClick={() => selectPack(pack.id)}
+                    className={`rounded-lg border p-3 text-left transition ${selected
+                      ? "border-cyan-500/50 bg-cyan-500/10"
+                      : available
+                        ? "border-neutral-800 bg-neutral-900 hover:border-neutral-700"
+                        : "border-amber-700/40 bg-amber-950/25 hover:border-amber-600/50"
+                      }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-neutral-100">{pack.label}</span>
+                      {pack.minPlan === "pro" ? (
+                        <span className="rounded-full border border-amber-700/40 bg-amber-950/40 px-2 py-0.5 text-[10px] text-amber-100">
+                          Pro
+                        </span>
+                      ) : null}
+                      {defaultPackId === pack.id ? (
+                        <span className="rounded-full border border-neutral-700 bg-neutral-800 px-2 py-0.5 text-[10px] text-neutral-300">
+                          default
+                        </span>
+                      ) : null}
+                    </div>
+                    <div className="mt-1 text-xs text-neutral-400">{pack.description}</div>
+                    {!available ? (
+                      <div className="mt-2 text-[11px] text-amber-100/90">
+                        Available on Pro.
+                      </div>
+                    ) : null}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ) : null}
         {isFreePlan && proPackNotice ? (
           <div className="rounded-lg border border-amber-700/40 bg-amber-950/30 p-3 text-sm text-amber-100">
             <div>{proPackNotice}</div>
@@ -377,187 +636,309 @@ export default function ShareForm({
           <SettingChip label="Watermark" value={preview.watermarkEnabled ? "On" : "Off"} />
           <SettingChip label="Access" value={preview.allowDownload ? "Download allowed" : "View-only"} />
         </div>
+        <div className="rounded-lg border border-neutral-800 bg-neutral-900 p-3">
+          <div className="text-sm font-medium text-neutral-200">Estimated outcome</div>
+          <div className="mt-1 text-xs text-neutral-400">{estimatedOutcome}</div>
+        </div>
 
-        {isRentalPromptPack ? (
-          <RecipientField value={toEmail} onChange={setToEmail} />
-        ) : null}
-
-        <button
-          onClick={onCreate}
-          disabled={busy || !docId}
-          className="rounded-lg bg-neutral-100 px-3 py-2 text-sm font-medium text-neutral-950 hover:bg-white disabled:opacity-50"
-        >
-          {busy ? "Creating..." : "Create secure link"}
-        </button>
-
-        <details
-          open={showCustomize}
-          onToggle={(e) => setShowCustomize((e.currentTarget as HTMLDetailsElement).open)}
-          className="rounded-lg border border-neutral-800 bg-neutral-900"
-        >
-          <summary className="cursor-pointer list-none px-3 py-2 text-sm font-medium text-neutral-200">
-            Customize
-          </summary>
-          <div className="border-t border-neutral-800 p-3">
-            <div className="flex flex-col gap-3">
-              {canEditTitle ? (
-                <div>
-                  <label className="text-sm font-medium text-neutral-300">
-                    Title before sharing (optional)
-                  </label>
-                  <div className="mt-1 text-xs text-neutral-500">
-                    If set, updates this document title before creating the share link.
-                  </div>
-                  <input
-                    value={shareTitle}
-                    onChange={(e) => setShareTitle(e.target.value)}
-                    placeholder="Leave blank to keep current title"
-                    className="mt-2 w-full rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm text-neutral-100 placeholder:text-neutral-500 focus:border-neutral-600 focus:outline-none focus:ring-2 focus:ring-neutral-700 transition"
-                  />
-                </div>
-              ) : null}
-
-              {!isRentalPromptPack ? (
-                <RecipientField value={toEmail} onChange={setToEmail} />
-              ) : null}
-
+        {mode === "simple" ? (
+          <div className="rounded-lg border border-neutral-800 bg-neutral-900 p-3">
+            <div className="text-sm font-medium text-neutral-200">Quick settings</div>
+            <div className="mt-3 flex flex-col gap-4">
               <div>
-                <label className="text-sm font-medium text-neutral-300">
-                  Password (optional)
+                <label className="text-sm font-medium text-neutral-300">Watermark</label>
+                <p className="mt-1 text-xs text-neutral-500">Recommended for external shares.</p>
+                <label className="mt-2 inline-flex items-center gap-2 text-sm text-neutral-200">
+                  <input
+                    type="checkbox"
+                    checked={preview.watermarkEnabled}
+                    onChange={(e) => setOverrideWatermarkEnabled(e.target.checked)}
+                    className="h-4 w-4 rounded border-neutral-700 bg-neutral-950 text-cyan-400 focus:ring-cyan-500"
+                  />
+                  Enable watermark
                 </label>
-                <div className="mt-1 text-xs text-neutral-500">
-                  If set, a password is required (in addition to recipient email, if enabled).
-                </div>
-                <input
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Set a password"
-                  type="password"
-                  className="mt-2 w-full rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm text-neutral-100 placeholder:text-neutral-500 focus:border-neutral-600 focus:outline-none focus:ring-2 focus:ring-neutral-700 transition"
-                />
               </div>
 
-              <label className="flex items-start gap-3 rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm text-neutral-200">
-                <input
-                  type="checkbox"
-                  checked={preview.allowDownload}
-                  onChange={(e) => setOverrideAllowDownload(e.target.checked)}
-                  className="mt-0.5 h-4 w-4 rounded border-neutral-700 bg-neutral-950 text-cyan-400 focus:ring-cyan-500"
-                />
-                <span>
-                  <span className="font-medium text-neutral-200">Allow recipient download</span>
-                  <span className="mt-1 block text-xs text-neutral-500">
-                    If disabled, recipients can preview but cannot download.
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setOverrideAllowDownload(null)}
-                    className="mt-1 text-[11px] text-cyan-300 hover:underline"
-                  >
-                    Use pack default
-                  </button>
-                </span>
-              </label>
-
-              <label className="flex items-start gap-3 rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm text-neutral-200">
-                <input
-                  type="checkbox"
-                  checked={preview.watermarkEnabled}
-                  onChange={(e) => setOverrideWatermarkEnabled(e.target.checked)}
-                  className="mt-0.5 h-4 w-4 rounded border-neutral-700 bg-neutral-950 text-cyan-400 focus:ring-cyan-500"
-                />
-                <span>
-                  <span className="font-medium text-neutral-200">Enable watermark</span>
-                  <span className="mt-1 block text-xs text-neutral-500">
-                    Adds share-level watermark overlay for inline previews.
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setOverrideWatermarkEnabled(null)}
-                    className="mt-1 text-[11px] text-cyan-300 hover:underline"
-                  >
-                    Use pack default
-                  </button>
-                </span>
-              </label>
-
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                <div>
-                  <label className="text-sm font-medium text-neutral-300">
-                    Max Views (optional)
-                  </label>
-                  <div className="mt-1 text-xs text-neutral-500">
-                    Leave blank for no share-level cap. Use 1 for single-view delivery.
-                  </div>
-                  <input
-                    value={hasMaxViewsOverride ? overrideMaxViews : ""}
-                    onChange={(e) => {
-                      setHasMaxViewsOverride(true);
-                      setOverrideMaxViews(e.target.value);
-                    }}
-                    placeholder={
-                      packedDefaults.maxViews == null ? "Pack default: unlimited" : `Pack default: ${packedDefaults.maxViews}`
-                    }
-                    inputMode="numeric"
-                    className="mt-2 w-full rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm text-neutral-100 placeholder:text-neutral-500 focus:border-neutral-600 focus:outline-none focus:ring-2 focus:ring-neutral-700 transition"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setHasMaxViewsOverride(false);
-                      setOverrideMaxViews("");
-                    }}
-                    className="mt-1 text-[11px] text-cyan-300 hover:underline"
-                  >
-                    Use pack default
-                  </button>
+              <div>
+                <label className="text-sm font-medium text-neutral-300">Watermark strength</label>
+                <p className="mt-1 text-xs text-neutral-500">Most common: light.</p>
+                <div className="mt-2 inline-flex rounded-lg border border-neutral-700 bg-neutral-950 p-1">
+                  {(["light", "strong"] as const).map((v) => (
+                    <button
+                      key={v}
+                      type="button"
+                      onClick={() => setWatermarkStrength(v)}
+                      className={`rounded-md px-3 py-1 text-xs font-medium ${watermarkStrength === v ? "bg-neutral-100 text-neutral-950" : "text-neutral-300 hover:text-neutral-100"}`}
+                    >
+                      {v === "light" ? "Light" : "Strong"}
+                    </button>
+                  ))}
                 </div>
+              </div>
 
-                <div>
-                  <label className="text-sm font-medium text-neutral-300">
-                    Expiration (optional)
-                  </label>
-                  <div className="mt-1 text-xs text-neutral-500">
-                    When set, access stops at this exact time.
-                  </div>
+              <div>
+                <label className="text-sm font-medium text-neutral-300">Watermark placement</label>
+                <p className="mt-1 text-xs text-neutral-500">Choose diagonal or center emphasis.</p>
+                <div className="mt-2 inline-flex rounded-lg border border-neutral-700 bg-neutral-950 p-1">
+                  {(["diagonal", "center"] as const).map((v) => (
+                    <button
+                      key={v}
+                      type="button"
+                      onClick={() => setWatermarkPlacement(v)}
+                      className={`rounded-md px-3 py-1 text-xs font-medium ${watermarkPlacement === v ? "bg-neutral-100 text-neutral-950" : "text-neutral-300 hover:text-neutral-100"}`}
+                    >
+                      {v === "diagonal" ? "Diagonal" : "Center"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-neutral-300">Expiry</label>
+                <p className="mt-1 text-xs text-neutral-500">Most common: 7 days.</p>
+                <select
+                  value={simpleExpiryChoice}
+                  onChange={(e) => applySimpleExpiry(e.target.value as SimpleExpiryChoice)}
+                  className="mt-2 w-full rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm text-neutral-100 focus:border-neutral-600 focus:outline-none focus:ring-2 focus:ring-neutral-700 transition"
+                >
+                  <option value="pack">Use pack default</option>
+                  <option value="24h">24 hours</option>
+                  <option value="72h">72 hours</option>
+                  <option value="7d">7 days</option>
+                  <option value="14d">14 days</option>
+                  <option value="30d">30 days</option>
+                  <option value="none">No expiration</option>
+                  <option value="custom">Custom date/time</option>
+                </select>
+                {simpleExpiryChoice === "custom" ? (
                   <input
-                    value={hasExpiresOverride ? overrideExpiresLocal : ""}
+                    value={overrideExpiresLocal}
                     onChange={(e) => {
                       setHasExpiresOverride(true);
                       setOverrideExpiresLocal(e.target.value);
                     }}
                     type="datetime-local"
+                    className="mt-2 w-full rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm text-neutral-100 focus:border-neutral-600 focus:outline-none focus:ring-2 focus:ring-neutral-700 transition"
+                  />
+                ) : null}
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-neutral-300">Download access</label>
+                <p className="mt-1 text-xs text-neutral-500">Disable for view-only delivery.</p>
+                <label className="mt-2 inline-flex items-center gap-2 text-sm text-neutral-200">
+                  <input
+                    type="checkbox"
+                    checked={preview.allowDownload}
+                    onChange={(e) => setOverrideAllowDownload(e.target.checked)}
+                    className="h-4 w-4 rounded border-neutral-700 bg-neutral-950 text-cyan-400 focus:ring-cyan-500"
+                  />
+                  Allow download
+                </label>
+              </div>
+
+              {isRentalPromptPack ? (
+                <RecipientField value={toEmail} onChange={setToEmail} />
+              ) : null}
+            </div>
+          </div>
+        ) : (
+          <details open className="rounded-lg border border-neutral-800 bg-neutral-900">
+            <summary className="cursor-pointer list-none px-3 py-2 text-sm font-medium text-neutral-200">
+              Customize
+            </summary>
+            <div className="border-t border-neutral-800 p-3">
+              <div className="flex flex-col gap-3">
+                {canEditTitle ? (
+                  <div>
+                    <label className="text-sm font-medium text-neutral-300">
+                      Title before sharing (optional)
+                    </label>
+                    <div className="mt-1 text-xs text-neutral-500">
+                      If set, updates this document title before creating the share link.
+                    </div>
+                    <input
+                      value={shareTitle}
+                      onChange={(e) => setShareTitle(e.target.value)}
+                      placeholder="Leave blank to keep current title"
+                      className="mt-2 w-full rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm text-neutral-100 placeholder:text-neutral-500 focus:border-neutral-600 focus:outline-none focus:ring-2 focus:ring-neutral-700 transition"
+                    />
+                  </div>
+                ) : null}
+
+                {!isRentalPromptPack ? (
+                  <RecipientField value={toEmail} onChange={setToEmail} />
+                ) : null}
+
+                <div>
+                  <label className="text-sm font-medium text-neutral-300">
+                    Password (optional)
+                  </label>
+                  <div className="mt-1 text-xs text-neutral-500">
+                    If set, a password is required (in addition to recipient email, if enabled).
+                  </div>
+                  <input
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Set a password"
+                    type="password"
                     className="mt-2 w-full rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm text-neutral-100 placeholder:text-neutral-500 focus:border-neutral-600 focus:outline-none focus:ring-2 focus:ring-neutral-700 transition"
                   />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setHasExpiresOverride(false);
-                      setOverrideExpiresLocal("");
-                    }}
-                    className="mt-1 text-[11px] text-cyan-300 hover:underline"
-                  >
-                    Use pack default
-                  </button>
+                </div>
+
+                <label className="flex items-start gap-3 rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm text-neutral-200">
+                  <input
+                    type="checkbox"
+                    checked={preview.allowDownload}
+                    onChange={(e) => setOverrideAllowDownload(e.target.checked)}
+                    className="mt-0.5 h-4 w-4 rounded border-neutral-700 bg-neutral-950 text-cyan-400 focus:ring-cyan-500"
+                  />
+                  <span>
+                    <span className="font-medium text-neutral-200">Allow recipient download</span>
+                    <span className="mt-1 block text-xs text-neutral-500">
+                      If disabled, recipients can preview but cannot download.
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setOverrideAllowDownload(null)}
+                      className="mt-1 text-[11px] text-cyan-300 hover:underline"
+                    >
+                      Use pack default
+                    </button>
+                  </span>
+                </label>
+
+                <label className="flex items-start gap-3 rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm text-neutral-200">
+                  <input
+                    type="checkbox"
+                    checked={preview.watermarkEnabled}
+                    onChange={(e) => setOverrideWatermarkEnabled(e.target.checked)}
+                    className="mt-0.5 h-4 w-4 rounded border-neutral-700 bg-neutral-950 text-cyan-400 focus:ring-cyan-500"
+                  />
+                  <span>
+                    <span className="font-medium text-neutral-200">Enable watermark</span>
+                    <span className="mt-1 block text-xs text-neutral-500">
+                      Adds share-level watermark overlay for inline previews.
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setOverrideWatermarkEnabled(null)}
+                      className="mt-1 text-[11px] text-cyan-300 hover:underline"
+                    >
+                      Use pack default
+                    </button>
+                  </span>
+                </label>
+
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                  <div>
+                    <label className="text-sm font-medium text-neutral-300">
+                      Max Views (optional)
+                    </label>
+                    <div className="mt-1 text-xs text-neutral-500">
+                      Leave blank for no share-level cap. Use 1 for single-view delivery.
+                    </div>
+                    <input
+                      value={hasMaxViewsOverride ? overrideMaxViews : ""}
+                      onChange={(e) => {
+                        setHasMaxViewsOverride(true);
+                        setOverrideMaxViews(e.target.value);
+                      }}
+                      placeholder={
+                        packedDefaults.maxViews == null ? "Pack default: unlimited" : `Pack default: ${packedDefaults.maxViews}`
+                      }
+                      inputMode="numeric"
+                      className="mt-2 w-full rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm text-neutral-100 placeholder:text-neutral-500 focus:border-neutral-600 focus:outline-none focus:ring-2 focus:ring-neutral-700 transition"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setHasMaxViewsOverride(false);
+                        setOverrideMaxViews("");
+                      }}
+                      className="mt-1 text-[11px] text-cyan-300 hover:underline"
+                    >
+                      Use pack default
+                    </button>
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-medium text-neutral-300">
+                      Expiration (optional)
+                    </label>
+                    <div className="mt-1 text-xs text-neutral-500">
+                      When set, access stops at this exact time.
+                    </div>
+                    <input
+                      value={hasExpiresOverride ? overrideExpiresLocal : ""}
+                      onChange={(e) => {
+                        setHasExpiresOverride(true);
+                        setOverrideExpiresLocal(e.target.value);
+                        setSimpleExpiryChoice("custom");
+                      }}
+                      type="datetime-local"
+                      className="mt-2 w-full rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm text-neutral-100 placeholder:text-neutral-500 focus:border-neutral-600 focus:outline-none focus:ring-2 focus:ring-neutral-700 transition"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setHasExpiresOverride(false);
+                        setOverrideExpiresLocal("");
+                        setSimpleExpiryChoice("pack");
+                      }}
+                      className="mt-1 text-[11px] text-cyan-300 hover:underline"
+                    >
+                      Use pack default
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        </details>
+          </details>
+        )}
 
-        <div className="flex flex-wrap gap-2">
+        <div className="sticky bottom-0 z-10 -mx-4 border-t border-neutral-800 bg-neutral-950/95 px-4 py-3 backdrop-blur">
           <button
-            onClick={onStats}
-            disabled={busy || !token}
-            className="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-200 hover:bg-neutral-800 disabled:opacity-50"
+            onClick={onCreate}
+            disabled={busy || !docId}
+            className="w-full rounded-lg bg-neutral-100 px-3 py-2 text-sm font-medium text-neutral-950 hover:bg-white disabled:opacity-50"
           >
-            Load stats
+            {busy ? "Generating..." : "Generate Protected Link"}
           </button>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={onResetAll}
+              className="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-1.5 text-xs text-neutral-200 hover:bg-neutral-800"
+            >
+              Reset
+            </button>
+            <button
+              type="button"
+              onClick={onSaveDefaultPack}
+              className="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-1.5 text-xs text-neutral-200 hover:bg-neutral-800"
+            >
+              Save preset
+            </button>
+            <button
+              type="button"
+              onClick={onExportConfig}
+              className="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-1.5 text-xs text-neutral-200 hover:bg-neutral-800"
+            >
+              Export config
+            </button>
+          </div>
         </div>
 
         {adjustedForPlan ? (
           <div className="rounded-lg border border-amber-700/40 bg-amber-950/30 p-3 text-sm text-amber-100">
             {isFreePlan ? "Adjusted for Free tier." : "Adjusted for your current plan limits."}
+          </div>
+        ) : null}
+
+        {uiMessage ? (
+          <div className="rounded-lg border border-emerald-700/40 bg-emerald-950/30 p-3 text-sm text-emerald-100">
+            {uiMessage}
           </div>
         ) : null}
 
@@ -579,6 +960,13 @@ export default function ShareForm({
                 className="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-200 hover:bg-neutral-800"
               >
                 Copy link
+              </button>
+              <button
+                onClick={onStats}
+                disabled={busy || !token}
+                className="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-200 hover:bg-neutral-800 disabled:opacity-50"
+              >
+                Load stats
               </button>
             </div>
             {createdWithPack ? (

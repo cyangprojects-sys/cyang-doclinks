@@ -373,12 +373,19 @@ export default async function SharePage({
     const availabilityHint = await getDocAvailabilityHint(bypass.docId);
     const viewMeta = await getDocViewMeta(bypass.docId);
     return (
-      <main className="mx-auto max-w-5xl px-4 py-10">
+      <main className="mx-auto max-w-6xl px-4 py-10">
         <div className="mb-4">
           <BackButton fallbackHref="/admin/dashboard" />
         </div>
-        <ShareForm docId={bypass.docId} canEditTitle={canEditTitle} planId={planId} />
-        <DocumentViewer alias={alias} contentType={viewMeta.contentType} filename={viewMeta.filename} availabilityHint={availabilityHint} />
+        <div className="grid gap-4 lg:grid-cols-[minmax(360px,460px)_minmax(0,1fr)]">
+          <section className="lg:max-h-[calc(100vh-9rem)] lg:overflow-y-auto lg:pr-1">
+            <ShareForm docId={bypass.docId} canEditTitle={canEditTitle} planId={planId} />
+          </section>
+          <aside className="lg:sticky lg:top-4 lg:self-start">
+            <div className="mb-2 text-xs font-medium uppercase tracking-wide text-neutral-400">Live preview</div>
+            <DocumentViewer alias={alias} contentType={viewMeta.contentType} filename={viewMeta.filename} availabilityHint={availabilityHint} />
+          </aside>
+        </div>
       </main>
     );
   }
