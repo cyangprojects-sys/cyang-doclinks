@@ -14,10 +14,15 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - name: Install Postgres client
+      - name: Install Postgres 17 client
         run: |
           sudo apt-get update
-          sudo apt-get install -y postgresql-client
+          sudo apt-get install -y curl ca-certificates gnupg lsb-release
+          sudo install -d /usr/share/postgresql-common/pgdg
+          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.gpg
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.gpg] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list > /dev/null
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client-17
 
       - name: Create dump
         env:
@@ -28,6 +33,7 @@ jobs:
             echo "Missing required secret: NEON_DATABASE_URL" >&2
             exit 1
           fi
+          pg_dump --version
           TS="$(date -u +%Y%m%dT%H%M%SZ)"
           FILE="neon-${TS}.dump"
           pg_dump \
@@ -70,4 +76,3 @@ jobs:
             -H "content-type: application/json" \
             -H "authorization: Bearer ${BACKUP_STATUS_WEBHOOK_TOKEN}" \
             --data "{\"status\":\"ok\",\"source\":\"github-actions\",\"backup_file\":\"${BACKUP_FILE}\"}"
-
