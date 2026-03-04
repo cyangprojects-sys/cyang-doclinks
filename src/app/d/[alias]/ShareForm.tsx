@@ -214,6 +214,8 @@ export default function ShareForm({
   const [adjustedForPlan, setAdjustedForPlan] = useState(false);
   const [proPackNotice, setProPackNotice] = useState<string | null>(null);
   const isFreePlan = String(planId || "").trim().toLowerCase() === "free";
+  const [showProPresets, setShowProPresets] = useState(false);
+  const [showMorePresets, setShowMorePresets] = useState(false);
 
   useEffect(() => {
     const canUsePack = (packId: string) => isPackAvailableForPlan(packId, planId);
@@ -245,6 +247,10 @@ export default function ShareForm({
       // ignore storage failures
     }
   }, [selectedPackId]);
+
+  useEffect(() => {
+    if (!isFreePlan) setShowProPresets(true);
+  }, [isFreePlan]);
 
   const selectedPack = useMemo(() => getPackById(selectedPackId), [selectedPackId]);
 
@@ -502,6 +508,14 @@ export default function ShareForm({
       : null;
 
   const isRentalPromptPack = Boolean(selectedPack.settings.collectRecipient);
+  const visibleQuickPresets = useMemo(
+    () =>
+      QUICK_PRESETS.filter((preset) => {
+        if (showProPresets) return true;
+        return getPackById(preset.packId).minPlan !== "pro";
+      }),
+    [showProPresets]
+  );
 
   return (
     <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-4 shadow-sm">
@@ -511,8 +525,20 @@ export default function ShareForm({
           <p className="mt-1 text-xs text-neutral-500">
             Start with a preset outcome, then tweak only what you need.
           </p>
+          {isFreePlan ? (
+            <div className="mt-2 flex items-center justify-between gap-2 rounded-lg border border-neutral-800 bg-neutral-900 px-3 py-2">
+              <span className="text-xs text-neutral-400">Most common presets are shown by default.</span>
+              <button
+                type="button"
+                onClick={() => setShowProPresets((v) => !v)}
+                className="text-xs font-medium text-neutral-200 underline underline-offset-2 hover:text-white"
+              >
+                {showProPresets ? "Hide Pro presets" : "Show Pro presets"}
+              </button>
+            </div>
+          ) : null}
           <div className="mt-2 grid grid-cols-1 gap-2 md:grid-cols-2">
-            {QUICK_PRESETS.map((preset) => {
+            {visibleQuickPresets.map((preset) => {
               const selected = selectedPresetId === preset.id;
               const available = isPackAvailableForPlan(preset.packId, planId);
               return (
@@ -524,7 +550,7 @@ export default function ShareForm({
                     ? "border-cyan-500/50 bg-cyan-500/10"
                     : available
                       ? "border-neutral-800 bg-neutral-900 hover:border-neutral-700"
-                      : "border-amber-700/40 bg-amber-950/25 hover:border-amber-600/50"
+                      : "border-neutral-800/80 bg-neutral-900/80 hover:border-neutral-700"
                     }`}
                 >
                   <div className="flex items-center gap-2">
@@ -542,7 +568,7 @@ export default function ShareForm({
                   </div>
                   <div className="mt-1 text-xs text-neutral-400">{preset.description}</div>
                   {!available ? (
-                    <div className="mt-2 text-[11px] text-amber-100/90">
+                    <div className="mt-2 text-[11px] text-neutral-300">
                       Upgrade to use this preset.
                     </div>
                   ) : null}
@@ -570,57 +596,65 @@ export default function ShareForm({
         </div>
 
         {mode === "advanced" ? (
-          <div>
-            <div className="flex items-center justify-between gap-2">
-              <h2 className="text-sm font-semibold text-neutral-200">Full pack catalog</h2>
-              <button
-                type="button"
-                onClick={onSaveDefaultPack}
-                className="rounded-md border border-neutral-700 bg-neutral-900 px-2 py-1 text-xs text-neutral-200 hover:bg-neutral-800"
-              >
-                Make this my default pack
-              </button>
-            </div>
-            <div className="mt-2 grid grid-cols-1 gap-2 md:grid-cols-2">
-              {PACKS.map((pack) => {
-                const selected = pack.id === selectedPack.id;
-                const available = isPackAvailableForPlan(pack, planId);
-                return (
-                  <button
-                    key={pack.id}
-                    type="button"
-                    onClick={() => selectPack(pack.id)}
-                    className={`rounded-lg border p-3 text-left transition ${selected
-                      ? "border-cyan-500/50 bg-cyan-500/10"
-                      : available
-                        ? "border-neutral-800 bg-neutral-900 hover:border-neutral-700"
-                        : "border-amber-700/40 bg-amber-950/25 hover:border-amber-600/50"
-                      }`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-neutral-100">{pack.label}</span>
-                      {pack.minPlan === "pro" ? (
-                        <span className="rounded-full border border-amber-700/40 bg-amber-950/40 px-2 py-0.5 text-[10px] text-amber-100">
-                          Pro
-                        </span>
-                      ) : null}
-                      {defaultPackId === pack.id ? (
-                        <span className="rounded-full border border-neutral-700 bg-neutral-800 px-2 py-0.5 text-[10px] text-neutral-300">
-                          default
-                        </span>
-                      ) : null}
-                    </div>
-                    <div className="mt-1 text-xs text-neutral-400">{pack.description}</div>
-                    {!available ? (
-                      <div className="mt-2 text-[11px] text-amber-100/90">
-                        Available on Pro.
+          <details
+            open={showMorePresets}
+            onToggle={(e) => setShowMorePresets((e.currentTarget as HTMLDetailsElement).open)}
+            className="rounded-lg border border-neutral-800 bg-neutral-900"
+          >
+            <summary className="cursor-pointer list-none px-3 py-2 text-sm font-semibold text-neutral-200">
+              More presets
+            </summary>
+            <div className="border-t border-neutral-800 p-3">
+              <div className="mb-3 flex items-center justify-end">
+                <button
+                  type="button"
+                  onClick={onSaveDefaultPack}
+                  className="rounded-md border border-neutral-700 bg-neutral-900 px-2 py-1 text-xs text-neutral-200 hover:bg-neutral-800"
+                >
+                  Make this my default pack
+                </button>
+              </div>
+              <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+                {PACKS.map((pack) => {
+                  const selected = pack.id === selectedPack.id;
+                  const available = isPackAvailableForPlan(pack, planId);
+                  return (
+                    <button
+                      key={pack.id}
+                      type="button"
+                      onClick={() => selectPack(pack.id)}
+                      className={`rounded-lg border p-3 text-left transition ${selected
+                        ? "border-cyan-500/50 bg-cyan-500/10"
+                        : available
+                          ? "border-neutral-800 bg-neutral-900 hover:border-neutral-700"
+                          : "border-neutral-800/80 bg-neutral-900/80 hover:border-neutral-700"
+                        }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-neutral-100">{pack.label}</span>
+                        {pack.minPlan === "pro" ? (
+                          <span className="rounded-full border border-amber-700/40 bg-amber-950/40 px-2 py-0.5 text-[10px] text-amber-100">
+                            Pro
+                          </span>
+                        ) : null}
+                        {defaultPackId === pack.id ? (
+                          <span className="rounded-full border border-neutral-700 bg-neutral-800 px-2 py-0.5 text-[10px] text-neutral-300">
+                            default
+                          </span>
+                        ) : null}
                       </div>
-                    ) : null}
-                  </button>
-                );
-              })}
+                      <div className="mt-1 text-xs text-neutral-400">{pack.description}</div>
+                      {!available ? (
+                        <div className="mt-2 text-[11px] text-neutral-300">
+                          Available on Pro.
+                        </div>
+                      ) : null}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-          </div>
+          </details>
         ) : null}
         {isFreePlan && proPackNotice ? (
           <div className="rounded-lg border border-amber-700/40 bg-amber-950/30 p-3 text-sm text-amber-100">
@@ -645,51 +679,53 @@ export default function ShareForm({
           <div className="rounded-lg border border-neutral-800 bg-neutral-900 p-3">
             <div className="text-sm font-medium text-neutral-200">Quick settings</div>
             <div className="mt-3 flex flex-col gap-4">
-              <div>
-                <label className="text-sm font-medium text-neutral-300">Watermark</label>
-                <p className="mt-1 text-xs text-neutral-500">Recommended for external shares.</p>
-                <label className="mt-2 inline-flex items-center gap-2 text-sm text-neutral-200">
-                  <input
-                    type="checkbox"
-                    checked={preview.watermarkEnabled}
-                    onChange={(e) => setOverrideWatermarkEnabled(e.target.checked)}
-                    className="h-4 w-4 rounded border-neutral-700 bg-neutral-950 text-cyan-400 focus:ring-cyan-500"
-                  />
-                  Enable watermark
-                </label>
-              </div>
-
-              <div>
-                <label className="text-sm font-medium text-neutral-300">Watermark strength</label>
-                <p className="mt-1 text-xs text-neutral-500">Most common: light.</p>
-                <div className="mt-2 inline-flex rounded-lg border border-neutral-700 bg-neutral-950 p-1">
-                  {(["light", "strong"] as const).map((v) => (
-                    <button
-                      key={v}
-                      type="button"
-                      onClick={() => setWatermarkStrength(v)}
-                      className={`rounded-md px-3 py-1 text-xs font-medium ${watermarkStrength === v ? "bg-neutral-100 text-neutral-950" : "text-neutral-300 hover:text-neutral-100"}`}
-                    >
-                      {v === "light" ? "Light" : "Strong"}
-                    </button>
-                  ))}
+              <div className="flex flex-wrap gap-3">
+                <div className="min-w-[160px] flex-1">
+                  <label className="text-sm font-medium text-neutral-300">Watermark</label>
+                  <p className="mt-1 text-xs text-neutral-500">Recommended for external shares.</p>
+                  <label className="mt-2 inline-flex items-center gap-2 text-sm text-neutral-200">
+                    <input
+                      type="checkbox"
+                      checked={preview.watermarkEnabled}
+                      onChange={(e) => setOverrideWatermarkEnabled(e.target.checked)}
+                      className="h-4 w-4 rounded border-neutral-700 bg-neutral-950 text-cyan-400 focus:ring-cyan-500"
+                    />
+                    Enable watermark
+                  </label>
                 </div>
-              </div>
 
-              <div>
-                <label className="text-sm font-medium text-neutral-300">Watermark placement</label>
-                <p className="mt-1 text-xs text-neutral-500">Choose diagonal or center emphasis.</p>
-                <div className="mt-2 inline-flex rounded-lg border border-neutral-700 bg-neutral-950 p-1">
-                  {(["diagonal", "center"] as const).map((v) => (
-                    <button
-                      key={v}
-                      type="button"
-                      onClick={() => setWatermarkPlacement(v)}
-                      className={`rounded-md px-3 py-1 text-xs font-medium ${watermarkPlacement === v ? "bg-neutral-100 text-neutral-950" : "text-neutral-300 hover:text-neutral-100"}`}
-                    >
-                      {v === "diagonal" ? "Diagonal" : "Center"}
-                    </button>
-                  ))}
+                <div className="min-w-[210px] flex-1">
+                  <label className="text-sm font-medium text-neutral-300">Watermark strength</label>
+                  <p className="mt-1 text-xs text-neutral-500">Most common: light.</p>
+                  <div className="mt-2 inline-flex max-w-full rounded-lg border border-neutral-700 bg-neutral-950 p-1">
+                    {(["light", "strong"] as const).map((v) => (
+                      <button
+                        key={v}
+                        type="button"
+                        onClick={() => setWatermarkStrength(v)}
+                        className={`rounded-md px-3 py-1 text-xs font-medium ${watermarkStrength === v ? "bg-neutral-100 text-neutral-950" : "text-neutral-300 hover:text-neutral-100"}`}
+                      >
+                        {v === "light" ? "Light" : "Strong"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="min-w-[230px] flex-1">
+                  <label className="text-sm font-medium text-neutral-300">Watermark placement</label>
+                  <p className="mt-1 text-xs text-neutral-500">Choose diagonal or center emphasis.</p>
+                  <div className="mt-2 inline-flex max-w-full rounded-lg border border-neutral-700 bg-neutral-950 p-1">
+                    {(["diagonal", "center"] as const).map((v) => (
+                      <button
+                        key={v}
+                        type="button"
+                        onClick={() => setWatermarkPlacement(v)}
+                        className={`rounded-md px-3 py-1 text-xs font-medium ${watermarkPlacement === v ? "bg-neutral-100 text-neutral-950" : "text-neutral-300 hover:text-neutral-100"}`}
+                      >
+                        {v === "diagonal" ? "Diagonal" : "Center"}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
 
@@ -898,13 +934,22 @@ export default function ShareForm({
         )}
 
         <div className="sticky bottom-0 z-10 -mx-4 border-t border-neutral-800 bg-neutral-950/95 px-4 py-3 backdrop-blur">
-          <button
-            onClick={onCreate}
-            disabled={busy || !docId}
-            className="w-full rounded-lg bg-neutral-100 px-3 py-2 text-sm font-medium text-neutral-950 hover:bg-white disabled:opacity-50"
-          >
-            {busy ? "Generating..." : "Generate Protected Link"}
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={onCreate}
+              disabled={busy || !docId}
+              className="flex-1 rounded-lg bg-neutral-100 px-3 py-2 text-sm font-medium text-neutral-950 hover:bg-white disabled:opacity-50"
+            >
+              {busy ? "Generating..." : "Generate Protected Link"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode("advanced")}
+              className="text-xs text-neutral-300 underline underline-offset-2 hover:text-neutral-100"
+            >
+              Customize (optional)
+            </button>
+          </div>
           <div className="mt-2 flex flex-wrap gap-2">
             <button
               type="button"

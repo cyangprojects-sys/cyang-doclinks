@@ -244,7 +244,7 @@ export default function SecurePdfCanvasViewer(props: {
       <div className="sticky top-0 z-20 flex items-center justify-between gap-3 border-b border-white/10 bg-black/70 px-3 py-2 text-xs text-white/80 backdrop-blur">
         <div className="flex items-center gap-2">
           <span>{modeLabel} preview</span>
-          {mode === "pdf" ? <span>{numPages ? `${numPages} pages` : ""}</span> : null}
+          {mode === "pdf" ? <span>{numPages > 0 ? "PDF ready" : "Preparing pages..."}</span> : null}
         </div>
         <div className="flex items-center gap-2">
           {zoomAllowed ? (
