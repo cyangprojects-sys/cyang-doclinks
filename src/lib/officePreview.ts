@@ -1,6 +1,5 @@
 import mammoth from "mammoth";
 import JSZip from "jszip";
-import ExcelJS from "exceljs";
 
 export type OfficePreviewResult =
   | { ok: true; html: string }
@@ -42,6 +41,15 @@ function esc(s: unknown): string {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
+}
+
+function unescXml(s: string): string {
+  return String(s || "")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&amp;/g, "&");
 }
 
 function mimeKind(mimeType: string): "docx" | "sheet" | "pptx" | "unsupported" {
@@ -105,26 +113,72 @@ async function convertSpreadsheet(bytes: Buffer, mimeType: string): Promise<Offi
         message: "Legacy .xls preview is not supported. Use .xlsx or .csv for inline preview.",
       };
     }
-    const workbook = new ExcelJS.Workbook();
-    const loadInput = bytes as unknown as Parameters<typeof workbook.xlsx.load>[0];
-    await workbook.xlsx.load(loadInput);
-    const worksheets = workbook.worksheets || [];
-    if (!worksheets.length) return { ok: false, error: "EMPTY_WORKBOOK", message: "Workbook has no sheets." };
-    const parts: string[] = [];
-    for (const ws of worksheets.slice(0, 5)) {
-      let rowCount = 0;
-      const rowParts: string[] = [];
-      ws.eachRow({ includeEmpty: false }, (row) => {
-        if (rowCount >= 500) return;
-        const rowValues = Array.isArray(row.values) ? row.values : [];
-        const cells = rowValues
-          .slice(1)
-          .map((value) => `<td>${esc(typeof value === "object" ? JSON.stringify(value) : value)}</td>`)
-          .join("");
-        rowParts.push(`<tr>${cells}</tr>`);
-        rowCount += 1;
+    const zip = await JSZip.loadAsync(bytes);
+    const sharedStrings = new Map<number, string>();
+    const sharedXmlFile = zip.file("xl/sharedStrings.xml");
+    if (sharedXmlFile) {
+      const sharedXml = await sharedXmlFile.async("text");
+      const stringNodes = [...sharedXml.matchAll(/<si[\s\S]*?>([\s\S]*?)<\/si>/gi)];
+      stringNodes.forEach((node, idx) => {
+        const text = [...node[1].matchAll(/<t[^>]*>([\s\S]*?)<\/t>/gi)].map((m) => unescXml(m[1])).join("");
+        sharedStrings.set(idx, text);
       });
-      parts.push(`<h2>${esc(ws.name)}</h2><table><tbody>${rowParts.join("")}</tbody></table>`);
+    }
+
+    const workbookXmlFile = zip.file("xl/workbook.xml");
+    const relsXmlFile = zip.file("xl/_rels/workbook.xml.rels");
+    const sheetFiles = Object.keys(zip.files)
+      .filter((n) => /^xl\/worksheets\/sheet\d+\.xml$/i.test(n))
+      .sort((a, b) => {
+        const ai = Number((a.match(/sheet(\d+)\.xml/i) || [])[1] || 0);
+        const bi = Number((b.match(/sheet(\d+)\.xml/i) || [])[1] || 0);
+        return ai - bi;
+      });
+    if (!sheetFiles.length) return { ok: false, error: "EMPTY_WORKBOOK", message: "Workbook has no sheets." };
+
+    const relMap = new Map<string, string>();
+    if (relsXmlFile) {
+      const relsXml = await relsXmlFile.async("text");
+      for (const m of relsXml.matchAll(/<Relationship[^>]*Id="([^"]+)"[^>]*Target="([^"]+)"/gi)) {
+        relMap.set(m[1], `xl/${String(m[2]).replace(/^\//, "")}`);
+      }
+    }
+
+    const sheetNameByPath = new Map<string, string>();
+    if (workbookXmlFile) {
+      const workbookXml = await workbookXmlFile.async("text");
+      for (const m of workbookXml.matchAll(/<sheet[^>]*name="([^"]+)"[^>]*r:id="([^"]+)"/gi)) {
+        const name = unescXml(m[1]);
+        const relId = m[2];
+        const path = relMap.get(relId);
+        if (path) sheetNameByPath.set(path, name);
+      }
+    }
+
+    const parts: string[] = [];
+    for (const [sheetIdx, filePath] of sheetFiles.slice(0, 5).entries()) {
+      const sheetXml = await zip.files[filePath].async("text");
+      const rowParts: string[] = [];
+      const rowMatches = [...sheetXml.matchAll(/<row\b[\s\S]*?>([\s\S]*?)<\/row>/gi)].slice(0, 500);
+      for (const row of rowMatches) {
+        const cells = [...row[1].matchAll(/<c\b([^>]*)>([\s\S]*?)<\/c>/gi)].slice(0, 30).map((cell) => {
+          const attrs = cell[1] || "";
+          const inner = cell[2] || "";
+          const t = (attrs.match(/\bt="([^"]+)"/i) || [])[1] || "";
+          const direct = (inner.match(/<v>([\s\S]*?)<\/v>/i) || [])[1] || "";
+          const inline = [...inner.matchAll(/<t[^>]*>([\s\S]*?)<\/t>/gi)].map((m) => unescXml(m[1])).join("");
+          const rawValue = inline || direct;
+          let value = unescXml(rawValue);
+          if (t === "s") {
+            const idx = Number(value);
+            value = Number.isFinite(idx) ? sharedStrings.get(idx) || "" : "";
+          }
+          return `<td>${esc(value)}</td>`;
+        });
+        rowParts.push(`<tr>${cells.join("")}</tr>`);
+      }
+      const displayName = sheetNameByPath.get(filePath) || `Sheet ${sheetIdx + 1}`;
+      parts.push(`<h2>${esc(displayName)}</h2><table><tbody>${rowParts.join("")}</tbody></table>`);
     }
     const html = parts.join("<hr/>");
     if (!html.trim()) return { ok: false, error: "EMPTY_CONVERSION", message: "No previewable sheet data found." };

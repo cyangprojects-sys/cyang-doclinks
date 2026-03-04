@@ -468,30 +468,27 @@ function DocumentViewer({
         </div>
       ) : null}
       {!availabilityHint ? (
-        <div className="overflow-hidden rounded-xl border border-white/10 bg-white/5">
-          {isArchive ? (
-            <div className="m-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-100">
-              <div className="font-semibold">Archive files are download-only.</div>
-              <div className="mt-1 text-amber-100/85">Inline viewing is disabled for archive content.</div>
-              <a
-                href={downloadUrl}
-                className="mt-3 inline-flex items-center rounded-lg border border-amber-200/40 bg-amber-100/10 px-3 py-2 text-sm text-amber-50 hover:bg-amber-100/20"
-              >
-                Download archive
-              </a>
-            </div>
-          ) : isMicrosoftOffice ? (
-            <div className="m-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-100">
-              <div className="font-semibold">Microsoft Office files are download-only.</div>
-              <div className="mt-1 text-amber-100/85">Inline viewing is disabled for Microsoft Office content.</div>
-              <a
-                href={downloadUrl}
-                className="mt-3 inline-flex items-center rounded-lg border border-amber-200/40 bg-amber-100/10 px-3 py-2 text-sm text-amber-50 hover:bg-amber-100/20"
-              >
-                Download file
-              </a>
-            </div>
-          ) : (
+        isMicrosoftOffice ? (
+          <a
+            href={downloadUrl}
+            className="inline-flex items-center rounded-lg border border-amber-200/40 bg-amber-100/10 px-3 py-2 text-sm text-amber-50 hover:bg-amber-100/20"
+          >
+            Download file
+          </a>
+        ) : (
+          <div className="overflow-hidden rounded-xl border border-white/10 bg-white/5">
+            {isArchive ? (
+              <div className="m-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-100">
+                <div className="font-semibold">Archive files are download-only.</div>
+                <div className="mt-1 text-amber-100/85">Inline viewing is disabled for archive content.</div>
+                <a
+                  href={downloadUrl}
+                  className="mt-3 inline-flex items-center rounded-lg border border-amber-200/40 bg-amber-100/10 px-3 py-2 text-sm text-amber-50 hover:bg-amber-100/20"
+                >
+                  Download archive
+                </a>
+              </div>
+            ) : (
             <SecurePdfCanvasViewer
               rawUrl={viewerUrl}
               downloadUrl={downloadUrl}
@@ -503,8 +500,9 @@ function DocumentViewer({
               forensicTag={forensicTag}
               className="h-[64vh] sm:h-[70vh] lg:h-[calc(100dvh-10rem)] xl:h-[calc(100dvh-9rem)]"
             />
-          )}
-        </div>
+            )}
+          </div>
+        )
       ) : null}
 
       <div className="mt-3 text-xs text-neutral-400">

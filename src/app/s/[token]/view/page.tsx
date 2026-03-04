@@ -158,11 +158,7 @@ export default async function ShareTokenViewPage(props: {
           <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-100">
             Archive files are download-only. Inline preview is disabled by policy.
           </div>
-        ) : isMicrosoftOffice ? (
-          <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-100">
-            Microsoft Office files are download-only. Inline preview is disabled by policy.
-          </div>
-        ) : (
+        ) : isMicrosoftOffice ? null : (
           <div className="overflow-hidden rounded-2xl border border-white/15 bg-black/20">
             <SecurePdfCanvasViewer
               rawUrl={rawUrl}

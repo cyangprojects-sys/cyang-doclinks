@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { detectFileFamily, fileFamilyLabel, type FileFamily } from "@/lib/fileFamily";
+import { detectFileFamily, fileFamilyLabel, isMicrosoftOfficeDocument, type FileFamily } from "@/lib/fileFamily";
 
 type PdfJsModule = {
   GlobalWorkerOptions: { workerSrc: string };
@@ -71,6 +71,10 @@ export default function SecurePdfCanvasViewer(props: {
   const mimeType = String(props.mimeType || "").trim().toLowerCase();
   const mode = useMemo<FileFamily>(
     () => detectFileFamily({ contentType: mimeType, filename: props.filename }),
+    [mimeType, props.filename]
+  );
+  const isMicrosoftOffice = useMemo(
+    () => isMicrosoftOfficeDocument({ contentType: mimeType, filename: props.filename }),
     [mimeType, props.filename]
   );
   const [notice, setNotice] = useState<string | null>(null);
@@ -221,6 +225,7 @@ export default function SecurePdfCanvasViewer(props: {
 
   const zoomAllowed = mode === "pdf" || mode === "image" || mode === "video";
   const modeLabel = fileFamilyLabel(mode);
+  const modeHeaderLabel = isMicrosoftOffice ? "OFFICE download" : `${modeLabel} preview`;
 
   return (
     <div
@@ -243,8 +248,8 @@ export default function SecurePdfCanvasViewer(props: {
     >
       <div className="sticky top-0 z-20 flex items-center justify-between gap-3 border-b border-white/10 bg-black/70 px-3 py-2 text-xs text-white/80 backdrop-blur">
         <div className="flex items-center gap-2">
-          <span>{modeLabel} preview</span>
-          {mode === "pdf" ? <span>{numPages > 0 ? "PDF ready" : "Preparing pages..."}</span> : null}
+          <span>{modeHeaderLabel}</span>
+          {mode === "pdf" && !isMicrosoftOffice ? <span>{numPages > 0 ? "PDF ready" : "Preparing pages..."}</span> : null}
         </div>
         <div className="flex items-center gap-2">
           {zoomAllowed ? (
@@ -370,7 +375,21 @@ export default function SecurePdfCanvasViewer(props: {
               <audio src={props.rawUrl} className="block w-full min-w-[340px]" controls controlsList="nodownload noplaybackrate" />
             ) : null}
 
-            {mode === "office" || mode === "file" ? (
+            {isMicrosoftOffice ? (
+              <div className="w-[min(760px,92vw)] rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-amber-100">
+                <div className="text-sm font-semibold">Microsoft Office files are download-only.</div>
+                <div className="mt-3">
+                  <a
+                    href={props.downloadUrl || props.rawUrl}
+                    className="inline-flex items-center rounded-lg border border-amber-200/40 bg-amber-100/10 px-3 py-2 text-sm text-amber-50 hover:bg-amber-100/20"
+                  >
+                    Download file
+                  </a>
+                </div>
+              </div>
+            ) : null}
+
+            {mode === "file" ? (
               <div className="w-[min(1100px,92vw)] rounded-xl border border-white/10 bg-black/30 p-3">
                 <iframe
                   title={`${modeLabel} preview`}
