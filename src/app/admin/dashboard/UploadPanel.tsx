@@ -146,11 +146,14 @@ function errorMessage(e: unknown): string {
 
 export default function UploadPanel({
   canCheckEncryptionStatus,
+  autoOpenPicker = false,
 }: {
   canCheckEncryptionStatus: boolean;
+  autoOpenPicker?: boolean;
 }) {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const didAutoOpenRef = useRef(false);
 
   const [items, setItems] = useState<UploadItem[]>([]);
   const [busy, setBusy] = useState(false);
@@ -166,6 +169,16 @@ export default function UploadPanel({
   const errorCount = useMemo(() => items.filter((i) => i.status === "error").length, [items]);
   const allowedTypeSummary =
     "Documents: .pdf, .doc, .docx, .txt, .rtf, .odt | Spreadsheets: .xls, .xlsx, .csv | Presentations: .ppt, .pptx | Images: .jpg, .jpeg, .png, .gif, .bmp, .heic | Archives: .zip, .rar | Audio/Video: .mp3, .wav, .mp4, .mov, .avi";
+
+  useEffect(() => {
+    if (!autoOpenPicker) return;
+    if (didAutoOpenRef.current) return;
+    didAutoOpenRef.current = true;
+    const id = window.setTimeout(() => {
+      fileInputRef.current?.click();
+    }, 0);
+    return () => window.clearTimeout(id);
+  }, [autoOpenPicker]);
 
   useEffect(() => {
     if (!canCheckEncryptionStatus) {

@@ -10,6 +10,7 @@ import { type UnifiedDocRow } from "./UnifiedDocsTableClient";
 import ViewerUsageWidget from "./ViewerUsageWidget";
 import ViewerHelpfulTiles from "./ViewerHelpfulTiles";
 import DashboardItemsTabs from "./DashboardItemsTabs";
+import DashboardHeaderActions from "./DashboardHeaderActions";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -206,6 +207,10 @@ const docFilter = sql`${orgFilter} ${ownerFilter}`;
   }
 
   const missingCoreTables = !hasDocs || (!hasDocViews && !hasShareTokens);
+  const headerDocs = unifiedRows.map((r) => ({
+    docId: r.doc_id,
+    title: r.doc_title || "Untitled document",
+  }));
 
   return (
     <div className="space-y-8">
@@ -214,14 +219,7 @@ const docFilter = sql`${orgFilter} ${ownerFilter}`;
           <h1 className="text-2xl font-semibold">Overview</h1>
           <div className="mt-1 text-sm text-white/65">Your protected documents and links</div>
         </div>
-        <div className="flex items-center gap-2">
-          <a href="/admin/upload" className="btn-base rounded-lg border border-white/20 bg-white/90 px-3 py-2 text-sm font-medium text-black hover:bg-white">
-            Create protected link
-          </a>
-          <a href="/admin/upload" className="btn-base btn-secondary rounded-lg px-3 py-2 text-sm">
-            Upload document
-          </a>
-        </div>
+        <DashboardHeaderActions docs={headerDocs} />
       </div>
 
       <AnalyticsWidgets ownerId={canSeeAll ? undefined : u.id} />

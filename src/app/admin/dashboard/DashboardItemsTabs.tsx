@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import UploadPanel from "./UploadPanel";
 import UnifiedDocsTableClient, { type UnifiedDocRow } from "./UnifiedDocsTableClient";
 import SharesTableClient, { type ShareRow } from "./SharesTableClient";
@@ -15,7 +16,15 @@ export default function DashboardItemsTabs(props: {
   canCheckEncryptionStatus: boolean;
   showDelete: boolean;
 }) {
-  const [active, setActive] = useState<TabKey>("documents");
+  const sp = useSearchParams();
+  const tabFromUrl = (sp.get("tab") || "").toLowerCase();
+  const defaultTab: TabKey = tabFromUrl === "links" ? "links" : tabFromUrl === "uploads" ? "uploads" : "documents";
+  const [active, setActive] = useState<TabKey>(defaultTab);
+  const autoOpenPicker = (sp.get("openPicker") || "") === "1";
+
+  useEffect(() => {
+    setActive(defaultTab);
+  }, [defaultTab]);
 
   const tabClass = (tab: TabKey) =>
     [
@@ -53,7 +62,7 @@ export default function DashboardItemsTabs(props: {
       {active === "uploads" ? (
         <div className="space-y-3">
           <div className="text-sm text-white/75">Upload a document, then create a protected link in one flow.</div>
-          <UploadPanel canCheckEncryptionStatus={props.canCheckEncryptionStatus} />
+          <UploadPanel canCheckEncryptionStatus={props.canCheckEncryptionStatus} autoOpenPicker={autoOpenPicker} />
         </div>
       ) : null}
     </section>
