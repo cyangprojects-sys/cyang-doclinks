@@ -170,6 +170,11 @@ export default function SharesTableClient(props: { shares: ShareRow[]; nowTs: nu
     URL.revokeObjectURL(url);
   }
 
+  async function runActionAndRefresh(fn: (fd: FormData) => Promise<void>, fd: FormData) {
+    await fn(fd);
+    router.refresh();
+  }
+
   return (
     <div className="glass-card-strong mt-4 rounded-2xl p-4">
       <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
@@ -285,30 +290,35 @@ export default function SharesTableClient(props: { shares: ShareRow[]; nowTs: nu
                       <td className="px-4 py-3 text-right text-white/90">{maxLabel(s.max_views)}</td>
                       <td className="px-4 py-3 text-right text-white/90">{s.view_count ?? 0}</td>
                       <td className="px-4 py-3 text-right">
-                        <SharePasswordForm token={s.token} hasPassword={Boolean(s.has_password)} setAction={setSharePasswordAction} clearAction={clearSharePasswordAction} />
+                        <SharePasswordForm
+                          token={s.token}
+                          hasPassword={Boolean(s.has_password)}
+                          setAction={async (fd) => runActionAndRefresh(setSharePasswordAction, fd)}
+                          clearAction={async (fd) => runActionAndRefresh(clearSharePasswordAction, fd)}
+                        />
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-right">
                         <div className="flex flex-wrap items-center justify-end gap-2">
-                          <form action={extendShareExpirationAction}>
+                          <form action={async (fd) => runActionAndRefresh(extendShareExpirationAction, fd)}>
                             <input type="hidden" name="token" value={s.token} />
                             <input type="hidden" name="days" value="7" />
                             <button type="submit" disabled={!!s.revoked_at} className="btn-base btn-secondary rounded-lg px-2.5 py-1.5 text-xs disabled:opacity-40">Extend 7d</button>
                           </form>
-                          <form action={extendShareExpirationAction}>
+                          <form action={async (fd) => runActionAndRefresh(extendShareExpirationAction, fd)}>
                             <input type="hidden" name="token" value={s.token} />
                             <input type="hidden" name="days" value="30" />
                             <button type="submit" disabled={!!s.revoked_at} className="btn-base btn-secondary rounded-lg px-2.5 py-1.5 text-xs disabled:opacity-40">Extend 30d</button>
                           </form>
-                          <form action={resetShareViewsCountAction}>
+                          <form action={async (fd) => runActionAndRefresh(resetShareViewsCountAction, fd)}>
                             <input type="hidden" name="token" value={s.token} />
                             <button type="submit" disabled={!!s.revoked_at} className="btn-base btn-secondary rounded-lg px-2.5 py-1.5 text-xs disabled:opacity-40">Reset views</button>
                           </form>
-                          <form action={forceSharePasswordResetAction}>
+                          <form action={async (fd) => runActionAndRefresh(forceSharePasswordResetAction, fd)}>
                             <input type="hidden" name="token" value={s.token} />
                             <button type="submit" disabled={!!s.revoked_at} className="btn-base btn-secondary rounded-lg px-2.5 py-1.5 text-xs disabled:opacity-40">Clear password</button>
                           </form>
                           <form
-                            action={setShareMaxViewsAction}
+                            action={async (fd) => runActionAndRefresh(setShareMaxViewsAction, fd)}
                             onSubmit={(e) => {
                               const input = (e.currentTarget.querySelector('input[name="maxViews"]') as HTMLInputElement) || null;
                               if (!input) return;
@@ -324,7 +334,7 @@ export default function SharesTableClient(props: { shares: ShareRow[]; nowTs: nu
                             <input type="hidden" name="maxViews" defaultValue="" />
                             <button type="submit" disabled={!!s.revoked_at} className="btn-base btn-secondary rounded-lg px-2.5 py-1.5 text-xs disabled:opacity-40">Set max views</button>
                           </form>
-                          <RevokeShareForm token={s.token} revoked={Boolean(s.revoked_at)} action={revokeDocShareAction} />
+                          <RevokeShareForm token={s.token} revoked={Boolean(s.revoked_at)} action={async (fd) => runActionAndRefresh(revokeDocShareAction, fd)} />
                         </div>
                       </td>
                     </tr>
@@ -341,12 +351,12 @@ export default function SharesTableClient(props: { shares: ShareRow[]; nowTs: nu
         <div className="flex flex-wrap gap-2">
           {canManageBulk ? (
             <>
-              <form action={bulkRevokeSharesAction} onSubmit={(e) => { if (!anySelected) e.preventDefault(); }}>
+              <form action={async (fd) => runActionAndRefresh(bulkRevokeSharesAction, fd)} onSubmit={(e) => { if (!anySelected) e.preventDefault(); }}>
                 <input type="hidden" name="tokens" value={JSON.stringify(selectedTokens)} />
                 <button type="submit" disabled={!anySelected} className="btn-base btn-danger rounded-xl px-3 py-2 text-sm disabled:opacity-40">Revoke selected</button>
               </form>
               <form
-                action={bulkExtendSharesAction}
+                action={async (fd) => runActionAndRefresh(bulkExtendSharesAction, fd)}
                 onSubmit={(e) => {
                   if (!anySelected) {
                     e.preventDefault();

@@ -89,6 +89,11 @@ export default function ViewsByDocTableClient(props: { rows: ViewsByDocRow[]; ca
     URL.revokeObjectURL(url);
   }
 
+  async function runActionAndRefresh(fn: (fd: FormData) => Promise<void>, fd: FormData) {
+    await fn(fd);
+    router.refresh();
+  }
+
   function syncUrl(next: { viewQ?: string; viewLimit?: number | null }) {
     const params = new URLSearchParams(sp.toString());
     if (next.viewQ !== undefined) {
@@ -238,16 +243,16 @@ export default function ViewsByDocTableClient(props: { rows: ViewsByDocRow[]; ca
                         </button>
                         {canManageShares ? (
                           <>
-                            <form action={revokeAllSharesForDocAction}>
+                            <form action={async (fd) => runActionAndRefresh(revokeAllSharesForDocAction, fd)}>
                               <input type="hidden" name="docId" value={r.doc_id} />
                               <button aria-label={`Revoke shares for ${r.doc_title || r.doc_id}`} type="submit" className="btn-base btn-secondary rounded-lg px-2.5 py-1.5 text-xs">Revoke shares</button>
                             </form>
-                            <form action={extendAliasExpirationAction}>
+                            <form action={async (fd) => runActionAndRefresh(extendAliasExpirationAction, fd)}>
                               <input type="hidden" name="docId" value={r.doc_id} />
                               <input type="hidden" name="days" value="7" />
                               <button aria-label={`Extend alias seven days for ${r.doc_title || r.doc_id}`} type="submit" className="btn-base btn-secondary rounded-lg px-2.5 py-1.5 text-xs">+7d</button>
                             </form>
-                            <form action={disableAliasForDocAction}>
+                            <form action={async (fd) => runActionAndRefresh(disableAliasForDocAction, fd)}>
                               <input type="hidden" name="docId" value={r.doc_id} />
                               <button aria-label={`Disable alias for ${r.doc_title || r.doc_id}`} type="submit" className="btn-base btn-danger rounded-lg px-2.5 py-1.5 text-xs">Disable alias</button>
                             </form>
@@ -272,11 +277,11 @@ export default function ViewsByDocTableClient(props: { rows: ViewsByDocRow[]; ca
         <div className="flex flex-wrap gap-2">
           {canManageShares ? (
             <>
-              <form action={bulkRevokeAllSharesForDocsAction} onSubmit={(e) => { if (!anySelected) e.preventDefault(); }}>
+              <form action={async (fd) => runActionAndRefresh(bulkRevokeAllSharesForDocsAction, fd)} onSubmit={(e) => { if (!anySelected) e.preventDefault(); }}>
                 <input type="hidden" name="docIds" value={JSON.stringify(selectedIds)} />
                 <button type="submit" disabled={!anySelected} className="btn-base btn-secondary rounded-xl px-3 py-2 text-sm disabled:opacity-40">Revoke all shares</button>
               </form>
-              <form action={bulkDisableAliasesForDocsAction} onSubmit={(e) => { if (!anySelected) e.preventDefault(); }}>
+              <form action={async (fd) => runActionAndRefresh(bulkDisableAliasesForDocsAction, fd)} onSubmit={(e) => { if (!anySelected) e.preventDefault(); }}>
                 <input type="hidden" name="docIds" value={JSON.stringify(selectedIds)} />
                 <button type="submit" disabled={!anySelected} className="btn-base btn-danger rounded-xl px-3 py-2 text-sm disabled:opacity-40">Disable aliases</button>
               </form>

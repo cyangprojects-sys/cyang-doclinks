@@ -270,7 +270,10 @@ function scanBadge(scanStatus: string | null) {
                 if (confirmText !== `DELETE ${selectedIds.length}`) return;
                 const fd = new FormData();
                 fd.set("docIds", JSON.stringify(selectedIds));
-                startTransition(() => bulkDeleteDocsAction(fd));
+                startTransition(async () => {
+                  await bulkDeleteDocsAction(fd);
+                  router.refresh();
+                });
                 setSelectedIds([]);
               }}
             >

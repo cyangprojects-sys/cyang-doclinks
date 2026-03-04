@@ -2,6 +2,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 export default function DeleteDocForm({
   docId,
@@ -13,6 +14,7 @@ export default function DeleteDocForm({
   action: (formData: FormData) => Promise<void>;
 }) {
   const [pending, setPending] = useState(false);
+  const router = useRouter();
 
   return (
     <form
@@ -24,6 +26,7 @@ export default function DeleteDocForm({
         setPending(true);
         try {
           await action(fd);
+          router.refresh();
         } finally {
           setPending(false);
         }
