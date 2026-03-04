@@ -2,6 +2,7 @@
 import { redirect } from "next/navigation";
 import { sql } from "@/lib/db";
 import { requireUser, roleAtLeast } from "@/lib/authz";
+import { getPlanForUser } from "@/lib/monetization";
 
 import AnalyticsWidgets from "./AnalyticsWidgets";
 import ViewsByDocTableClient, { type ViewsByDocRow } from "./ViewsByDocTableClient";
@@ -51,6 +52,8 @@ export default async function AdminDashboardPage() {
 
   const canSeeAll = roleAtLeast(u.role, "admin");
   const canCheckEncryptionStatus = roleAtLeast(u.role, "owner");
+  const userPlan = await getPlanForUser(u.id);
+  const planId = String(userPlan.id || "free").toLowerCase() === "free" ? "free" : "pro";
   const nowTs = Date.now();
 
   const hasDocs = await tableExists("public.docs");
@@ -219,7 +222,7 @@ const docFilter = sql`${orgFilter} ${ownerFilter}`;
           <h1 className="text-2xl font-semibold">Overview</h1>
           <div className="mt-1 text-sm text-white/65">Your protected documents and links</div>
         </div>
-        <DashboardHeaderActions docs={headerDocs} />
+        <DashboardHeaderActions docs={headerDocs} planId={planId} />
       </div>
 
       <AnalyticsWidgets ownerId={canSeeAll ? undefined : u.id} />
