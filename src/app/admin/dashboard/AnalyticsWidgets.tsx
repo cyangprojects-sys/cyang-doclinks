@@ -24,6 +24,17 @@ function fmtInt(n: number) {
   }
 }
 
+function fmtMinsAgo(iso: string | null): string {
+  if (!iso) return "not available";
+  const t = new Date(iso).getTime();
+  if (Number.isNaN(t)) return "not available";
+  const mins = Math.max(0, Math.floor((Date.now() - t) / 60000));
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins} min ago`;
+  const hrs = Math.floor(mins / 60);
+  return `${hrs}h ago`;
+}
+
 export default async function AnalyticsWidgets({ ownerId }: { ownerId?: string; }) {
   const isViewerScoped = Boolean(ownerId);
   const hasDocViews = await tableExists("public.doc_views");
@@ -234,8 +245,19 @@ export default async function AnalyticsWidgets({ ownerId }: { ownerId?: string; 
   let topSecurityTypes: Array<{ type: string; c: number }> = [];
   let unencryptedDocs = 0;
   let encryptedMissingKeyVersion = 0;
+  let lastSecurityEventAt: string | null = null;
 
   if (hasSecurityEvents) {
+    try {
+      const rows = (await sql`
+        select max(se.created_at)::text as last_at
+        from public.security_events se
+      `) as unknown as Array<{ last_at: string | null }>;
+      lastSecurityEventAt = rows?.[0]?.last_at ?? null;
+    } catch {
+      // ignore
+    }
+
     try {
       const rows = (await sql`
         select
@@ -386,173 +408,98 @@ export default async function AnalyticsWidgets({ ownerId }: { ownerId?: string; 
 
   return (
     <section className="mb-6">
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
         <div className="glass-card-strong rounded-2xl p-4">
-          <div className="text-xs text-white/60">Total views (all time)</div>
-          <div className="mt-1 text-2xl font-semibold text-white">{fmtInt(totalViews)}</div>
-          <div className="mt-2 text-xs text-white/60">Last 30 days</div>
-          <div className="mt-1 flex items-center justify-between gap-3">
-            <div className="text-sm font-medium text-white/90">{fmtInt(views30)}</div>
-            <div className="text-white/65">
-              <Sparkline values={series30} ariaLabel="30 day views sparkline" />
-            </div>
+          <div className="text-xs text-white/60">Protection status</div>
+          <div className="mt-2 text-xl font-semibold text-white">
+            {unencryptedDocs === 0 && presignErrors24h === 0 && scanFailures24h === 0 ? "Protected" : "Needs attention"}
           </div>
+          <ul className="mt-2 space-y-1 text-xs text-white/70">
+            <li>{unencryptedDocs === 0 ? "All documents encrypted" : `${fmtInt(unencryptedDocs)} documents need encryption review`}</li>
+            <li>{unencryptedDocs === 0 ? "0 unencrypted docs" : `${fmtInt(unencryptedDocs)} unencrypted docs`}</li>
+            <li>Last security check: {fmtMinsAgo(lastSecurityEventAt)}</li>
+          </ul>
         </div>
 
         <div className="glass-card-strong rounded-2xl p-4">
-          <div className="text-xs text-white/60">Rolling views</div>
-          <div className="mt-2 flex items-baseline justify-between">
-            <div>
-              <div className="text-2xl font-semibold text-white">{fmtInt(views7)}</div>
-              <div className="text-xs text-white/60">Last 7 days</div>
-            </div>
-            <div>
-              <div className="text-2xl font-semibold text-white">{fmtInt(views30)}</div>
-              <div className="text-xs text-white/60">Last 30 days</div>
-            </div>
-          </div>
-          <div className="mt-3 text-xs text-white/60">
-            {hasDocViewDaily ? (
-              <span>Using daily aggregates (fast).</span>
-            ) : (
-              <span>Using raw logs (enable doc_view_daily for faster widgets).</span>
-            )}
-          </div>
+          <div className="text-xs text-white/60">Active shares</div>
+          <div className="mt-1 text-3xl font-semibold text-white">{fmtInt(activeShares)}</div>
+          <div className="mt-1 text-xs text-white/65">Expiring soon: {fmtInt(expiringShares)}</div>
+          <Link href="/admin/upload" className="mt-3 inline-flex rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white hover:bg-white/15">
+            Create new protected link
+          </Link>
         </div>
 
         <div className="glass-card-strong rounded-2xl p-4">
-          <div className="text-xs text-white/60">Shares</div>
-          <div className="mt-2 grid grid-cols-3 gap-2">
-            <div>
-              <div className="text-xl font-semibold text-white">{fmtInt(activeShares)}</div>
-              <div className="text-xs text-white/60">Active</div>
-            </div>
-            <div>
-              <div className="text-xl font-semibold text-white">{fmtInt(revokedShares)}</div>
-              <div className="text-xs text-white/60">Revoked</div>
-            </div>
-            <div>
-              <div className="text-xl font-semibold text-white">{fmtInt(expiringShares)}</div>
-              <div className="text-xs text-white/60">Expiring (3d)</div>
-            </div>
+          <div className="text-xs text-white/60">Recent activity</div>
+          <div className="mt-1 text-3xl font-semibold text-white">{fmtInt(views7)}</div>
+          <div className="text-xs text-white/65">Views this week</div>
+          <div className="mt-2 flex items-center justify-between gap-3">
+            <div className="text-xs text-white/60">This month: {fmtInt(views30)}</div>
+            <Sparkline values={series30} ariaLabel="Views this week sparkline" />
           </div>
-          <div className="mt-3 text-xs text-white/60">Alias expiring (3d): {fmtInt(expiringAliases)}</div>
+          <div className="mt-2 text-xs text-white/60">
+            Most viewed: {topDocs[0]?.doc_title || "No activity yet"}
+          </div>
+          <div className="mt-1 text-xs text-white/50">All-time views: {fmtInt(totalViews)}</div>
         </div>
+      </div>
 
-        <div className="glass-card-strong rounded-2xl p-4">
-          <div className="text-xs text-white/60">Top docs (30d)</div>
-          <ol className="mt-2 space-y-1 text-sm">
-            {topDocs.length ? (
-              topDocs.map((d) => (
-                <li key={d.doc_id} className="flex items-center justify-between gap-2">
-                  <Link className="truncate text-white/90 underline-offset-2 hover:underline" href={`/admin/docs/${d.doc_id}`}>
-                    {d.doc_title || d.doc_id.slice(0, 8)}
-                  </Link>
-                  <span className="shrink-0 text-xs text-white/60">{fmtInt(d.views_30)}</span>
-                </li>
-              ))
-            ) : (
-              <li className="text-xs text-white/60">No data yet.</li>
-            )}
-          </ol>
-        </div>
-
-        {!isViewerScoped ? (
-          <>
-            <div className="glass-card-strong rounded-2xl p-4">
-              <div className="flex items-center justify-between gap-2">
-                <div className="text-xs text-white/60">Security ops (24h)</div>
-                <Link className="text-[11px] text-white/70 underline-offset-2 hover:underline" href="/admin/security">
-                  Open security
+      <div className="mt-3">
+        <details className="glass-card-strong rounded-2xl p-4">
+          <summary className="cursor-pointer list-none">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <div className="text-sm font-semibold text-white">Health</div>
+                <div className="mt-1 text-xs text-white/60">System checks in plain language. View details for advanced signals.</div>
+              </div>
+              <span className="text-xs text-white/60">View details</span>
+            </div>
+            <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-white/80">
+                {presignErrors24h === 0 ? "Uploads working" : "Some uploads failed to start"}
+              </div>
+              <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-white/80">
+                {cronFailures24h === 0 ? "Links working" : "Some link checks failed"}
+              </div>
+              <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-white/80">
+                {unencryptedDocs === 0 ? "Encryption OK" : "Encryption needs attention"}
+              </div>
+              <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-white/80">
+                {hasBackupRuns ? (backupFreshOk ? "Backups healthy" : "Backups need attention") : "Backups not configured"}
+              </div>
+            </div>
+          </summary>
+          <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
+            <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3 text-xs text-white/70">
+              <div className="font-medium text-white/90">Layer 2: Guidance</div>
+              <ul className="mt-2 space-y-1">
+                <li>Background checks running: {fmtInt(cronFreshHealthy)}/{fmtInt(cronFreshTotal || 6)} jobs fresh in 6h</li>
+                <li>Some uploads failed to start: {fmtInt(presignErrors24h)}</li>
+                <li>Some background checks failed: {fmtInt(scanFailures24h)}</li>
+                <li>Some items need manual processing: {fmtInt(deadLetterBacklog)}</li>
+                <li>Some emails failed to send or process: {fmtInt(deadLetterAlerts24h)}</li>
+              </ul>
+            </div>
+            <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3 text-xs text-white/70">
+              <div className="font-medium text-white/90">Layer 3: Advanced / System</div>
+              <ul className="mt-2 space-y-1">
+                <li>Revoked shares: {fmtInt(revokedShares)}</li>
+                <li>Alias links expiring (3d): {fmtInt(expiringAliases)}</li>
+                <li>Backup status: {backupLastStatus || "not configured"}</li>
+                <li>Backup freshness: {backupHoursSinceLastSuccess == null ? "unknown" : `${backupHoursSinceLastSuccess.toFixed(1)}h`}</li>
+                <li>Security signals (24h): {fmtInt(topSecurityTypes.reduce((a, b) => a + b.c, 0))}</li>
+                <li>Encrypted docs missing key version: {fmtInt(encryptedMissingKeyVersion)}</li>
+                <li>Abuse spikes (24h): {fmtInt(abuseSpikes24h)}</li>
+              </ul>
+              {!isViewerScoped ? (
+                <Link href="/admin/security" className="mt-3 inline-flex rounded-md border border-white/20 px-2 py-1 text-xs text-white/85 hover:bg-white/10">
+                  Open security details
                 </Link>
-              </div>
-              <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
-                <div>
-                  <div className="text-xl font-semibold text-white">{fmtInt(scanFailures24h)}</div>
-                  <div className="text-xs text-white/60">Scan failures</div>
-                </div>
-                <div>
-                  <div className="text-xl font-semibold text-white">{fmtInt(deadLetterAlerts24h)}</div>
-                  <div className="text-xs text-white/60">Dead-letter alerts</div>
-                </div>
-                <div>
-                  <div className="text-xl font-semibold text-white">{fmtInt(presignErrors24h)}</div>
-                  <div className="text-xs text-white/60">Presign errors</div>
-                </div>
-                <div>
-                  <div className="text-xl font-semibold text-white">{fmtInt(abuseSpikes24h)}</div>
-                  <div className="text-xs text-white/60">Abuse spikes</div>
-                </div>
-              </div>
-              <div className="mt-3 text-xs text-white/60">Dead-letter backlog: {fmtInt(deadLetterBacklog)}</div>
+              ) : null}
             </div>
-
-            <div className="glass-card-strong rounded-2xl p-4">
-              <div className="text-xs text-white/60">Ops readiness (24h)</div>
-              <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
-                <div>
-                  <div className="text-xl font-semibold text-white">{fmtInt(cronRuns24h)}</div>
-                  <div className="text-xs text-white/60">Cron runs</div>
-                </div>
-                <div>
-                  <div className="text-xl font-semibold text-white">{fmtInt(cronFailures24h)}</div>
-                  <div className="text-xs text-white/60">Cron failures</div>
-                </div>
-                <div>
-                  <div className="text-xl font-semibold text-white">
-                    {cronFreshHealthy}/{cronFreshTotal || 6}
-                  </div>
-                  <div className="text-xs text-white/60">Fresh cron jobs (6h)</div>
-                </div>
-                <div>
-                  <div className="text-xl font-semibold text-white">
-                    {backupLastStatus || "n/a"}
-                  </div>
-                  <div className="text-xs text-white/60">Last backup status</div>
-                </div>
-              </div>
-              <div className="mt-3 text-xs text-white/60">
-                Backup freshness:{" "}
-                <span className={backupFreshOk ? "text-emerald-300" : "text-amber-300"}>
-                  {backupHoursSinceLastSuccess == null ? "unknown" : `${backupHoursSinceLastSuccess.toFixed(1)}h`}
-                </span>
-              </div>
-            </div>
-
-            <div className="glass-card-strong rounded-2xl p-4">
-              <div className="text-xs text-white/60">Top security events (24h)</div>
-              <ol className="mt-2 space-y-1 text-sm">
-                {topSecurityTypes.length ? (
-                  topSecurityTypes.map((r) => (
-                    <li key={r.type} className="flex items-center justify-between gap-2">
-                      <span className="truncate font-mono text-xs text-white/85">{r.type}</span>
-                      <span className="shrink-0 text-xs text-white/60">{fmtInt(r.c)}</span>
-                    </li>
-                  ))
-                ) : (
-                  <li className="text-xs text-white/60">No security events in the last 24 hours.</li>
-                )}
-              </ol>
-            </div>
-
-            <div className="glass-card-strong rounded-2xl p-4">
-              <div className="text-xs text-white/60">Encryption health</div>
-              <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
-                <div>
-                  <div className="text-xl font-semibold text-white">{fmtInt(unencryptedDocs)}</div>
-                  <div className="text-xs text-white/60">Unencrypted docs</div>
-                </div>
-                <div>
-                  <div className="text-xl font-semibold text-white">{fmtInt(encryptedMissingKeyVersion)}</div>
-                  <div className="text-xs text-white/60">Missing key version</div>
-                </div>
-              </div>
-              <div className={`mt-3 text-xs ${unencryptedDocs === 0 ? "text-emerald-300" : "text-amber-300"}`}>
-                Invariant: unencrypted docs must be 0.
-              </div>
-            </div>
-          </>
-        ) : null}
+          </div>
+        </details>
       </div>
     </section>
   );

@@ -244,7 +244,7 @@ export default function SharesTableClient(props: { shares: ShareRow[]; nowTs: nu
             </thead>
             <tbody>
               {filtered.length === 0 ? (
-                <tr><td colSpan={10} className="px-4 py-6 text-white/60">No share records match these filters.</td></tr>
+                <tr><td colSpan={10} className="px-4 py-6 text-white/60">No protected links yet. Create your first link.</td></tr>
               ) : (
                 filtered.map((s) => {
                   const st = computeStatus(s, nowTs);

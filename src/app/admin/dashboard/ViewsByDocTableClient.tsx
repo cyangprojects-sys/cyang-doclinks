@@ -182,7 +182,7 @@ export default function ViewsByDocTableClient(props: { rows: ViewsByDocRow[]; ca
             </thead>
             <tbody>
               {filtered.length === 0 ? (
-                <tr><td colSpan={7} className="px-4 py-6 text-white/60">No documents match your filters.</td></tr>
+                <tr><td colSpan={7} className="px-4 py-6 text-white/60">No activity yet. Share a link to start tracking views.</td></tr>
               ) : (
                 filtered.map((r) => (
                   <tr key={r.doc_id} className="border-t border-white/10 hover:bg-white/[0.03]">

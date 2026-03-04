@@ -322,7 +322,7 @@ function scanBadge(scanStatus: string | null) {
           </thead>
           <tbody>
             {pageRows.length === 0 ? (
-              <tr><td colSpan={showDelete ? 9 : 7} className="px-4 py-10 text-white/60">No documents found.</td></tr>
+              <tr><td colSpan={showDelete ? 9 : 7} className="px-4 py-10 text-white/60">No documents uploaded yet. Upload a document to get started.</td></tr>
             ) : (
               pageRows.map((r) => {
                 const st = statusFor(r);

@@ -19,21 +19,27 @@ type NavItem = {
   pricingOnly?: boolean;
 };
 
-const NAV_ITEMS: NavItem[] = [
-  { href: "/admin/dashboard", label: "Dashboard" },
-  { href: "/admin/upload", label: "Uploads" },
-  { href: "/admin/dashboard#shares", label: "Shares" },
-  { href: "/admin/upgrade", label: "Upgrade", pricingOnly: true },
-  { href: "/admin/viewer-uploads", label: "Viewer Uploads", ownerOnly: true },
-  { href: "/admin/audit", label: "Audit", ownerOnly: true },
+const PRIMARY_NAV_ITEMS: NavItem[] = [
+  { href: "/admin/dashboard", label: "Home" },
+  { href: "/admin/dashboard#docs", label: "Documents" },
+  { href: "/admin/dashboard#shares", label: "Links" },
+  { href: "/admin/dashboard#activity", label: "Activity" },
   { href: "/admin/security", label: "Security", ownerOnly: true },
-  { href: "/admin/api-keys", label: "Keys", ownerOnly: true },
+  { href: "/admin/dashboard#settings", label: "Settings" },
   { href: "/admin/billing", label: "Billing", ownerOnly: true },
-  { href: "/admin/billing/stripe", label: "Stripe", ownerOnly: true },
+  { href: "/admin/webhooks", label: "Integrations", ownerOnly: true },
+  { href: "/admin/upgrade", label: "Pro features", pricingOnly: true },
+];
+
+const ADVANCED_NAV_ITEMS: NavItem[] = [
+  { href: "/admin/api-keys", label: "Keys", ownerOnly: true },
   { href: "/admin/webhooks", label: "Webhooks", ownerOnly: true },
   { href: "/admin/abuse", label: "Abuse", ownerOnly: true },
   { href: "/admin/dmca", label: "DMCA", ownerOnly: true },
   { href: "/admin/debug", label: "Debug", ownerOnly: true },
+  { href: "/admin/billing/stripe", label: "Stripe", ownerOnly: true },
+  { href: "/admin/audit", label: "Audit", ownerOnly: true },
+  { href: "/admin/viewer-uploads", label: "Viewer uploads", ownerOnly: true },
 ];
 
 function isActive(pathname: string, href: string) {
@@ -45,9 +51,18 @@ export default function AdminShell({ email, isOwner, showPricingUi, children }: 
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
 
-  const visibleItems = useMemo(
+  const visiblePrimaryItems = useMemo(
     () =>
-      NAV_ITEMS.filter((item) => {
+      PRIMARY_NAV_ITEMS.filter((item) => {
+        if (item.ownerOnly && !isOwner) return false;
+        if (item.pricingOnly && !showPricingUi) return false;
+        return true;
+      }),
+    [isOwner, showPricingUi]
+  );
+  const visibleAdvancedItems = useMemo(
+    () =>
+      ADVANCED_NAV_ITEMS.filter((item) => {
         if (item.ownerOnly && !isOwner) return false;
         if (item.pricingOnly && !showPricingUi) return false;
         return true;
@@ -56,9 +71,9 @@ export default function AdminShell({ email, isOwner, showPricingUi, children }: 
   );
 
   const currentTitle = useMemo(() => {
-    const hit = visibleItems.find((item) => isActive(pathname, item.href));
+    const hit = [...visiblePrimaryItems, ...visibleAdvancedItems].find((item) => isActive(pathname, item.href));
     return hit?.label || "Admin";
-  }, [pathname, visibleItems]);
+  }, [pathname, visibleAdvancedItems, visiblePrimaryItems]);
 
   return (
     <div className="app-shell min-h-screen">
@@ -69,10 +84,10 @@ export default function AdminShell({ email, isOwner, showPricingUi, children }: 
               <img src="/branding/cyang_primary.svg" alt="cyang.io" className="h-7 w-7 object-contain" />
               <div className="text-base font-semibold tracking-tight text-white">cyang.io/doclinks</div>
             </div>
-            <div className="mt-1 text-xs uppercase tracking-[0.16em] text-white/55">Admin Console</div>
+            <div className="mt-1 text-xs uppercase tracking-[0.16em] text-white/55">Overview</div>
           </div>
           <nav className="flex-1 space-y-1.5 px-3 py-4">
-            {visibleItems.map((item) => {
+            {visiblePrimaryItems.map((item) => {
               const active = isActive(pathname, item.href);
               return (
                 <Link
@@ -90,6 +105,32 @@ export default function AdminShell({ email, isOwner, showPricingUi, children }: 
                 </Link>
               );
             })}
+            {visibleAdvancedItems.length > 0 ? (
+              <details className="mt-3 rounded-xl border border-white/10 bg-white/[0.02] p-2">
+                <summary className="cursor-pointer list-none px-1 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-white/65">
+                  Advanced
+                </summary>
+                <div className="mt-2 space-y-1">
+                  {visibleAdvancedItems.map((item) => {
+                    const active = isActive(pathname, item.href);
+                    return (
+                      <Link
+                        key={item.label}
+                        href={item.href}
+                        className={[
+                          "btn-base relative flex items-center rounded-xl px-3 py-2 text-sm",
+                          active
+                            ? "border border-white/20 bg-gradient-to-r from-blue-400/20 to-cyan-300/15 text-white"
+                            : "border border-transparent text-white/70 hover:border-white/15 hover:bg-white/5 hover:text-white",
+                        ].join(" ")}
+                      >
+                        {item.label}
+                      </Link>
+                    );
+                  })}
+                </div>
+              </details>
+            ) : null}
           </nav>
           <div className="border-t border-white/10 px-4 py-4 text-xs text-white/60">
             <div className="truncate">Signed in as {email || "unknown"}</div>
@@ -120,7 +161,7 @@ export default function AdminShell({ email, isOwner, showPricingUi, children }: 
                 </button>
                 <div className="space-y-0.5">
                   <h1 className="text-sm font-semibold tracking-tight text-white md:text-base">{currentTitle}</h1>
-                  <p className="hidden text-xs uppercase tracking-[0.12em] text-white/60 md:block">Minimal Enterprise Console</p>
+                  <p className="hidden text-xs text-white/60 md:block">Your protected documents and links</p>
                 </div>
               </div>
               <div className="hidden items-center gap-2 md:flex">
@@ -166,7 +207,7 @@ export default function AdminShell({ email, isOwner, showPricingUi, children }: 
               </button>
             </div>
             <nav className="space-y-1">
-              {visibleItems.map((item) => {
+              {visiblePrimaryItems.map((item) => {
                 const active = isActive(pathname, item.href);
                 return (
                   <Link
@@ -184,6 +225,33 @@ export default function AdminShell({ email, isOwner, showPricingUi, children }: 
                   </Link>
                 );
               })}
+              {visibleAdvancedItems.length > 0 ? (
+                <details className="mt-2 rounded-xl border border-white/10 bg-white/[0.02] p-2">
+                  <summary className="cursor-pointer list-none px-1 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-white/65">
+                    Advanced
+                  </summary>
+                  <div className="mt-2 space-y-1">
+                    {visibleAdvancedItems.map((item) => {
+                      const active = isActive(pathname, item.href);
+                      return (
+                        <Link
+                          key={item.label}
+                          href={item.href}
+                          onClick={() => setMenuOpen(false)}
+                          className={[
+                            "btn-base flex rounded-xl px-3 py-2.5 text-sm",
+                            active
+                              ? "border border-white/20 bg-gradient-to-r from-blue-400/20 to-cyan-300/15 text-white"
+                              : "border border-transparent text-white/75 hover:border-white/15 hover:bg-white/5 hover:text-white",
+                          ].join(" ")}
+                        >
+                          {item.label}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </details>
+              ) : null}
             </nav>
           </div>
         </div>

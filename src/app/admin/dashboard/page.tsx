@@ -3,13 +3,13 @@ import { redirect } from "next/navigation";
 import { sql } from "@/lib/db";
 import { requireUser, roleAtLeast } from "@/lib/authz";
 
-import UploadPanel from "./UploadPanel";
 import AnalyticsWidgets from "./AnalyticsWidgets";
 import ViewsByDocTableClient, { type ViewsByDocRow } from "./ViewsByDocTableClient";
-import SharesTableClient, { type ShareRow } from "./SharesTableClient";
-import UnifiedDocsTableClient, { type UnifiedDocRow } from "./UnifiedDocsTableClient";
+import { type ShareRow } from "./SharesTableClient";
+import { type UnifiedDocRow } from "./UnifiedDocsTableClient";
 import ViewerUsageWidget from "./ViewerUsageWidget";
 import ViewerHelpfulTiles from "./ViewerHelpfulTiles";
+import DashboardItemsTabs from "./DashboardItemsTabs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -209,20 +209,22 @@ const docFilter = sql`${orgFilter} ${ownerFilter}`;
 
   return (
     <div className="space-y-8">
-      <div className="flex items-end justify-between gap-4">
-        <h1 className="text-2xl font-semibold">Dashboard</h1>
-        <div className="hidden text-xs text-neutral-500 md:block">
-          {u.email} · role: {u.role}
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold">Overview</h1>
+          <div className="mt-1 text-sm text-white/65">Your protected documents and links</div>
+        </div>
+        <div className="flex items-center gap-2">
+          <a href="/admin/upload" className="btn-base rounded-lg border border-white/20 bg-white/90 px-3 py-2 text-sm font-medium text-black hover:bg-white">
+            Create protected link
+          </a>
+          <a href="/admin/upload" className="btn-base btn-secondary rounded-lg px-3 py-2 text-sm">
+            Upload document
+          </a>
         </div>
       </div>
 
       <AnalyticsWidgets ownerId={canSeeAll ? undefined : u.id} />
-
-      {/* Usage + quick actions */}
-      <div className="grid gap-4 lg:grid-cols-2">
-        <ViewerUsageWidget userId={u.id} />
-        {!canSeeAll ? <ViewerHelpfulTiles userId={u.id} orgId={u.orgId} hasOrgId={hasOrgId} /> : null}
-      </div>
 
       {missingCoreTables ? (
         <div className="rounded-lg border border-neutral-800 bg-neutral-950 p-4 text-sm text-neutral-300">
@@ -239,22 +241,17 @@ const docFilter = sql`${orgFilter} ${ownerFilter}`;
         </div>
       ) : null}
 
-      {/* Upload */}
-      <section className="space-y-3">
-        <h2 className="text-lg font-semibold">Upload</h2>
-        <UploadPanel canCheckEncryptionStatus={canCheckEncryptionStatus} />
-      </section>
-
-      {/* Unified docs */}
-      <section id="docs" className="space-y-3">
+      <section id="activity" className="space-y-3">
         <div className="flex items-center justify-between gap-4">
-          <h2 className="text-lg font-semibold">Documents</h2>
+          <h2 className="text-lg font-semibold">Recent activity</h2>
           <a className="text-xs text-neutral-500 hover:underline" href="#views-by-doc">
-            jump to views →
+            view activity details →
           </a>
         </div>
-        {/* Viewers can delete own docs using owner_id, with created_by_email fallback for legacy rows. */}
-        <UnifiedDocsTableClient rows={unifiedRows} defaultPageSize={10} showDelete={canSeeAll || hasOwnerId || hasCreatedByEmail} />
+        <div className="grid gap-4 lg:grid-cols-2">
+          <ViewerUsageWidget userId={u.id} />
+          {!canSeeAll ? <ViewerHelpfulTiles userId={u.id} orgId={u.orgId} hasOrgId={hasOrgId} /> : null}
+        </div>
       </section>
 
       {/* Views by doc */}
@@ -268,10 +265,32 @@ const docFilter = sql`${orgFilter} ${ownerFilter}`;
         <ViewsByDocTableClient rows={viewsRows} canManageShares={canSeeAll} />
       </section>
 
-      {/* Shares */}
-      <section id="shares" className="space-y-3">
-        <h2 className="text-lg font-semibold">Shares</h2>
-        <SharesTableClient shares={shares} nowTs={nowTs} canManageBulk={canSeeAll} />
+      <section className="space-y-3">
+        <div className="flex items-center justify-between gap-4">
+          <h2 className="text-lg font-semibold">Your items</h2>
+          <a className="text-xs text-neutral-500 hover:underline" href="#settings">
+            jump to settings →
+          </a>
+        </div>
+        <DashboardItemsTabs
+          docs={unifiedRows}
+          shares={shares}
+          nowTs={nowTs}
+          canManageBulk={canSeeAll}
+          canCheckEncryptionStatus={canCheckEncryptionStatus}
+          showDelete={canSeeAll || hasOwnerId || hasCreatedByEmail}
+        />
+      </section>
+
+      <section id="settings" className="space-y-3">
+        <h2 className="text-lg font-semibold">Settings</h2>
+        <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4 text-sm text-white/75">
+          <div className="font-medium text-white">Pro unlocks</div>
+          <div className="mt-1">Unlock expiring links, access modes, and audit export.</div>
+          <a href="/admin/upgrade" className="mt-3 inline-flex rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white hover:bg-white/15">
+            See Pro features
+          </a>
+        </div>
       </section>
     </div>
   );
