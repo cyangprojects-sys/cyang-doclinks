@@ -32,10 +32,18 @@ Required GitHub Secrets:
 
 Optional GitHub Variables:
 - `R2_BACKUP_PREFIX` (default: `db-backups/neon`)
-- `BACKUP_STATUS_WEBHOOK_URL` (optional callback URL)
+- `BACKUP_STATUS_WEBHOOK_URL` (recommended: `https://www.cyang.io/api/backup/status`)
 
 Optional GitHub Secret:
 - `BACKUP_STATUS_WEBHOOK_TOKEN` (Bearer token for status webhook)
+
+Required app env for webhook auth:
+- `BACKUP_STATUS_WEBHOOK_TOKEN` (must match the GitHub secret above)
+
+Webhook behavior:
+- On successful backup upload, workflow posts `status=ok` to `/api/backup/status`.
+- On failed backup runs, workflow posts `status=failed`.
+- Endpoint writes records into `public.backup_runs`, so dashboard backup health updates from real backup outcomes.
 
 Recommended free-tier posture:
 1. Keep cadence daily.
