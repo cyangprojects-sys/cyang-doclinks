@@ -130,26 +130,6 @@ const MORE_PRESETS: readonly MorePreset[] = [
     label: "Resume / Portfolio",
     description: "Longer window for resume and portfolio sharing.",
   },
-  {
-    id: "internal_review",
-    label: "Team Review",
-    description: "Low-friction review mode for internal feedback.",
-  },
-  {
-    id: "marketplace_sale",
-    label: "Marketplace Sale",
-    description: "Short-lived, watermarked view-only sharing.",
-  },
-  {
-    id: "executive_brief",
-    label: "Board / Leadership",
-    description: "Tight window sharing for leadership documents.",
-  },
-  {
-    id: "client_delivery",
-    label: "Client Delivery",
-    description: "Longer-lived links for final deliverables.",
-  },
 ];
 
 const EXPIRY_SECONDS_BY_CHOICE: Readonly<Record<"24h" | "72h" | "7d" | "14d" | "30d", number>> = {
@@ -592,7 +572,16 @@ export default function ShareForm({
           <p className="mt-1 text-xs text-neutral-500">
             Pick a preset. Everything is secure by default.
           </p>
-          <div className="mt-2 text-xs text-neutral-400">Most common (Free)</div>
+          <div className="mt-2 flex items-center justify-between gap-2">
+            <div className="text-xs text-neutral-400">Most common (Free)</div>
+            <button
+              type="button"
+              onClick={onSaveDefaultPack}
+              className="rounded-md border border-neutral-700 bg-neutral-900 px-2 py-1 text-xs text-neutral-200 hover:bg-neutral-800"
+            >
+              Make this my default pack
+            </button>
+          </div>
           <div className="mt-2 grid grid-cols-1 gap-2 md:grid-cols-2">
             {visibleQuickPresets.map((preset) => {
               const selected = selectedPresetId === preset.id;
@@ -636,8 +625,8 @@ export default function ShareForm({
 
         {isFreePlan ? (
           <div className="rounded-lg border border-neutral-800 bg-neutral-900 p-3">
-            <div className="text-xs font-semibold uppercase tracking-wide text-neutral-400">
-              Pro presets (locked)
+            <div className="text-xs font-semibold text-neutral-400">
+              Pro presets
             </div>
             <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
               {PRO_TEASER_PRESETS.map((preset) => (
@@ -686,19 +675,11 @@ export default function ShareForm({
           onToggle={(e) => setShowMorePresets((e.currentTarget as HTMLDetailsElement).open)}
           className="rounded-lg border border-neutral-800 bg-neutral-900"
         >
-          <summary className="cursor-pointer list-none px-3 py-2 text-sm font-semibold text-neutral-200">
-            More presets (optional)
+          <summary className="cursor-pointer list-none px-3 py-2">
+            <span className="text-sm font-semibold text-neutral-200">More presets</span>
+            <span className="ml-2 text-xs text-neutral-500">Optional</span>
           </summary>
           <div className="border-t border-neutral-800 p-3">
-            <div className="mb-3 flex items-center justify-end">
-              <button
-                type="button"
-                onClick={onSaveDefaultPack}
-                className="rounded-md border border-neutral-700 bg-neutral-900 px-2 py-1 text-xs text-neutral-200 hover:bg-neutral-800"
-              >
-                Make this my default pack
-              </button>
-            </div>
             <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
               {MORE_PRESETS.map((preset) => {
                 const pack = getPackById(preset.id);
@@ -1053,7 +1034,10 @@ export default function ShareForm({
             </button>
           </div>
           <div className="mt-2 text-xs text-neutral-400">
-            Need stricter sharing? Unlock Pro presets (one-time access, confidential, ID mode).
+            Need stricter sharing?{" "}
+            <a href="/admin/upgrade" className="text-neutral-200 underline underline-offset-2 hover:text-white">
+              Unlock Pro presets (one-time access, confidential, ID mode).
+            </a>
           </div>
           <div className="mt-2 flex flex-wrap gap-2">
             <button
