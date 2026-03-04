@@ -5,7 +5,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { sql } from "@/lib/db";
 import { verifyApiKeyFromRequest } from "@/lib/apiAuth";
 import { emitWebhook } from "@/lib/webhooks";
-import { clientIpKey, enforceGlobalApiRateLimit } from "@/lib/securityTelemetry";
+import { clientIpKey, enforceGlobalApiRateLimit, logDbErrorEvent } from "@/lib/securityTelemetry";
 import { appendImmutableAudit } from "@/lib/immutableAudit";
 
 export async function POST(req: NextRequest) {
@@ -81,7 +81,14 @@ export async function POST(req: NextRequest) {
     if (typeof e === "object" && e !== null && "code" in e && String((e as { code?: string }).code || "") === "23505") {
       return NextResponse.json({ ok: false, error: "ALIAS_TAKEN" }, { status: 409 });
     }
-    throw e;
+    await logDbErrorEvent({
+      scope: "api_v1_aliases",
+      message: msg || "alias_create_failed",
+      ip: ipInfo.ip,
+      actorUserId: auth.ownerId,
+      meta: { route: "/api/v1/aliases" },
+    });
+    return NextResponse.json({ ok: false, error: "SERVER_ERROR" }, { status: 500 });
   }
   if (!created.length) {
     return NextResponse.json({ ok: false, error: "ALIAS_TAKEN" }, { status: 409 });

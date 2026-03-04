@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    await requirePermission("security.keys.read");
+    await requirePermission("security.keys.manage");
 
     let activeId: string | null = null;
     try {

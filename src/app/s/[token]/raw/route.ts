@@ -124,6 +124,12 @@ function shouldCountView(req: NextRequest): boolean {
   return range.includes("bytes=0-");
 }
 
+function isNonInitialRangeRequest(req: NextRequest): boolean {
+  const range = (req.headers.get("range") || "").toLowerCase();
+  if (!range) return false;
+  return !range.includes("bytes=0-");
+}
+
 function parseDisposition(input: string | null): "inline" | "attachment" {
   const v = String(input || "").trim().toLowerCase();
   if (v === "1" || v === "true" || v === "download" || v === "attachment") return "attachment";
@@ -252,6 +258,12 @@ export async function GET(
         "Retry-After": String(tokenRl.resetSeconds),
       },
     });
+  }
+
+  // Prevent view-limit bypass via direct non-initial range probes.
+  // Legitimate clients should start at byte 0 through the normal flow.
+  if (isNonInitialRangeRequest(req)) {
+    return await deny("invalid_range_start", 416, "Range Not Satisfiable");
   }
 
   let rows: ShareLookupRow[] = [];
@@ -538,7 +550,7 @@ export async function GET(
         meta: { route: "/s/[token]/raw" },
       });
     }
-    throw e;
+    return new NextResponse("Unavailable", { status: 503 });
   }
 }
 

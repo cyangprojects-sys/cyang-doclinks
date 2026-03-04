@@ -995,6 +995,9 @@ test.describe("security state enforcement", () => {
     if (!doc) return;
 
     const token = `tok_dl_replay_${randSuffix()}`.slice(0, 64);
+    const replayEnabled = !["0", "false", "no", "off"].includes(
+      String(process.env.ACCESS_TICKET_REPLAY_ENABLED || "false").trim().toLowerCase()
+    );
     await sql`
       insert into public.share_tokens (token, doc_id, max_views, views_count)
       values (${token}, ${doc.id}::uuid, null, 0)
@@ -1044,10 +1047,14 @@ test.describe("security state enforcement", () => {
       }
 
       const secondTicket = await request.get(ticketPath, { headers: navHeaders });
-      expect(secondTicket.status()).not.toBe(404);
-      if (secondTicket.status() === 403) {
-        const body = await secondTicket.text();
-        expect(body).not.toContain("Direct open is disabled for this protected document.");
+      if (replayEnabled) {
+        expect(secondTicket.status()).not.toBe(404);
+        if (secondTicket.status() === 403) {
+          const body = await secondTicket.text();
+          expect(body).not.toContain("Direct open is disabled for this protected document.");
+        }
+      } else {
+        expect(secondTicket.status()).toBe(404);
       }
     } finally {
       await sql`delete from public.share_tokens where token = ${token}`;

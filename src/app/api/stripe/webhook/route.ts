@@ -271,6 +271,13 @@ export async function POST(req: NextRequest) {
       });
       return NextResponse.json({ ok: false, error: "TIMEOUT" }, { status: 504 });
     }
-    throw e;
+    await logSecurityEvent({
+      type: "stripe_webhook_unhandled_error",
+      severity: "high",
+      ip: requestIp,
+      scope: "billing_webhook",
+      message: "Unhandled Stripe webhook route error",
+    });
+    return NextResponse.json({ ok: false, error: "SERVER_ERROR" }, { status: 500 });
   }
 }

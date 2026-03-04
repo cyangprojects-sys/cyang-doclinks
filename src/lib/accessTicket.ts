@@ -98,8 +98,9 @@ export async function consumeAccessTicket(args: { req: Request; ticketId: string
   // NOTE: Browsers can legitimately hit the same ticket more than once (preload, retry, iframe reload).
   // Replays are purpose-sensitive: previews can tolerate a short retry window;
   // downloads should be effectively one-time by default.
+  // Security default: disabled unless explicitly enabled.
   const replayEnabled = !["0", "false", "no", "off"].includes(
-    String(process.env.ACCESS_TICKET_REPLAY_ENABLED || "true").trim().toLowerCase()
+    String(process.env.ACCESS_TICKET_REPLAY_ENABLED || "false").trim().toLowerCase()
   );
   const replayGracePreview = Math.max(0, Number(process.env.ACCESS_TICKET_REPLAY_GRACE_SECONDS_PREVIEW || 20));
   // Browsers may issue near-simultaneous duplicate navigations for attachment downloads.

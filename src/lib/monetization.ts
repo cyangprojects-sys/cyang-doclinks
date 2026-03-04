@@ -58,6 +58,14 @@ const OWNER_UNLIMITED_PLAN: Plan = {
 
 let billingSubscriptionsTableExistsCache: boolean | null = null;
 
+function envFlag(name: string, fallback: boolean): boolean {
+  const raw = String(process.env[name] || "").trim().toLowerCase();
+  if (!raw) return fallback;
+  if (raw === "1" || raw === "true" || raw === "yes" || raw === "on") return true;
+  if (raw === "0" || raw === "false" || raw === "no" || raw === "off") return false;
+  return fallback;
+}
+
 async function billingSubscriptionsTableExists(): Promise<boolean> {
   if (billingSubscriptionsTableExistsCache != null) return billingSubscriptionsTableExistsCache;
   try {
@@ -71,6 +79,8 @@ async function billingSubscriptionsTableExists(): Promise<boolean> {
 
 async function userHasActiveProEntitlement(userId: string): Promise<boolean> {
   if (!(await billingSubscriptionsTableExists())) return false;
+  const allowTrialing = envFlag("STRIPE_ALLOW_TRIALING_ENTITLEMENT", false);
+  const allowGrace = envFlag("STRIPE_ALLOW_GRACE_ENTITLEMENT", false);
   try {
     const rows = (await sql`
       select 1
@@ -78,12 +88,17 @@ async function userHasActiveProEntitlement(userId: string): Promise<boolean> {
       where bs.user_id = ${userId}::uuid
         and bs.plan_id = 'pro'
         and (
-          lower(coalesce(bs.status, '')) in ('active', 'trialing')
-          or (
+          lower(coalesce(bs.status, '')) = 'active'
+          ${allowTrialing ? sql`or lower(coalesce(bs.status, '')) = 'trialing'` : sql``}
+          ${
+            allowGrace
+              ? sql`or (
             lower(coalesce(bs.status, '')) in ('past_due', 'grace')
             and bs.grace_until is not null
             and bs.grace_until > now()
-          )
+          )`
+              : sql``
+          }
         )
       limit 1
     `) as unknown as Array<{ "?column?": number }>;
