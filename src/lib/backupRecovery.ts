@@ -40,20 +40,32 @@ export async function runBackupRecoveryCheck() {
   const { enabled, maxAgeHours, recoveryDrillDays, webhook } = parseBackupRecoveryConfig();
   if (!enabled) return { enabled: false, ran: false };
 
+  // If automation is enabled but no webhook is configured, do not emit
+  // synthetic "skipped" runs. This keeps backup health driven by real backup
+  // outcomes (for example GitHub backup status webhooks).
+  if (!webhook) {
+    return {
+      enabled: true,
+      ran: false,
+      backupOk: null,
+      backupStatus: "not_configured",
+      maxAgeHours,
+      hoursSinceLastSuccess: null,
+      freshnessOk: false,
+      recoveryDrillDays,
+      recoveryDrillDue: true,
+      backupMeta: { reason: "BACKUP_WEBHOOK_URL is not set" },
+    };
+  }
+
   let backupOk = false;
-  let backupStatus = "skipped";
+  let backupStatus = "failed";
   let backupMeta: Record<string, unknown> = {};
 
-  if (webhook) {
-    const ping = await pingBackupWebhook(webhook);
-    backupOk = ping.ok;
-    backupStatus = ping.ok ? "ok" : "failed";
-    backupMeta = { status: ping.status, response: ping.body ?? "" };
-  } else {
-    backupOk = true;
-    backupStatus = "skipped";
-    backupMeta = { reason: "BACKUP_WEBHOOK_URL is not set" };
-  }
+  const ping = await pingBackupWebhook(webhook);
+  backupOk = ping.ok;
+  backupStatus = ping.ok ? "ok" : "failed";
+  backupMeta = { status: ping.status, response: ping.body ?? "" };
 
   try {
     await sql`

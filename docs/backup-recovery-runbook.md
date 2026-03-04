@@ -44,6 +44,7 @@ Webhook behavior:
 - On successful backup upload, workflow posts `status=ok` to `/api/backup/status`.
 - On failed backup runs, workflow posts `status=failed`.
 - Endpoint writes records into `public.backup_runs`, so dashboard backup health updates from real backup outcomes.
+- Optional DB optimization: run `scripts/sql/backup_runs_source_idx.sql` to speed up source-filtered backup health queries.
 
 Recommended free-tier posture:
 1. Keep cadence daily.

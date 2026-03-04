@@ -244,6 +244,7 @@ export default async function AnalyticsWidgets({ ownerId }: { ownerId?: string; 
   let backupRunCount = 0;
   let backupHoursSinceLastSuccess: number | null = null;
   let backupFreshOk = false;
+  let backupUsesGithubReporting = false;
   let topSecurityTypes: Array<{ type: string; c: number }> = [];
   let unencryptedDocs = 0;
   let encryptedMissingKeyVersion = 0;
@@ -253,6 +254,7 @@ export default async function AnalyticsWidgets({ ownerId }: { ownerId?: string; 
     String(process.env.BACKUP_AUTOMATION_ENABLED || "").trim().toLowerCase()
   );
   const backupWebhookConfigured = String(process.env.BACKUP_WEBHOOK_URL || "").trim().length > 0;
+  const backupStatusWebhookTokenConfigured = String(process.env.BACKUP_STATUS_WEBHOOK_TOKEN || "").trim().length > 0;
   const backupMaxAgeHoursRaw = Number(process.env.BACKUP_MAX_AGE_HOURS || 30);
   const backupMaxAgeHours =
     Number.isFinite(backupMaxAgeHoursRaw) && backupMaxAgeHoursRaw > 0
@@ -362,8 +364,23 @@ export default async function AnalyticsWidgets({ ownerId }: { ownerId?: string; 
   if (hasBackupRuns) {
     try {
       const rows = (await sql`
+        select count(*)::int as c
+        from public.backup_runs
+        where coalesce(details->>'source', '') = 'github-actions'
+      `) as unknown as Array<{ c: number }>;
+      backupUsesGithubReporting = Number(rows?.[0]?.c ?? 0) > 0;
+    } catch {
+      // ignore
+    }
+    const backupSourceFilter = backupUsesGithubReporting
+      ? sql`and coalesce(details->>'source', '') = 'github-actions'`
+      : sql``;
+    try {
+      const rows = (await sql`
         select status::text as status, created_at::text as created_at
         from public.backup_runs
+        where 1=1
+          ${backupSourceFilter}
         order by created_at desc
         limit 1
       `) as unknown as Array<{ status: string; created_at: string }>;
@@ -376,6 +393,8 @@ export default async function AnalyticsWidgets({ ownerId }: { ownerId?: string; 
       const rows = (await sql`
         select count(*)::int as c
         from public.backup_runs
+        where 1=1
+          ${backupSourceFilter}
       `) as unknown as Array<{ c: number }>;
       backupRunCount = Number(rows?.[0]?.c ?? 0);
     } catch {
@@ -387,6 +406,7 @@ export default async function AnalyticsWidgets({ ownerId }: { ownerId?: string; 
           extract(epoch from (now() - max(created_at))) / 3600.0 as hours_since
         from public.backup_runs
         where status in ('ok', 'success')
+          ${backupSourceFilter}
       `) as unknown as Array<{ hours_since: number | string | null }>;
       const h = rows?.[0]?.hours_since;
       backupHoursSinceLastSuccess = h == null ? null : Number(h);
@@ -488,9 +508,9 @@ export default async function AnalyticsWidgets({ ownerId }: { ownerId?: string; 
               <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-white/80">
                 {unencryptedDocs === 0 ? "Encryption OK" : "Encryption needs attention"}
               </div>
-              <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-white/80">
-                {!hasBackupRuns
-                  ? "Backups not configured"
+                <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-white/80">
+                  {!hasBackupRuns
+                    ? "Backups not configured"
                   : backupRunCount === 0
                   ? "Backups not started"
                   : backupFreshOk
@@ -515,6 +535,7 @@ export default async function AnalyticsWidgets({ ownerId }: { ownerId?: string; 
               <ul className="mt-2 space-y-1">
                 <li>Revoked shares: {fmtInt(revokedShares)}</li>
                 <li>Alias links expiring (3d): {fmtInt(expiringAliases)}</li>
+                <li>Backup source: {backupUsesGithubReporting ? "GitHub Actions webhook" : "Nightly webhook check"}</li>
                 <li>Backup status: {backupLastStatus || "not configured"}</li>
                 <li>Backup freshness: {backupHoursSinceLastSuccess == null ? "unknown" : `${backupHoursSinceLastSuccess.toFixed(1)}h`}</li>
                 <li>Security signals (24h): {fmtInt(topSecurityTypes.reduce((a, b) => a + b.c, 0))}</li>
@@ -537,7 +558,9 @@ export default async function AnalyticsWidgets({ ownerId }: { ownerId?: string; 
                   Automation: {backupAutomationEnabled ? "Enabled" : "Disabled"}
                 </div>
                 <div className="rounded-lg border border-white/10 bg-black/20 px-3 py-2">
-                  Backup destination: {backupWebhookConfigured ? "Configured" : "Missing BACKUP_WEBHOOK_URL"}
+                  Backup destination: {backupUsesGithubReporting || backupStatusWebhookTokenConfigured
+                    ? (backupStatusWebhookTokenConfigured ? "GitHub status webhook configured" : "GitHub status webhook missing app token")
+                    : (backupWebhookConfigured ? "Configured" : "Missing BACKUP_WEBHOOK_URL")}
                 </div>
                 <div className="rounded-lg border border-white/10 bg-black/20 px-3 py-2">
                   Backup telemetry table: {hasBackupRuns ? "Ready" : "Missing public.backup_runs"}
@@ -559,7 +582,9 @@ export default async function AnalyticsWidgets({ ownerId }: { ownerId?: string; 
                 </div>
               </div>
               <div className="mt-3 rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-white/75">
-                Next step: set `BACKUP_AUTOMATION_ENABLED=true`, set `BACKUP_WEBHOOK_URL`, verify cron secret wiring, then run `/api/cron/nightly` once and confirm at least one `ok` row in `public.backup_runs`.
+                Next step: {backupUsesGithubReporting || backupStatusWebhookTokenConfigured
+                  ? "set `BACKUP_STATUS_WEBHOOK_TOKEN` in app env, set GitHub `BACKUP_STATUS_WEBHOOK_URL`, run backup workflow once, then confirm at least one `ok` row in `public.backup_runs` from `github-actions`."
+                  : "set `BACKUP_AUTOMATION_ENABLED=true`, set `BACKUP_WEBHOOK_URL`, verify cron secret wiring, then run `/api/cron/nightly` once and confirm at least one `ok` row in `public.backup_runs`."}
               </div>
             </div>
           ) : null}
