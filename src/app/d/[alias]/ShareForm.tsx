@@ -7,7 +7,6 @@ import type { CreateShareResult, ShareStatsResult } from "./actions";
 import {
   DEFAULT_PACK_ID,
   DEFAULT_SHARE_SETTINGS,
-  PACKS,
   PRO_PACK_UPSELL_CTA,
   PRO_PACK_UPSELL_MESSAGE,
   applyPack,
@@ -36,6 +35,18 @@ type QuickPreset = {
   expiryChoice: SimpleExpiryChoice;
   watermarkStrength: WatermarkStrength;
   watermarkPlacement: WatermarkPlacement;
+};
+type ProTeaserPresetId = "one_time_share" | "legal_confidential" | "id_verification";
+type ProTeaserPreset = {
+  id: ProTeaserPresetId;
+  label: string;
+  description: string;
+  bullets: [string, string, string];
+};
+type MorePreset = {
+  id: PackId;
+  label: string;
+  description: string;
 };
 
 const QUICK_PRESETS: readonly QuickPreset[] = [
@@ -69,6 +80,7 @@ const QUICK_PRESETS: readonly QuickPreset[] = [
     id: "client_share",
     label: "Client share",
     description: "Download-friendly with a 7-day expiry.",
+    badge: "Popular",
     packId: "internal_review",
     watermarkEnabled: false,
     allowDownload: true,
@@ -76,6 +88,67 @@ const QUICK_PRESETS: readonly QuickPreset[] = [
     expiryChoice: "7d",
     watermarkStrength: "light",
     watermarkPlacement: "center",
+  },
+];
+
+const PRO_TEASER_PRESETS: readonly ProTeaserPreset[] = [
+  {
+    id: "one_time_share",
+    label: "One-Time Share",
+    description: "Auto-closes after first access.",
+    bullets: [
+      "One-view access closes automatically.",
+      "Watermarked and view-only by default.",
+      "Designed for handoff links that should not circulate.",
+    ],
+  },
+  {
+    id: "legal_confidential",
+    label: "Legal / Confidential",
+    description: "Stricter sharing + stronger watermark defaults.",
+    bullets: [
+      "Short expiry with limited allowed views.",
+      "Watermark-on and download-off defaults.",
+      "Best for sensitive HR and legal documents.",
+    ],
+  },
+  {
+    id: "id_verification",
+    label: "ID / Verification",
+    description: "Best for paystubs, IDs, onboarding.",
+    bullets: [
+      "Built for identity and verification documents.",
+      "Watermarked, view-first sharing defaults.",
+      "Limits casual forwarding during onboarding flows.",
+    ],
+  },
+];
+
+const MORE_PRESETS: readonly MorePreset[] = [
+  {
+    id: "job_search",
+    label: "Resume / Portfolio",
+    description: "Longer window for resume and portfolio sharing.",
+  },
+  {
+    id: "internal_review",
+    label: "Team Review",
+    description: "Low-friction review mode for internal feedback.",
+  },
+  {
+    id: "marketplace_sale",
+    label: "Marketplace Sale",
+    description: "Short-lived, watermarked view-only sharing.",
+  },
+  {
+    id: "executive_brief",
+    label: "Board / Leadership",
+    description: "Tight window sharing for leadership documents.",
+  },
+  {
+    id: "client_delivery",
+    label: "Client Delivery",
+    description: "Longer-lived links for final deliverables.",
   },
 ];
 
@@ -201,6 +274,7 @@ export default function ShareForm({
   const [createdPackId, setCreatedPackId] = useState<PackId | null>(null);
   const [adjustedForPlan, setAdjustedForPlan] = useState(false);
   const [proPackNotice, setProPackNotice] = useState<string | null>(null);
+  const [activeProTeaserId, setActiveProTeaserId] = useState<ProTeaserPresetId | null>(null);
   const isFreePlan = String(planId || "").trim().toLowerCase() === "free";
   const [showMorePresets, setShowMorePresets] = useState(false);
 
@@ -277,6 +351,16 @@ export default function ShareForm({
     return lines.join(" ");
   }, [preview.allowDownload, preview.expiresAt, preview.maxViews, preview.watermarkEnabled, watermarkPlacement, watermarkStrength]);
 
+  const activeProTeaser = activeProTeaserId
+    ? PRO_TEASER_PRESETS.find((preset) => preset.id === activeProTeaserId) || null
+    : null;
+
+  const watermarkingLabel = preview.watermarkEnabled
+    ? watermarkStrength === "strong"
+      ? "Strong"
+      : "Light"
+    : "Off";
+
   function clearOverrides() {
     setOverrideAllowDownload(null);
     setOverrideWatermarkEnabled(null);
@@ -297,6 +381,7 @@ export default function ShareForm({
       return;
     }
 
+    setActiveProTeaserId(null);
     setProPackNotice(null);
     setUiMessage(null);
     setSelectedPackId(packId);
@@ -336,6 +421,7 @@ export default function ShareForm({
       setProPackNotice(PRO_PACK_UPSELL_MESSAGE);
       return;
     }
+    setActiveProTeaserId(null);
     setProPackNotice(null);
     setErr(null);
     setUiMessage(null);
@@ -354,6 +440,11 @@ export default function ShareForm({
     setWatermarkPlacement(preset.watermarkPlacement);
     applySimpleExpiry(preset.expiryChoice);
     setAdjustedForPlan(false);
+  }
+
+  function onSelectProTeaser(presetId: ProTeaserPresetId) {
+    setActiveProTeaserId(presetId);
+    setProPackNotice(null);
   }
 
   async function onCreate() {
@@ -499,9 +590,9 @@ export default function ShareForm({
         <div>
           <h2 className="text-sm font-semibold text-neutral-200">Choose a protection preset</h2>
           <p className="mt-1 text-xs text-neutral-500">
-            Start with a preset outcome, then tweak only what you need.
+            Pick a preset. Everything is secure by default.
           </p>
-          <div className="mt-2 text-xs text-neutral-400">Most common presets</div>
+          <div className="mt-2 text-xs text-neutral-400">Most common (Free)</div>
           <div className="mt-2 grid grid-cols-1 gap-2 md:grid-cols-2">
             {visibleQuickPresets.map((preset) => {
               const selected = selectedPresetId === preset.id;
@@ -543,84 +634,114 @@ export default function ShareForm({
           </div>
         </div>
 
-        <div className="inline-flex w-fit rounded-lg border border-neutral-800 bg-neutral-900 p-1">
-          <button
-            type="button"
-            onClick={() => setMode("simple")}
-            className={`rounded-md px-3 py-1.5 text-xs font-medium transition ${mode === "simple" ? "bg-neutral-100 text-neutral-950" : "text-neutral-300 hover:text-neutral-100"}`}
-          >
-            Simple mode
-          </button>
-          <button
-            type="button"
-            onClick={() => setMode("advanced")}
-            className={`rounded-md px-3 py-1.5 text-xs font-medium transition ${mode === "advanced" ? "bg-neutral-100 text-neutral-950" : "text-neutral-300 hover:text-neutral-100"}`}
-          >
-            Advanced mode
-          </button>
-        </div>
-
-        {mode === "advanced" ? (
-          <details
-            open={showMorePresets}
-            onToggle={(e) => setShowMorePresets((e.currentTarget as HTMLDetailsElement).open)}
-            className="rounded-lg border border-neutral-800 bg-neutral-900"
-          >
-            <summary className="cursor-pointer list-none px-3 py-2 text-sm font-semibold text-neutral-200">
-              More presets
-            </summary>
-            <div className="border-t border-neutral-800 p-3">
-              <div className="mb-3 flex items-center justify-end">
-                <button
-                  type="button"
-                  onClick={onSaveDefaultPack}
-                  className="rounded-md border border-neutral-700 bg-neutral-900 px-2 py-1 text-xs text-neutral-200 hover:bg-neutral-800"
-                >
-                  Make this my default pack
-                </button>
-              </div>
-              <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-                {PACKS.map((pack) => {
-                  const selected = pack.id === selectedPack.id;
-                  const available = isPackAvailableForPlan(pack, planId);
-                  return (
-                    <button
-                      key={pack.id}
-                      type="button"
-                      onClick={() => selectPack(pack.id)}
-                      className={`rounded-lg border p-3 text-left transition ${selected
-                        ? "border-cyan-500/50 bg-cyan-500/10"
-                        : available
-                          ? "border-neutral-800 bg-neutral-900 hover:border-neutral-700"
-                          : "border-neutral-800/80 bg-neutral-900/80 hover:border-neutral-700"
-                        }`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-neutral-100">{pack.label}</span>
-                        {pack.minPlan === "pro" ? (
-                          <span className="rounded-full border border-amber-700/40 bg-amber-950/40 px-2 py-0.5 text-[10px] text-amber-100">
-                            Pro
-                          </span>
-                        ) : null}
-                        {defaultPackId === pack.id ? (
-                          <span className="rounded-full border border-neutral-700 bg-neutral-800 px-2 py-0.5 text-[10px] text-neutral-300">
-                            default
-                          </span>
-                        ) : null}
-                      </div>
-                      <div className="mt-1 text-xs text-neutral-400">{pack.description}</div>
-                      {!available ? (
-                        <div className="mt-2 text-[11px] text-neutral-300">
-                          Available on Pro.
-                        </div>
-                      ) : null}
-                    </button>
-                  );
-                })}
-              </div>
+        {isFreePlan ? (
+          <div className="rounded-lg border border-neutral-800 bg-neutral-900 p-3">
+            <div className="text-xs font-semibold uppercase tracking-wide text-neutral-400">
+              Pro presets (locked)
             </div>
-          </details>
+            <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
+              {PRO_TEASER_PRESETS.map((preset) => (
+                <button
+                  key={preset.id}
+                  type="button"
+                  onClick={() => onSelectProTeaser(preset.id)}
+                  className="rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2 text-left transition hover:border-neutral-700"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-semibold text-neutral-200">{preset.label}</span>
+                    <span className="rounded-full border border-amber-700/40 bg-amber-950/40 px-2 py-0.5 text-[10px] text-amber-100">
+                      Locked
+                    </span>
+                  </div>
+                  <div className="mt-1 text-[11px] leading-4 text-neutral-400">{preset.description}</div>
+                </button>
+              ))}
+            </div>
+          </div>
         ) : null}
+
+        {isFreePlan && activeProTeaser ? (
+          <div className="rounded-lg border border-amber-700/40 bg-amber-950/25 p-3">
+            <div className="text-sm font-semibold text-amber-100">Unlock Pro presets</div>
+            <div className="mt-1 text-xs text-amber-200">
+              {activeProTeaser.label} helps when you need tighter sharing controls.
+            </div>
+            <ul className="mt-2 list-disc space-y-1 pl-4 text-xs text-amber-100">
+              {activeProTeaser.bullets.map((bullet) => (
+                <li key={bullet}>{bullet}</li>
+              ))}
+            </ul>
+            <div className="mt-2 text-xs text-amber-200">$12/mo</div>
+            <a
+              href="/admin/upgrade"
+              className="mt-2 inline-block rounded-md border border-amber-600/60 bg-amber-400/10 px-2.5 py-1.5 text-xs font-medium text-amber-50 hover:bg-amber-400/20"
+            >
+              Upgrade to Pro
+            </a>
+          </div>
+        ) : null}
+
+        <details
+          open={showMorePresets}
+          onToggle={(e) => setShowMorePresets((e.currentTarget as HTMLDetailsElement).open)}
+          className="rounded-lg border border-neutral-800 bg-neutral-900"
+        >
+          <summary className="cursor-pointer list-none px-3 py-2 text-sm font-semibold text-neutral-200">
+            More presets (optional)
+          </summary>
+          <div className="border-t border-neutral-800 p-3">
+            <div className="mb-3 flex items-center justify-end">
+              <button
+                type="button"
+                onClick={onSaveDefaultPack}
+                className="rounded-md border border-neutral-700 bg-neutral-900 px-2 py-1 text-xs text-neutral-200 hover:bg-neutral-800"
+              >
+                Make this my default pack
+              </button>
+            </div>
+            <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+              {MORE_PRESETS.map((preset) => {
+                const pack = getPackById(preset.id);
+                const selected = pack.id === selectedPack.id;
+                const available = isPackAvailableForPlan(pack, planId);
+                return (
+                  <button
+                    key={pack.id}
+                    type="button"
+                    onClick={() => selectPack(pack.id)}
+                    className={`rounded-lg border p-3 text-left transition ${selected
+                      ? "border-cyan-500/50 bg-cyan-500/10"
+                      : available
+                        ? "border-neutral-800 bg-neutral-900 hover:border-neutral-700"
+                        : "border-neutral-800/80 bg-neutral-900/80 hover:border-neutral-700"
+                      }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-neutral-100">{preset.label}</span>
+                      {pack.minPlan === "pro" ? (
+                        <span className="rounded-full border border-amber-700/40 bg-amber-950/40 px-2 py-0.5 text-[10px] text-amber-100">
+                          Pro
+                        </span>
+                      ) : null}
+                      {defaultPackId === pack.id ? (
+                        <span className="rounded-full border border-neutral-700 bg-neutral-800 px-2 py-0.5 text-[10px] text-neutral-300">
+                          default
+                        </span>
+                      ) : null}
+                    </div>
+                    <div className="mt-1 text-xs text-neutral-400">{preset.description}</div>
+                    {!available ? (
+                      <div className="mt-2 text-[11px] text-neutral-300">
+                        Requires Pro.
+                      </div>
+                    ) : null}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </details>
+
         {isFreePlan && proPackNotice ? (
           <div className="rounded-lg border border-amber-700/40 bg-amber-950/30 p-3 text-sm text-amber-100">
             <div>{proPackNotice}</div>
@@ -630,15 +751,31 @@ export default function ShareForm({
           </div>
         ) : null}
 
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-          <SettingChip label="Expires" value={fmtIso(preview.expiresAt)} />
-          <SettingChip label="Watermark" value={preview.watermarkEnabled ? "On" : "Off"} />
-          <SettingChip label="Access" value={preview.allowDownload ? "Download allowed" : "View-only"} />
+        <div>
+          <h3 className="text-sm font-semibold text-neutral-200">Your settings</h3>
+          <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
+            <SettingChip label="Link expires" value={fmtIso(preview.expiresAt)} />
+            <SettingChip label="Watermarking" value={watermarkingLabel} />
+            <SettingChip label="Viewing" value={preview.allowDownload ? "Download allowed" : "View-only"} />
+          </div>
         </div>
         <div className="rounded-lg border border-neutral-800 bg-neutral-900 p-3">
           <div className="text-sm font-medium text-neutral-200">Estimated outcome</div>
           <div className="mt-1 text-xs text-neutral-400">{estimatedOutcome}</div>
         </div>
+
+        {mode === "advanced" ? (
+          <div className="rounded-lg border border-neutral-800 bg-neutral-900 px-3 py-2 text-xs text-neutral-300">
+            Advanced mode is on.
+            <button
+              type="button"
+              onClick={() => setMode("simple")}
+              className="ml-2 text-neutral-200 underline underline-offset-2 hover:text-white"
+            >
+              Back to simple mode
+            </button>
+          </div>
+        ) : null}
 
         {mode === "simple" ? (
           <div className="rounded-lg border border-neutral-800 bg-neutral-900 p-3">
@@ -746,7 +883,7 @@ export default function ShareForm({
         ) : (
           <details open className="rounded-lg border border-neutral-800 bg-neutral-900">
             <summary className="cursor-pointer list-none px-3 py-2 text-sm font-medium text-neutral-200">
-              Customize
+              Fine-tune settings
             </summary>
             <div className="border-t border-neutral-800 p-3">
               <div className="flex flex-col gap-3">
@@ -912,8 +1049,11 @@ export default function ShareForm({
               onClick={() => setMode("advanced")}
               className="text-xs text-neutral-300 underline underline-offset-2 hover:text-neutral-100"
             >
-              Customize (optional)
+              Fine-tune settings (optional)
             </button>
+          </div>
+          <div className="mt-2 text-xs text-neutral-400">
+            Need stricter sharing? Unlock Pro presets (one-time access, confidential, ID mode).
           </div>
           <div className="mt-2 flex flex-wrap gap-2">
             <button
