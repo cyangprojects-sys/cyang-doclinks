@@ -71,24 +71,32 @@ jobs:
           echo "Uploaded: s3://${R2_BACKUP_BUCKET}/${PREFIX}/${BACKUP_FILE}"
 
       - name: Report backup success to app webhook
-        if: ${{ success() && vars.BACKUP_STATUS_WEBHOOK_URL != '' && secrets.BACKUP_STATUS_WEBHOOK_TOKEN != '' }}
+        if: ${{ success() && vars.BACKUP_STATUS_WEBHOOK_URL != '' }}
         env:
           BACKUP_STATUS_WEBHOOK_URL: ${{ vars.BACKUP_STATUS_WEBHOOK_URL }}
           BACKUP_STATUS_WEBHOOK_TOKEN: ${{ secrets.BACKUP_STATUS_WEBHOOK_TOKEN }}
         run: |
           set -euo pipefail
+          if [ -z "${BACKUP_STATUS_WEBHOOK_TOKEN:-}" ]; then
+            echo "Skipping webhook report: BACKUP_STATUS_WEBHOOK_TOKEN not set."
+            exit 0
+          fi
           curl -fsS -X POST "${BACKUP_STATUS_WEBHOOK_URL}" \
             -H "content-type: application/json" \
             -H "authorization: Bearer ${BACKUP_STATUS_WEBHOOK_TOKEN}" \
             --data "{\"status\":\"ok\",\"source\":\"github-actions\",\"backup_file\":\"${BACKUP_FILE}\",\"details\":{\"repository\":\"${GITHUB_REPOSITORY}\",\"run_id\":\"${GITHUB_RUN_ID}\",\"run_attempt\":\"${GITHUB_RUN_ATTEMPT}\"}}"
 
       - name: Report backup failure to app webhook
-        if: ${{ failure() && vars.BACKUP_STATUS_WEBHOOK_URL != '' && secrets.BACKUP_STATUS_WEBHOOK_TOKEN != '' }}
+        if: ${{ failure() && vars.BACKUP_STATUS_WEBHOOK_URL != '' }}
         env:
           BACKUP_STATUS_WEBHOOK_URL: ${{ vars.BACKUP_STATUS_WEBHOOK_URL }}
           BACKUP_STATUS_WEBHOOK_TOKEN: ${{ secrets.BACKUP_STATUS_WEBHOOK_TOKEN }}
         run: |
           set -euo pipefail
+          if [ -z "${BACKUP_STATUS_WEBHOOK_TOKEN:-}" ]; then
+            echo "Skipping webhook report: BACKUP_STATUS_WEBHOOK_TOKEN not set."
+            exit 0
+          fi
           curl -fsS -X POST "${BACKUP_STATUS_WEBHOOK_URL}" \
             -H "content-type: application/json" \
             -H "authorization: Bearer ${BACKUP_STATUS_WEBHOOK_TOKEN}" \
