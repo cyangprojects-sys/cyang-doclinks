@@ -1,6 +1,17 @@
 import crypto from "crypto";
 import { sql } from "@/lib/db";
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const MAX_STREAM_KEY_LEN = 160;
+const MAX_ACTION_LEN = 120;
+const MAX_SUBJECT_LEN = 256;
+const MAX_IP_HASH_LEN = 128;
+const MAX_PAYLOAD_DEPTH = 4;
+const MAX_PAYLOAD_ARRAY_ITEMS = 64;
+const MAX_PAYLOAD_OBJECT_KEYS = 64;
+const MAX_PAYLOAD_KEY_LEN = 64;
+const MAX_PAYLOAD_STRING_LEN = 512;
+
 type ImmutableAuditEvent = {
   streamKey: string;
   action: string;
@@ -11,6 +22,39 @@ type ImmutableAuditEvent = {
   ipHash?: string | null;
   payload?: Record<string, unknown> | null;
 };
+
+function clampText(value: unknown, maxLen: number): string | null {
+  const s = String(value || "").trim();
+  if (!s) return null;
+  return s.slice(0, maxLen);
+}
+
+function normalizeUuidOrNull(value: unknown): string | null {
+  const s = String(value || "").trim();
+  if (!s) return null;
+  return UUID_RE.test(s) ? s : null;
+}
+
+function sanitizePayload(value: unknown, depth: number = 0): unknown {
+  if (value == null) return null;
+  if (typeof value === "string") return value.slice(0, MAX_PAYLOAD_STRING_LEN);
+  if (typeof value === "number" || typeof value === "boolean") return value;
+  if (depth >= MAX_PAYLOAD_DEPTH) return "[truncated]";
+  if (Array.isArray(value)) {
+    return value.slice(0, MAX_PAYLOAD_ARRAY_ITEMS).map((v) => sanitizePayload(v, depth + 1));
+  }
+  if (typeof value === "object") {
+    const out: Record<string, unknown> = {};
+    const entries = Object.entries(value as Record<string, unknown>).slice(0, MAX_PAYLOAD_OBJECT_KEYS);
+    for (const [k, v] of entries) {
+      const key = String(k || "").slice(0, MAX_PAYLOAD_KEY_LEN);
+      if (!key) continue;
+      out[key] = sanitizePayload(v, depth + 1);
+    }
+    return out;
+  }
+  return String(value).slice(0, MAX_PAYLOAD_STRING_LEN);
+}
 
 function stableJson(input: unknown): string {
   if (input === null || typeof input !== "object") return JSON.stringify(input);
@@ -28,12 +72,17 @@ export async function appendImmutableAudit(
   event: ImmutableAuditEvent,
   options?: { strict?: boolean }
 ): Promise<void> {
-  const streamKey = String(event.streamKey || "").trim();
-  const action = String(event.action || "").trim();
+  const streamKey = clampText(event.streamKey, MAX_STREAM_KEY_LEN) || "";
+  const action = clampText(event.action, MAX_ACTION_LEN) || "";
   if (!streamKey || !action) return;
 
   const occurredAt = new Date().toISOString();
-  const payload = event.payload ?? {};
+  const payload = sanitizePayload(event.payload ?? {}) as Record<string, unknown>;
+  const actorUserId = normalizeUuidOrNull(event.actorUserId);
+  const orgId = normalizeUuidOrNull(event.orgId);
+  const docId = normalizeUuidOrNull(event.docId);
+  const subjectId = clampText(event.subjectId, MAX_SUBJECT_LEN);
+  const ipHash = clampText(event.ipHash, MAX_IP_HASH_LEN);
 
   try {
     const prevRows = (await sql`
@@ -63,11 +112,11 @@ export async function appendImmutableAudit(
           ${previousHash || null},
           ${eventHash},
           ${action},
-          ${event.actorUserId ? event.actorUserId : null}::uuid,
-          ${event.orgId ? event.orgId : null}::uuid,
-          ${event.docId ? event.docId : null}::uuid,
-          ${event.subjectId ?? null},
-          ${event.ipHash ?? null},
+          ${actorUserId}::uuid,
+          ${orgId}::uuid,
+          ${docId}::uuid,
+          ${subjectId},
+          ${ipHash},
           ${JSON.stringify(payload)}::jsonb,
           ${occurredAt}::timestamptz
         )
