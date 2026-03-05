@@ -4,17 +4,27 @@
 import { sql } from "@/lib/db";
 import { constantTimeEqual, hashApiKey } from "@/lib/apiKeys";
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const MAX_API_KEY_LEN = 512;
+const MAX_SUFFIX_LEN = 256;
+
 export type ApiAuthResult =
   | { ok: true; ownerId: string; apiKeyId: string; prefix: string }
   | { ok: false; status: number; error: string };
 
+function normalizeUuidOrNull(value: unknown): string | null {
+  const s = String(value || "").trim();
+  if (!s) return null;
+  return UUID_RE.test(s) ? s : null;
+}
+
 function extractApiKey(req: Request): string | null {
   const h = req.headers;
 
-  const x = (h.get("x-api-key") || "").trim();
+  const x = (h.get("x-api-key") || "").trim().slice(0, MAX_API_KEY_LEN);
   if (x) return x;
 
-  const auth = (h.get("authorization") || "").trim();
+  const auth = (h.get("authorization") || "").trim().slice(0, MAX_API_KEY_LEN);
   if (!auth) return null;
 
   // Bearer <key>
@@ -31,7 +41,7 @@ function extractPrefix(plaintext: string): string | null {
   if (parts[0] !== "cyk") return null;
   const p = parts[1];
   if (!/^[a-f0-9]{8}$/i.test(p)) return null;
-  const remainder = parts.slice(2).join("_").trim();
+  const remainder = parts.slice(2).join("_").trim().slice(0, MAX_SUFFIX_LEN);
   if (!remainder) return null;
   return `cyk_${p}`;
 }
@@ -58,6 +68,9 @@ export async function verifyApiKeyFromRequest(req: Request): Promise<ApiAuthResu
 
   const row = rows?.[0];
   if (!row) return { ok: false, status: 401, error: "INVALID_API_KEY" };
+  const apiKeyId = normalizeUuidOrNull(row.id);
+  const ownerId = normalizeUuidOrNull(row.owner_id);
+  if (!apiKeyId || !ownerId) return { ok: false, status: 401, error: "INVALID_API_KEY" };
 
   if (!constantTimeEqual(row.key_hash, keyHash)) {
     return { ok: false, status: 401, error: "INVALID_API_KEY" };
@@ -68,11 +81,11 @@ export async function verifyApiKeyFromRequest(req: Request): Promise<ApiAuthResu
     await sql`
       update public.api_keys
       set last_used_at = now()
-      where id = ${row.id}::uuid
+      where id = ${apiKeyId}::uuid
     `;
   } catch {
     // ignore
   }
 
-  return { ok: true, ownerId: row.owner_id, apiKeyId: row.id, prefix };
+  return { ok: true, ownerId, apiKeyId, prefix };
 }

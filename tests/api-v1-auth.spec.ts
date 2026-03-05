@@ -62,4 +62,18 @@ test.describe("api auth guard primitives", () => {
       expect(out.error).toBe("INVALID_API_KEY_FORMAT");
     }
   });
+
+  test("rejects oversized API key header values", async () => {
+    const req = new Request("http://localhost/api/v1/docs", {
+      headers: {
+        authorization: `Bearer ${"x".repeat(5000)}`,
+      },
+    });
+    const out = await verifyApiKeyFromRequest(req);
+    expect(out.ok).toBeFalsy();
+    if (!out.ok) {
+      expect(out.status).toBe(401);
+      expect(out.error).toBe("INVALID_API_KEY_FORMAT");
+    }
+  });
 });
