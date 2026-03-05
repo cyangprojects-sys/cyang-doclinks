@@ -103,18 +103,23 @@ const BLOCKED_MIME_EXACT = new Set([
 ]);
 
 export const ALLOWED_UPLOAD_EXTENSIONS = ALLOWED.map((s) => s.ext);
+const MAX_FILENAME_LEN = 240;
+const MAX_EXT_LEN = 16;
+const MAX_MIME_LEN = 160;
 
 function extOf(filename: string): string {
   const n = String(filename || "").trim().toLowerCase();
   const idx = n.lastIndexOf(".");
-  return idx >= 0 ? n.slice(idx + 1) : "";
+  return idx >= 0 ? n.slice(idx + 1).slice(0, MAX_EXT_LEN) : "";
 }
 
-function normalizeMime(mime: string | null | undefined): string {
-  return String(mime || "")
-    .split(";")[0]
-    .trim()
-    .toLowerCase();
+function normalizeMime(mime: string | null | undefined): string | null {
+  const raw = String(mime || "").trim().toLowerCase();
+  if (!raw) return null;
+  if (raw.length > MAX_MIME_LEN || /[\r\n\0]/.test(raw)) return null;
+  const out = raw.split(";", 1)[0].trim();
+  if (!out || out.length > MAX_MIME_LEN) return null;
+  return out;
 }
 
 function isLikelyExecutableSignature(bytes: Buffer): boolean {
@@ -190,7 +195,14 @@ export function validateUploadType(args: {
   bytes?: Buffer | null;
 }): UploadTypeValidationResult {
   const filename = String(args.filename || "").trim();
-  if (!filename || filename.length > 240 || /[\\/:*?"<>|]/.test(filename) || filename.includes("..")) {
+  if (
+    !filename ||
+    filename.length > MAX_FILENAME_LEN ||
+    /[\x00-\x1f]/.test(filename) ||
+    /[\\/:*?"<>|]/.test(filename) ||
+    filename.includes("..") ||
+    filename.endsWith(".")
+  ) {
     return { ok: false, error: "BAD_FILENAME", message: "Invalid filename." };
   }
 
@@ -205,6 +217,9 @@ export function validateUploadType(args: {
   }
 
   const declared = normalizeMime(args.declaredMime);
+  if (args.declaredMime != null && String(args.declaredMime).trim() && !declared) {
+    return { ok: false, error: "MIME_MISMATCH", message: "Declared MIME type is invalid." };
+  }
   if (declared) {
     if (BLOCKED_MIME_EXACT.has(declared) || BLOCKED_MIME_PREFIXES.some((p) => declared.startsWith(p))) {
       return { ok: false, error: "EXECUTABLE_BLOCKED", message: "Executable MIME type is blocked." };

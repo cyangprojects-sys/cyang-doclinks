@@ -6,6 +6,12 @@ test.describe("webhook secret helpers", () => {
     expect(decryptWebhookSecretForUse("legacy-secret")).toBe("legacy-secret");
   });
 
+  test("rejects malformed plaintext and encrypted secret values", () => {
+    expect(encryptWebhookSecretForStorage("bad\r\nsecret")).toBe("");
+    expect(decryptWebhookSecretForUse("plain\r\nsecret")).toBeNull();
+    expect(decryptWebhookSecretForUse("v1:not-valid")).toBeNull();
+  });
+
   test("encrypts and decrypts webhook secret when OIDC_SECRETS_KEY is configured", () => {
     const old = process.env.OIDC_SECRETS_KEY;
     process.env.OIDC_SECRETS_KEY = Buffer.alloc(32, 7).toString("base64");
@@ -19,4 +25,3 @@ test.describe("webhook secret helpers", () => {
     }
   });
 });
-

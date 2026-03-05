@@ -96,6 +96,15 @@ test.describe("runtime env validation", () => {
     expect(() => assertRuntimeEnv("stripe_webhook")).not.toThrow();
   });
 
+  test("rejects newline-polluted required env values", () => {
+    setEnv("NODE_ENV", "development");
+    process.env.ENABLE_STRICT_ENV_VALIDATION = "true";
+    process.env.DATABASE_URL = "postgres://test\r\n";
+    process.env.STRIPE_WEBHOOK_SECRET = "whsec_test";
+    process.env.STRIPE_PRO_PRICE_IDS = "price_test";
+    expect(() => assertRuntimeEnv("stripe_webhook")).toThrow(RuntimeEnvError);
+  });
+
   test("enforces upload_presign required envs", () => {
     setEnv("NODE_ENV", "development");
     process.env.ENABLE_STRICT_ENV_VALIDATION = "true";
@@ -161,5 +170,13 @@ test.describe("runtime env validation", () => {
     if (caught instanceof RuntimeEnvError) {
       expect(caught.missing).toContain("DOC_MASTER_KEYS_JSON");
     }
+  });
+
+  test("fails closed when runtime scope is invalid at runtime", () => {
+    setEnv("NODE_ENV", "development");
+    process.env.ENABLE_STRICT_ENV_VALIDATION = "true";
+    process.env.DATABASE_URL = "postgres://test";
+    const call = () => assertRuntimeEnv("not_a_scope" as unknown as "serve");
+    expect(call).toThrow(RuntimeEnvError);
   });
 });

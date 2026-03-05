@@ -10,6 +10,17 @@ export type RuntimeEnvScope =
   | "stripe_webhook"
   | "stripe_admin";
 
+const RUNTIME_ENV_SCOPES: ReadonlyArray<RuntimeEnvScope> = [
+  "serve",
+  "share_raw",
+  "alias_raw",
+  "ticket_serve",
+  "upload_complete",
+  "upload_presign",
+  "stripe_webhook",
+  "stripe_admin",
+];
+
 export class RuntimeEnvError extends Error {
   readonly scope: RuntimeEnvScope;
   readonly missing: string[];
@@ -33,7 +44,9 @@ function isStrictValidationEnabled(): boolean {
 }
 
 function hasEnv(name: string): boolean {
-  return String(process.env[name] || "").trim().length > 0;
+  const raw = String(process.env[name] || "");
+  if (!raw.trim()) return false;
+  return !/[\r\n\0]/.test(raw);
 }
 
 function hasAnyEnv(names: string[]): boolean {
@@ -56,12 +69,7 @@ function requiredForScope(scope: RuntimeEnvScope): string[] {
     if (!valid.ok) missing.add("DOC_MASTER_KEYS_JSON");
   };
 
-  // Most runtime server routes require DB.
-  if (scope !== "upload_presign") {
-    require("DATABASE_URL");
-  } else {
-    require("DATABASE_URL");
-  }
+  require("DATABASE_URL");
 
   switch (scope) {
     case "serve":
@@ -103,6 +111,9 @@ function requiredForScope(scope: RuntimeEnvScope): string[] {
 
 export function assertRuntimeEnv(scope: RuntimeEnvScope): void {
   if (!isStrictValidationEnabled()) return;
+  if (!RUNTIME_ENV_SCOPES.includes(scope)) {
+    throw new RuntimeEnvError("serve", ["RUNTIME_ENV_SCOPE"]);
+  }
   const missing = requiredForScope(scope);
   if (missing.length) {
     throw new RuntimeEnvError(scope, missing);

@@ -11,6 +11,22 @@ test.describe("upload type validation", () => {
     if (!out.ok) expect(out.error).toBe("BAD_FILENAME");
   });
 
+  test("rejects control characters and trailing dots in filenames", () => {
+    const badControl = validateUploadType({
+      filename: "report\n.pdf",
+      declaredMime: "application/pdf",
+    });
+    expect(badControl.ok).toBeFalsy();
+    if (!badControl.ok) expect(badControl.error).toBe("BAD_FILENAME");
+
+    const badTrailingDot = validateUploadType({
+      filename: "report.pdf.",
+      declaredMime: "application/pdf",
+    });
+    expect(badTrailingDot.ok).toBeFalsy();
+    if (!badTrailingDot.ok) expect(badTrailingDot.error).toBe("BAD_FILENAME");
+  });
+
   test("blocks executable extensions", () => {
     const out = validateUploadType({
       filename: "malware.exe",
@@ -42,6 +58,15 @@ test.describe("upload type validation", () => {
     const out = validateUploadType({
       filename: "notes.txt",
       declaredMime: "application/pdf",
+    });
+    expect(out.ok).toBeFalsy();
+    if (!out.ok) expect(out.error).toBe("MIME_MISMATCH");
+  });
+
+  test("rejects malformed declared MIME values", () => {
+    const out = validateUploadType({
+      filename: "report.pdf",
+      declaredMime: "application/pdf\r\nx-bad:1",
     });
     expect(out.ok).toBeFalsy();
     if (!out.ok) expect(out.error).toBe("MIME_MISMATCH");

@@ -133,4 +133,22 @@ test.describe("geo, cookie, and view helpers", () => {
     expect(b).not.toBeNull();
     expect(a).not.toBe(b);
   });
+
+  test("view hashIp falls back to NEXTAUTH_SECRET and rejects malformed ip values", () => {
+    const oldViewSalt = process.env.VIEW_SALT;
+    const oldNextAuthSecret = process.env.NEXTAUTH_SECRET;
+    try {
+      delete process.env.VIEW_SALT;
+      process.env.NEXTAUTH_SECRET = "nextauth-test-secret";
+      const stable = hashIp("4.4.4.4");
+      expect(stable).not.toBeNull();
+      expect(stable).toHaveLength(64);
+      expect(hashIp("4.4.4.4\r\nbad")).toBeNull();
+    } finally {
+      if (typeof oldViewSalt === "string") process.env.VIEW_SALT = oldViewSalt;
+      else delete process.env.VIEW_SALT;
+      if (typeof oldNextAuthSecret === "string") process.env.NEXTAUTH_SECRET = oldNextAuthSecret;
+      else delete process.env.NEXTAUTH_SECRET;
+    }
+  });
 });
