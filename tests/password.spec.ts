@@ -28,4 +28,11 @@ test.describe("password helpers", () => {
     expect(verifyPassword("x", "scrypt$missing")).toBeFalsy();
     expect(verifyPassword("x", "scrypt$bad###$stillbad###")).toBeFalsy();
   });
+
+  test("rejects oversized or null-byte password inputs", () => {
+    expect(() => hashPassword("x".repeat(4097))).toThrow("INVALID_PASSWORD");
+    expect(() => hashPassword("abc\0def")).toThrow("INVALID_PASSWORD");
+    expect(verifyPassword("x".repeat(4097), hashPassword("valid-pass-123!"))).toBeFalsy();
+    expect(verifyPassword("abc\0def", hashPassword("valid-pass-123!"))).toBeFalsy();
+  });
 });

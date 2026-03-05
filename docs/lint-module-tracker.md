@@ -104,6 +104,7 @@ Status key: `done` | `pending`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\orgMembership.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\observability.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\packs.ts`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\password.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\publicBaseUrl.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\quarantineOverride.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\rateLimit.ts`
@@ -111,7 +112,10 @@ Status key: `done` | `pending`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\routeTimeout.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\runtimeEnv.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\scanQueue.ts`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\shareAuth.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\slug.ts`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\signup.ts`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\tenant.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\uploadTypeValidation.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\view.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\viewLimitOverride.ts`

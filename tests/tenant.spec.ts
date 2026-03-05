@@ -16,6 +16,7 @@ test.describe("tenant org slug normalization", () => {
     expect(normalizeOrgSlug("with_underscore")).toBeNull();
     expect(normalizeOrgSlug("with/slash")).toBeNull();
     expect(normalizeOrgSlug("with..dots")).toBeNull();
+    expect(normalizeOrgSlug("acme\r\ncorp")).toBeNull();
   });
 
   test("rejects overlong slugs", () => {

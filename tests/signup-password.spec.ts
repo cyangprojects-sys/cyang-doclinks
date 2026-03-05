@@ -16,4 +16,9 @@ test.describe("signup password complexity", () => {
   test("accepts strong password", () => {
     expect(validatePasswordComplexity("StrongPass123!")).toBeNull();
   });
+
+  test("rejects oversized and null-byte passwords", () => {
+    expect(validatePasswordComplexity("A".repeat(1025))).toBe("Password is too long.");
+    expect(validatePasswordComplexity("Strong\0Pass123!")).toBe("Password contains unsupported characters.");
+  });
 });

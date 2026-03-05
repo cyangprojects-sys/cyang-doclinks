@@ -75,6 +75,10 @@ test.describe("share auth helpers", () => {
     if (!out.ok) expect(out.reason).toBe("format");
   });
 
+  test("rejects invalid unlock token components at creation time", () => {
+    expect(() => makeUnlockCookieValue("bad.token")).toThrow("INVALID_TOKEN");
+  });
+
   test("round-trips device trust cookie value", () => {
     const value = makeDeviceTrustCookieValue("share_1", "device_hash_1");
     const out = verifyDeviceTrustCookieValue(value);
@@ -101,6 +105,16 @@ test.describe("share auth helpers", () => {
     const out = verifyEmailProofToken(tok);
     expect(out.ok).toBeTruthy();
     if (out.ok) expect(out.email).toBe("user@example.com");
+  });
+
+  test("rejects invalid email proof inputs at creation time", () => {
+    expect(() =>
+      makeEmailProofToken({
+        shareId: "share_abc",
+        token: "tok_abc",
+        email: "not-an-email",
+      })
+    ).toThrow("INVALID_EMAIL");
   });
 
   test("rejects expired email proof token", () => {
@@ -132,5 +146,15 @@ test.describe("share auth helpers", () => {
     const out = verifyEmailProofToken(`${tok}x`);
     expect(out.ok).toBeFalsy();
     if (!out.ok) expect(out.reason).toBe("sig");
+  });
+
+  test("rejects malformed cookie payloads with control characters", () => {
+    const unlock = verifyUnlockCookieValue("tok.123.sig\r\n");
+    expect(unlock.ok).toBeFalsy();
+    if (!unlock.ok) expect(unlock.reason).toBe("format");
+
+    const proof = verifyEmailProofToken("v1.share.token.user@example.com.123.sig\r\n");
+    expect(proof.ok).toBeFalsy();
+    if (!proof.ok) expect(proof.reason).toBe("format");
   });
 });

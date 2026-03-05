@@ -16,8 +16,16 @@ export type ManualSignupInput = {
   country: string;
 };
 
+const MAX_EMAIL_LEN = 320;
+const MAX_COMPLEXITY_PASSWORD_LEN = 1024;
+const BASIC_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 function normalizeEmail(emailRaw: string): string {
-  return String(emailRaw || "").trim().toLowerCase();
+  const email = String(emailRaw || "").trim().toLowerCase();
+  if (!email || email.length > MAX_EMAIL_LEN) return "";
+  if (/[\r\n\0]/.test(email)) return "";
+  if (!BASIC_EMAIL_RE.test(email)) return "";
+  return email;
 }
 
 async function signupTablesReady(): Promise<boolean> {
@@ -39,6 +47,8 @@ async function legalAcceptancesReady(): Promise<boolean> {
 }
 
 export function validatePasswordComplexity(password: string): string | null {
+  if (password.length > MAX_COMPLEXITY_PASSWORD_LEN) return "Password is too long.";
+  if (/[\0]/.test(password)) return "Password contains unsupported characters.";
   if (password.length < 12) return "Password must be at least 12 characters.";
   if (!/[a-z]/.test(password)) return "Password must include a lowercase letter.";
   if (!/[A-Z]/.test(password)) return "Password must include an uppercase letter.";
@@ -245,4 +255,3 @@ export async function verifyManualCredentials(emailRaw: string, password: string
   if (!verifyPassword(password, row.password_hash)) return null;
   return { email: row.email, name: `${row.first_name} ${row.last_name}`.trim() };
 }
-

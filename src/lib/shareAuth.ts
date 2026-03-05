@@ -14,15 +14,24 @@ const SHARE_UNLOCK_COOKIE = "cyang_share_unlock";
 const DEVICE_TRUST_COOKIE = "cyang_trusted_device";
 
 const EIGHT_HOURS_SEC = 8 * 60 * 60;
+const MAX_SECRET_LEN = 512;
+const MAX_COOKIE_VALUE_LEN = 2048;
+const MAX_COMPONENT_LEN = 160;
+const MAX_EMAIL_LEN = 320;
+const MAX_EMAIL_PROOF_TTL_SEC = 24 * 60 * 60;
+const MIN_EMAIL_PROOF_TTL_SEC = 60;
+const COMPONENT_RE = /^[A-Za-z0-9_-]+$/;
+const BASIC_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function envSecret() {
-    // Prefer a dedicated secret, fallback to VIEW_SALT, then NEXTAUTH_SECRET
-    return (
-        process.env.SHARE_COOKIE_SECRET ||
-        process.env.VIEW_SALT ||
-        process.env.NEXTAUTH_SECRET ||
-        ""
-    );
+    // Prefer a dedicated secret, fallback to VIEW_SALT, then NEXTAUTH_SECRET.
+    const candidates = [process.env.SHARE_COOKIE_SECRET, process.env.VIEW_SALT, process.env.NEXTAUTH_SECRET];
+    for (const candidate of candidates) {
+        const raw = String(candidate || "").trim();
+        if (!raw || raw.length > MAX_SECRET_LEN || /[\r\n\0]/.test(raw)) continue;
+        return raw;
+    }
+    return "";
 }
 
 function b64url(buf: Buffer) {
@@ -50,6 +59,32 @@ function constantTimeEq(aStr: string, bStr: string) {
     return crypto.timingSafeEqual(a, b);
 }
 
+function normalizeComponent(value: string, fieldName: string): string {
+    const raw = String(value || "").trim();
+    if (!raw || raw.length > MAX_COMPONENT_LEN || !COMPONENT_RE.test(raw)) {
+        throw new Error(`INVALID_${fieldName}`);
+    }
+    return raw;
+}
+
+function normalizeEmail(value: string): string {
+    const raw = String(value || "").trim().toLowerCase();
+    if (!raw || raw.length > MAX_EMAIL_LEN) throw new Error("INVALID_EMAIL");
+    if (/[\r\n\0]/.test(raw)) throw new Error("INVALID_EMAIL");
+    if (!BASIC_EMAIL_RE.test(raw)) throw new Error("INVALID_EMAIL");
+    return raw;
+}
+
+function safeNowMs(nowMs: number): number {
+    return Number.isFinite(nowMs) ? Math.floor(nowMs) : Date.now();
+}
+
+function safeExpiry(nowMs: number, ttlSec: number): number {
+    const ttl = Number.isFinite(ttlSec) ? Math.floor(ttlSec) : 10 * 60;
+    const boundedTtl = Math.max(MIN_EMAIL_PROOF_TTL_SEC, Math.min(MAX_EMAIL_PROOF_TTL_SEC, ttl));
+    return Math.floor(safeNowMs(nowMs) / 1000) + boundedTtl;
+}
+
 /** ========= SHARE UNLOCK COOKIE ========= */
 
 export function shareUnlockCookieName() {
@@ -57,20 +92,26 @@ export function shareUnlockCookieName() {
 }
 
 export function makeUnlockCookieValue(token: string, nowMs = Date.now()) {
-    const exp = Math.floor(nowMs / 1000) + EIGHT_HOURS_SEC; // unix seconds
-    const payload = `${token}.${exp}`;
+    const tokenNorm = normalizeComponent(token, "TOKEN");
+    const exp = Math.floor(safeNowMs(nowMs) / 1000) + EIGHT_HOURS_SEC; // unix seconds
+    const payload = `${tokenNorm}.${exp}`;
     const sig = sign(payload);
     return `${payload}.${sig}`;
 }
 
 export function verifyUnlockCookieValue(value: string | undefined | null) {
-    if (!value) return { ok: false as const, reason: "missing" as const };
-    const parts = value.split(".");
+    const rawInput = String(value || "");
+    const raw = rawInput.trim();
+    if (!raw) return { ok: false as const, reason: "missing" as const };
+    if (raw.length > MAX_COOKIE_VALUE_LEN || /[\r\n\0]/.test(rawInput)) return { ok: false as const, reason: "format" as const };
+
+    const parts = raw.split(".");
     if (parts.length !== 3) return { ok: false as const, reason: "format" as const };
 
     const [token, expStr, sig] = parts;
     const exp = Number(expStr);
-    if (!token || !Number.isFinite(exp)) return { ok: false as const, reason: "format" as const };
+    if (!token || !Number.isFinite(exp) || !Number.isInteger(exp)) return { ok: false as const, reason: "format" as const };
+    if (token.length > MAX_COMPONENT_LEN || !COMPONENT_RE.test(token)) return { ok: false as const, reason: "format" as const };
     if (Math.floor(Date.now() / 1000) > exp) return { ok: false as const, reason: "expired" as const };
 
     const payload = `${token}.${exp}`;
@@ -107,15 +148,21 @@ export function makeDeviceTrustCookieValue(
     deviceHash: string,
     nowMs = Date.now()
 ) {
-    const exp = Math.floor(nowMs / 1000) + EIGHT_HOURS_SEC;
-    const payload = `v1.${shareId}.${deviceHash}.${exp}`;
+    const shareIdNorm = normalizeComponent(shareId, "SHARE_ID");
+    const deviceHashNorm = normalizeComponent(deviceHash, "DEVICE_HASH");
+    const exp = Math.floor(safeNowMs(nowMs) / 1000) + EIGHT_HOURS_SEC;
+    const payload = `v1.${shareIdNorm}.${deviceHashNorm}.${exp}`;
     const sig = sign(payload);
     return `${payload}.${sig}`;
 }
 
 export function verifyDeviceTrustCookieValue(value: string | undefined | null) {
-    if (!value) return { ok: false as const, reason: "missing" as const };
-    const parts = value.split(".");
+    const rawInput = String(value || "");
+    const raw = rawInput.trim();
+    if (!raw) return { ok: false as const, reason: "missing" as const };
+    if (raw.length > MAX_COOKIE_VALUE_LEN || /[\r\n\0]/.test(rawInput)) return { ok: false as const, reason: "format" as const };
+
+    const parts = raw.split(".");
     // v1.shareId.deviceHash.exp.sig => 5 parts
     if (parts.length !== 5) return { ok: false as const, reason: "format" as const };
 
@@ -123,9 +170,11 @@ export function verifyDeviceTrustCookieValue(value: string | undefined | null) {
     if (v !== "v1") return { ok: false as const, reason: "format" as const };
 
     const exp = Number(expStr);
-    if (!shareId || !deviceHash || !Number.isFinite(exp)) {
+    if (!shareId || !deviceHash || !Number.isFinite(exp) || !Number.isInteger(exp)) {
         return { ok: false as const, reason: "format" as const };
     }
+    if (shareId.length > MAX_COMPONENT_LEN || !COMPONENT_RE.test(shareId)) return { ok: false as const, reason: "format" as const };
+    if (deviceHash.length > MAX_COMPONENT_LEN || !COMPONENT_RE.test(deviceHash)) return { ok: false as const, reason: "format" as const };
     if (Math.floor(Date.now() / 1000) > exp) {
         return { ok: false as const, reason: "expired" as const };
     }
@@ -151,19 +200,24 @@ export function makeEmailProofToken(args: {
     nowMs?: number;
     ttlSec?: number; // default 10 minutes
 }) {
-    const nowMs = args.nowMs ?? Date.now();
-    const ttl = args.ttlSec ?? 10 * 60;
-    const exp = Math.floor(nowMs / 1000) + ttl;
+    const shareId = normalizeComponent(args.shareId, "SHARE_ID");
+    const token = normalizeComponent(args.token, "TOKEN");
+    const nowMs = safeNowMs(args.nowMs ?? Date.now());
+    const exp = safeExpiry(nowMs, args.ttlSec ?? 10 * 60);
 
-    const emailNorm = args.email.trim().toLowerCase();
-    const payload = `v1.${args.shareId}.${args.token}.${emailNorm}.${exp}`;
+    const emailNorm = normalizeEmail(args.email);
+    const payload = `v1.${shareId}.${token}.${emailNorm}.${exp}`;
     const sig = sign(payload);
     return `${payload}.${sig}`;
 }
 
 export function verifyEmailProofToken(value: string | undefined | null) {
-    if (!value) return { ok: false as const, reason: "missing" as const };
-    const parts = value.split(".");
+    const rawInput = String(value || "");
+    const raw = rawInput.trim();
+    if (!raw) return { ok: false as const, reason: "missing" as const };
+    if (raw.length > MAX_COOKIE_VALUE_LEN || /[\r\n\0]/.test(rawInput)) return { ok: false as const, reason: "format" as const };
+
+    const parts = raw.split(".");
     // Format: v1.shareId.token.email.exp.sig
     // Email may contain dots, so parse from both ends instead of fixed part count.
     if (parts.length < 6) return { ok: false as const, reason: "format" as const };
@@ -177,9 +231,12 @@ export function verifyEmailProofToken(value: string | undefined | null) {
     if (v !== "v1") return { ok: false as const, reason: "format" as const };
 
     const exp = Number(expStr);
-    if (!shareId || !token || !email || !Number.isFinite(exp)) {
+    if (!shareId || !token || !email || !Number.isFinite(exp) || !Number.isInteger(exp)) {
         return { ok: false as const, reason: "format" as const };
     }
+    if (shareId.length > MAX_COMPONENT_LEN || !COMPONENT_RE.test(shareId)) return { ok: false as const, reason: "format" as const };
+    if (token.length > MAX_COMPONENT_LEN || !COMPONENT_RE.test(token)) return { ok: false as const, reason: "format" as const };
+    if (email.length > MAX_EMAIL_LEN || !BASIC_EMAIL_RE.test(email)) return { ok: false as const, reason: "format" as const };
     if (Math.floor(Date.now() / 1000) > exp) {
         return { ok: false as const, reason: "expired" as const };
     }
