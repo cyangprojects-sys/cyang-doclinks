@@ -1,19 +1,33 @@
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { requireRole } from "@/lib/authz";
 import { isDebugApiEnabled } from "@/lib/debugAccess";
+import { enforceGlobalApiRateLimit } from "@/lib/securityTelemetry";
 
 async function regclass(name: string) {
   const rows = (await sql`select to_regclass(${name})::text as reg`) as { reg: string | null }[];
   return rows?.[0]?.reg ?? null;
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   if (!isDebugApiEnabled()) {
     return NextResponse.json({ ok: false, error: "NOT_FOUND" }, { status: 404 });
+  }
+  const rl = await enforceGlobalApiRateLimit({
+    req,
+    scope: "ip:admin_dbinfo",
+    limit: Number(process.env.RATE_LIMIT_ADMIN_DBINFO_PER_MIN || 60),
+    windowSeconds: 60,
+    strict: true,
+  });
+  if (!rl.ok) {
+    return NextResponse.json(
+      { ok: false, error: "RATE_LIMIT" },
+      { status: rl.status, headers: { "Retry-After": String(rl.retryAfterSeconds) } }
+    );
   }
   try {
     await requireRole("owner");

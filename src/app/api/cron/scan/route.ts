@@ -6,7 +6,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { cronUnauthorizedResponse, isCronAuthorized } from "@/lib/cronAuth";
 import { sql } from "@/lib/db";
 import { scanR2Object } from "@/lib/malwareScan";
-import { logSecurityEvent, detectScanFailureSpike } from "@/lib/securityTelemetry";
+import { logSecurityEvent, detectScanFailureSpike, enforceGlobalApiRateLimit } from "@/lib/securityTelemetry";
 import { healScanQueue } from "@/lib/scanQueue";
 import { reportException } from "@/lib/observability";
 import { logCronRun } from "@/lib/cronTelemetry";
@@ -22,6 +22,20 @@ type Job = {
 const SCANNER_VERSION = "v3-external-clam-only";
 
 export async function GET(req: NextRequest) {
+  const rl = await enforceGlobalApiRateLimit({
+    req,
+    scope: "ip:cron_scan",
+    limit: Number(process.env.RATE_LIMIT_CRON_SCAN_PER_MIN || 30),
+    windowSeconds: 60,
+    strict: true,
+  });
+  if (!rl.ok) {
+    return NextResponse.json(
+      { ok: false, error: "RATE_LIMIT" },
+      { status: rl.status, headers: { "Retry-After": String(rl.retryAfterSeconds) } }
+    );
+  }
+
   if (!isCronAuthorized(req)) {
     return cronUnauthorizedResponse();
   }

@@ -5,8 +5,23 @@ import { NextResponse, type NextRequest } from "next/server";
 import { cronUnauthorizedResponse, isCronAuthorized } from "@/lib/cronAuth";
 import { logCronRun } from "@/lib/cronTelemetry";
 import { runR2OrphanSweep } from "@/lib/retention";
+import { enforceGlobalApiRateLimit } from "@/lib/securityTelemetry";
 
 export async function GET(req: NextRequest) {
+  const rl = await enforceGlobalApiRateLimit({
+    req,
+    scope: "ip:cron_orphan_sweep",
+    limit: Number(process.env.RATE_LIMIT_CRON_ORPHAN_SWEEP_PER_MIN || 20),
+    windowSeconds: 60,
+    strict: true,
+  });
+  if (!rl.ok) {
+    return NextResponse.json(
+      { ok: false, error: "RATE_LIMIT" },
+      { status: rl.status, headers: { "Retry-After": String(rl.retryAfterSeconds) } }
+    );
+  }
+
   if (!isCronAuthorized(req)) {
     return cronUnauthorizedResponse();
   }

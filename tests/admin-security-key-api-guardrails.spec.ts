@@ -12,6 +12,7 @@ test.describe("admin security key api guardrails", () => {
       expect(code.includes("authErrorCode(")).toBeTruthy();
       expect(code.includes('error: "UNAUTHENTICATED"')).toBeTruthy();
       expect(code.includes('error: "FORBIDDEN"')).toBeTruthy();
+      expect(code.includes("enforceGlobalApiRateLimit(")).toBeTruthy();
     }
   });
 

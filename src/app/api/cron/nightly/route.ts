@@ -19,6 +19,7 @@ import {
   detectTokenAccessDeniedSpike,
   detectUploadCompletionSpike,
   detectViewSpike,
+  enforceGlobalApiRateLimit,
   logSecurityEvent,
 } from "@/lib/securityTelemetry";
 import { logCronRun } from "@/lib/cronTelemetry";
@@ -27,6 +28,20 @@ import { runBillingMaintenance } from "@/lib/billingSubscription";
 import { cronUnauthorizedResponse, isCronAuthorized } from "@/lib/cronAuth";
 
 export async function GET(req: NextRequest) {
+  const rl = await enforceGlobalApiRateLimit({
+    req,
+    scope: "ip:cron_nightly",
+    limit: Number(process.env.RATE_LIMIT_CRON_NIGHTLY_PER_MIN || 10),
+    windowSeconds: 60,
+    strict: true,
+  });
+  if (!rl.ok) {
+    return NextResponse.json(
+      { ok: false, error: "RATE_LIMIT" },
+      { status: rl.status, headers: { "Retry-After": String(rl.retryAfterSeconds) } }
+    );
+  }
+
   if (!isCronAuthorized(req)) {
     return cronUnauthorizedResponse();
   }

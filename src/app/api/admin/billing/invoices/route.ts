@@ -7,6 +7,7 @@ import { sql } from "@/lib/db";
 import { ensureStripeCustomer, safeStripeRedirectUrl, stripeApi } from "@/lib/stripeClient";
 import { getRouteTimeoutMs, isRouteTimeoutError, withRouteTimeout } from "@/lib/routeTimeout";
 import { assertRuntimeEnv, isRuntimeEnvError } from "@/lib/runtimeEnv";
+import { enforceGlobalApiRateLimit } from "@/lib/securityTelemetry";
 type StripeInvoiceLike = {
   id?: string;
   number?: string;
@@ -72,6 +73,20 @@ export async function GET(req: NextRequest) {
   try {
     return await withRouteTimeout(
       (async () => {
+        const rl = await enforceGlobalApiRateLimit({
+          req,
+          scope: "ip:admin_billing_invoices",
+          limit: Number(process.env.RATE_LIMIT_ADMIN_BILLING_INVOICES_PER_MIN || 60),
+          windowSeconds: 60,
+          strict: true,
+        });
+        if (!rl.ok) {
+          return NextResponse.json(
+            { ok: false, error: "RATE_LIMIT" },
+            { status: rl.status, headers: { "Retry-After": String(rl.retryAfterSeconds) } }
+          );
+        }
+
         assertRuntimeEnv("stripe_admin");
         const u = await requirePermission("billing.manage");
         const limitRaw = Number(new URL(req.url).searchParams.get("limit") || 20);

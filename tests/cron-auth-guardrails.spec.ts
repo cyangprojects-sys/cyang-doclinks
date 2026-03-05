@@ -22,6 +22,8 @@ test.describe("cron auth guardrails", () => {
     for (const route of routes) {
       const code = readFileSync(route, "utf8");
       expect(code.includes("cronUnauthorizedResponse")).toBeTruthy();
+      expect(code.includes("enforceGlobalApiRateLimit(")).toBeTruthy();
+      expect(code.includes("RATE_LIMIT")).toBeTruthy();
     }
   });
 });

@@ -6,6 +6,7 @@ import { NextRequest } from "next/server";
 import { sql } from "@/lib/db";
 import { requirePermission } from "@/lib/rbac";
 import { getPlanForUser } from "@/lib/monetization";
+import { enforceGlobalApiRateLimit } from "@/lib/securityTelemetry";
 
 type ExportType = "audit" | "access" | "views";
 type CsvRow = Record<string, unknown>;
@@ -39,6 +40,20 @@ function parseExportType(raw: string | null): ExportType {
 // We keep it static so the query stays fully typed and parameterized.
 
 export async function GET(req: NextRequest) {
+  const rl = await enforceGlobalApiRateLimit({
+    req,
+    scope: "ip:admin_audit_export",
+    limit: Number(process.env.RATE_LIMIT_ADMIN_AUDIT_EXPORT_PER_MIN || 30),
+    windowSeconds: 60,
+    strict: true,
+  });
+  if (!rl.ok) {
+    return new Response("Too Many Requests", {
+      status: rl.status,
+      headers: { "Retry-After": String(rl.retryAfterSeconds) },
+    });
+  }
+
   let userId: string | null = null;
   try {
     const u = await requirePermission("audit.export");

@@ -1,8 +1,9 @@
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import { requirePermission } from "@/lib/rbac";
 import { listMasterKeysWithStatus, isMasterKeyRevoked, getDbActiveMasterKeyId, listRecentMasterKeyChanges } from "@/lib/masterKeys";
 import { getActiveMasterKey } from "@/lib/encryption";
 import { listKeyRotationJobs, getKeyRotationStatusSummary } from "@/lib/keyRotationJobs";
+import { enforceGlobalApiRateLimit } from "@/lib/securityTelemetry";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -14,8 +15,22 @@ function authErrorCode(e: unknown): "UNAUTHENTICATED" | "FORBIDDEN" | null {
   return null;
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    const rl = await enforceGlobalApiRateLimit({
+      req,
+      scope: "ip:admin_security_keys",
+      limit: Number(process.env.RATE_LIMIT_ADMIN_SECURITY_KEYS_PER_MIN || 60),
+      windowSeconds: 60,
+      strict: true,
+    });
+    if (!rl.ok) {
+      return NextResponse.json(
+        { ok: false, error: "RATE_LIMIT" },
+        { status: rl.status, headers: { "Retry-After": String(rl.retryAfterSeconds) } }
+      );
+    }
+
     await requirePermission("security.keys.manage");
 
     let activeId: string | null = null;

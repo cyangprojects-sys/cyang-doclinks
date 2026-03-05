@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { requireRole } from "@/lib/authz";
 import { isDebugApiEnabled } from "@/lib/debugAccess";
+import { enforceGlobalApiRateLimit } from "@/lib/securityTelemetry";
 
 import { HeadObjectCommand } from "@aws-sdk/client-s3";
 import { getR2Bucket, r2Client } from "@/lib/r2";
@@ -43,6 +44,19 @@ export async function GET(req: NextRequest) {
     const r2Bucket = getR2Bucket();
     if (!isDebugApiEnabled() || !isAdminDebugGateEnabledInThisRoute()) {
       return NextResponse.json({ ok: false, error: "NOT_FOUND" }, { status: 404 });
+    }
+    const rl = await enforceGlobalApiRateLimit({
+      req,
+      scope: "ip:admin_debug_inspect",
+      limit: Number(process.env.RATE_LIMIT_ADMIN_DEBUG_PER_MIN || 30),
+      windowSeconds: 60,
+      strict: true,
+    });
+    if (!rl.ok) {
+      return NextResponse.json(
+        { ok: false, error: "RATE_LIMIT" },
+        { status: rl.status, headers: { "Retry-After": String(rl.retryAfterSeconds) } }
+      );
     }
 
     await requireRole("owner");

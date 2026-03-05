@@ -82,6 +82,25 @@ test.describe("api route guardrails", () => {
     expect(code.includes('requireRole("admin")')).toBeTruthy();
   });
 
+  test("sensitive admin GET routes include explicit rate limiting", () => {
+    const routes = [
+      "src/app/api/admin/audit/export/route.ts",
+      "src/app/api/admin/billing/invoices/route.ts",
+      "src/app/api/admin/billing/status/route.ts",
+      "src/app/api/admin/db-index-audit/route.ts",
+      "src/app/api/admin/dbinfo/route.ts",
+      "src/app/api/admin/debug/route.ts",
+      "src/app/api/admin/retention/run/route.ts",
+      "src/app/api/admin/security/keys/route.ts",
+      "src/app/api/admin/upload/route.ts",
+    ];
+    for (const route of routes) {
+      const code = src(route);
+      expect(code.includes("enforceGlobalApiRateLimit(")).toBeTruthy();
+      expect(code.includes("strict: true")).toBeTruthy();
+    }
+  });
+
   test("cron unauthorized responses do not include setup hints", () => {
     const files = routeFiles().filter((f) => f.includes("src/app/api/cron/"));
     const findings: string[] = [];

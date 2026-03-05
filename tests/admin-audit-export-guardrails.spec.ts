@@ -7,6 +7,8 @@ test.describe("admin audit export guardrails", () => {
     expect(code.includes("Export failed: ${msg}")).toBeFalsy();
     expect(code.includes("err instanceof Error ? err.message : \"unknown error\"")).toBeFalsy();
     expect(code.includes("return new Response(\"Export failed.\", { status: 500 });")).toBeTruthy();
+    expect(code.includes("enforceGlobalApiRateLimit(")).toBeTruthy();
+    expect(code.includes("RATE_LIMIT_ADMIN_AUDIT_EXPORT_PER_MIN")).toBeTruthy();
     expect(code.includes("const type = parseExportType(url.searchParams.get(\"type\"));")).toBeTruthy();
     expect(code.includes("if (msg === \"UNAUTHENTICATED\")")).toBeTruthy();
   });

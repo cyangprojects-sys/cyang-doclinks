@@ -1,6 +1,7 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { requireRole } from "@/lib/authz";
+import { enforceGlobalApiRateLimit } from "@/lib/securityTelemetry";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -27,8 +28,22 @@ type MissingFkIndexRow = {
   suggested_index: string;
 };
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    const rl = await enforceGlobalApiRateLimit({
+      req,
+      scope: "ip:admin_db_index_audit",
+      limit: Number(process.env.RATE_LIMIT_ADMIN_DB_INDEX_AUDIT_PER_MIN || 20),
+      windowSeconds: 60,
+      strict: true,
+    });
+    if (!rl.ok) {
+      return NextResponse.json(
+        { ok: false, error: "RATE_LIMIT" },
+        { status: rl.status, headers: { "Retry-After": String(rl.retryAfterSeconds) } }
+      );
+    }
+
     await requireRole("owner");
 
     const seqScanRisk = (await sql`

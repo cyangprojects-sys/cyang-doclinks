@@ -6,6 +6,8 @@ test.describe("admin billing api guardrails", () => {
     const code = readFileSync("src/app/api/admin/billing/invoices/route.ts", "utf8");
     expect(code.includes("safeStripeRedirectUrl")).toBeTruthy();
     expect(code.includes("safeInvoiceUrl(")).toBeTruthy();
+    expect(code.includes("enforceGlobalApiRateLimit(")).toBeTruthy();
+    expect(code.includes("RATE_LIMIT_ADMIN_BILLING_INVOICES_PER_MIN")).toBeTruthy();
     expect(code.includes('error: "UNAUTHENTICATED"')).toBeTruthy();
     expect(code.includes('error: "FORBIDDEN"')).toBeTruthy();
   });
@@ -13,6 +15,8 @@ test.describe("admin billing api guardrails", () => {
   test("billing status route distinguishes unauthenticated from forbidden", () => {
     const code = readFileSync("src/app/api/admin/billing/status/route.ts", "utf8");
     expect(code.includes("authErrorCode(")).toBeTruthy();
+    expect(code.includes("enforceGlobalApiRateLimit(")).toBeTruthy();
+    expect(code.includes("RATE_LIMIT_ADMIN_BILLING_STATUS_PER_MIN")).toBeTruthy();
     expect(code.includes('error: "UNAUTHENTICATED"')).toBeTruthy();
     expect(code.includes('error: "FORBIDDEN"')).toBeTruthy();
   });

@@ -5,8 +5,23 @@ import { NextResponse, type NextRequest } from "next/server";
 import { cronUnauthorizedResponse, isCronAuthorized } from "@/lib/cronAuth";
 import { processKeyRotationJobs } from "@/lib/keyRotationJobs";
 import { logCronRun } from "@/lib/cronTelemetry";
+import { enforceGlobalApiRateLimit } from "@/lib/securityTelemetry";
 
 export async function GET(req: NextRequest) {
+  const rl = await enforceGlobalApiRateLimit({
+    req,
+    scope: "ip:cron_key_rotation",
+    limit: Number(process.env.RATE_LIMIT_CRON_KEY_ROTATION_PER_MIN || 30),
+    windowSeconds: 60,
+    strict: true,
+  });
+  if (!rl.ok) {
+    return NextResponse.json(
+      { ok: false, error: "RATE_LIMIT" },
+      { status: rl.status, headers: { "Retry-After": String(rl.retryAfterSeconds) } }
+    );
+  }
+
   if (!isCronAuthorized(req)) {
     return cronUnauthorizedResponse();
   }
