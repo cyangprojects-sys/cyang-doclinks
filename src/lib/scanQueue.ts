@@ -1,13 +1,47 @@
 // src/lib/scanQueue.ts
 import { sql } from "@/lib/db";
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const MAX_BUCKET_LEN = 128;
+const MAX_KEY_LEN = 1024;
+
+function assertDbConfigured() {
+  if (!String(process.env.DATABASE_URL || "").trim()) {
+    throw new Error("Missing DATABASE_URL");
+  }
+}
+
+function normalizeUuidOrNull(value: unknown): string | null {
+  const s = String(value || "").trim();
+  if (!s) return null;
+  return UUID_RE.test(s) ? s : null;
+}
+
+function normalizeTextOrNull(value: unknown, maxLen: number): string | null {
+  const s = String(value || "").trim();
+  if (!s) return null;
+  return s.slice(0, maxLen);
+}
+
+function boundedInt(raw: unknown, fallback: number, min: number, max: number): number {
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(max, Math.max(min, Math.floor(n)));
+}
+
 /**
  * Enqueue a malware scan job for a doc (idempotent).
  * - Creates/updates malware_scan_jobs for the doc
  * - Sets docs.scan_status to 'pending' (best-effort)
  */
 export async function enqueueDocScan(opts: { docId: string; bucket: string; key: string }) {
-  const { docId, bucket, key } = opts;
+  assertDbConfigured();
+  const docId = normalizeUuidOrNull(opts.docId);
+  const bucket = normalizeTextOrNull(opts.bucket, MAX_BUCKET_LEN);
+  const key = normalizeTextOrNull(opts.key, MAX_KEY_LEN);
+  if (!docId) throw new Error("INVALID_DOC_ID");
+  if (!bucket) throw new Error("INVALID_BUCKET");
+  if (!key) throw new Error("INVALID_KEY");
 
   // Idempotent insert/update by doc_id unique index.
   await sql`
@@ -40,10 +74,12 @@ export async function healScanQueue(args?: {
   retryBaseMinutes?: number;
   retryMaxMinutes?: number;
 }) {
-  const runningTimeout = Math.max(1, Number(args?.runningTimeoutMinutes ?? process.env.SCAN_RUNNING_TIMEOUT_MINUTES ?? 20));
-  const maxAttempts = Math.max(1, Number(args?.maxAttempts ?? process.env.SCAN_MAX_ATTEMPTS ?? 5));
-  const retryBase = Math.max(1, Number(args?.retryBaseMinutes ?? process.env.SCAN_RETRY_BASE_MINUTES ?? 5));
-  const retryMax = Math.max(retryBase, Number(args?.retryMaxMinutes ?? process.env.SCAN_RETRY_MAX_MINUTES ?? 720));
+  assertDbConfigured();
+  const runningTimeout = boundedInt(args?.runningTimeoutMinutes ?? process.env.SCAN_RUNNING_TIMEOUT_MINUTES ?? 20, 20, 1, 240);
+  const maxAttempts = boundedInt(args?.maxAttempts ?? process.env.SCAN_MAX_ATTEMPTS ?? 5, 5, 1, 50);
+  const retryBase = boundedInt(args?.retryBaseMinutes ?? process.env.SCAN_RETRY_BASE_MINUTES ?? 5, 5, 1, 120);
+  const retryMaxRaw = boundedInt(args?.retryMaxMinutes ?? process.env.SCAN_RETRY_MAX_MINUTES ?? 720, 720, 1, 1_440);
+  const retryMax = Math.max(retryBase, retryMaxRaw);
 
   const staleRunning = (await sql`
     with requeue as (
