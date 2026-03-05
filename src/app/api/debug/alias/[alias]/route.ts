@@ -16,6 +16,18 @@ type AliasLookupRow = {
   created_at: string | null;
 };
 
+function normalizeAliasParam(rawAlias: string): string | null {
+  let decoded = "";
+  try {
+    decoded = decodeURIComponent(rawAlias || "").trim().toLowerCase();
+  } catch {
+    return null;
+  }
+  if (!decoded) return "";
+  if (!/^[a-z0-9_-]{3,80}$/.test(decoded)) return null;
+  return decoded;
+}
+
 export async function GET(
   _req: Request,
   context: { params: Promise<{ alias: string }> }
@@ -35,13 +47,16 @@ export async function GET(
   }
 
   const { alias: rawAlias } = await context.params;
-  const alias = decodeURIComponent(rawAlias || "").trim().toLowerCase();
+  const alias = normalizeAliasParam(rawAlias || "");
 
-  if (!alias) {
+  if (alias === "") {
     return NextResponse.json(
       { ok: false, error: "missing_alias" },
       { status: 400 }
     );
+  }
+  if (!alias) {
+    return NextResponse.json({ ok: false, error: "INVALID_ALIAS" }, { status: 400 });
   }
 
   let rowDocAliases: AliasLookupRow[] = [];

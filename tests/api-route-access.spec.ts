@@ -13,5 +13,15 @@ test.describe("api route access controls (static)", () => {
     expect(code.includes("isDebugApiEnabled()")).toBeTruthy();
     expect(code.includes("UNAUTHENTICATED")).toBeTruthy();
     expect(code.includes("FORBIDDEN")).toBeTruthy();
+    expect(code.includes("normalizeAliasParam(")).toBeTruthy();
+    expect(code.includes("INVALID_ALIAS")).toBeTruthy();
+  });
+
+  test("admin dbinfo endpoint enforces owner auth with explicit auth errors", () => {
+    const code = readFileSync("src/app/api/admin/dbinfo/route.ts", "utf8");
+    expect(code.includes("isDebugApiEnabled()")).toBeTruthy();
+    expect(code.includes('await requireRole("owner")')).toBeTruthy();
+    expect(code.includes("UNAUTHENTICATED")).toBeTruthy();
+    expect(code.includes("FORBIDDEN")).toBeTruthy();
   });
 });

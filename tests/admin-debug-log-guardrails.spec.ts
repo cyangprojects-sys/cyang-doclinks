@@ -8,5 +8,7 @@ test.describe("admin debug log guardrails", () => {
     expect(code.includes("console.warn(\"ADMIN DEBUG ERROR\")")).toBeTruthy();
     expect(code.includes("Debug inspection failed:")).toBeFalsy();
     expect(code.includes("message: \"Debug inspection failed.\"")).toBeTruthy();
+    expect(code.includes('error: "UNAUTHENTICATED"')).toBeTruthy();
+    expect(code.includes('error: "FORBIDDEN"')).toBeTruthy();
   });
 });

@@ -15,19 +15,31 @@ export async function GET() {
   if (!isDebugApiEnabled()) {
     return NextResponse.json({ ok: false, error: "NOT_FOUND" }, { status: 404 });
   }
-  await requireRole("owner");
+  try {
+    await requireRole("owner");
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : "";
+    if (msg === "UNAUTHENTICATED") {
+      return NextResponse.json({ ok: false, error: "UNAUTHENTICATED" }, { status: 401 });
+    }
+    return NextResponse.json({ ok: false, error: "FORBIDDEN" }, { status: 403 });
+  }
 
-  const tables = {
-    "public.doc_audit": Boolean(await regclass("public.doc_audit")),
-    "public.doc_access_log": Boolean(await regclass("public.doc_access_log")),
-    "public.doc_views": Boolean(await regclass("public.doc_views")),
-    "public.docs": Boolean(await regclass("public.docs")),
-    "public.documents": Boolean(await regclass("public.documents")),
-  };
+  try {
+    const tables = {
+      "public.doc_audit": Boolean(await regclass("public.doc_audit")),
+      "public.doc_access_log": Boolean(await regclass("public.doc_access_log")),
+      "public.doc_views": Boolean(await regclass("public.doc_views")),
+      "public.docs": Boolean(await regclass("public.docs")),
+      "public.documents": Boolean(await regclass("public.documents")),
+    };
 
-  return NextResponse.json({
-    ok: true,
-    now: new Date().toISOString(),
-    tables,
-  });
+    return NextResponse.json({
+      ok: true,
+      now: new Date().toISOString(),
+      tables,
+    });
+  } catch {
+    return NextResponse.json({ ok: false, error: "SERVER_ERROR" }, { status: 500 });
+  }
 }
