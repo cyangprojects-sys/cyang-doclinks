@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requirePermission } from "@/lib/rbac";
 import { migrateLegacyEncryptionBatch } from "@/lib/encryptionMigration";
-import { logSecurityEvent } from "@/lib/securityTelemetry";
+import { enforceGlobalApiRateLimit, logSecurityEvent } from "@/lib/securityTelemetry";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -22,6 +22,19 @@ function parseJsonBodyLength(req: Request): number {
 
 export async function POST(req: Request) {
   try {
+    const rl = await enforceGlobalApiRateLimit({
+      req,
+      scope: "ip:admin_security_migrate_legacy",
+      limit: Number(process.env.RATE_LIMIT_ADMIN_SECURITY_MIGRATE_PER_MIN || 60),
+      windowSeconds: 60,
+      strict: true,
+    });
+    if (!rl.ok) {
+      return NextResponse.json(
+        { ok: false, error: "RATE_LIMIT" },
+        { status: rl.status, headers: { "Retry-After": String(rl.retryAfterSeconds) } }
+      );
+    }
     if (parseJsonBodyLength(req) > MAX_SECURITY_MIGRATE_BODY_BYTES) {
       return NextResponse.json({ ok: false, error: "PAYLOAD_TOO_LARGE" }, { status: 413 });
     }

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/authz";
 import { sql } from "@/lib/db";
-import { logSecurityEvent } from "@/lib/securityTelemetry";
+import { enforceGlobalApiRateLimit, logSecurityEvent } from "@/lib/securityTelemetry";
 import { resolvePublicAppBaseUrl } from "@/lib/publicBaseUrl";
 
 export const runtime = "nodejs";
@@ -23,6 +23,16 @@ export async function POST(req: Request) {
   }
 
   try {
+    const rl = await enforceGlobalApiRateLimit({
+      req,
+      scope: "ip:admin_security_requeue_scans",
+      limit: Number(process.env.RATE_LIMIT_ADMIN_SECURITY_REQUEUE_PER_MIN || 30),
+      windowSeconds: 60,
+      strict: true,
+    });
+    if (!rl.ok) {
+      return NextResponse.redirect(new URL("/admin/security?error=RATE_LIMIT", appBaseUrl), { status: 303 });
+    }
     const u = await requireRole("owner");
     if (parseBodyLength(req) > MAX_REQUEUE_SCANS_BODY_BYTES) {
       return NextResponse.redirect(new URL("/admin/security?error=PAYLOAD_TOO_LARGE", appBaseUrl), { status: 303 });

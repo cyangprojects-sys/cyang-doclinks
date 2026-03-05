@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/authz";
 import { getSecurityFreezeSettings, setSecurityFreezeSettings } from "@/lib/settings";
 import { appendImmutableAudit } from "@/lib/immutableAudit";
-import { logSecurityEvent } from "@/lib/securityTelemetry";
+import { enforceGlobalApiRateLimit, logSecurityEvent } from "@/lib/securityTelemetry";
 import { resolvePublicAppBaseUrl } from "@/lib/publicBaseUrl";
 
 export const runtime = "nodejs";
@@ -42,6 +42,22 @@ export async function POST(req: Request) {
   }
 
   try {
+    const rl = await enforceGlobalApiRateLimit({
+      req,
+      scope: "ip:admin_security_freeze",
+      limit: Number(process.env.RATE_LIMIT_ADMIN_SECURITY_FREEZE_PER_MIN || 60),
+      windowSeconds: 60,
+      strict: true,
+    });
+    if (!rl.ok) {
+      if (ct.includes("application/json")) {
+        return NextResponse.json(
+          { ok: false, error: "RATE_LIMIT" },
+          { status: rl.status, headers: { "Retry-After": String(rl.retryAfterSeconds) } }
+        );
+      }
+      return NextResponse.redirect(new URL("/admin/security?error=RATE_LIMIT", appBaseUrl), { status: 303 });
+    }
     if (parseJsonBodyLength(req) > MAX_SECURITY_FREEZE_BODY_BYTES) {
       if (ct.includes("application/json")) {
         return NextResponse.json({ ok: false, error: "PAYLOAD_TOO_LARGE" }, { status: 413 });

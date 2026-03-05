@@ -3,7 +3,7 @@ import { z } from "zod";
 import { requirePermission } from "@/lib/rbac";
 import { sql } from "@/lib/db";
 import { setActiveMasterKey } from "@/lib/masterKeys";
-import { logSecurityEvent } from "@/lib/securityTelemetry";
+import { enforceGlobalApiRateLimit, logSecurityEvent } from "@/lib/securityTelemetry";
 import { appendImmutableAudit } from "@/lib/immutableAudit";
 
 export const runtime = "nodejs";
@@ -23,6 +23,19 @@ function parseJsonBodyLength(req: Request): number {
 
 export async function POST(req: Request) {
   try {
+    const rl = await enforceGlobalApiRateLimit({
+      req,
+      scope: "ip:admin_security_rollback",
+      limit: Number(process.env.RATE_LIMIT_ADMIN_SECURITY_KEY_OPS_PER_MIN || 120),
+      windowSeconds: 60,
+      strict: true,
+    });
+    if (!rl.ok) {
+      return NextResponse.json(
+        { ok: false, error: "RATE_LIMIT" },
+        { status: rl.status, headers: { "Retry-After": String(rl.retryAfterSeconds) } }
+      );
+    }
     if (parseJsonBodyLength(req) > MAX_SECURITY_ROLLBACK_BODY_BYTES) {
       return NextResponse.json({ ok: false, error: "PAYLOAD_TOO_LARGE" }, { status: 413 });
     }

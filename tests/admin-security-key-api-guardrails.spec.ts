@@ -42,6 +42,8 @@ test.describe("admin security key api guardrails", () => {
       const code = readFileSync(file, "utf8");
       expect(code.includes("parseJsonBodyLength")).toBeTruthy();
       expect(code.includes('error: "PAYLOAD_TOO_LARGE"')).toBeTruthy();
+      expect(code.includes("enforceGlobalApiRateLimit(")).toBeTruthy();
+      expect(code.includes("RATE_LIMIT")).toBeTruthy();
     }
   });
 });

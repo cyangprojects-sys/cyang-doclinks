@@ -5,7 +5,7 @@ import { NextResponse } from "next/server";
 import { requirePermission } from "@/lib/rbac";
 import { clearViewLimitOverride, setViewLimitOverride } from "@/lib/viewLimitOverride";
 import { appendImmutableAudit } from "@/lib/immutableAudit";
-import { logSecurityEvent } from "@/lib/securityTelemetry";
+import { enforceGlobalApiRateLimit, logSecurityEvent } from "@/lib/securityTelemetry";
 import { resolvePublicAppBaseUrl } from "@/lib/publicBaseUrl";
 const MAX_BILLING_OVERRIDE_FORM_BYTES = 8 * 1024;
 
@@ -21,6 +21,16 @@ export async function POST(req: Request) {
     appBaseUrl = resolvePublicAppBaseUrl(req.url);
   } catch {
     return NextResponse.json({ ok: false, error: "ENV_MISCONFIGURED" }, { status: 500 });
+  }
+  const rl = await enforceGlobalApiRateLimit({
+    req,
+    scope: "ip:admin_billing_view_override",
+    limit: Number(process.env.RATE_LIMIT_ADMIN_BILLING_OVERRIDE_PER_MIN || 60),
+    windowSeconds: 60,
+    strict: true,
+  });
+  if (!rl.ok) {
+    return NextResponse.redirect(new URL("/admin/billing?error=RATE_LIMIT", appBaseUrl), { status: 303 });
   }
 
   try {

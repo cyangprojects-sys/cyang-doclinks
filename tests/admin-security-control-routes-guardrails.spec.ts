@@ -11,6 +11,8 @@ test.describe("admin security control route guardrails", () => {
       const code = readFileSync(file, "utf8");
       expect(code.includes("parseJsonBodyLength(")).toBeTruthy();
       expect(code.includes('error: "PAYLOAD_TOO_LARGE"')).toBeTruthy();
+      expect(code.includes("enforceGlobalApiRateLimit(")).toBeTruthy();
+      expect(code.includes("RATE_LIMIT")).toBeTruthy();
     }
   });
 
@@ -18,5 +20,7 @@ test.describe("admin security control route guardrails", () => {
     const code = readFileSync("src/app/api/admin/security/requeue-scans/route.ts", "utf8");
     expect(code.includes("parseBodyLength(")).toBeTruthy();
     expect(code.includes('error=PAYLOAD_TOO_LARGE')).toBeTruthy();
+    expect(code.includes("enforceGlobalApiRateLimit(")).toBeTruthy();
+    expect(code.includes("RATE_LIMIT")).toBeTruthy();
   });
 });

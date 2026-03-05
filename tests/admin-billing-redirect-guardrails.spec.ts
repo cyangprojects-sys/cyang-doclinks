@@ -17,6 +17,8 @@ test.describe("admin billing redirect guardrails", () => {
       const code = readFileSync(file, "utf8");
       expect(code.includes("parseFormBodyLength(")).toBeTruthy();
       expect(code.includes("PAYLOAD_TOO_LARGE")).toBeTruthy();
+      expect(code.includes("enforceGlobalApiRateLimit(")).toBeTruthy();
+      expect(code.includes("RATE_LIMIT")).toBeTruthy();
     }
   });
 });

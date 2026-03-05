@@ -5,7 +5,7 @@ import { DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { sql } from "@/lib/db";
 import { r2Client } from "@/lib/r2";
 import { requireDocWrite, requireUser } from "@/lib/authz";
-import { clientIpKey, logSecurityEvent } from "@/lib/securityTelemetry";
+import { clientIpKey, enforceGlobalApiRateLimit, logSecurityEvent } from "@/lib/securityTelemetry";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -24,6 +24,19 @@ function parseJsonBodyLength(req: NextRequest): number {
 export async function POST(req: NextRequest) {
   const ipInfo = clientIpKey(req);
   try {
+    const rl = await enforceGlobalApiRateLimit({
+      req,
+      scope: "ip:admin_upload_abort",
+      limit: Number(process.env.RATE_LIMIT_ADMIN_UPLOAD_ABORT_PER_MIN || 120),
+      windowSeconds: 60,
+      strict: true,
+    });
+    if (!rl.ok) {
+      return NextResponse.json(
+        { ok: false, error: "RATE_LIMIT" },
+        { status: rl.status, headers: { "Retry-After": String(rl.retryAfterSeconds) } }
+      );
+    }
     if (parseJsonBodyLength(req) > MAX_UPLOAD_ABORT_BODY_BYTES) {
       return NextResponse.json({ ok: false, error: "PAYLOAD_TOO_LARGE" }, { status: 413 });
     }

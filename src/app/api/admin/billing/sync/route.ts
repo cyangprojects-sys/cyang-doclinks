@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requirePermission } from "@/lib/rbac";
 import { runBillingMaintenance } from "@/lib/billingSubscription";
 import { appendImmutableAudit } from "@/lib/immutableAudit";
-import { logSecurityEvent } from "@/lib/securityTelemetry";
+import { enforceGlobalApiRateLimit, logSecurityEvent } from "@/lib/securityTelemetry";
 import { getRouteTimeoutMs, isRouteTimeoutError, withRouteTimeout } from "@/lib/routeTimeout";
 import { assertRuntimeEnv, isRuntimeEnvError } from "@/lib/runtimeEnv";
 import { resolvePublicAppBaseUrl } from "@/lib/publicBaseUrl";
@@ -23,6 +23,16 @@ export async function POST(req: NextRequest) {
     appBaseUrl = resolvePublicAppBaseUrl(req.url);
   } catch {
     return NextResponse.json({ ok: false, error: "ENV_MISCONFIGURED" }, { status: 500 });
+  }
+  const rl = await enforceGlobalApiRateLimit({
+    req,
+    scope: "ip:admin_billing_sync",
+    limit: Number(process.env.RATE_LIMIT_ADMIN_BILLING_SYNC_PER_MIN || 30),
+    windowSeconds: 60,
+    strict: true,
+  });
+  if (!rl.ok) {
+    return NextResponse.redirect(new URL("/admin/billing/stripe?error=RATE_LIMIT", appBaseUrl), { status: 303 });
   }
 
   const timeoutMs = getRouteTimeoutMs("ROUTE_TIMEOUT_BILLING_SYNC_MS", 30_000);

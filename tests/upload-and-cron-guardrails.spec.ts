@@ -16,11 +16,15 @@ test.describe("upload and cron guardrails", () => {
     const code = readFileSync("src/app/api/admin/upload/abort/route.ts", "utf8");
     expect(code.includes("parseJsonBodyLength(")).toBeTruthy();
     expect(code.includes('error: "PAYLOAD_TOO_LARGE"')).toBeTruthy();
+    expect(code.includes("enforceGlobalApiRateLimit(")).toBeTruthy();
+    expect(code.includes("RATE_LIMIT")).toBeTruthy();
   });
 
   test("viewer billing checkout route uses auth error classification helper", () => {
     const code = readFileSync("src/app/api/billing/checkout/route.ts", "utf8");
     expect(code.includes("authErrorCode(")).toBeTruthy();
+    expect(code.includes("enforceGlobalApiRateLimit(")).toBeTruthy();
+    expect(code.includes("RATE_LIMIT")).toBeTruthy();
   });
 
   test("cron aggregate validates daysBack and fails closed on invalid values", () => {

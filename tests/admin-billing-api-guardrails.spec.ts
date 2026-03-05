@@ -25,6 +25,8 @@ test.describe("admin billing api guardrails", () => {
     ]) {
       const code = readFileSync(file, "utf8");
       expect(code.includes("authErrorCode(")).toBeTruthy();
+      expect(code.includes("enforceGlobalApiRateLimit(")).toBeTruthy();
+      expect(code.includes("RATE_LIMIT")).toBeTruthy();
     }
   });
 

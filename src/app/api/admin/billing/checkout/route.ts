@@ -6,7 +6,7 @@ import { requirePermission } from "@/lib/rbac";
 import { sql } from "@/lib/db";
 import { ensureStripeCustomer, safeStripeRedirectUrl, stripeApi } from "@/lib/stripeClient";
 import { appendImmutableAudit } from "@/lib/immutableAudit";
-import { logSecurityEvent } from "@/lib/securityTelemetry";
+import { enforceGlobalApiRateLimit, logSecurityEvent } from "@/lib/securityTelemetry";
 import { getRouteTimeoutMs, isRouteTimeoutError, withRouteTimeout } from "@/lib/routeTimeout";
 import { assertRuntimeEnv, isRuntimeEnvError } from "@/lib/runtimeEnv";
 import { resolvePublicAppBaseUrl } from "@/lib/publicBaseUrl";
@@ -59,6 +59,16 @@ export async function POST(req: NextRequest) {
     appBaseUrl = resolvePublicAppBaseUrl(req.url);
   } catch {
     return NextResponse.json({ ok: false, error: "ENV_MISCONFIGURED" }, { status: 500 });
+  }
+  const rl = await enforceGlobalApiRateLimit({
+    req,
+    scope: "ip:admin_billing_checkout",
+    limit: Number(process.env.RATE_LIMIT_ADMIN_BILLING_CHECKOUT_PER_MIN || 60),
+    windowSeconds: 60,
+    strict: true,
+  });
+  if (!rl.ok) {
+    return NextResponse.redirect(new URL("/admin/billing?error=RATE_LIMIT", appBaseUrl), { status: 303 });
   }
 
   const timeoutMs = getRouteTimeoutMs("ROUTE_TIMEOUT_BILLING_CHECKOUT_MS", 15_000);

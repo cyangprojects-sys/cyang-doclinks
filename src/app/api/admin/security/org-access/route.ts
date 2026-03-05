@@ -9,7 +9,7 @@ import {
   upsertMembership,
 } from "@/lib/orgMembership";
 import { sql } from "@/lib/db";
-import { logSecurityEvent } from "@/lib/securityTelemetry";
+import { enforceGlobalApiRateLimit, logSecurityEvent } from "@/lib/securityTelemetry";
 import { resolvePublicAppBaseUrl } from "@/lib/publicBaseUrl";
 
 export const runtime = "nodejs";
@@ -66,6 +66,17 @@ export async function POST(req: Request) {
   }
 
   try {
+    const rl = await enforceGlobalApiRateLimit({
+      req,
+      scope: "ip:admin_security_org_access",
+      limit: Number(process.env.RATE_LIMIT_ADMIN_SECURITY_ORG_ACCESS_PER_MIN || 60),
+      windowSeconds: 60,
+      strict: true,
+    });
+    if (!rl.ok) {
+      return NextResponse.redirect(new URL("/admin/security?error=RATE_LIMIT", appBaseUrl), { status: 303 });
+    }
+
     const u = await requireOwnerInOrg();
     if (!(await orgMembershipTablesReady())) {
       return NextResponse.json({ ok: false, error: "TABLES_MISSING" }, { status: 409 });

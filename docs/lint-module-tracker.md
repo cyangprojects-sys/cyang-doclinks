@@ -193,6 +193,23 @@ Remaining resweep modules in current pass: 0
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\viewer\office\route.ts` (resweep: runtime oversized-payload coverage)
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\v1\webhooks\test\route.ts` (resweep: runtime oversized-payload coverage)
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\stripe\webhook\route.ts` (resweep: runtime oversized-payload coverage)
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\billing\checkout\route.ts` (resweep: explicit per-IP throttle)
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\billing\checkout\route.ts` (resweep: explicit per-IP throttle)
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\billing\portal\route.ts` (resweep: explicit per-IP throttle)
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\billing\sync\route.ts` (resweep: explicit per-IP throttle)
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\billing\route.ts` (resweep: explicit per-IP throttle)
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\billing\view-override\route.ts` (resweep: explicit per-IP throttle)
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\security\activate\route.ts` (resweep: explicit per-IP throttle)
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\security\revoke\route.ts` (resweep: explicit per-IP throttle)
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\security\rotate\route.ts` (resweep: explicit per-IP throttle)
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\security\rollback\route.ts` (resweep: explicit per-IP throttle)
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\security\migrate-legacy\route.ts` (resweep: explicit per-IP throttle)
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\security\freeze\route.ts` (resweep: explicit per-IP throttle)
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\security\rbac\route.ts` (resweep: explicit per-IP throttle)
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\security\tenant-freeze\route.ts` (resweep: explicit per-IP throttle)
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\security\org-access\route.ts` (resweep: explicit per-IP throttle)
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\security\requeue-scans\route.ts` (resweep: explicit per-IP throttle)
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\upload\abort\route.ts` (resweep: explicit per-IP throttle)
 
 ## Stale actions removed
 

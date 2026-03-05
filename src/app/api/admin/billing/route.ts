@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import { requirePermission } from "@/lib/rbac";
+import { enforceGlobalApiRateLimit } from "@/lib/securityTelemetry";
 import { setBillingFlags, getBillingFlags } from "@/lib/settings";
 import { resolvePublicAppBaseUrl } from "@/lib/publicBaseUrl";
 const MAX_BILLING_SETTINGS_FORM_BYTES = 8 * 1024;
@@ -28,6 +29,18 @@ export async function GET() {
 
 export async function POST(req: Request) {
   const base = resolvePublicAppBaseUrl(req.url);
+  const rl = await enforceGlobalApiRateLimit({
+    req,
+    scope: "ip:admin_billing_settings",
+    limit: Number(process.env.RATE_LIMIT_ADMIN_BILLING_SETTINGS_PER_MIN || 60),
+    windowSeconds: 60,
+    strict: true,
+  });
+  if (!rl.ok) {
+    const url = new URL("/admin/billing", base);
+    url.searchParams.set("error", "RATE_LIMIT");
+    return NextResponse.redirect(url, { status: 303 });
+  }
 
   try {
     await requirePermission("billing.manage");
