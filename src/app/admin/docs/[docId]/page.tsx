@@ -76,6 +76,7 @@ export default async function AdminDocDetailPage({
   if (!docId) notFound();
 
   const canSeeAll = roleAtLeast(u.role, "admin");
+  const isViewer = !canSeeAll;
   const hasDocs = await tableExists("public.docs");
   if (!hasDocs) notFound();
 
@@ -194,8 +195,8 @@ export default async function AdminDocDetailPage({
   views30 = sparkVals.reduce((a, b) => a + b, 0);
   views7 = sparkVals.slice(-7).reduce((a, b) => a + b, 0);
 
-  // Shares list + counts
-  const hasShareTokens = await tableExists("public.share_tokens");
+  // Shares list + counts (viewer mode keeps this hidden/read-only by design)
+  const hasShareTokens = !isViewer && (await tableExists("public.share_tokens"));
   type ShareRow = {
     token: string;
     created_at: string | null;
@@ -234,10 +235,10 @@ export default async function AdminDocDetailPage({
     }
   }
 
-  // IP breakdown (top 10) from doc_views (best-effort)
+  // IP breakdown (top 10) from doc_views (best-effort, admin+owner only)
   type IpRow = { ip_hash: string; views: number };
   let ipRows: IpRow[] = [];
-  if (hasDocViews) {
+  if (!isViewer && hasDocViews) {
     try {
       ipRows = (await sql`
         select
@@ -266,7 +267,7 @@ export default async function AdminDocDetailPage({
         <div className="flex items-center gap-2">
           <Link
             className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-white hover:bg-white/15"
-            href="/admin/dashboard"
+            href="/admin/documents"
           >
             ← Back
           </Link>
@@ -302,83 +303,85 @@ export default async function AdminDocDetailPage({
           <div className="mt-2 text-xs text-white/60">
             Expires: {fmtDate(aliasExpires)} • Active: {String(aliasActive ?? true)} • Revoked: {fmtDate(aliasRevokedAt)}
           </div>
-          <div className="mt-3 space-y-2">
-            <form action={createOrAssignAliasAction} className="flex flex-wrap items-end gap-2">
-              <input type="hidden" name="docId" value={docId} />
-              <label className="text-xs text-neutral-400">
-                Create alias
-                <input
-                  aria-label="Create alias"
-                  name="alias"
-                  placeholder="new-alias"
-                  className="mt-1 w-40 rounded-md border border-neutral-700 bg-black/40 px-2 py-1 text-xs text-neutral-100"
-                />
-              </label>
-              <label className="text-xs text-neutral-400">
-                TTL days
-                <input
-                  aria-label="Alias TTL days"
-                  type="number"
-                  name="expiresDays"
-                  min={1}
-                  max={365}
-                  defaultValue={30}
-                  className="mt-1 w-20 rounded-md border border-neutral-700 bg-black/40 px-2 py-1 text-xs text-neutral-100"
-                />
-              </label>
-              <button type="submit" className="rounded-md border border-white/20 bg-white/10 px-2 py-1 text-xs text-white">
-                Create
-              </button>
-            </form>
-
-            {alias ? (
-              <form action={renameDocAliasAction} className="flex flex-wrap items-end gap-2">
+          {!isViewer ? (
+            <div className="mt-3 space-y-2">
+              <form action={createOrAssignAliasAction} className="flex flex-wrap items-end gap-2">
                 <input type="hidden" name="docId" value={docId} />
                 <label className="text-xs text-neutral-400">
-                  Rename alias
+                  Create alias
                   <input
-                    aria-label="Rename alias"
-                    name="newAlias"
-                    defaultValue={alias}
-                    className="mt-1 w-44 rounded-md border border-neutral-700 bg-black/40 px-2 py-1 text-xs text-neutral-100"
+                    aria-label="Create alias"
+                    name="alias"
+                    placeholder="new-alias"
+                    className="mt-1 w-40 rounded-md border border-neutral-700 bg-black/40 px-2 py-1 text-xs text-neutral-100"
+                  />
+                </label>
+                <label className="text-xs text-neutral-400">
+                  TTL days
+                  <input
+                    aria-label="Alias TTL days"
+                    type="number"
+                    name="expiresDays"
+                    min={1}
+                    max={365}
+                    defaultValue={30}
+                    className="mt-1 w-20 rounded-md border border-neutral-700 bg-black/40 px-2 py-1 text-xs text-neutral-100"
                   />
                 </label>
                 <button type="submit" className="rounded-md border border-white/20 bg-white/10 px-2 py-1 text-xs text-white">
-                  Rename
+                  Create
                 </button>
               </form>
-            ) : null}
 
-            <form action={setAliasExpirationAction} className="flex flex-wrap items-end gap-2">
-              <input type="hidden" name="docId" value={docId} />
-              <label className="text-xs text-neutral-400">
-                Set expiration (days)
-                <input
-                  aria-label="Set alias expiration days"
-                  type="number"
-                  name="days"
-                  min={1}
-                  max={365}
-                  defaultValue={30}
-                  className="mt-1 w-20 rounded-md border border-neutral-700 bg-black/40 px-2 py-1 text-xs text-neutral-100"
-                />
-              </label>
-              <button type="submit" className="rounded-md border border-white/20 bg-white/10 px-2 py-1 text-xs text-white">
-                Apply
-              </button>
-            </form>
+              {alias ? (
+                <form action={renameDocAliasAction} className="flex flex-wrap items-end gap-2">
+                  <input type="hidden" name="docId" value={docId} />
+                  <label className="text-xs text-neutral-400">
+                    Rename alias
+                    <input
+                      aria-label="Rename alias"
+                      name="newAlias"
+                      defaultValue={alias}
+                      className="mt-1 w-44 rounded-md border border-neutral-700 bg-black/40 px-2 py-1 text-xs text-neutral-100"
+                    />
+                  </label>
+                  <button type="submit" className="rounded-md border border-white/20 bg-white/10 px-2 py-1 text-xs text-white">
+                    Rename
+                  </button>
+                </form>
+              ) : null}
 
-            {canSeeAll ? (
-              <form action={disableAliasForDocAction}>
+              <form action={setAliasExpirationAction} className="flex flex-wrap items-end gap-2">
                 <input type="hidden" name="docId" value={docId} />
-                <button type="submit" className="rounded-md border border-red-900 bg-red-950/40 px-2 py-1 text-xs text-red-200">
-                  Disable alias
+                <label className="text-xs text-neutral-400">
+                  Set expiration (days)
+                  <input
+                    aria-label="Set alias expiration days"
+                    type="number"
+                    name="days"
+                    min={1}
+                    max={365}
+                    defaultValue={30}
+                    className="mt-1 w-20 rounded-md border border-neutral-700 bg-black/40 px-2 py-1 text-xs text-neutral-100"
+                  />
+                </label>
+                <button type="submit" className="rounded-md border border-white/20 bg-white/10 px-2 py-1 text-xs text-white">
+                  Apply
                 </button>
               </form>
-            ) : (
-              <div className="text-xs text-white/55">Admin-only alias controls are hidden for viewers.</div>
-            )}
-          </div>
+
+              {canSeeAll ? (
+                <form action={disableAliasForDocAction}>
+                  <input type="hidden" name="docId" value={docId} />
+                  <button type="submit" className="rounded-md border border-red-900 bg-red-950/40 px-2 py-1 text-xs text-red-200">
+                    Disable alias
+                  </button>
+                </form>
+              ) : null}
+            </div>
+          ) : (
+            <div className="mt-3 text-xs text-white/55">Alias management is available to admins and owners.</div>
+          )}
         </div>
 
         <div className={card}>
@@ -429,80 +432,82 @@ export default async function AdminDocDetailPage({
         </div>
       </section>
 
-      <section className="grid grid-cols-1 gap-3 xl:grid-cols-2">
-        <div className={card}>
-          <h2 className="text-base font-semibold text-white">Share history</h2>
-          <div className="mt-3 overflow-hidden rounded-2xl border border-white/10">
-            <div className="max-h-[560px] overflow-auto">
-            <table className="min-w-[760px] w-full text-sm">
-              <thead className="sticky top-0 bg-[#10192b]/95 text-left text-xs text-white/60 backdrop-blur">
-                <tr>
-                  <th className="py-2 pr-4">Token</th>
-                  <th className="py-2 pr-4">Created</th>
-                  <th className="py-2 pr-4">Expires</th>
-                  <th className="py-2 pr-4">Views</th>
-                  <th className="py-2 pr-4">Max</th>
-                  <th className="py-2 pr-4">Revoked</th>
-                </tr>
-              </thead>
-              <tbody className="text-white/85">
-                {shares.length ? (
-                  shares.map((s) => (
-                    <tr key={s.token} className="border-t border-white/10">
-                      <td className="py-2 pr-4 font-mono text-xs">{s.token.slice(0, 10)}…</td>
-                      <td className="py-2 pr-4">{fmtDate(s.created_at)}</td>
-                      <td className="py-2 pr-4">{fmtDate(s.expires_at)}</td>
-                      <td className="py-2 pr-4">{fmtInt(s.views_count ?? 0)}</td>
-                      <td className="py-2 pr-4">{s.max_views ?? "—"}</td>
-                      <td className="py-2 pr-4">{fmtDate(s.revoked_at)}</td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr className="border-t border-white/10">
-                    <td className="py-3 text-xs text-white/60" colSpan={6}>
-                      No shares found.
-                    </td>
+      {!isViewer ? (
+        <section className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+          <div className={card}>
+            <h2 className="text-base font-semibold text-white">Share history</h2>
+            <div className="mt-3 overflow-hidden rounded-2xl border border-white/10">
+              <div className="max-h-[560px] overflow-auto">
+              <table className="min-w-[760px] w-full text-sm">
+                <thead className="sticky top-0 bg-[#10192b]/95 text-left text-xs text-white/60 backdrop-blur">
+                  <tr>
+                    <th className="py-2 pr-4">Token</th>
+                    <th className="py-2 pr-4">Created</th>
+                    <th className="py-2 pr-4">Expires</th>
+                    <th className="py-2 pr-4">Views</th>
+                    <th className="py-2 pr-4">Max</th>
+                    <th className="py-2 pr-4">Revoked</th>
                   </tr>
-                )}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="text-white/85">
+                  {shares.length ? (
+                    shares.map((s) => (
+                      <tr key={s.token} className="border-t border-white/10">
+                        <td className="py-2 pr-4 font-mono text-xs">{s.token.slice(0, 10)}…</td>
+                        <td className="py-2 pr-4">{fmtDate(s.created_at)}</td>
+                        <td className="py-2 pr-4">{fmtDate(s.expires_at)}</td>
+                        <td className="py-2 pr-4">{fmtInt(s.views_count ?? 0)}</td>
+                        <td className="py-2 pr-4">{s.max_views ?? "—"}</td>
+                        <td className="py-2 pr-4">{fmtDate(s.revoked_at)}</td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr className="border-t border-white/10">
+                      <td className="py-3 text-xs text-white/60" colSpan={6}>
+                        No shares found.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+              </div>
             </div>
           </div>
-        </div>
 
-        <div className={card}>
-          <h2 className="text-base font-semibold text-white">IP breakdown (30d)</h2>
-          <div className="mt-1 text-xs text-white/60">Hashed IPs (privacy-preserving).</div>
-          <div className="mt-3 overflow-hidden rounded-2xl border border-white/10">
-            <div className="max-h-[420px] overflow-auto">
-            <table className="min-w-[520px] w-full text-sm">
-              <thead className="sticky top-0 bg-[#10192b]/95 text-left text-xs text-white/60 backdrop-blur">
-                <tr>
-                  <th className="py-2 pr-4">IP hash</th>
-                  <th className="py-2 pr-4">Views</th>
-                </tr>
-              </thead>
-              <tbody className="text-white/85">
-                {ipRows.length ? (
-                  ipRows.map((r) => (
-                    <tr key={r.ip_hash} className="border-t border-white/10">
-                      <td className="py-2 pr-4 font-mono text-xs">{(r.ip_hash || "—").slice(0, 18)}…</td>
-                      <td className="py-2 pr-4">{fmtInt(r.views)}</td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr className="border-t border-white/10">
-                    <td className="py-3 text-xs text-white/60" colSpan={2}>
-                      No data yet.
-                    </td>
+          <div className={card}>
+            <h2 className="text-base font-semibold text-white">IP breakdown (30d)</h2>
+            <div className="mt-1 text-xs text-white/60">Hashed IPs (privacy-preserving).</div>
+            <div className="mt-3 overflow-hidden rounded-2xl border border-white/10">
+              <div className="max-h-[420px] overflow-auto">
+              <table className="min-w-[520px] w-full text-sm">
+                <thead className="sticky top-0 bg-[#10192b]/95 text-left text-xs text-white/60 backdrop-blur">
+                  <tr>
+                    <th className="py-2 pr-4">IP hash</th>
+                    <th className="py-2 pr-4">Views</th>
                   </tr>
-                )}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="text-white/85">
+                  {ipRows.length ? (
+                    ipRows.map((r) => (
+                      <tr key={r.ip_hash} className="border-t border-white/10">
+                        <td className="py-2 pr-4 font-mono text-xs">{(r.ip_hash || "—").slice(0, 18)}…</td>
+                        <td className="py-2 pr-4">{fmtInt(r.views)}</td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr className="border-t border-white/10">
+                      <td className="py-3 text-xs text-white/60" colSpan={2}>
+                        No data yet.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+              </div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
+      ) : null}
 
       <div className="text-xs text-white/60">
         Note: download counts are not tracked separately yet; current page shows view/access activity only.
