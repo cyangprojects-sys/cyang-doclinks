@@ -94,6 +94,8 @@ test.describe("security freeze controls", () => {
     const databaseUrl = String(process.env.DATABASE_URL || "").trim();
     test.skip(!databaseUrl, "DATABASE_URL not available");
     const sql = neon(databaseUrl);
+    const hasAppSettings = await tableExists(sql, "app_settings");
+    test.skip(!hasAppSettings, "app_settings table not available");
 
     const docId = await pickDocId(sql);
     test.skip(!docId, "No docs available for fixture setup");
@@ -125,6 +127,8 @@ test.describe("security freeze controls", () => {
     const databaseUrl = String(process.env.DATABASE_URL || "").trim();
     test.skip(!databaseUrl, "DATABASE_URL not available");
     const sql = neon(databaseUrl);
+    const hasAppSettings = await tableExists(sql, "app_settings");
+    test.skip(!hasAppSettings, "app_settings table not available");
 
     const hasDocAliases = await tableExists(sql, "doc_aliases");
     test.skip(!hasDocAliases, "doc_aliases table not available");
@@ -155,6 +159,8 @@ test.describe("security freeze controls", () => {
     const databaseUrl = String(process.env.DATABASE_URL || "").trim();
     test.skip(!databaseUrl, "DATABASE_URL not available");
     const sql = neon(databaseUrl);
+    const hasAppSettings = await tableExists(sql, "app_settings");
+    test.skip(!hasAppSettings, "app_settings table not available");
 
     const hasDocAliases = await tableExists(sql, "doc_aliases");
     test.skip(!hasDocAliases, "doc_aliases table not available");
@@ -190,6 +196,8 @@ test.describe("security freeze controls", () => {
     const databaseUrl = String(process.env.DATABASE_URL || "").trim();
     test.skip(!databaseUrl, "DATABASE_URL not available");
     const sql = neon(databaseUrl);
+    const hasAppSettings = await tableExists(sql, "app_settings");
+    test.skip(!hasAppSettings, "app_settings table not available");
     const original = await readFreeze(sql);
 
     try {
@@ -210,6 +218,8 @@ test.describe("security freeze controls", () => {
     const databaseUrl = String(process.env.DATABASE_URL || "").trim();
     test.skip(!databaseUrl, "DATABASE_URL not available");
     const sql = neon(databaseUrl);
+    const hasAppSettings = await tableExists(sql, "app_settings");
+    test.skip(!hasAppSettings, "app_settings table not available");
     const original = await readFreeze(sql);
 
     try {

@@ -4,6 +4,13 @@ import crypto from "node:crypto";
 
 type Sql = ReturnType<typeof neon<false, false>>;
 
+type FreezeSettings = {
+  globalServeDisabled: boolean;
+  shareServeDisabled: boolean;
+  aliasServeDisabled: boolean;
+  ticketServeDisabled: boolean;
+};
+
 function randSuffix(): string {
   return `${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
 }
@@ -154,7 +161,51 @@ async function tableExists(sql: Sql, tableName: string): Promise<boolean> {
   }
 }
 
+async function readSecurityFreeze(sql: Sql): Promise<FreezeSettings | null> {
+  const hasAppSettings = await tableExists(sql, "app_settings");
+  if (!hasAppSettings) return null;
+
+  try {
+    const rows = (await sql`
+      select value
+      from public.app_settings
+      where key = 'security_freeze'
+      limit 1
+    `) as unknown as Array<{ value: unknown }>;
+    const value = (rows?.[0]?.value || {}) as Partial<FreezeSettings>;
+    return {
+      globalServeDisabled: Boolean(value?.globalServeDisabled),
+      shareServeDisabled: Boolean(value?.shareServeDisabled),
+      aliasServeDisabled: Boolean(value?.aliasServeDisabled),
+      ticketServeDisabled: Boolean(value?.ticketServeDisabled),
+    };
+  } catch {
+    return null;
+  }
+}
+
 test.describe("security state enforcement", () => {
+  test.beforeEach(async () => {
+    const databaseUrl = String(process.env.DATABASE_URL || "").trim();
+    test.skip(!databaseUrl, "DATABASE_URL not available");
+    if (!databaseUrl) return;
+
+    const sql = neon(databaseUrl);
+    const freeze = await readSecurityFreeze(sql);
+    if (!freeze) return;
+
+    const enabledFlags: string[] = [];
+    if (freeze.globalServeDisabled) enabledFlags.push("globalServeDisabled");
+    if (freeze.shareServeDisabled) enabledFlags.push("shareServeDisabled");
+    if (freeze.aliasServeDisabled) enabledFlags.push("aliasServeDisabled");
+    if (freeze.ticketServeDisabled) enabledFlags.push("ticketServeDisabled");
+
+    test.skip(
+      enabledFlags.length > 0,
+      `security_freeze is enabled (${enabledFlags.join(", ")}); skipping serve-path assertions in shared CI DB`
+    );
+  });
+
   test("top-level raw navigation is blocked while non-navigation raw access can mint a ticket", async ({ request }) => {
     const databaseUrl = String(process.env.DATABASE_URL || "").trim();
     test.skip(!databaseUrl, "DATABASE_URL not available");
