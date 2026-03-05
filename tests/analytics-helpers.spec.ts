@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { envInt } from "../src/lib/analytics";
+import { aggregateDocViewDaily, envInt } from "../src/lib/analytics";
 
 function setEnv(name: string, value: string | undefined) {
   const env = process.env as Record<string, string | undefined>;
@@ -38,5 +38,28 @@ test.describe("analytics env helpers", () => {
 
     setEnv(key, "  7 ");
     expect(envInt(key, 120)).toBe(7);
+  });
+
+  test("fails closed for malformed env values", () => {
+    setEnv(key, "10\r\n");
+    expect(envInt(key, 120)).toBe(120);
+    setEnv(key, `8${"x".repeat(32)}`);
+    expect(envInt(key, 120)).toBe(120);
+  });
+
+  test("aggregate helper clamps daysBack bounds when DB is unavailable", async () => {
+    const dbSnapshot = process.env.DATABASE_URL;
+    setEnv("DATABASE_URL", undefined);
+    try {
+      const low = await aggregateDocViewDaily({ daysBack: 0 });
+      expect(low.daysBack).toBe(1);
+      expect(low.ok).toBeFalsy();
+
+      const high = await aggregateDocViewDaily({ daysBack: 999999 });
+      expect(high.daysBack).toBe(3650);
+      expect(high.ok).toBeFalsy();
+    } finally {
+      setEnv("DATABASE_URL", dbSnapshot);
+    }
   });
 });

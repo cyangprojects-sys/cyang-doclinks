@@ -39,4 +39,22 @@ test.describe("log access guardrails", () => {
     expect(seen.some((msg) => msg.includes("Failed to log access."))).toBeTruthy();
     expect(seen.some((msg) => msg.includes("DATABASE_URL"))).toBeFalsy();
   });
+
+  test("returns early on malformed docId input", async () => {
+    const seen: string[] = [];
+    const originalWarn = console.warn;
+    console.warn = (...args: unknown[]) => {
+      seen.push(args.map((v) => String(v)).join(" "));
+    };
+
+    try {
+      await expect(
+        logAccess({ docId: "bad\r\ndoc-id", alias: "a", token: "t", ip: "1.2.3.4", userAgent: "ua" })
+      ).resolves.toBeUndefined();
+    } finally {
+      console.warn = originalWarn;
+    }
+
+    expect(seen).toHaveLength(0);
+  });
 });

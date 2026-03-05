@@ -88,6 +88,7 @@ Status key: `done` | `pending`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\apiAuth.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\apiKeys.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\alias.ts`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\analytics.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\audit.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\billingFlags.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\clientIp.ts`
@@ -97,11 +98,13 @@ Status key: `done` | `pending`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\debugAccess.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\demo.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\documentStatus.ts`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\email.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\fileFamily.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\immutableAudit.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\keyRotationJobs.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\legal.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\legalDocs.ts`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\logAccess.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\masterKeys.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\mfa.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\orgMembership.ts`
@@ -112,6 +115,7 @@ Status key: `done` | `pending`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\quarantineOverride.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\rateLimit.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\redirects.ts`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\resend.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\routeTimeout.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\runtimeEnv.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\scanQueue.ts`

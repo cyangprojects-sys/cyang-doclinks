@@ -3,16 +3,25 @@
 
 import { sql } from "@/lib/db";
 
+const MAX_ENV_INT_LEN = 24;
+const MIN_AGGREGATE_DAYS_BACK = 1;
+const MAX_AGGREGATE_DAYS_BACK = 3650;
+
 export function envInt(name: string, fallback: number): number {
-  const raw = (process.env[name] || "").trim();
+  const rawInput = String(process.env[name] || "");
+  if (/[\r\n\0]/.test(rawInput)) return fallback;
+  const raw = rawInput.trim();
+  if (!raw || raw.length > MAX_ENV_INT_LEN) return fallback;
   const n = Number(raw);
   if (!raw || !Number.isFinite(n) || n <= 0) return fallback;
   return Math.floor(n);
 }
 
 async function tableExists(fqTable: string): Promise<boolean> {
+  const table = String(fqTable || "").trim().toLowerCase();
+  if (!/^[a-z_][a-z0-9_]{0,62}\.[a-z_][a-z0-9_]{0,62}$/.test(table)) return false;
   try {
-    const rows = (await sql`select to_regclass(${fqTable})::text as reg`) as unknown as Array<{
+    const rows = (await sql`select to_regclass(${table})::text as reg`) as unknown as Array<{
       reg: string | null;
     }>;
     return !!rows?.[0]?.reg;
@@ -33,7 +42,10 @@ export type AggregateResult = {
 // Recomputes daily aggregates from public.doc_views into public.doc_view_daily.
 // This is safe to run repeatedly (UPSERT by doc_id+date).
 export async function aggregateDocViewDaily(args?: { daysBack?: number }): Promise<AggregateResult> {
-  const daysBack = args?.daysBack ?? envInt("ANALYTICS_AGGREGATE_DAYS_BACK", 120);
+  const requestedDaysBack = Number(args?.daysBack ?? envInt("ANALYTICS_AGGREGATE_DAYS_BACK", 120));
+  const daysBack = Number.isFinite(requestedDaysBack)
+    ? Math.max(MIN_AGGREGATE_DAYS_BACK, Math.min(MAX_AGGREGATE_DAYS_BACK, Math.floor(requestedDaysBack)))
+    : 120;
   const now = new Date().toISOString();
 
   const exists = await tableExists("public.doc_view_daily");
