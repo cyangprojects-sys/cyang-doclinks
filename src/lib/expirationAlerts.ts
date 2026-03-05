@@ -6,6 +6,8 @@ import { sendMail } from "@/lib/email";
 import { getExpirationAlertSettings } from "@/lib/settings";
 import { resolveConfiguredPublicAppBaseUrl } from "@/lib/publicBaseUrl";
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 function getBaseUrl() {
   return resolveConfiguredPublicAppBaseUrl();
 }
@@ -46,6 +48,16 @@ function clampDays(days: unknown, fallback: number) {
   const n = typeof days === "number" ? days : Number(String(days ?? ""));
   if (!Number.isFinite(n)) return fallback;
   return Math.max(1, Math.min(30, Math.floor(n)));
+}
+
+function safeAlertError(prefix: string): string {
+  return `${prefix}_failed`;
+}
+
+function maskedToken(token: string): string {
+  const t = String(token || "").trim();
+  if (t.length <= 12) return t;
+  return `${t.slice(0, 8)}...${t.slice(-4)}`;
 }
 
 async function tryUpsertNotification(p: {
@@ -119,7 +131,22 @@ export async function sendExpirationAlerts(input?: { days?: number }): Promise<E
     };
   }
 
-  const base = getBaseUrl();
+  let base: string;
+  try {
+    base = getBaseUrl();
+  } catch {
+    return {
+      ok: false,
+      enabled: settings.enabled,
+      email_enabled: settings.emailEnabled,
+      days,
+      owners_processed: 0,
+      sent_count: 0,
+      alias_items: 0,
+      share_items: 0,
+      errors: ["base_url_unavailable"],
+    };
+  }
   const errors: string[] = [];
 
   // 1) Expiring aliases
@@ -144,8 +171,8 @@ export async function sendExpirationAlerts(input?: { days?: number }): Promise<E
       order by d.owner_id, a.expires_at asc
       limit 500
     `) as unknown as ExpiringAliasRow[];
-  } catch (e) {
-    errors.push(`aliases_query_failed: ${e instanceof Error ? e.message : String(e)}`);
+  } catch {
+    errors.push(safeAlertError("aliases_query"));
     aliases = [];
   }
 
@@ -171,8 +198,8 @@ export async function sendExpirationAlerts(input?: { days?: number }): Promise<E
       order by d.owner_id, st.expires_at asc
       limit 500
     `) as unknown as ExpiringShareRow[];
-  } catch (e) {
-    errors.push(`shares_query_failed: ${e instanceof Error ? e.message : String(e)}`);
+  } catch {
+    errors.push(safeAlertError("shares_query"));
     shares = [];
   }
 
@@ -220,7 +247,10 @@ export async function sendExpirationAlerts(input?: { days?: number }): Promise<E
   if (settings.emailEnabled) {
     for (const [ownerId, bucket] of owners.entries()) {
       const to = (bucket.email || "").trim();
-      if (!to) continue;
+      if (!to || to.length > 254 || !EMAIL_RE.test(to)) {
+        errors.push(`send_skipped_invalid_owner_email(${ownerId})`);
+        continue;
+      }
 
       const lines: string[] = [];
 
@@ -244,7 +274,7 @@ export async function sendExpirationAlerts(input?: { days?: number }): Promise<E
           const docUrl = `${base}/admin/docs/${encodeURIComponent(r.doc_id)}`;
           const shareUrl = `${base}/s/${encodeURIComponent(r.token)}`;
           lines.push(
-            `- ${name} (${r.doc_id})\n  expires: ${r.expires_at}\n  token: ${r.token}${r.to_email ? `\n  to: ${r.to_email}` : ""}\n  admin: ${docUrl}\n  link: ${shareUrl}`
+            `- ${name} (${r.doc_id})\n  expires: ${r.expires_at}\n  token: ${maskedToken(r.token)}${r.to_email ? `\n  to: ${r.to_email}` : ""}\n  admin: ${docUrl}\n  link: ${shareUrl}`
           );
         }
         lines.push("");
@@ -262,8 +292,8 @@ export async function sendExpirationAlerts(input?: { days?: number }): Promise<E
           text: body,
         });
         sent += 1;
-      } catch (e) {
-        errors.push(`send_failed(${ownerId}): ${e instanceof Error ? e.message : String(e)}`);
+      } catch {
+        errors.push(`send_failed(${ownerId})`);
       }
     }
   }

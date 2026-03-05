@@ -4,7 +4,7 @@ Total modules with lint warnings:
 66
 
 Remaining pending modules:
-12
+9
 
 Status key: `done` | `pending`
 
@@ -60,8 +60,8 @@ Status key: `done` | `pending`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\authz.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\billingSubscription.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\db.ts`
-- pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\expirationAlerts.ts`
-- pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\geo.ts`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\expirationAlerts.ts`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\geo.ts`
 - pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\malwareScan.ts`
 - pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\monetization.ts`
 - pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\pdfSafety.ts`
@@ -70,7 +70,7 @@ Status key: `done` | `pending`
 - pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\retention.ts`
 - pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\securityTelemetry.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\settings.ts`
-- pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\shareLifecycle.ts`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\shareLifecycle.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\stripeClient.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\stripeWebhook.ts`
 - pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\usageMaintenance.ts`

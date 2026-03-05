@@ -2,6 +2,10 @@
 
 import { sql } from "@/lib/db";
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const SHARE_TOKEN_RE =
+  /^(?:[a-f0-9]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i;
+
 export function getCountryFromHeaders(headers: Headers): string | null {
   const v =
     (headers.get("x-vercel-ip-country") || "").trim() ||
@@ -40,7 +44,22 @@ export async function geoDecisionForRequest(args: {
   docId: string;
   token?: string | null;
 }): Promise<{ allowed: boolean; reason?: string }> {
-  const { country, docId, token } = args;
+  const docId = String(args.docId || "").trim();
+  if (!docId || !UUID_RE.test(docId)) {
+    return { allowed: false, reason: "INVALID_DOC_ID" };
+  }
+
+  const countryRaw = String(args.country || "").trim().toUpperCase();
+  const country = countryRaw ? countryRaw : null;
+  if (country && !/^[A-Z]{2}$/.test(country)) {
+    return { allowed: false, reason: "INVALID_COUNTRY" };
+  }
+
+  const tokenRaw = String(args.token || "").trim();
+  const token = tokenRaw || null;
+  if (token && !SHARE_TOKEN_RE.test(token)) {
+    return { allowed: false, reason: "INVALID_SHARE_TOKEN" };
+  }
 
   // 1) Share-level policy (if available)
   if (token) {

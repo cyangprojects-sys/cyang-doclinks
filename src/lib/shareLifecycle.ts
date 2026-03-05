@@ -1,7 +1,10 @@
 import { sql } from "@/lib/db";
 
 export async function revokeExpiredSharesBatch(limit: number = 1000): Promise<{ revoked: number }> {
-  const n = Math.max(1, Math.min(5000, Number(limit || 1000)));
+  const raw = Number(limit);
+  const n = Number.isFinite(raw)
+    ? Math.max(1, Math.min(5000, Math.floor(raw)))
+    : 1000;
   try {
     const rows = (await sql`
       with targets as (
