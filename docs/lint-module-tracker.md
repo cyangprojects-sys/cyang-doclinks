@@ -4,7 +4,7 @@ Total modules with lint warnings:
 66
 
 Remaining pending modules:
-48
+47
 
 Status key: `done` | `pending`
 
@@ -14,7 +14,7 @@ Status key: `done` | `pending`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\(owner)\api-keys\CreateApiKeyForm.tsx`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\(owner)\audit\page.tsx`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\(owner)\billing\stripe\page.tsx`
-- pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\(owner)\db-debug\page.tsx`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\(owner)\db-debug\page.tsx` (module removed from repo)
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\(owner)\debug\page.tsx`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\(owner)\dmca\DmcaActionsClient.tsx`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\(owner)\layout.tsx`
