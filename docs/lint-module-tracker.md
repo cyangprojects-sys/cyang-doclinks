@@ -184,6 +184,12 @@ Remaining resweep modules in current pass: 0
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\security\requeue-scans\route.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\billing\route.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\billing\view-override\route.ts`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\actions.ts` (resweep: bounded FormData + bulk parser limits)
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\(owner)\webhooks\actions.ts` (resweep: webhook field/event bounds)
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\(owner)\billing\actions.ts` (resweep: checkbox value bounds)
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\d\[alias]\actions.ts` (resweep: share form field bounds)
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\mfa\actions.ts` (resweep: MFA code/redirect bounds)
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\s\[token]\actions.ts` (resweep: token/password/email bounds)
 
 ## Stale actions removed
 

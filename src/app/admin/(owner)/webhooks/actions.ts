@@ -12,8 +12,27 @@ import {
 } from "@/lib/webhooks";
 import { encryptWebhookSecretForStorage } from "@/lib/webhookSecrets";
 
+const MAX_WEBHOOK_ID_LEN = 64;
+const MAX_WEBHOOK_NAME_LEN = 120;
+const MAX_WEBHOOK_URL_LEN = 2048;
+const MAX_WEBHOOK_SECRET_LEN = 512;
+const MAX_WEBHOOK_EVENTS = 32;
+const MAX_WEBHOOK_EVENT_LEN = 64;
+
+function readFormText(formData: FormData, key: string, maxLen: number): string {
+  const raw = String(formData.get(key) || "");
+  if (/[\r\n\0]/.test(raw)) throw new Error("Bad request.");
+  const value = raw.trim();
+  if (value.length > maxLen) throw new Error("Bad request.");
+  return value;
+}
+
 function parseEvents(formData: FormData): string[] {
-  const raw = formData.getAll("events").map((v) => String(v || "").trim()).filter(Boolean);
+  const raw = formData
+    .getAll("events")
+    .map((v) => String(v || "").trim())
+    .filter((v) => v.length > 0 && v.length <= MAX_WEBHOOK_EVENT_LEN && !/[\r\n\0]/.test(v))
+    .slice(0, MAX_WEBHOOK_EVENTS);
   return normalizeWebhookEvents(raw);
 }
 
@@ -21,11 +40,11 @@ export async function createWebhookAction(formData: FormData): Promise<void> {
   const u = await requireUser();
   if (!(u.role === "owner" || u.role === "admin")) throw new Error("Forbidden");
 
-  const name = String(formData.get("name") || "").trim();
-  const url = normalizeWebhookUrl(String(formData.get("url") || "").trim());
-  const plainSecret = String(formData.get("secret") || "").trim();
+  const name = readFormText(formData, "name", MAX_WEBHOOK_NAME_LEN);
+  const url = normalizeWebhookUrl(readFormText(formData, "url", MAX_WEBHOOK_URL_LEN));
+  const plainSecret = readFormText(formData, "secret", MAX_WEBHOOK_SECRET_LEN);
   const secret = plainSecret ? encryptWebhookSecretForStorage(plainSecret) : null;
-  const enabledRaw = String(formData.get("enabled") || "");
+  const enabledRaw = readFormText(formData, "enabled", 8);
   const enabled = enabledRaw === "on" || enabledRaw === "true" || enabledRaw === "1";
   const events = parseEvents(formData);
 
@@ -43,13 +62,13 @@ export async function updateWebhookAction(formData: FormData): Promise<void> {
   const u = await requireUser();
   if (!(u.role === "owner" || u.role === "admin")) throw new Error("Forbidden");
 
-  const id = String(formData.get("id") || "").trim();
-  const name = String(formData.get("name") || "").trim();
-  const url = normalizeWebhookUrl(String(formData.get("url") || "").trim());
-  const plainSecret = String(formData.get("secret") || "").trim();
-  const clearSecretRaw = String(formData.get("clear_secret") || "").trim().toLowerCase();
+  const id = readFormText(formData, "id", MAX_WEBHOOK_ID_LEN);
+  const name = readFormText(formData, "name", MAX_WEBHOOK_NAME_LEN);
+  const url = normalizeWebhookUrl(readFormText(formData, "url", MAX_WEBHOOK_URL_LEN));
+  const plainSecret = readFormText(formData, "secret", MAX_WEBHOOK_SECRET_LEN);
+  const clearSecretRaw = readFormText(formData, "clear_secret", 8).toLowerCase();
   const clearSecret = clearSecretRaw === "on" || clearSecretRaw === "true" || clearSecretRaw === "1";
-  const enabledRaw = String(formData.get("enabled") || "");
+  const enabledRaw = readFormText(formData, "enabled", 8);
   const enabled = enabledRaw === "on" || enabledRaw === "true" || enabledRaw === "1";
   const events = parseEvents(formData);
 
@@ -91,7 +110,7 @@ export async function deleteWebhookAction(formData: FormData): Promise<void> {
   const u = await requireUser();
   if (!(u.role === "owner" || u.role === "admin")) throw new Error("Forbidden");
 
-  const id = String(formData.get("id") || "").trim();
+  const id = readFormText(formData, "id", MAX_WEBHOOK_ID_LEN);
   if (!id) throw new Error("Missing id.");
 
   await sql`
@@ -107,7 +126,7 @@ export async function testWebhookAction(formData: FormData): Promise<void> {
   const u = await requireUser();
   if (!(u.role === "owner" || u.role === "admin")) throw new Error("Forbidden");
 
-  const id = String(formData.get("id") || "").trim();
+  const id = readFormText(formData, "id", MAX_WEBHOOK_ID_LEN);
   if (!id) throw new Error("Missing id.");
 
   // Prefer queue (if table exists), fall back to setting last_error.

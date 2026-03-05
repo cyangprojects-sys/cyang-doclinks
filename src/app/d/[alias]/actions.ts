@@ -46,6 +46,23 @@ export type RevokeShareResult =
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const SHARE_TOKEN_RE =
   /^(?:[a-f0-9]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i;
+const MAX_DOC_ID_LEN = 64;
+const MAX_ALIAS_LEN = 160;
+const MAX_TOKEN_LEN = 128;
+const MAX_EMAIL_LEN = 320;
+const MAX_PASSWORD_LEN = 256;
+const MAX_PACK_ID_LEN = 64;
+const MAX_DATE_OVERRIDE_LEN = 64;
+const MAX_COUNTRY_FIELD_LEN = 2048;
+const MAX_SHARE_TITLE_LEN = 240;
+
+function readFormText(formData: FormData, key: string, maxLen: number): string {
+  const raw = String(formData.get(key) || "");
+  if (/[\r\n\0]/.test(raw)) return "";
+  const value = raw.trim();
+  if (value.length > maxLen) return "";
+  return value;
+}
 
 function newToken(): string {
   return randomBytes(16).toString("hex");
@@ -111,13 +128,13 @@ export async function createAndEmailShareToken(
   form: FormData
 ): Promise<CreateShareResult> {
   try {
-    const docId = String(form.get("docId") || "").trim();
-    const alias = String(form.get("alias") || "").trim();
-    const shareTitleRaw = String(form.get("shareTitle") || "").trim();
-    const shareTitle = shareTitleRaw ? shareTitleRaw.slice(0, 240) : null;
-    const toEmailRaw = String(form.get("toEmail") || "").trim();
-    const passwordRaw = String(form.get("password") || "");
-    const selectedPackRaw = String(form.get("packId") || "").trim();
+    const docId = readFormText(form, "docId", MAX_DOC_ID_LEN);
+    const alias = readFormText(form, "alias", MAX_ALIAS_LEN);
+    const shareTitleRaw = readFormText(form, "shareTitle", MAX_SHARE_TITLE_LEN);
+    const shareTitle = shareTitleRaw ? shareTitleRaw.slice(0, MAX_SHARE_TITLE_LEN) : null;
+    const toEmailRaw = readFormText(form, "toEmail", MAX_EMAIL_LEN);
+    const passwordRaw = readFormText(form, "password", MAX_PASSWORD_LEN);
+    const selectedPackRaw = readFormText(form, "packId", MAX_PACK_ID_LEN);
     const selectedPack = getPackById(selectedPackRaw);
 
     const parseOptionalBoolean = (raw: string): boolean | null => {
@@ -143,21 +160,23 @@ export async function createAndEmailShareToken(
       return Number(v);
     };
 
-    const overrideExpiresAtRaw = String(
-      form.get("overrideExpiresAt") ?? form.get("expiresAt") ?? ""
-    ).trim();
-    const overrideMaxViewsRaw = String(
-      form.get("overrideMaxViews") ?? form.get("maxViews") ?? ""
-    ).trim();
-    const overrideAllowDownloadRaw = String(
-      form.get("overrideAllowDownload") ?? form.get("allowDownload") ?? ""
-    ).trim();
-    const overrideWatermarkEnabledRaw = String(
-      form.get("overrideWatermarkEnabled") ?? form.get("watermarkEnabled") ?? ""
-    ).trim();
+    const overrideExpiresAtRaw = String(form.get("overrideExpiresAt") ?? form.get("expiresAt") ?? "")
+      .trim()
+      .slice(0, MAX_DATE_OVERRIDE_LEN);
+    const overrideMaxViewsRaw = String(form.get("overrideMaxViews") ?? form.get("maxViews") ?? "")
+      .trim()
+      .slice(0, 16);
+    const overrideAllowDownloadRaw = String(form.get("overrideAllowDownload") ?? form.get("allowDownload") ?? "")
+      .trim()
+      .slice(0, 16);
+    const overrideWatermarkEnabledRaw = String(form.get("overrideWatermarkEnabled") ?? form.get("watermarkEnabled") ?? "")
+      .trim()
+      .slice(0, 16);
 
-    const allowedCountriesRaw = String(form.get("allowedCountries") || form.get("allowed_countries") || "").trim();
-    const blockedCountriesRaw = String(form.get("blockedCountries") || form.get("blocked_countries") || "").trim();
+    const allowedCountriesRaw = readFormText(form, "allowedCountries", MAX_COUNTRY_FIELD_LEN)
+      || readFormText(form, "allowed_countries", MAX_COUNTRY_FIELD_LEN);
+    const blockedCountriesRaw = readFormText(form, "blockedCountries", MAX_COUNTRY_FIELD_LEN)
+      || readFormText(form, "blocked_countries", MAX_COUNTRY_FIELD_LEN);
 
     if (!docId)
       return { ok: false, error: "bad_request", message: "Missing docId" };
@@ -394,7 +413,7 @@ export async function getShareStatsByToken(
   token: string
 ): Promise<ShareStatsResult> {
   try {
-    const tokenValue = String(token || "").trim();
+    const tokenValue = String(token || "").trim().slice(0, MAX_TOKEN_LEN);
     if (!isShareToken(tokenValue)) {
       return { ok: false, error: "invalid_token", message: "Invalid token" };
     }
@@ -477,7 +496,7 @@ export async function revokeShareToken(
   token: string
 ): Promise<RevokeShareResult> {
   try {
-    const tokenValue = String(token || "").trim();
+    const tokenValue = String(token || "").trim().slice(0, MAX_TOKEN_LEN);
     if (!isShareToken(tokenValue)) {
       return { ok: false, error: "invalid_token", message: "Invalid token" };
     }

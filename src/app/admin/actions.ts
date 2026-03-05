@@ -120,6 +120,52 @@ function parseAliasTtlDays(raw: unknown): number {
   return 30;
 }
 
+const MAX_DOC_ID_LEN = 64;
+const MAX_ALIAS_LEN = 160;
+const MAX_TOKEN_LEN = 128;
+const MAX_EMAIL_LEN = 320;
+const MAX_REASON_LEN = 512;
+const MAX_PASSWORD_LEN = 256;
+const MAX_API_KEY_NAME_LEN = 120;
+const MAX_BULK_JSON_CHARS = 64 * 1024;
+const MAX_BULK_ITEMS = 500;
+
+function readFormText(formData: FormData, keys: string | string[], maxLen: number): string {
+  const list = Array.isArray(keys) ? keys : [keys];
+  for (const key of list) {
+    const raw = formData.get(key);
+    if (raw == null) continue;
+    const source = String(raw || "").replace(/[\r\n]+/g, " ");
+    if (/[\0]/.test(source)) throw new Error(`${key} contains invalid characters.`);
+    const value = source.trim();
+    if (value.length > maxLen) throw new Error(`${key} is too long.`);
+    return value;
+  }
+  return "";
+}
+
+function parseStringArrayFormField(formData: FormData, key: string, itemLabel: string): string[] {
+  const raw = readFormText(formData, key, MAX_BULK_JSON_CHARS);
+  if (!raw) return [];
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new Error(`Invalid ${itemLabel} payload.`);
+  }
+  if (!Array.isArray(parsed)) {
+    throw new Error(`Invalid ${itemLabel} payload.`);
+  }
+  const out: string[] = [];
+  for (const item of parsed) {
+    if (out.length >= MAX_BULK_ITEMS) break;
+    const value = String(item || "").trim();
+    if (!value || value.length > MAX_TOKEN_LEN || /[\r\n\0]/.test(value)) continue;
+    out.push(value);
+  }
+  return out;
+}
+
 async function purgeDocGraphRows(docId: string): Promise<boolean> {
   const shareTokensExists = await tableExists("public.share_tokens");
   const shareUnlocksExists = await tableExists("public.share_unlocks");
@@ -158,8 +204,8 @@ async function purgeDocGraphRows(docId: string): Promise<boolean> {
 
 // Used as <form action={createOrAssignAliasAction}> — must return void
 export async function createOrAssignAliasAction(formData: FormData): Promise<void> {
-  const alias = normalizeAliasInput(String(formData.get("alias") || ""));
-  const docId = String(formData.get("docId") || formData.get("doc_id") || "").trim();
+  const alias = normalizeAliasInput(readFormText(formData, "alias", MAX_ALIAS_LEN));
+  const docId = readFormText(formData, ["docId", "doc_id"], MAX_DOC_ID_LEN);
   const expiresDays = parseAliasTtlDays(formData.get("expiresDays"));
 
   if (!alias) throw new Error("Missing alias.");
@@ -214,8 +260,8 @@ export async function createOrAssignAliasAction(formData: FormData): Promise<voi
 }
 
 export async function renameDocAliasAction(formData: FormData): Promise<void> {
-  const docId = String(formData.get("docId") || "").trim();
-  const newAlias = normalizeAliasInput(String(formData.get("newAlias") || ""));
+  const docId = readFormText(formData, "docId", MAX_DOC_ID_LEN);
+  const newAlias = normalizeAliasInput(readFormText(formData, "newAlias", MAX_ALIAS_LEN));
   if (!docId) throw new Error("Missing docId.");
   if (!newAlias) throw new Error("Missing new alias.");
   if (!/^[a-z0-9_-]{3,80}$/.test(newAlias)) {
@@ -303,7 +349,7 @@ export async function renameDocAliasAction(formData: FormData): Promise<void> {
 }
 
 export async function setAliasExpirationAction(formData: FormData): Promise<void> {
-  const docId = String(formData.get("docId") || "").trim();
+  const docId = readFormText(formData, "docId", MAX_DOC_ID_LEN);
   const days = parseAliasTtlDays(formData.get("days"));
   if (!docId) throw new Error("Missing docId.");
 
@@ -337,12 +383,10 @@ export async function setAliasExpirationAction(formData: FormData): Promise<void
 export async function emailMagicLinkAction(formData: FormData): Promise<void> {
   const u = await requireUser();
 
-  const to = String(
-    formData.get("to") || formData.get("email") || formData.get("recipient") || ""
-  ).trim();
+  const to = readFormText(formData, ["to", "email", "recipient"], MAX_EMAIL_LEN);
 
-  const docId = String(formData.get("docId") || formData.get("doc_id") || "").trim();
-  const alias = String(formData.get("alias") || "").trim();
+  const docId = readFormText(formData, ["docId", "doc_id"], MAX_DOC_ID_LEN);
+  const alias = readFormText(formData, "alias", MAX_ALIAS_LEN);
 
   if (!to) throw new Error("Missing recipient email.");
   if (!alias && !docId) throw new Error("Provide alias or docId.");
@@ -385,8 +429,8 @@ export async function emailMagicLinkAction(formData: FormData): Promise<void> {
 
 // Used as <form action={deleteDocAction}> — must return void
 export async function deleteDocAction(formData: FormData): Promise<void> {
-  const docId = String(formData.get("docId") || formData.get("doc_id") || "").trim();
-  const reason = String(formData.get("reason") || "").trim() || null;
+  const docId = readFormText(formData, ["docId", "doc_id"], MAX_DOC_ID_LEN);
+  const reason = readFormText(formData, "reason", MAX_REASON_LEN) || null;
   if (!docId) throw new Error("Missing docId.");
 
   await requireDocWrite(docId);
@@ -435,7 +479,7 @@ export async function deleteDocAction(formData: FormData): Promise<void> {
 
 // Used as <form action={revokeDocShareAction}>
 export async function revokeDocShareAction(formData: FormData): Promise<void> {
-  const token = String(formData.get("token") || "").trim();
+  const token = readFormText(formData, "token", MAX_TOKEN_LEN);
   if (!token) throw new Error("Missing token.");
 
   await requireShareWrite(token);
@@ -488,8 +532,8 @@ export async function revokeDocShareAction(formData: FormData): Promise<void> {
 
 // Used as <form action={setSharePasswordAction}>
 export async function setSharePasswordAction(formData: FormData): Promise<void> {
-  const token = String(formData.get("token") || "").trim();
-  const password = String(formData.get("password") || "").trim();
+  const token = readFormText(formData, "token", MAX_TOKEN_LEN);
+  const password = readFormText(formData, "password", MAX_PASSWORD_LEN);
 
   if (!token) throw new Error("Missing token.");
   if (password.length < 4) throw new Error("Password must be at least 4 characters.");
@@ -511,7 +555,7 @@ export async function setSharePasswordAction(formData: FormData): Promise<void> 
 
 // Used as <form action={clearSharePasswordAction}>
 export async function clearSharePasswordAction(formData: FormData): Promise<void> {
-  const token = String(formData.get("token") || "").trim();
+  const token = readFormText(formData, "token", MAX_TOKEN_LEN);
   if (!token) throw new Error("Missing token.");
 
   await requireShareWrite(token);
@@ -530,7 +574,7 @@ export async function clearSharePasswordAction(formData: FormData): Promise<void
 
 export async function revokeAllSharesForDocAction(formData: FormData): Promise<void> {
   await requireRole("admin");
-  const docId = String(formData.get("docId") || "").trim();
+  const docId = readFormText(formData, "docId", MAX_DOC_ID_LEN);
   if (!docId) throw new Error("Missing docId.");
 
   await sql`
@@ -552,7 +596,7 @@ export async function revokeAllSharesForDocAction(formData: FormData): Promise<v
 
 export async function disableAliasForDocAction(formData: FormData): Promise<void> {
   await requireRole("admin");
-  const docId = String(formData.get("docId") || "").trim();
+  const docId = readFormText(formData, "docId", MAX_DOC_ID_LEN);
   if (!docId) throw new Error("Missing docId.");
 
   const arows = (await sql`
@@ -602,7 +646,7 @@ export async function disableAliasForDocAction(formData: FormData): Promise<void
 
 export async function extendAliasExpirationAction(formData: FormData): Promise<void> {
   await requireRole("admin");
-  const docId = String(formData.get("docId") || "").trim();
+  const docId = readFormText(formData, "docId", MAX_DOC_ID_LEN);
   const days = Number(formData.get("days") || 0);
   if (!docId) throw new Error("Missing docId.");
   if (!Number.isFinite(days) || days <= 0) throw new Error("Invalid days.");
@@ -624,7 +668,7 @@ export async function extendAliasExpirationAction(formData: FormData): Promise<v
 }
 
 export async function extendShareExpirationAction(formData: FormData): Promise<void> {
-  const token = String(formData.get("token") || "").trim();
+  const token = readFormText(formData, "token", MAX_TOKEN_LEN);
   const days = Number(formData.get("days") || 0);
   if (!token) throw new Error("Missing token.");
   if (!Number.isFinite(days) || days <= 0) throw new Error("Invalid days.");
@@ -641,8 +685,8 @@ export async function extendShareExpirationAction(formData: FormData): Promise<v
 }
 
 export async function setShareMaxViewsAction(formData: FormData): Promise<void> {
-  const token = String(formData.get("token") || "").trim();
-  const maxViewsRaw = String(formData.get("maxViews") || "").trim();
+  const token = readFormText(formData, "token", MAX_TOKEN_LEN);
+  const maxViewsRaw = readFormText(formData, "maxViews", 16);
   if (!token) throw new Error("Missing token.");
   await requireShareWrite(token);
 
@@ -662,7 +706,7 @@ export async function setShareMaxViewsAction(formData: FormData): Promise<void> 
 }
 
 export async function resetShareViewsCountAction(formData: FormData): Promise<void> {
-  const token = String(formData.get("token") || "").trim();
+  const token = readFormText(formData, "token", MAX_TOKEN_LEN);
   if (!token) throw new Error("Missing token.");
   await requireShareWrite(token);
 
@@ -677,7 +721,7 @@ export async function resetShareViewsCountAction(formData: FormData): Promise<vo
 }
 
 export async function forceSharePasswordResetAction(formData: FormData): Promise<void> {
-  const token = String(formData.get("token") || "").trim();
+  const token = readFormText(formData, "token", MAX_TOKEN_LEN);
   if (!token) throw new Error("Missing token.");
   await requireShareWrite(token);
 
@@ -700,10 +744,8 @@ export async function forceSharePasswordResetAction(formData: FormData): Promise
 
 export async function bulkRevokeSharesAction(formData: FormData): Promise<void> {
   await requireRole("admin");
-  const raw = String(formData.get("tokens") || "").trim();
-  if (!raw) throw new Error("Missing tokens.");
-  const tokens = JSON.parse(raw) as string[];
-  if (!Array.isArray(tokens) || tokens.length === 0) return;
+  const tokens = parseStringArrayFormField(formData, "tokens", "tokens");
+  if (!Array.isArray(tokens) || tokens.length === 0) throw new Error("Missing tokens.");
 
   await sql`
     update public.share_tokens
@@ -718,12 +760,10 @@ export async function bulkRevokeSharesAction(formData: FormData): Promise<void> 
 
 export async function bulkExtendSharesAction(formData: FormData): Promise<void> {
   await requireRole("admin");
-  const raw = String(formData.get("tokens") || "").trim();
+  const tokens = parseStringArrayFormField(formData, "tokens", "tokens");
   const days = Number(formData.get("days") || 0);
-  if (!raw) throw new Error("Missing tokens.");
+  if (!tokens.length) throw new Error("Missing tokens.");
   if (!Number.isFinite(days) || days <= 0) throw new Error("Invalid days.");
-  const tokens = JSON.parse(raw) as string[];
-  if (!Array.isArray(tokens) || tokens.length === 0) return;
 
   await sql`
     update public.share_tokens
@@ -737,10 +777,8 @@ export async function bulkExtendSharesAction(formData: FormData): Promise<void> 
 
 export async function bulkRevokeAllSharesForDocsAction(formData: FormData): Promise<void> {
   await requireRole("admin");
-  const raw = String(formData.get("docIds") || "").trim();
-  if (!raw) throw new Error("Missing docIds.");
-  const docIds = JSON.parse(raw) as string[];
-  if (!Array.isArray(docIds) || docIds.length === 0) return;
+  const docIds = parseStringArrayFormField(formData, "docIds", "docIds");
+  if (!Array.isArray(docIds) || docIds.length === 0) throw new Error("Missing docIds.");
 
   await sql`
     update public.share_tokens
@@ -763,10 +801,8 @@ export async function bulkRevokeAllSharesForDocsAction(formData: FormData): Prom
 
 export async function bulkDisableAliasesForDocsAction(formData: FormData): Promise<void> {
   await requireRole("admin");
-  const raw = String(formData.get("docIds") || "").trim();
-  if (!raw) throw new Error("Missing docIds.");
-  const docIds = JSON.parse(raw) as string[];
-  if (!Array.isArray(docIds) || docIds.length === 0) return;
+  const docIds = parseStringArrayFormField(formData, "docIds", "docIds");
+  if (!Array.isArray(docIds) || docIds.length === 0) throw new Error("Missing docIds.");
 
   try {
     await sql`
@@ -804,11 +840,9 @@ export async function bulkDisableAliasesForDocsAction(formData: FormData): Promi
 
 export async function bulkDeleteDocsAction(formData: FormData): Promise<void> {
   await requireUser();
-  const raw = String(formData.get("docIds") || "").trim();
-  const reason = String(formData.get("reason") || "").trim() || null;
-  if (!raw) throw new Error("Missing docIds.");
-  const docIds = JSON.parse(raw) as string[];
-  if (!Array.isArray(docIds) || docIds.length === 0) return;
+  const docIds = parseStringArrayFormField(formData, "docIds", "docIds");
+  const reason = readFormText(formData, "reason", MAX_REASON_LEN) || null;
+  if (!Array.isArray(docIds) || docIds.length === 0) throw new Error("Missing docIds.");
 
   for (const docId of docIds) {
     const id = String(docId || "").trim();
@@ -861,7 +895,7 @@ export async function bulkDeleteDocsAction(formData: FormData): Promise<void> {
 export async function createApiKeyAction(formData: FormData) {
   const u = await requireRole("admin");
 
-  const name = String(formData.get("name") || "").trim();
+  const name = readFormText(formData, "name", MAX_API_KEY_NAME_LEN);
   if (!name) throw new Error("Missing name.");
 
   const { plaintext, prefix } = generateApiKey();
@@ -879,7 +913,7 @@ export async function createApiKeyAction(formData: FormData) {
 
 export async function revokeApiKeyAction(formData: FormData) {
   await requireRole("admin");
-  const id = String(formData.get("id") || "").trim();
+  const id = readFormText(formData, "id", MAX_DOC_ID_LEN);
   if (!id) throw new Error("Missing id.");
 
   await sql`

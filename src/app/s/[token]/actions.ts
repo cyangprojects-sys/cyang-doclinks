@@ -12,6 +12,23 @@ import { rateLimit, stableHash } from "@/lib/rateLimit";
 const UNLOCK_HOURS = 8;
 const RATE_LIMIT_PER_MIN = 10;
 const RATE_LIMIT_PER_10MIN = 25;
+const MAX_TOKEN_LEN = 128;
+const MAX_PASSWORD_LEN = 256;
+const MAX_EMAIL_LEN = 320;
+const SHARE_TOKEN_RE =
+  /^(?:[a-f0-9]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i;
+
+function cleanText(raw: unknown, maxLen: number): string {
+    const value = String(raw || "");
+    if (/[\r\n\0]/.test(value)) return "";
+    const trimmed = value.trim();
+    if (trimmed.length > maxLen) return "";
+    return trimmed;
+}
+
+function isShareToken(value: string): boolean {
+    return SHARE_TOKEN_RE.test(String(value || "").trim());
+}
 
 function cookieName(token: string) {
     return `share_unlock_${token}`;
@@ -50,14 +67,17 @@ function hashIp(ip: string) {
 }
 
 export async function isShareUnlockedAction(token: string): Promise<boolean> {
+    const safeToken = cleanText(token, MAX_TOKEN_LEN);
+    if (!safeToken || !isShareToken(safeToken)) return false;
+
     const c = await cookies();
-    const unlockId = c.get(cookieName(token))?.value || "";
+    const unlockId = c.get(cookieName(safeToken))?.value || "";
     if (!unlockId) return false;
 
     const rows = (await sql`
     select 1
     from public.share_unlocks
-    where token = ${token}
+    where token = ${safeToken}
       and unlock_id = ${unlockId}
       and expires_at > now()
     limit 1
@@ -121,11 +141,11 @@ export type VerifySharePasswordResult =
 export async function verifySharePasswordCore(
     formData: FormData
 ): Promise<VerifySharePasswordResult> {
-    const token = String(formData.get("token") || "").trim();
-    const password = String(formData.get("password") || "");
-    const emailInput = String(formData.get("email") || "").trim().toLowerCase();
+    const token = cleanText(formData.get("token"), MAX_TOKEN_LEN);
+    const password = cleanText(formData.get("password"), MAX_PASSWORD_LEN);
+    const emailInput = cleanText(formData.get("email"), MAX_EMAIL_LEN).toLowerCase();
 
-    if (!token) return { ok: false, error: "not_found", message: "Missing token." };
+    if (!token || !isShareToken(token)) return { ok: false, error: "not_found", message: "Missing token." };
 
     const share = await resolveShareMeta(token);
     if (!share.ok) return { ok: false, error: "not_found", message: "Share not found." };
@@ -244,7 +264,7 @@ export async function verifySharePasswordCore(
  * Must return void/Promise<void>. Redirects instead of returning data.
  */
 export async function verifySharePasswordAction(formData: FormData): Promise<void> {
-    const token = String(formData.get("token") || "").trim();
+    const token = cleanText(formData.get("token"), MAX_TOKEN_LEN);
     const res = await verifySharePasswordCore(formData);
 
     if (res.ok) {
