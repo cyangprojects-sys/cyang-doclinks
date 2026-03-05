@@ -90,6 +90,7 @@ Status key: `done` | `pending`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\immutableAudit.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\quarantineOverride.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\rateLimit.ts`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\viewLimitOverride.ts`
 
 ## Stale actions removed
 
