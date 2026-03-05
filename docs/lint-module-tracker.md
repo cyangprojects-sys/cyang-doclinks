@@ -90,6 +90,8 @@ Status key: `done` | `pending`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\audit.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\immutableAudit.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\keyRotationJobs.ts`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\masterKeys.ts`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\mfa.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\orgMembership.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\quarantineOverride.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\rateLimit.ts`

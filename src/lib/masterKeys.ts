@@ -3,6 +3,10 @@ import { sql } from "@/lib/db";
 import { type ActiveMasterKey } from "@/lib/encryption";
 import { getActiveMasterKey, getMasterKeyById } from "@/lib/encryption";
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const KEY_ID_RE = /^[A-Za-z0-9._:-]{1,64}$/;
+const MAX_REASON_LEN = 240;
+
 export type MasterKeyStatus = {
   id: string;
   active: boolean;
@@ -18,6 +22,30 @@ export type MasterKeyChange = {
   reason: string | null;
   rollback_of_change_id: string | null;
 };
+
+function normalizeUuidOrNull(value: unknown): string | null {
+  const s = String(value || "").trim();
+  if (!s) return null;
+  return UUID_RE.test(s) ? s : null;
+}
+
+function normalizeKeyId(value: unknown): string | null {
+  const s = String(value || "").trim();
+  if (!s) return null;
+  return KEY_ID_RE.test(s) ? s : null;
+}
+
+function normalizeReason(value: unknown): string | null {
+  const s = String(value || "").trim();
+  if (!s) return null;
+  return s.slice(0, MAX_REASON_LEN);
+}
+
+function boundedInt(raw: unknown, fallback: number, min: number, max: number): number {
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(max, Math.max(min, Math.floor(n)));
+}
 
 async function revocationsTableExists(): Promise<boolean> {
   try {
@@ -54,7 +82,8 @@ function getEnvKeyIds(): string[] {
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return envKeys;
     for (const k of parsed) {
-      if (k && typeof k.id === "string") envKeys.push(k.id);
+      const id = normalizeKeyId(k?.id);
+      if (id) envKeys.push(id);
     }
   } catch {
     // ignore
@@ -71,8 +100,7 @@ export async function getDbActiveMasterKeyId(): Promise<string | null> {
       where id = true
       limit 1
     `) as unknown as Array<{ active_key_id: string | null }>;
-    const keyId = String(rows?.[0]?.active_key_id || "").trim();
-    return keyId || null;
+    return normalizeKeyId(rows?.[0]?.active_key_id) ?? null;
   } catch {
     return null;
   }
@@ -128,7 +156,9 @@ export async function getActiveMasterKeyOrThrow(): Promise<ActiveMasterKey> {
 }
 
 export async function getMasterKeyByIdOrThrow(id: string): Promise<ActiveMasterKey> {
-  const mk = getMasterKeyById(id);
+  const keyId = normalizeKeyId(id);
+  if (!keyId) throw new Error("BAD_REQUEST");
+  const mk = getMasterKeyById(keyId);
   if (await isMasterKeyRevoked(mk.id)) {
     throw new Error("MASTER_KEY_REVOKED");
   }
@@ -136,12 +166,14 @@ export async function getMasterKeyByIdOrThrow(id: string): Promise<ActiveMasterK
 }
 
 export async function isMasterKeyRevoked(id: string): Promise<boolean> {
+  const keyId = normalizeKeyId(id);
+  if (!keyId) return false;
   if (!(await revocationsTableExists())) return false;
   try {
     const rows = (await sql`
       select 1
       from public.master_key_revocations
-      where key_id = ${id}
+      where key_id = ${keyId}
       limit 1
     `) as unknown as Array<{ "?column?": number }>;
     return rows.length > 0;
@@ -154,11 +186,12 @@ export async function revokeMasterKey(args: { id: string; actorUserId: string | 
   if (!(await revocationsTableExists())) {
     throw new Error("MISSING_MASTER_KEY_TABLE");
   }
-  const id = String(args.id || "").trim();
+  const id = normalizeKeyId(args.id);
   if (!id) throw new Error("BAD_REQUEST");
+  const actorUserId = normalizeUuidOrNull(args.actorUserId);
   await sql`
     insert into public.master_key_revocations (key_id, revoked_by_user_id)
-    values (${id}, ${args.actorUserId ? args.actorUserId : null}::uuid)
+    values (${id}, ${actorUserId}::uuid)
     on conflict (key_id) do nothing
   `;
 }
@@ -171,8 +204,11 @@ export async function setActiveMasterKey(args: {
 }): Promise<void> {
   if (!(await settingsTableExists())) throw new Error("MISSING_MASTER_KEY_SETTINGS_TABLE");
 
-  const keyId = String(args.keyId || "").trim();
+  const keyId = normalizeKeyId(args.keyId);
   if (!keyId) throw new Error("BAD_REQUEST");
+  const actorUserId = normalizeUuidOrNull(args.actorUserId);
+  const reason = normalizeReason(args.reason);
+  const rollbackOfChangeId = normalizeUuidOrNull(args.rollbackOfChangeId);
 
   const envIds = getEnvKeyIds();
   if (!envIds.includes(keyId)) throw new Error("MASTER_KEY_NOT_IN_ENV");
@@ -181,7 +217,7 @@ export async function setActiveMasterKey(args: {
   const previous = await getDbActiveMasterKeyId();
   await sql`
     insert into public.master_key_settings (id, active_key_id, updated_by_user_id, notes, updated_at)
-    values (true, ${keyId}, ${args.actorUserId ? args.actorUserId : null}::uuid, ${args.reason ?? null}, now())
+    values (true, ${keyId}, ${actorUserId}::uuid, ${reason}, now())
     on conflict (id) do update set
       active_key_id = excluded.active_key_id,
       updated_by_user_id = excluded.updated_by_user_id,
@@ -194,7 +230,7 @@ export async function setActiveMasterKey(args: {
       insert into public.master_key_changes
         (changed_by_user_id, previous_key_id, new_key_id, reason, rollback_of_change_id)
       values
-        (${args.actorUserId ? args.actorUserId : null}::uuid, ${previous ?? null}, ${keyId}, ${args.reason ?? null}, ${args.rollbackOfChangeId ?? null}::uuid)
+        (${actorUserId}::uuid, ${previous ?? null}, ${keyId}, ${reason}, ${rollbackOfChangeId}::uuid)
     `;
   }
 }
@@ -222,11 +258,13 @@ export async function listRecentMasterKeyChanges(limit: number = 25): Promise<Ma
 }
 
 export async function countDocsEncryptedWithKey(keyId: string): Promise<number> {
+  const id = normalizeKeyId(keyId);
+  if (!id) return 0;
   const rows = (await sql`
     select count(*)::int as c
     from public.docs
     where coalesce(encryption_enabled, false) = true
-      and coalesce(enc_key_version, '') = ${keyId}
+      and coalesce(enc_key_version, '') = ${id}
   `) as unknown as Array<{ c: number }>;
   return Number(rows?.[0]?.c ?? 0);
 }
@@ -236,15 +274,17 @@ export async function rotateDocKeys(args: {
   toKeyId?: string; // default: current active
   limit?: number; // safety cap
 }): Promise<{ scanned: number; rotated: number; failed: number; remaining: number }> {
-  const fromKeyId = String(args.fromKeyId || "").trim();
+  const fromKeyId = normalizeKeyId(args.fromKeyId);
   if (!fromKeyId) throw new Error("BAD_REQUEST");
+  const toKeyId = args.toKeyId ? normalizeKeyId(args.toKeyId) : null;
+  if (args.toKeyId && !toKeyId) throw new Error("BAD_REQUEST");
 
-  const toKey = args.toKeyId ? await getMasterKeyByIdOrThrow(args.toKeyId) : await getActiveMasterKeyOrThrow();
+  const toKey = toKeyId ? await getMasterKeyByIdOrThrow(toKeyId) : await getActiveMasterKeyOrThrow();
   const fromKey = await getMasterKeyByIdOrThrow(fromKeyId);
 
   if (fromKey.id === toKey.id) return { scanned: 0, rotated: 0, failed: 0, remaining: 0 };
 
-  const limit = Math.max(1, Math.min(Number(args.limit ?? 250), 2000));
+  const limit = boundedInt(args.limit ?? 250, 250, 1, 2000);
 
   // Load a batch of docs encrypted with fromKey
   const docs = (await sql`
@@ -275,6 +315,11 @@ export async function rotateDocKeys(args: {
   let rotated = 0;
   let failed = 0;
   for (const d of docs) {
+    const docId = normalizeUuidOrNull(d.id);
+    if (!docId) {
+      failed += 1;
+      continue;
+    }
     try {
       const dataKey = unwrapDataKey({
         wrapped: d.enc_wrapped_key,
@@ -292,7 +337,7 @@ export async function rotateDocKeys(args: {
           enc_wrapped_key = ${wrap.wrapped},
           enc_wrap_iv = ${wrap.iv},
           enc_wrap_tag = ${wrap.tag}
-        where id = ${d.id}::uuid
+        where id = ${docId}::uuid
       `;
 
       rotated += 1;

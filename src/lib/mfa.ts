@@ -12,6 +12,12 @@ const MFA_ISSUER = "CYANG Doclinks";
 const TOTP_STEP_SECONDS = 30;
 const TOTP_WINDOW = 1;
 const MFA_RECOVERY_CODES_COUNT = 10;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const EMAIL_MAX_LEN = 320;
+const CODE_MAX_LEN = 64;
+const MAX_MFA_COOKIE_LEN = 2048;
+const MAX_RECOVERY_COOKIE_LEN = 4096;
+const MAX_RECOVERY_CODES_IN_COOKIE = 20;
 
 type MfaRow = {
   user_id: string;
@@ -21,6 +27,20 @@ type MfaRow = {
   recovery_codes_generated_at: string | null;
   enabled_at: string | null;
 };
+
+function normalizeUuidOrNull(value: unknown): string | null {
+  const s = String(value || "").trim();
+  if (!s) return null;
+  return UUID_RE.test(s) ? s : null;
+}
+
+function normalizeEmail(value: unknown): string {
+  return String(value || "").trim().toLowerCase().slice(0, EMAIL_MAX_LEN);
+}
+
+function normalizeCode(value: unknown): string {
+  return String(value || "").trim().slice(0, CODE_MAX_LEN);
+}
 
 function envBool(name: string, fallback = false): boolean {
   const raw = String(process.env[name] || "").trim().toLowerCase();
@@ -132,13 +152,13 @@ function verifyTotp(secretBase32: string, codeRaw: string): boolean {
 }
 
 function mfaCookieValue(userId: string, email: string, role: Role, expUnix: number): string {
-  const payload = `${userId}|${email}|${role}|${expUnix}`;
+  const payload = `${normalizeUuidOrNull(userId) || ""}|${normalizeEmail(email)}|${role}|${expUnix}`;
   const sig = sign(payload);
   return `${payload}|${sig}`;
 }
 
 function parseMfaCookie(value: string | null): { userId: string; email: string; role: Role; expUnix: number } | null {
-  const raw = String(value || "").trim();
+  const raw = String(value || "").trim().slice(0, MAX_MFA_COOKIE_LEN);
   if (!raw) return null;
   const parts = raw.split("|");
   if (parts.length !== 5) return null;
@@ -148,8 +168,10 @@ function parseMfaCookie(value: string | null): { userId: string; email: string; 
   const expUnix = Number(expRaw);
   if (!Number.isFinite(expUnix) || expUnix <= Math.floor(Date.now() / 1000)) return null;
   const role = roleRaw === "owner" || roleRaw === "admin" || roleRaw === "viewer" ? roleRaw : null;
-  if (!role) return null;
-  return { userId, email, role, expUnix };
+  const safeUserId = normalizeUuidOrNull(userId);
+  const safeEmail = normalizeEmail(email);
+  if (!role || !safeUserId || !safeEmail) return null;
+  return { userId: safeUserId, email: safeEmail, role, expUnix };
 }
 
 function normalizeRecoveryCode(input: string): string {
@@ -172,13 +194,17 @@ function randomRecoveryCode(): string {
 
 function recoveryCookieValue(codes: string[]): string {
   const expUnix = nowUnix() + MFA_RECOVERY_COOKIE_TTL_SECONDS;
-  const payload = Buffer.from(JSON.stringify({ codes, expUnix }), "utf8").toString("base64url");
+  const normalizedCodes = codes
+    .map((c) => String(c || "").trim().slice(0, CODE_MAX_LEN))
+    .filter(Boolean)
+    .slice(0, MAX_RECOVERY_CODES_IN_COOKIE);
+  const payload = Buffer.from(JSON.stringify({ codes: normalizedCodes, expUnix }), "utf8").toString("base64url");
   const sig = sign(payload);
   return `${payload}.${sig}`;
 }
 
 function parseRecoveryCookie(value: string | null): string[] | null {
-  const raw = String(value || "").trim();
+  const raw = String(value || "").trim().slice(0, MAX_RECOVERY_COOKIE_LEN);
   if (!raw) return null;
   const dot = raw.lastIndexOf(".");
   if (dot <= 0) return null;
@@ -190,7 +216,10 @@ function parseRecoveryCookie(value: string | null): string[] | null {
     const expUnix = Number(json.expUnix);
     if (!Number.isFinite(expUnix) || expUnix <= nowUnix()) return null;
     if (!Array.isArray(json.codes)) return null;
-    const codes = json.codes.map((v) => String(v || "").trim()).filter(Boolean);
+    const codes = json.codes
+      .slice(0, MAX_RECOVERY_CODES_IN_COOKIE)
+      .map((v) => String(v || "").trim().slice(0, CODE_MAX_LEN))
+      .filter(Boolean);
     return codes.length ? codes : null;
   } catch {
     return null;
@@ -198,9 +227,12 @@ function parseRecoveryCookie(value: string | null): string[] | null {
 }
 
 export async function issueMfaCookie(args: { userId: string; email: string; role: Role }): Promise<void> {
+  const userId = normalizeUuidOrNull(args.userId);
+  const email = normalizeEmail(args.email);
+  if (!userId || !email) return;
   const jar = await cookies();
   const expUnix = nowUnix() + MFA_COOKIE_TTL_SECONDS;
-  jar.set(MFA_COOKIE, mfaCookieValue(args.userId, args.email, args.role, expUnix), {
+  jar.set(MFA_COOKIE, mfaCookieValue(userId, email, args.role, expUnix), {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
@@ -246,17 +278,22 @@ export async function consumeRecoveryCodesDisplayCookie(): Promise<string[] | nu
 
 export async function hasValidMfaCookie(args: { userId: string; email: string; role: Role }): Promise<boolean> {
   if (!roleRequiresMfa(args.role)) return true;
+  const userId = normalizeUuidOrNull(args.userId);
+  const email = normalizeEmail(args.email);
+  if (!userId || !email) return false;
   const jar = await cookies();
   const parsed = parseMfaCookie(jar.get(MFA_COOKIE)?.value ?? null);
   if (!parsed) return false;
   return (
-    parsed.userId === args.userId &&
-    parsed.email === args.email &&
+    parsed.userId === userId &&
+    parsed.email === email &&
     parsed.role === args.role
   );
 }
 
 async function getMfaRow(userId: string): Promise<MfaRow | null> {
+  const uid = normalizeUuidOrNull(userId);
+  if (!uid) return null;
   const rows = (await sql`
     select
       user_id::text as user_id,
@@ -266,7 +303,7 @@ async function getMfaRow(userId: string): Promise<MfaRow | null> {
       recovery_codes_generated_at::text as recovery_codes_generated_at,
       enabled_at::text as enabled_at
     from public.user_mfa
-    where user_id = ${userId}::uuid
+    where user_id = ${uid}::uuid
     limit 1
   `) as unknown as MfaRow[];
   return rows?.[0] ?? null;
@@ -281,7 +318,9 @@ export async function getMfaStatus(userId: string): Promise<{
   if (!(await mfaTableExists())) {
     return { available: false, enabled: false, pendingSecret: null, recoveryCodesCount: 0 };
   }
-  const row = await getMfaRow(userId);
+  const uid = normalizeUuidOrNull(userId);
+  if (!uid) return { available: true, enabled: false, pendingSecret: null, recoveryCodesCount: 0 };
+  const row = await getMfaRow(uid);
   if (!row) return { available: true, enabled: false, pendingSecret: null, recoveryCodesCount: 0 };
   let pendingSecret: string | null = null;
   if (row.pending_secret) {
@@ -301,7 +340,9 @@ export async function getMfaStatus(userId: string): Promise<{
 
 export async function getOrCreatePendingMfaSecret(userId: string): Promise<string> {
   if (!(await mfaTableExists())) throw new Error("MFA_TABLE_MISSING");
-  const existing = await getMfaRow(userId);
+  const uid = normalizeUuidOrNull(userId);
+  if (!uid) throw new Error("BAD_REQUEST");
+  const existing = await getMfaRow(uid);
   if (existing?.pending_secret) {
     try {
       return decryptSecret(existing.pending_secret);
@@ -315,12 +356,12 @@ export async function getOrCreatePendingMfaSecret(userId: string): Promise<strin
     await sql`
       update public.user_mfa
       set pending_secret = ${encrypted}, updated_at = now()
-      where user_id = ${userId}::uuid
+      where user_id = ${uid}::uuid
     `;
   } else {
     await sql`
       insert into public.user_mfa (user_id, pending_secret, created_at, updated_at)
-      values (${userId}::uuid, ${encrypted}, now(), now())
+      values (${uid}::uuid, ${encrypted}, now(), now())
       on conflict (user_id)
       do update set pending_secret = excluded.pending_secret, updated_at = now()
     `;
@@ -329,14 +370,16 @@ export async function getOrCreatePendingMfaSecret(userId: string): Promise<strin
 }
 
 export function totpUri(secretBase32: string, email: string): string {
-  const label = encodeURIComponent(`${MFA_ISSUER}:${email}`);
+  const label = encodeURIComponent(`${MFA_ISSUER}:${normalizeEmail(email)}`);
   const issuer = encodeURIComponent(MFA_ISSUER);
   return `otpauth://totp/${label}?secret=${encodeURIComponent(secretBase32)}&issuer=${issuer}&algorithm=SHA1&digits=6&period=${TOTP_STEP_SECONDS}`;
 }
 
 export async function regenerateRecoveryCodes(userId: string): Promise<string[] | null> {
   if (!(await mfaTableExists())) return null;
-  const row = await getMfaRow(userId);
+  const uid = normalizeUuidOrNull(userId);
+  if (!uid) return null;
+  const row = await getMfaRow(uid);
   if (!row?.totp_secret || !row.enabled_at) return null;
   const codes: string[] = [];
   for (let i = 0; i < MFA_RECOVERY_CODES_COUNT; i += 1) {
@@ -349,14 +392,17 @@ export async function regenerateRecoveryCodes(userId: string): Promise<string[] 
       recovery_code_hashes = ${JSON.stringify(hashes)}::jsonb,
       recovery_codes_generated_at = now(),
       updated_at = now()
-    where user_id = ${userId}::uuid
+    where user_id = ${uid}::uuid
   `;
   return codes;
 }
 
 export async function enableMfa(args: { userId: string; code: string }): Promise<boolean> {
   if (!(await mfaTableExists())) return false;
-  const row = await getMfaRow(args.userId);
+  const userId = normalizeUuidOrNull(args.userId);
+  if (!userId) return false;
+  const code = normalizeCode(args.code);
+  const row = await getMfaRow(userId);
   if (!row?.pending_secret) return false;
   let pendingSecret: string;
   try {
@@ -364,11 +410,11 @@ export async function enableMfa(args: { userId: string; code: string }): Promise
   } catch {
     return false;
   }
-  if (!verifyTotp(pendingSecret, args.code)) return false;
+  if (!verifyTotp(pendingSecret, code)) return false;
   const encrypted = encryptSecret(pendingSecret);
   await sql`
     insert into public.user_mfa (user_id, totp_secret, pending_secret, enabled_at, created_at, updated_at)
-    values (${args.userId}::uuid, ${encrypted}, null, now(), now(), now())
+    values (${userId}::uuid, ${encrypted}, null, now(), now(), now())
     on conflict (user_id)
     do update set
       totp_secret = excluded.totp_secret,
@@ -376,13 +422,16 @@ export async function enableMfa(args: { userId: string; code: string }): Promise
       enabled_at = now(),
       updated_at = now()
   `;
-  await regenerateRecoveryCodes(args.userId);
+  await regenerateRecoveryCodes(userId);
   return true;
 }
 
 export async function verifyMfaCode(args: { userId: string; code: string }): Promise<boolean> {
   if (!(await mfaTableExists())) return false;
-  const row = await getMfaRow(args.userId);
+  const userId = normalizeUuidOrNull(args.userId);
+  if (!userId) return false;
+  const code = normalizeCode(args.code);
+  const row = await getMfaRow(userId);
   if (!row?.totp_secret || !row.enabled_at) return false;
   let secret: string;
   try {
@@ -390,16 +439,16 @@ export async function verifyMfaCode(args: { userId: string; code: string }): Pro
   } catch {
     return false;
   }
-  if (verifyTotp(secret, args.code)) {
+  if (verifyTotp(secret, code)) {
     await sql`
       update public.user_mfa
       set last_verified_at = now(), updated_at = now()
-      where user_id = ${args.userId}::uuid
+      where user_id = ${userId}::uuid
     `;
     return true;
   }
 
-  const codeHash = hashRecoveryCode(args.code);
+  const codeHash = hashRecoveryCode(code);
   const hashes = Array.isArray(row.recovery_code_hashes) ? row.recovery_code_hashes : [];
   const index = hashes.findIndex((h) => h === codeHash);
   if (index < 0) return false;
@@ -410,7 +459,7 @@ export async function verifyMfaCode(args: { userId: string; code: string }): Pro
       recovery_code_hashes = ${JSON.stringify(remaining)}::jsonb,
       last_verified_at = now(),
       updated_at = now()
-    where user_id = ${args.userId}::uuid
+    where user_id = ${userId}::uuid
   `;
   return true;
 }
