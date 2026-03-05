@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { readFileSync } from "node:fs";
 import { verifyApiKeyFromRequest } from "../src/lib/apiAuth";
 
 test.describe("api auth guard primitives", () => {
@@ -75,5 +76,13 @@ test.describe("api auth guard primitives", () => {
       expect(out.status).toBe(401);
       expect(out.error).toBe("INVALID_API_KEY_FORMAT");
     }
+  });
+
+  test("api auth helper includes control-character filtering", () => {
+    const code = readFileSync("src/lib/apiAuth.ts", "utf8");
+    expect(code.includes("CONTROL_CHARS_RE")).toBeTruthy();
+    expect(code.includes("CONTROL_CHARS_RE.test(x)")).toBeTruthy();
+    expect(code.includes("CONTROL_CHARS_RE.test(key)")).toBeTruthy();
+    expect(code.includes("CONTROL_CHARS_RE.test(remainder)")).toBeTruthy();
   });
 });

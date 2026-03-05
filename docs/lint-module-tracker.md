@@ -164,6 +164,8 @@ Remaining resweep modules in current pass: 0
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\v1\webhooks\test\route.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\viewer\office\route.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\v1\takedown\route.ts`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\v1\docs\route.ts`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\apiAuth.ts`
 
 ## Stale actions removed
 

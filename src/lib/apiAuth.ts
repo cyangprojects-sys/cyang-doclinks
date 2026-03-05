@@ -7,6 +7,7 @@ import { constantTimeEqual, hashApiKey } from "@/lib/apiKeys";
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const MAX_API_KEY_LEN = 512;
 const MAX_SUFFIX_LEN = 256;
+const CONTROL_CHARS_RE = /[\r\n\0]/;
 
 export type ApiAuthResult =
   | { ok: true; ownerId: string; apiKeyId: string; prefix: string }
@@ -22,15 +23,18 @@ function extractApiKey(req: Request): string | null {
   const h = req.headers;
 
   const x = (h.get("x-api-key") || "").trim().slice(0, MAX_API_KEY_LEN);
-  if (x) return x;
+  if (x) return CONTROL_CHARS_RE.test(x) ? null : x;
 
   const auth = (h.get("authorization") || "").trim().slice(0, MAX_API_KEY_LEN);
   if (!auth) return null;
 
   // Bearer <key>
   const m = auth.match(/^Bearer\s+(.+)$/i);
-  if (m?.[1]) return m[1].trim();
-  return auth;
+  if (m?.[1]) {
+    const key = m[1].trim();
+    return CONTROL_CHARS_RE.test(key) ? null : key;
+  }
+  return CONTROL_CHARS_RE.test(auth) ? null : auth;
 }
 
 function extractPrefix(plaintext: string): string | null {
@@ -42,7 +46,7 @@ function extractPrefix(plaintext: string): string | null {
   const p = parts[1];
   if (!/^[a-f0-9]{8}$/i.test(p)) return null;
   const remainder = parts.slice(2).join("_").trim().slice(0, MAX_SUFFIX_LEN);
-  if (!remainder) return null;
+  if (!remainder || CONTROL_CHARS_RE.test(remainder)) return null;
   return `cyk_${p}`;
 }
 
