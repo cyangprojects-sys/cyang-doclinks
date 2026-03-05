@@ -77,4 +77,14 @@ test.describe("api key helpers", () => {
     expect(constantTimeEqual("abcd", "abce")).toBeFalsy();
     expect(constantTimeEqual("abcd", "abc")).toBeFalsy();
   });
+
+  test("hash and compare helpers bound oversized plaintext inputs", () => {
+    process.env.API_KEY_SALT = "api-key-salt";
+    const oversized = `cyk_deadbeef_${"x".repeat(5000)}`;
+    const h1 = hashApiKey(oversized);
+    const h2 = hashApiKey(oversized);
+    expect(h1).toBe(h2);
+    expect(h1).toHaveLength(64);
+    expect(constantTimeEqual(oversized, oversized)).toBeTruthy();
+  });
 });

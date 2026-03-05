@@ -1,6 +1,8 @@
 // src/lib/apiKeys.ts
 import crypto from "crypto";
 
+const MAX_API_KEY_INPUT_LEN = 512;
+
 export type ApiKeyRecord = {
   id: string;
   owner_id: string;
@@ -27,12 +29,15 @@ export function generateApiKey(): { plaintext: string; prefix: string } {
 
 export function hashApiKey(plaintext: string): string {
   const salt = normSecretSalt();
-  return crypto.createHmac("sha256", salt).update(plaintext).digest("hex");
+  const key = String(plaintext || "").trim().slice(0, MAX_API_KEY_INPUT_LEN);
+  return crypto.createHmac("sha256", salt).update(key).digest("hex");
 }
 
 export function constantTimeEqual(a: string, b: string): boolean {
-  const ab = Buffer.from(a);
-  const bb = Buffer.from(b);
+  const aa = String(a || "").slice(0, MAX_API_KEY_INPUT_LEN);
+  const bbIn = String(b || "").slice(0, MAX_API_KEY_INPUT_LEN);
+  const ab = Buffer.from(aa, "utf8");
+  const bb = Buffer.from(bbIn, "utf8");
   if (ab.length !== bb.length) return false;
   return crypto.timingSafeEqual(ab, bb);
 }

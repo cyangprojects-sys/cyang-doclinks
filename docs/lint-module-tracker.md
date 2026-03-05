@@ -86,6 +86,7 @@ Status key: `done` | `pending`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\signup\page.tsx`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\accessTicket.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\apiAuth.ts`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\apiKeys.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\alias.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\audit.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\immutableAudit.ts`
