@@ -4,7 +4,7 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { requirePermission } from "@/lib/rbac";
 import { sql } from "@/lib/db";
-import { ensureStripeCustomer, stripeApi } from "@/lib/stripeClient";
+import { ensureStripeCustomer, safeStripeRedirectUrl, stripeApi } from "@/lib/stripeClient";
 import { getRouteTimeoutMs, isRouteTimeoutError, withRouteTimeout } from "@/lib/routeTimeout";
 import { assertRuntimeEnv, isRuntimeEnvError } from "@/lib/runtimeEnv";
 type StripeInvoiceLike = {
@@ -22,6 +22,23 @@ type StripeInvoiceLike = {
 };
 function errorMessage(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
+}
+
+function authErrorCode(e: unknown): "UNAUTHENTICATED" | "FORBIDDEN" | null {
+  const msg = errorMessage(e).trim();
+  if (msg === "UNAUTHENTICATED") return "UNAUTHENTICATED";
+  if (msg === "FORBIDDEN") return "FORBIDDEN";
+  return null;
+}
+
+function safeInvoiceUrl(value: unknown): string | null {
+  const raw = String(value || "").trim();
+  if (!raw) return null;
+  try {
+    return safeStripeRedirectUrl(raw);
+  } catch {
+    return null;
+  }
 }
 
 async function readExistingCustomerId(userId: string): Promise<string | null> {
@@ -85,8 +102,8 @@ export async function GET(req: NextRequest) {
             amountDue: Number(inv?.amount_due || 0),
             amountPaid: Number(inv?.amount_paid || 0),
             currency: String(inv?.currency || "usd").toUpperCase(),
-            hostedInvoiceUrl: inv?.hosted_invoice_url ? String(inv.hosted_invoice_url) : null,
-            invoicePdf: inv?.invoice_pdf ? String(inv.invoice_pdf) : null,
+            hostedInvoiceUrl: safeInvoiceUrl(inv?.hosted_invoice_url),
+            invoicePdf: safeInvoiceUrl(inv?.invoice_pdf),
             periodStart: Number(inv?.period_start || 0),
             periodEnd: Number(inv?.period_end || 0),
             created: Number(inv?.created || 0),
@@ -102,8 +119,11 @@ export async function GET(req: NextRequest) {
     if (isRouteTimeoutError(e)) {
       return NextResponse.json({ ok: false, error: "TIMEOUT" }, { status: 504 });
     }
-    const msg = errorMessage(e) || "failed";
-    if (msg === "FORBIDDEN" || msg === "UNAUTHENTICATED") {
+    const authCode = authErrorCode(e);
+    if (authCode === "UNAUTHENTICATED") {
+      return NextResponse.json({ ok: false, error: "UNAUTHENTICATED" }, { status: 401 });
+    }
+    if (authCode === "FORBIDDEN") {
       return NextResponse.json({ ok: false, error: "FORBIDDEN" }, { status: 403 });
     }
     return NextResponse.json({ ok: false, error: "BILLING_UPSTREAM_ERROR" }, { status: 502 });

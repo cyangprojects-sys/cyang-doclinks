@@ -10,6 +10,13 @@ import { getRouteTimeoutMs, isRouteTimeoutError, withRouteTimeout } from "@/lib/
 import { assertRuntimeEnv, isRuntimeEnvError } from "@/lib/runtimeEnv";
 import { resolvePublicAppBaseUrl } from "@/lib/publicBaseUrl";
 
+function authErrorCode(e: unknown): "UNAUTHENTICATED" | "FORBIDDEN" | null {
+  const msg = e instanceof Error ? e.message : String(e || "");
+  if (msg === "UNAUTHENTICATED") return "UNAUTHENTICATED";
+  if (msg === "FORBIDDEN") return "FORBIDDEN";
+  return null;
+}
+
 export async function POST(req: NextRequest) {
   let appBaseUrl: string;
   try {
@@ -64,11 +71,18 @@ export async function POST(req: NextRequest) {
       });
       return NextResponse.redirect(new URL("/admin/billing/stripe?error=TIMEOUT", appBaseUrl), { status: 303 });
     }
-    const msg = e instanceof Error ? e.message : String(e || "billing_sync_failed");
+    const authCode = authErrorCode(e);
     const safeError =
-      msg === "FORBIDDEN" || msg === "UNAUTHENTICATED"
+      authCode
         ? "FORBIDDEN"
         : "BILLING_SYNC_FAILED";
+    await logSecurityEvent({
+      type: "billing_maintenance_failed",
+      severity: "medium",
+      scope: "billing",
+      message: "Manual billing maintenance failed",
+      meta: { code: safeError },
+    });
     return NextResponse.redirect(new URL(`/admin/billing/stripe?error=${encodeURIComponent(safeError)}`, appBaseUrl), { status: 303 });
   }
 }

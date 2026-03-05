@@ -25,6 +25,13 @@ async function readExistingCustomerId(userId: string): Promise<string | null> {
   }
 }
 
+function authErrorCode(e: unknown): "UNAUTHENTICATED" | "FORBIDDEN" | null {
+  const msg = e instanceof Error ? e.message : String(e || "");
+  if (msg === "UNAUTHENTICATED") return "UNAUTHENTICATED";
+  if (msg === "FORBIDDEN") return "FORBIDDEN";
+  return null;
+}
+
 async function persistCustomerId(userId: string, customerId: string): Promise<void> {
   try {
     await sql`
@@ -101,8 +108,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.redirect(new URL("/admin/billing?error=TIMEOUT", appBaseUrl), { status: 303 });
     }
     const msg = e instanceof Error ? e.message : String(e || "portal_failed");
+    const authCode = authErrorCode(e);
     const safeError =
-      msg === "FORBIDDEN" || msg === "UNAUTHENTICATED"
+      authCode
         ? "FORBIDDEN"
         : msg === "STRIPE_SECRET_KEY is not configured"
           ? "ENV_MISCONFIGURED"

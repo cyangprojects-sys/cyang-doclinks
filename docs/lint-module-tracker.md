@@ -4,7 +4,7 @@ Total modules with lint warnings:
 66
 
 Remaining pending modules:
-41
+36
 
 Status key: `done` | `pending`
 
@@ -26,11 +26,11 @@ Status key: `done` | `pending`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\layout.tsx`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\abuse\route.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\audit\export\route.ts`
-- pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\billing\checkout\route.ts`
-- pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\billing\invoices\route.ts`
-- pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\billing\portal\route.ts`
-- pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\billing\status\route.ts`
-- pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\billing\sync\route.ts`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\billing\checkout\route.ts`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\billing\invoices\route.ts`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\billing\portal\route.ts`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\billing\status\route.ts`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\billing\sync\route.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\dbinfo\route.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\debug\route.ts`
 - pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\security\keys\route.ts`

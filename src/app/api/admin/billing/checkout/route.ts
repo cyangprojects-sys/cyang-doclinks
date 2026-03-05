@@ -20,6 +20,13 @@ function getProPriceId(): string {
   return ids[0];
 }
 
+function authErrorCode(e: unknown): "UNAUTHENTICATED" | "FORBIDDEN" | null {
+  const msg = e instanceof Error ? e.message : String(e || "");
+  if (msg === "UNAUTHENTICATED") return "UNAUTHENTICATED";
+  if (msg === "FORBIDDEN") return "FORBIDDEN";
+  return null;
+}
+
 async function readExistingCustomerId(userId: string): Promise<string | null> {
   try {
     const rows = (await sql`
@@ -119,8 +126,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.redirect(new URL("/admin/billing?error=TIMEOUT", appBaseUrl), { status: 303 });
     }
     const msg = e instanceof Error ? e.message : String(e || "checkout_failed");
+    const authCode = authErrorCode(e);
     const safeError =
-      msg === "FORBIDDEN" || msg === "UNAUTHENTICATED"
+      authCode
         ? "FORBIDDEN"
         : msg === "STRIPE_PRO_PRICE_IDS is not configured"
           ? "ENV_MISCONFIGURED"
