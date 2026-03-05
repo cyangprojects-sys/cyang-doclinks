@@ -663,7 +663,24 @@ try {
       return NextResponse.json({ ok: false, error: "alias_generation_failed" }, { status: 500 });
     }
 
-    const baseUrl = resolvePublicAppBaseUrl(req.url);
+    let baseUrl: string;
+    try {
+      baseUrl = resolvePublicAppBaseUrl(req.url);
+    } catch (e: unknown) {
+      // Do not fail upload finalization due to APP_URL/NEXTAUTH_URL configuration.
+      // Fallback to request origin so client still receives a usable link.
+      const reqOrigin = new URL(req.url).origin;
+      await logSecurityEvent({
+        type: "upload_complete_base_url_fallback",
+        severity: "medium",
+        ip: ipInfo.ip,
+        docId,
+        scope: "upload_complete",
+        message: "Fell back to request origin because configured public base URL is invalid",
+        meta: { error: errorMessage(e), reqOrigin },
+      });
+      baseUrl = reqOrigin;
+    }
 
         await logSecurityEvent({
           type: "upload_complete_success",
