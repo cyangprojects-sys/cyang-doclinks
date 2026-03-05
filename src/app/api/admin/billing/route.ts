@@ -5,12 +5,19 @@ import { NextResponse } from "next/server";
 import { requirePermission } from "@/lib/rbac";
 import { setBillingFlags, getBillingFlags } from "@/lib/settings";
 import { resolvePublicAppBaseUrl } from "@/lib/publicBaseUrl";
+const MAX_BILLING_SETTINGS_FORM_BYTES = 8 * 1024;
 
 function asCheckboxBool(v: FormDataEntryValue | null): boolean {
   // unchecked checkboxes are absent
   if (v == null) return false;
   const s = String(v).toLowerCase();
   return s === "on" || s === "true" || s === "1" || s === "yes";
+}
+
+function parseFormBodyLength(req: Request): number {
+  const raw = String(req.headers.get("content-length") || "").trim();
+  const size = Number(raw);
+  return Number.isFinite(size) && size > 0 ? size : 0;
 }
 
 export async function GET() {
@@ -24,6 +31,12 @@ export async function POST(req: Request) {
 
   try {
     await requirePermission("billing.manage");
+    if (parseFormBodyLength(req) > MAX_BILLING_SETTINGS_FORM_BYTES) {
+      const url = new URL("/admin/billing", base);
+      url.searchParams.set("error", "PAYLOAD_TOO_LARGE");
+      return NextResponse.redirect(url, { status: 303 });
+    }
+
     const form = await req.formData();
     const next = {
       enforcePlanLimits: asCheckboxBool(form.get("enforcePlanLimits")),

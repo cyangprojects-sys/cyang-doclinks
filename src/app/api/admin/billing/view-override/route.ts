@@ -7,6 +7,13 @@ import { clearViewLimitOverride, setViewLimitOverride } from "@/lib/viewLimitOve
 import { appendImmutableAudit } from "@/lib/immutableAudit";
 import { logSecurityEvent } from "@/lib/securityTelemetry";
 import { resolvePublicAppBaseUrl } from "@/lib/publicBaseUrl";
+const MAX_BILLING_OVERRIDE_FORM_BYTES = 8 * 1024;
+
+function parseFormBodyLength(req: Request): number {
+  const raw = String(req.headers.get("content-length") || "").trim();
+  const size = Number(raw);
+  return Number.isFinite(size) && size > 0 ? size : 0;
+}
 
 export async function POST(req: Request) {
   let appBaseUrl: string;
@@ -18,6 +25,10 @@ export async function POST(req: Request) {
 
   try {
     const u = await requirePermission("billing.override");
+    if (parseFormBodyLength(req) > MAX_BILLING_OVERRIDE_FORM_BYTES) {
+      return NextResponse.redirect(new URL("/admin/billing?error=PAYLOAD_TOO_LARGE", appBaseUrl), { status: 303 });
+    }
+
     const form = await req.formData();
     const action = String(form.get("action") || "").trim();
     const ownerId = String(form.get("ownerId") || u.id).trim();

@@ -6,6 +6,13 @@ import { resolvePublicAppBaseUrl } from "@/lib/publicBaseUrl";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+const MAX_REQUEUE_SCANS_BODY_BYTES = 4 * 1024;
+
+function parseBodyLength(req: Request): number {
+  const raw = String(req.headers.get("content-length") || "").trim();
+  const size = Number(raw);
+  return Number.isFinite(size) && size > 0 ? size : 0;
+}
 
 export async function POST(req: Request) {
   let appBaseUrl: string;
@@ -17,6 +24,9 @@ export async function POST(req: Request) {
 
   try {
     const u = await requireRole("owner");
+    if (parseBodyLength(req) > MAX_REQUEUE_SCANS_BODY_BYTES) {
+      return NextResponse.redirect(new URL("/admin/security?error=PAYLOAD_TOO_LARGE", appBaseUrl), { status: 303 });
+    }
 
     const rows = (await sql`
       with candidates as (

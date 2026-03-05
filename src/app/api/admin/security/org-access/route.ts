@@ -14,9 +14,16 @@ import { resolvePublicAppBaseUrl } from "@/lib/publicBaseUrl";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+const MAX_ORG_ACCESS_FORM_BYTES = 8 * 1024;
 
 function normEmail(email: unknown): string {
   return String(email || "").trim().toLowerCase();
+}
+
+function parseFormBodyLength(req: Request): number {
+  const raw = String(req.headers.get("content-length") || "").trim();
+  const size = Number(raw);
+  return Number.isFinite(size) && size > 0 ? size : 0;
 }
 
 function parseRole(role: unknown): Role | null {
@@ -62,6 +69,10 @@ export async function POST(req: Request) {
     const u = await requireOwnerInOrg();
     if (!(await orgMembershipTablesReady())) {
       return NextResponse.json({ ok: false, error: "TABLES_MISSING" }, { status: 409 });
+    }
+
+    if (parseFormBodyLength(req) > MAX_ORG_ACCESS_FORM_BYTES) {
+      return NextResponse.redirect(new URL("/admin/security?error=PAYLOAD_TOO_LARGE", appBaseUrl), { status: 303 });
     }
 
     const form = await req.formData();

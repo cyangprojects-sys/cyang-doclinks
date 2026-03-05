@@ -13,4 +13,10 @@ test.describe("admin security control route guardrails", () => {
       expect(code.includes('error: "PAYLOAD_TOO_LARGE"')).toBeTruthy();
     }
   });
+
+  test("requeue-scans route enforces payload-size checks", () => {
+    const code = readFileSync("src/app/api/admin/security/requeue-scans/route.ts", "utf8");
+    expect(code.includes("parseBodyLength(")).toBeTruthy();
+    expect(code.includes('error=PAYLOAD_TOO_LARGE')).toBeTruthy();
+  });
 });
