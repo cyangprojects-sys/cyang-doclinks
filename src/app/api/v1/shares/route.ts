@@ -14,8 +14,14 @@ import { resolvePublicAppBaseUrl } from "@/lib/publicBaseUrl";
 import { DEFAULT_SHARE_SETTINGS, PRO_PACK_UPSELL_MESSAGE, applyPack, getPackById, isPackAvailableForPlan } from "@/lib/packs";
 import { getShareEligibility } from "@/lib/documentStatus";
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 function newToken(): string {
   return crypto.randomBytes(16).toString("hex");
+}
+
+function isUuid(value: string): boolean {
+  return UUID_RE.test(String(value || "").trim());
 }
 
 export async function POST(req: NextRequest) {
@@ -49,6 +55,7 @@ export async function POST(req: NextRequest) {
 
   const docId = String(body?.doc_id || body?.docId || "").trim();
   if (!docId) return NextResponse.json({ ok: false, error: "MISSING_DOC_ID" }, { status: 400 });
+  if (!isUuid(docId)) return NextResponse.json({ ok: false, error: "INVALID_DOC_ID" }, { status: 400 });
 
   const docRows = (await sql`
     select

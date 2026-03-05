@@ -7,6 +7,18 @@ import { verifyApiKeyFromRequest } from "@/lib/apiAuth";
 import { processWebhookDeliveries } from "@/lib/webhooks";
 import { clientIpKey, enforceGlobalApiRateLimit, logSecurityEvent } from "@/lib/securityTelemetry";
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function isUuid(value: string): boolean {
+  return UUID_RE.test(String(value || "").trim());
+}
+
+function safeWebhookMessage(value: unknown): string {
+  const text = String(value ?? "").trim();
+  if (!text) return "Hello from cyang.io";
+  return text.slice(0, 1000);
+}
+
 export async function POST(req: NextRequest) {
   const requestIp = clientIpKey(req).ip;
   const rl = await enforceGlobalApiRateLimit({
@@ -36,6 +48,9 @@ export async function POST(req: NextRequest) {
   }
 
   const webhookId = String(body?.webhook_id || body?.webhookId || "").trim() || null;
+  if (webhookId && !isUuid(webhookId)) {
+    return NextResponse.json({ ok: false, error: "INVALID_WEBHOOK_ID" }, { status: 400 });
+  }
 
   // Load hooks
   const hooks = webhookId
@@ -65,7 +80,7 @@ export async function POST(req: NextRequest) {
     for (const h of hooks) {
       const payload = {
         test: true,
-        message: body?.message || "Hello from cyang.io",
+        message: safeWebhookMessage(body?.message),
         requested_at: new Date().toISOString(),
         api_key_prefix: auth.prefix,
       };

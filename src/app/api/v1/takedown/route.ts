@@ -21,10 +21,16 @@ type Body = {
   signature?: string | null;
 };
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 function norm(s: unknown, max = 4000): string | null {
   const v = String(s ?? "").trim();
   if (!v) return null;
   return v.length > max ? v.slice(0, max) : v;
+}
+
+function isUuid(value: string): boolean {
+  return UUID_RE.test(String(value || "").trim());
 }
 
 export async function POST(req: NextRequest) {
@@ -47,6 +53,9 @@ export async function POST(req: NextRequest) {
   const token = norm(body.token, 256);
   const alias = norm(body.alias, 256)?.toLowerCase() ?? null;
   const docIdInput = norm(body.doc_id, 128);
+  if (docIdInput && !isUuid(docIdInput)) {
+    return NextResponse.json({ ok: false, error: "INVALID_DOC_ID" }, { status: 400 });
+  }
 
   const requesterName = norm(body.requester_name, 256);
   const requesterEmail = norm(body.requester_email, 256)?.toLowerCase() ?? null;
@@ -76,6 +85,9 @@ export async function POST(req: NextRequest) {
     }
   } catch {
     // ignore resolution errors; we still store notice
+  }
+  if (docId && !isUuid(docId)) {
+    docId = null;
   }
 
   const rows = (await sql`
