@@ -25,5 +25,7 @@ test.describe("non-api oauth route guardrails", () => {
     expect(code.includes("RATE_LIMIT_ORG_AUTH_START_IP_PER_MIN")).toBeTruthy();
     expect(code.includes("SLUG_RE")).toBeTruthy();
     expect(code.includes("INVITE_TOKEN_MAX")).toBeTruthy();
+    expect(code.includes("INVITE_TOKEN_RE")).toBeTruthy();
+    expect(code.includes("toLowerCase()")).toBeTruthy();
   });
 });

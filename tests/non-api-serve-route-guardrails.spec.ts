@@ -32,6 +32,8 @@ test.describe("non-api serving route guardrails", () => {
 
   test("/t/[ticketId] consumes ticket and enforces ticket/IP controls", () => {
     const code = src("src/app/t/[ticketId]/route.ts");
+    expect(code.includes("UUID_RE")).toBeTruthy();
+    expect(code.includes("if (!isUuid(ticketId))")).toBeTruthy();
     expect(code.includes("consumeAccessTicket(")).toBeTruthy();
     expect(code.includes("enforceGlobalApiRateLimit(")).toBeTruthy();
     expect(code.includes("allowUnencryptedServing(")).toBeTruthy();

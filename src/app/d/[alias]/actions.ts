@@ -43,8 +43,20 @@ export type RevokeShareResult =
   | { ok: true; token: string }
   | { ok: false; error: string; message?: string };
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const SHARE_TOKEN_RE =
+  /^(?:[a-f0-9]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i;
+
 function newToken(): string {
   return randomBytes(16).toString("hex");
+}
+
+function isUuid(value: string): boolean {
+  return UUID_RE.test(String(value || "").trim());
+}
+
+function isShareToken(value: string): boolean {
+  return SHARE_TOKEN_RE.test(String(value || "").trim());
 }
 
 function baseUrlFromEnv(): string {
@@ -149,6 +161,8 @@ export async function createAndEmailShareToken(
 
     if (!docId)
       return { ok: false, error: "bad_request", message: "Missing docId" };
+    if (!isUuid(docId))
+      return { ok: false, error: "invalid_doc_id", message: "Invalid docId" };
 
     await requireDocWrite(docId);
 
@@ -380,6 +394,11 @@ export async function getShareStatsByToken(
   token: string
 ): Promise<ShareStatsResult> {
   try {
+    const tokenValue = String(token || "").trim();
+    if (!isShareToken(tokenValue)) {
+      return { ok: false, error: "invalid_token", message: "Invalid token" };
+    }
+
     let rows: Array<{
       token: string;
       doc_id: string;
@@ -407,7 +426,7 @@ export async function getShareStatsByToken(
           pack_id::text as pack_id,
           pack_version::int as pack_version
         from public.share_tokens
-        where token = ${token}
+        where token = ${tokenValue}
         limit 1
       `) as unknown as typeof rows;
     } catch {
@@ -424,7 +443,7 @@ export async function getShareStatsByToken(
           null::text as pack_id,
           null::int as pack_version
         from public.share_tokens
-        where token = ${token}
+        where token = ${tokenValue}
         limit 1
       `) as unknown as typeof rows;
     }
@@ -458,11 +477,16 @@ export async function revokeShareToken(
   token: string
 ): Promise<RevokeShareResult> {
   try {
+    const tokenValue = String(token || "").trim();
+    if (!isShareToken(tokenValue)) {
+      return { ok: false, error: "invalid_token", message: "Invalid token" };
+    }
+
     // Lookup doc_id first so we can enforce ownership.
     const rows = (await sql`
       select doc_id::text as doc_id
       from public.share_tokens
-      where token = ${token}
+      where token = ${tokenValue}
       limit 1
     `) as unknown as Array<{ doc_id: string }>;
 
@@ -474,10 +498,10 @@ export async function revokeShareToken(
     await sql`
       update public.share_tokens
       set revoked_at = now()
-      where token = ${token}
+      where token = ${tokenValue}
     `;
 
-    return { ok: true, token };
+    return { ok: true, token: tokenValue };
   } catch (e: unknown) {
     return { ok: false, error: "exception", message: "Unable to revoke share." };
   }

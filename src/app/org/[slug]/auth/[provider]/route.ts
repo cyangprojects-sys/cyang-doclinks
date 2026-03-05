@@ -11,6 +11,7 @@ export const dynamic = "force-dynamic";
 const ALLOWED = new Set(["google", "enterprise-oidc"]);
 const SLUG_RE = /^[a-z0-9][a-z0-9-]{0,63}$/i;
 const INVITE_TOKEN_MAX = 512;
+const INVITE_TOKEN_RE = /^[A-Za-z0-9_-]{16,128}$/;
 
 type RouteCtx = {
   // Next.js typings changed in recent versions: `params` may be a Promise.
@@ -33,7 +34,7 @@ export async function GET(req: NextRequest, ctx: RouteCtx) {
 
   const params = await Promise.resolve(ctx.params);
   const slug = String(params?.slug || "").trim().toLowerCase();
-  const provider = String(params?.provider || "").trim();
+  const provider = String(params?.provider || "").trim().toLowerCase();
 
   let appBaseUrl: string;
   try {
@@ -55,7 +56,8 @@ export async function GET(req: NextRequest, ctx: RouteCtx) {
     return NextResponse.redirect(new URL(`/org/${encodeURIComponent(slug)}/login`, appBaseUrl));
   }
 
-  const inviteToken = String(new URL(req.url).searchParams.get("invite") || "").trim().slice(0, INVITE_TOKEN_MAX);
+  const inviteTokenRaw = String(new URL(req.url).searchParams.get("invite") || "").trim().slice(0, INVITE_TOKEN_MAX);
+  const inviteToken = INVITE_TOKEN_RE.test(inviteTokenRaw) ? inviteTokenRaw : "";
 
   // Bind org to this browser (httpOnly so JS can't tamper with it).
   const res = NextResponse.redirect(

@@ -18,8 +18,12 @@ import { assertRuntimeEnv, isRuntimeEnvError } from "@/lib/runtimeEnv";
 import { detectFileFamily, isMicrosoftOfficeDocument } from "@/lib/fileFamily";
 import { resolvePublicAppBaseUrl } from "@/lib/publicBaseUrl";
 
-function normAlias(alias: string): string {
-  return decodeURIComponent(String(alias || "")).trim().toLowerCase();
+function normalizeAlias(alias: string): string | null {
+  try {
+    return decodeURIComponent(String(alias || "")).trim().toLowerCase();
+  } catch {
+    return null;
+  }
 }
 
 function isExpired(expiresAt: string | null): boolean {
@@ -45,7 +49,7 @@ async function getAliasRow(aliasInput: string): Promise<
   | { ok: true; docId: string; revokedAt: string | null; expiresAt: string | null; passwordHash: string | null }
   | { ok: false }
 > {
-  const alias = normAlias(aliasInput);
+  const alias = String(aliasInput || "").trim().toLowerCase();
   if (!alias) return { ok: false };
 
   // Preferred: doc_aliases
@@ -186,7 +190,7 @@ export async function GET(
     }
 
     const { alias: rawAlias } = await ctx.params;
-    const alias = normAlias(rawAlias || "");
+    const alias = normalizeAlias(rawAlias || "");
     const ip = clientIpKey(req).ip;
     const deny = async (reason: string, status = 404) => {
       await logSecurityEvent({

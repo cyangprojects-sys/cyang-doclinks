@@ -18,6 +18,12 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function isUuid(value: string): boolean {
+  return UUID_RE.test(String(value || "").trim());
+}
+
 function isBlockedTopLevelTicketOpen(req: NextRequest): boolean {
   const dest = (req.headers.get("sec-fetch-dest") || "").toLowerCase();
   const mode = (req.headers.get("sec-fetch-mode") || "").toLowerCase();
@@ -171,6 +177,12 @@ export async function GET(
   }
 
   const { ticketId } = await params;
+  if (!isUuid(ticketId)) {
+    return new NextResponse("Not found", {
+      status: 404,
+      headers: secureDocHeaders(),
+    });
+  }
   const topLevelOpen = isBlockedTopLevelTicketOpen(req);
 
   if (topLevelOpen) {

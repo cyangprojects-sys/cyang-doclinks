@@ -4,7 +4,7 @@ Total modules with lint warnings:
 66
 
 Remaining pending modules:
-25
+21
 
 Status key: `done` | `pending`
 
@@ -50,12 +50,12 @@ Status key: `done` | `pending`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\v1\takedown\route.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\v1\webhooks\test\route.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\components\SecurePdfCanvasViewer.tsx`
-- pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\d\[alias]\actions.ts`
-- pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\d\[alias]\raw\route.ts`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\d\[alias]\actions.ts`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\d\[alias]\raw\route.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\d\[alias]\ShareForm.tsx`
-- pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\org\[slug]\auth\[provider]\route.ts`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\org\[slug]\auth\[provider]\route.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\report\ReportForm.tsx`
-- pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\t\[ticketId]\route.ts`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\t\[ticketId]\route.ts`
 - pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\auth.ts`
 - pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\authz.ts`
 - pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\billingSubscription.ts`
