@@ -17,9 +17,20 @@ type Action =
 
 type JsonBody = Record<string, unknown>;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const MAX_ADMIN_ABUSE_BODY_BYTES = 32 * 1024;
+const MAX_SHARE_TOKEN_LEN = 256;
+const MAX_REASON_LEN = 500;
+const MAX_NOTES_LEN = 2000;
+const ALLOWED_ACTIONS = new Set(["disable_doc", "override_quarantine", "revoke_override", "revoke_share", "close_report"]);
+
+function parseJsonBodyLength(req: NextRequest): number {
+  const raw = String(req.headers.get("content-length") || "").trim();
+  const out = Number(raw);
+  return Number.isFinite(out) ? Math.max(0, Math.floor(out)) : 0;
+}
 
 function norm(s: unknown): string {
-  return String(s || "").trim();
+  return String(s || "").replace(/[\r\n]+/g, " ").trim();
 }
 
 function isUuid(value: string): boolean {
@@ -32,7 +43,8 @@ function bodyString(body: JsonBody, key: string): string {
 function bodyOptString(body: JsonBody, key: string, max: number): string | null {
   const v = body[key];
   if (v == null) return null;
-  const s = String(v).trim();
+  const s = String(v).replace(/[\r\n]+/g, " ").trim();
+  if (/[\0]/.test(s)) return null;
   return s ? s.slice(0, max) : null;
 }
 
@@ -61,18 +73,28 @@ export async function POST(req: NextRequest) {
       { status: rl.status, headers: { "Retry-After": String(rl.retryAfterSeconds) } }
     );
   }
+  if (parseJsonBodyLength(req) > MAX_ADMIN_ABUSE_BODY_BYTES) {
+    return NextResponse.json({ ok: false, error: "PAYLOAD_TOO_LARGE" }, { status: 413 });
+  }
 
   let body: Action;
   let rawBody: JsonBody;
   try {
-    rawBody = (await req.json()) as JsonBody;
+    const parsed = await req.json();
+    rawBody = parsed && typeof parsed === "object" && !Array.isArray(parsed) ? (parsed as JsonBody) : ({} as JsonBody);
     body = rawBody as Action;
   } catch {
     return NextResponse.json({ ok: false, error: "BAD_JSON" }, { status: 400 });
   }
+  if (!rawBody || !Object.keys(rawBody).length) {
+    return NextResponse.json({ ok: false, error: "BAD_JSON" }, { status: 400 });
+  }
 
   const act = bodyString(rawBody, "action");
-  const reason = bodyOptString(rawBody, "reason", 500);
+  if (!ALLOWED_ACTIONS.has(act)) {
+    return NextResponse.json({ ok: false, error: "UNKNOWN_ACTION" }, { status: 400 });
+  }
+  const reason = bodyOptString(rawBody, "reason", MAX_REASON_LEN);
 
   if (act === "disable_doc") {
     const docId = bodyString(rawBody, "docId");
@@ -212,6 +234,9 @@ export async function POST(req: NextRequest) {
   if (act === "revoke_share") {
     const token = bodyString(rawBody, "token");
     if (!token) return NextResponse.json({ ok: false, error: "MISSING_TOKEN" }, { status: 400 });
+    if (token.length > MAX_SHARE_TOKEN_LEN || /[\r\n\0\s]/.test(token)) {
+      return NextResponse.json({ ok: false, error: "INVALID_TOKEN" }, { status: 400 });
+    }
 
     await sql`
       update public.share_tokens
@@ -253,7 +278,7 @@ export async function POST(req: NextRequest) {
 
   if (act === "close_report") {
     const reportId = bodyString(rawBody, "reportId");
-    const notes = bodyOptString(rawBody, "notes", 2000);
+    const notes = bodyOptString(rawBody, "notes", MAX_NOTES_LEN);
     if (!reportId) return NextResponse.json({ ok: false, error: "MISSING_REPORT" }, { status: 400 });
     if (!isUuid(reportId)) return NextResponse.json({ ok: false, error: "INVALID_REPORT" }, { status: 400 });
 
