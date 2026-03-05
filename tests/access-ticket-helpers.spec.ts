@@ -103,4 +103,11 @@ test.describe("access ticket helpers", () => {
     expect(ticketTtlSeconds()).toBe(1);
     expect(signedUrlTtlSeconds()).toBe(1);
   });
+
+  test("caps ttl values to short-lived maximums", () => {
+    process.env.ACCESS_TICKET_TTL_SECONDS = "999999";
+    process.env.ACCESS_TICKET_SIGNED_URL_TTL_SECONDS = "999999";
+    expect(ticketTtlSeconds()).toBe(300);
+    expect(signedUrlTtlSeconds()).toBe(300);
+  });
 });

@@ -13,6 +13,12 @@
 import crypto from "crypto";
 import { sql } from "@/lib/db";
 
+const MAX_LIMIT = 10_000;
+const MAX_WINDOW_SECONDS = 86_400;
+const MAX_SCOPE_LEN = 96;
+const MAX_ID_LEN = 256;
+const MAX_HASH_INPUT_LEN = 2048;
+
 export type RateLimitResult = {
   ok: boolean;
   limit: number;
@@ -30,18 +36,29 @@ function bucketFor(windowSeconds: number, epochSeconds: number): number {
   return Math.floor(epochSeconds / windowSeconds);
 }
 
+function boundedInt(raw: unknown, fallback: number, min: number, max: number): number {
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(max, Math.max(min, Math.floor(n)));
+}
+
+function normalizeKey(value: unknown, maxLen: number): string {
+  return String(value || "").trim().slice(0, maxLen);
+}
+
 export function stableHash(input: string, saltEnv: string = "VIEW_SALT"): string {
   const salt = (process.env[saltEnv] || process.env.VIEW_SALT || process.env.NEXTAUTH_SECRET || "").trim();
+  const safeInput = String(input || "").slice(0, MAX_HASH_INPUT_LEN);
   if (!salt) {
     const allowInsecureFallback =
       String(process.env.DEV_ALLOW_INSECURE_FALLBACK || "").trim() === "1" &&
       process.env.NODE_ENV !== "production";
     if (allowInsecureFallback) {
-      return crypto.createHash("sha256").update(input || "").digest("hex").slice(0, 32);
+      return crypto.createHash("sha256").update(safeInput).digest("hex").slice(0, 32);
     }
     throw new Error("Missing hashing secret (set VIEW_SALT or NEXTAUTH_SECRET).");
   }
-  return crypto.createHmac("sha256", salt).update(input || "").digest("hex").slice(0, 32);
+  return crypto.createHmac("sha256", salt).update(safeInput).digest("hex").slice(0, 32);
 }
 
 export async function rateLimit(args: {
@@ -51,10 +68,24 @@ export async function rateLimit(args: {
   windowSeconds: number;
   failClosed?: boolean;
 }): Promise<RateLimitResult> {
-  const limit = Math.max(1, Math.floor(args.limit));
-  const windowSeconds = Math.max(1, Math.floor(args.windowSeconds));
+  const limit = boundedInt(args.limit, 1, 1, MAX_LIMIT);
+  const windowSeconds = boundedInt(args.windowSeconds, 60, 1, MAX_WINDOW_SECONDS);
+  const scope = normalizeKey(args.scope, MAX_SCOPE_LEN);
+  const id = normalizeKey(args.id, MAX_ID_LEN);
   const now = nowEpochSeconds();
   const bucket = bucketFor(windowSeconds, now);
+  const failClosed = Boolean(args.failClosed);
+
+  if (!scope || !id) {
+    return {
+      ok: false,
+      limit,
+      remaining: 0,
+      resetSeconds: windowSeconds,
+      bucket,
+      count: limit + 1,
+    };
+  }
 
   // reset at next bucket boundary
   const resetSeconds = (bucket + 1) * windowSeconds - now;
@@ -62,7 +93,7 @@ export async function rateLimit(args: {
   try {
     const rows = (await sql`
       insert into public.rate_limit_counters (scope, id, bucket, count)
-      values (${args.scope}, ${args.id}, ${bucket}::bigint, 1)
+      values (${scope}, ${id}, ${bucket}::bigint, 1)
       on conflict (scope, id, bucket)
       do update set
         count = public.rate_limit_counters.count + 1,
@@ -82,7 +113,7 @@ export async function rateLimit(args: {
     };
   } catch {
     // If the table is missing or DB is unavailable, optionally fail closed.
-    if (args.failClosed) {
+    if (failClosed) {
       return {
         ok: false,
         limit,

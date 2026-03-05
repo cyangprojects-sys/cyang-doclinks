@@ -4,6 +4,35 @@ import { getClientIp } from "@/lib/view";
 
 export type AccessTicketPurpose = "preview_view" | "file_download" | "watermarked_file_download";
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const MAX_TICKET_TTL_SECONDS = 300;
+const MAX_SIGNED_URL_TTL_SECONDS = 300;
+const MAX_ALIAS_LEN = 128;
+const MAX_SHARE_TOKEN_LEN = 256;
+const MAX_BUCKET_LEN = 128;
+const MAX_KEY_LEN = 1024;
+const MAX_CONTENT_TYPE_LEN = 128;
+const MAX_CONTENT_DISPOSITION_LEN = 256;
+const MAX_REPLAY_GRACE_SECONDS = 300;
+
+function boundedInt(raw: unknown, fallback: number, min: number, max: number): number {
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(max, Math.max(min, Math.floor(n)));
+}
+
+function normalizeUuidOrNull(value: unknown): string | null {
+  const s = String(value || "").trim();
+  if (!s) return null;
+  return UUID_RE.test(s) ? s : null;
+}
+
+function normalizeTextOrNull(value: unknown, maxLen: number): string | null {
+  const s = String(value || "").trim();
+  if (!s) return null;
+  return s.slice(0, maxLen);
+}
+
 function bindingSecret() {
   const viewSalt = (process.env.VIEW_SALT || "").trim();
   if (viewSalt) return viewSalt;
@@ -38,16 +67,17 @@ export function hashIpForTicket(ip: string | null | undefined) {
 
 export function ticketTtlSeconds() {
   // Ticket itself should be very short-lived; this is the "exchange" window.
-  const raw = Number(process.env.ACCESS_TICKET_TTL_SECONDS || 30);
-  if (!Number.isFinite(raw)) return 30;
-  return Math.max(1, Math.floor(raw));
+  return boundedInt(process.env.ACCESS_TICKET_TTL_SECONDS || 30, 30, 1, MAX_TICKET_TTL_SECONDS);
 }
 
 export function signedUrlTtlSeconds() {
   // Signed URL minted *from* a ticket should be even shorter-lived than normal.
-  const raw = Number(process.env.ACCESS_TICKET_SIGNED_URL_TTL_SECONDS || 30);
-  if (!Number.isFinite(raw)) return 30;
-  return Math.max(1, Math.floor(raw));
+  return boundedInt(
+    process.env.ACCESS_TICKET_SIGNED_URL_TTL_SECONDS || 30,
+    30,
+    1,
+    MAX_SIGNED_URL_TTL_SECONDS
+  );
 }
 
 export async function mintAccessTicket(args: {
@@ -66,13 +96,21 @@ export async function mintAccessTicket(args: {
 
   const ipHash = hashIpForTicket(ip);
   const uaHash = hashUserAgent(ua);
+  const safeDocId = normalizeUuidOrNull(args.docId);
+  const safeShareToken = normalizeTextOrNull(args.shareToken, MAX_SHARE_TOKEN_LEN);
+  const safeAlias = normalizeTextOrNull(args.alias, MAX_ALIAS_LEN);
+  const safeBucket = normalizeTextOrNull(args.r2Bucket, MAX_BUCKET_LEN);
+  const safeKey = normalizeTextOrNull(args.r2Key, MAX_KEY_LEN);
+  const safeContentType = normalizeTextOrNull(args.responseContentType, MAX_CONTENT_TYPE_LEN);
+  const safeDisposition = normalizeTextOrNull(args.responseContentDisposition, MAX_CONTENT_DISPOSITION_LEN);
+  if (!safeBucket || !safeKey || !safeContentType || !safeDisposition) return null;
 
   const ttl = ticketTtlSeconds();
   const rows = (await sql`
     insert into public.access_tickets
       (doc_id, share_token, alias, purpose, r2_bucket, r2_key, response_content_type, response_content_disposition, ip_hash, ua_hash, expires_at)
     values
-      (${args.docId ?? null}::uuid, ${args.shareToken ?? null}, ${args.alias ?? null}, ${args.purpose}, ${args.r2Bucket}, ${args.r2Key}, ${args.responseContentType}, ${args.responseContentDisposition}, ${ipHash}, ${uaHash}, now() + (${ttl}::text || ' seconds')::interval)
+      (${safeDocId}::uuid, ${safeShareToken}, ${safeAlias}, ${args.purpose}, ${safeBucket}, ${safeKey}, ${safeContentType}, ${safeDisposition}, ${ipHash}, ${uaHash}, now() + (${ttl}::text || ' seconds')::interval)
     returning id::text as id
   `) as unknown as Array<{ id: string }>;
 
@@ -80,6 +118,9 @@ export async function mintAccessTicket(args: {
 }
 
 export async function consumeAccessTicket(args: { req: Request; ticketId: string }) {
+  const ticketId = normalizeUuidOrNull(args.ticketId);
+  if (!ticketId) return { ok: false as const };
+
   const ip = getClientIp(args.req);
   const ua = args.req.headers.get("user-agent") || null;
 
@@ -102,19 +143,31 @@ export async function consumeAccessTicket(args: { req: Request; ticketId: string
   const replayEnabled = !["0", "false", "no", "off"].includes(
     String(process.env.ACCESS_TICKET_REPLAY_ENABLED || "false").trim().toLowerCase()
   );
-  const replayGracePreview = Math.max(0, Number(process.env.ACCESS_TICKET_REPLAY_GRACE_SECONDS_PREVIEW || 20));
+  const replayGracePreview = boundedInt(
+    process.env.ACCESS_TICKET_REPLAY_GRACE_SECONDS_PREVIEW || 20,
+    20,
+    0,
+    MAX_REPLAY_GRACE_SECONDS
+  );
   // Browsers may issue near-simultaneous duplicate navigations for attachment downloads.
   // Keep a short replay window to avoid false "Not found" on legitimate download clicks.
-  const replayGraceDownload = Math.max(0, Number(process.env.ACCESS_TICKET_REPLAY_GRACE_SECONDS_DOWNLOAD || 0));
-  const replayGraceWatermarked = Math.max(
+  const replayGraceDownload = boundedInt(
+    process.env.ACCESS_TICKET_REPLAY_GRACE_SECONDS_DOWNLOAD || 0,
     0,
-    Number(process.env.ACCESS_TICKET_REPLAY_GRACE_SECONDS_WATERMARKED_DOWNLOAD || replayGraceDownload)
+    0,
+    MAX_REPLAY_GRACE_SECONDS
+  );
+  const replayGraceWatermarked = boundedInt(
+    process.env.ACCESS_TICKET_REPLAY_GRACE_SECONDS_WATERMARKED_DOWNLOAD || replayGraceDownload,
+    replayGraceDownload,
+    0,
+    MAX_REPLAY_GRACE_SECONDS
   );
 
   const consumeRows = (await sql`
     update public.access_tickets
     set used_at = now()
-    where id = ${args.ticketId}::uuid
+    where id = ${ticketId}::uuid
       and used_at is null
       and expires_at > now()
       ${requireIp ? sql`and ip_hash = ${ipHash}` : sql``}
@@ -158,7 +211,7 @@ export async function consumeAccessTicket(args: { req: Request; ticketId: string
       response_content_type::text as response_content_type,
       response_content_disposition::text as response_content_disposition
     from public.access_tickets
-    where id = ${args.ticketId}::uuid
+    where id = ${ticketId}::uuid
       and expires_at > now()
       and used_at is not null
       and used_at > now() - (
