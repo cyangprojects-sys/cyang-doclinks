@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { requirePermission } from "@/lib/rbac";
 import {
   RBAC_PERMISSIONS,
@@ -38,8 +38,22 @@ function parseJsonBodyLength(req: Request): number {
   return Number.isFinite(out) ? Math.max(0, Math.floor(out)) : 0;
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    const rl = await enforceGlobalApiRateLimit({
+      req,
+      scope: "ip:admin_security_rbac_get",
+      limit: Number(process.env.RATE_LIMIT_ADMIN_SECURITY_RBAC_PER_MIN || 60),
+      windowSeconds: 60,
+      strict: true,
+    });
+    if (!rl.ok) {
+      return NextResponse.json(
+        { ok: false, error: "RATE_LIMIT" },
+        { status: rl.status, headers: { "Retry-After": String(rl.retryAfterSeconds) } }
+      );
+    }
+
     await requirePermission("security.keys.manage");
     const exists = await permissionsTableExists();
     const rows = exists ? await listRolePermissionOverrides() : [];

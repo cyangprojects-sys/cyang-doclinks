@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/authz";
 import { getSecurityFreezeSettings, setSecurityFreezeSettings } from "@/lib/settings";
 import { appendImmutableAudit } from "@/lib/immutableAudit";
@@ -20,8 +20,22 @@ function parseJsonBodyLength(req: Request): number {
   return Number.isFinite(out) ? Math.max(0, Math.floor(out)) : 0;
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    const rl = await enforceGlobalApiRateLimit({
+      req,
+      scope: "ip:admin_security_freeze_get",
+      limit: Number(process.env.RATE_LIMIT_ADMIN_SECURITY_FREEZE_PER_MIN || 60),
+      windowSeconds: 60,
+      strict: true,
+    });
+    if (!rl.ok) {
+      return NextResponse.json(
+        { ok: false, error: "RATE_LIMIT" },
+        { status: rl.status, headers: { "Retry-After": String(rl.retryAfterSeconds) } }
+      );
+    }
+
     await requireRole("owner");
     const result = await getSecurityFreezeSettings();
     return NextResponse.json({ ok: true, settings: result.settings });

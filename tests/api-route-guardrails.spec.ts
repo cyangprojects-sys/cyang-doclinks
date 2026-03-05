@@ -90,8 +90,12 @@ test.describe("api route guardrails", () => {
       "src/app/api/admin/db-index-audit/route.ts",
       "src/app/api/admin/dbinfo/route.ts",
       "src/app/api/admin/debug/route.ts",
+      "src/app/api/admin/billing/route.ts",
       "src/app/api/admin/retention/run/route.ts",
       "src/app/api/admin/security/keys/route.ts",
+      "src/app/api/admin/security/freeze/route.ts",
+      "src/app/api/admin/security/rbac/route.ts",
+      "src/app/api/admin/security/org-access/route.ts",
       "src/app/api/admin/upload/route.ts",
     ];
     for (const route of routes) {

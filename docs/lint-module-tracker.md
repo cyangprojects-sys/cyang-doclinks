@@ -236,6 +236,10 @@ Remaining resweep modules in current pass: 0
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\cron\scan\route.ts` (resweep: explicit pre-auth cron throttle)
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\cron\webhooks\route.ts` (resweep: explicit pre-auth cron throttle)
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\.env.example` (resweep: added admin GET + cron throttle env keys)
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\billing\route.ts` (resweep: added GET throttle; POST throttle already present)
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\security\freeze\route.ts` (resweep: added GET throttle; POST throttle already present)
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\security\rbac\route.ts` (resweep: added GET throttle; POST throttle already present)
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\security\org-access\route.ts` (resweep: added GET throttle; POST throttle already present)
 
 ## Stale actions removed
 

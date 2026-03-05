@@ -1,7 +1,7 @@
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { requirePermission } from "@/lib/rbac";
 import { enforceGlobalApiRateLimit } from "@/lib/securityTelemetry";
 import { setBillingFlags, getBillingFlags } from "@/lib/settings";
@@ -21,7 +21,21 @@ function parseFormBodyLength(req: Request): number {
   return Number.isFinite(size) && size > 0 ? size : 0;
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const rl = await enforceGlobalApiRateLimit({
+    req,
+    scope: "ip:admin_billing_settings_get",
+    limit: Number(process.env.RATE_LIMIT_ADMIN_BILLING_SETTINGS_PER_MIN || 60),
+    windowSeconds: 60,
+    strict: true,
+  });
+  if (!rl.ok) {
+    return NextResponse.json(
+      { ok: false, error: "RATE_LIMIT" },
+      { status: rl.status, headers: { "Retry-After": String(rl.retryAfterSeconds) } }
+    );
+  }
+
   await requirePermission("billing.manage");
   const res = await getBillingFlags();
   return NextResponse.json(res, { status: res.ok ? 200 : 500 });
