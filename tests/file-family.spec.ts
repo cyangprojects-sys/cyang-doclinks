@@ -30,6 +30,9 @@ test.describe("file family classifier", () => {
 
   test("detects pdf by extension and normalizes case/whitespace", () => {
     expect(detectFileFamily({ filename: " Report.PDF ", contentType: "application/octet-stream" })).toBe("pdf");
+    expect(
+      detectFileFamily({ filename: "https://files.example.com/docs/report.pdf?x=1", contentType: "application/octet-stream" })
+    ).toBe("pdf");
   });
 
   test("falls back to generic file for unknown type", () => {
@@ -45,6 +48,11 @@ test.describe("file family classifier", () => {
     expect(isMicrosoftOfficeDocument({ filename: "slides.pptx" })).toBeTruthy();
     expect(isMicrosoftOfficeDocument({ contentType: "application/vnd.oasis.opendocument.text", filename: "doc.odt" })).toBeFalsy();
     expect(isMicrosoftOfficeDocument({ filename: "notes.ODT" })).toBeFalsy();
+    expect(
+      isMicrosoftOfficeDocument({
+        contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document; charset=utf-8",
+      })
+    ).toBeTruthy();
   });
 
   test("maps display labels", () => {

@@ -37,6 +37,10 @@ export type PackDefinition = {
   recommendedFor?: string[];
 };
 
+const MAX_PACK_ID_INPUT_LEN = 64;
+const MAX_EXPIRES_IN_SECONDS = 365 * 24 * 60 * 60;
+const MAX_MAX_VIEWS = 1_000_000;
+
 export const PRO_PACK_UPSELL_MESSAGE =
   "This pack requires Pro because it enables stricter controls (one-time view / highly restricted sharing).";
 
@@ -194,7 +198,7 @@ const LEGACY_PACK_ID_MAP: Readonly<Record<string, PackId>> = {
 };
 
 function normalizePackId(raw: string): string {
-  const v = raw.trim().toLowerCase();
+  const v = raw.trim().toLowerCase().slice(0, MAX_PACK_ID_INPUT_LEN);
   return LEGACY_PACK_ID_MAP[v] ?? v;
 }
 
@@ -204,7 +208,7 @@ function normalizePlanTier(planId: string | null | undefined): PackTier {
 }
 
 export function isPackId(value: string): value is PackId {
-  const v = value.trim().toLowerCase();
+  const v = String(value || "").trim().toLowerCase().slice(0, MAX_PACK_ID_INPUT_LEN);
   return Object.prototype.hasOwnProperty.call(PACK_BY_ID, v);
 }
 
@@ -234,23 +238,37 @@ export function applyPack(
   const settings = pack.settings;
   const next: ShareSettings = { ...baseConfig };
 
+  const safeNowMs = Number.isFinite(nowMs) ? nowMs : Date.now();
+
   if (settings.expiresInSeconds !== undefined && settings.expiresInSeconds !== null) {
-    const seconds = Math.max(0, Math.floor(settings.expiresInSeconds));
+    const seconds = Math.max(0, Math.min(MAX_EXPIRES_IN_SECONDS, Math.floor(settings.expiresInSeconds)));
     next.expiresInSeconds = seconds;
-    next.expiresAt = new Date(nowMs + seconds * 1000).toISOString();
+    next.expiresAt = new Date(safeNowMs + seconds * 1000).toISOString();
   } else if (settings.expiresAt !== undefined) {
-    next.expiresAt = settings.expiresAt;
+    const expiresAt = String(settings.expiresAt || "").trim();
+    const parsed = Date.parse(expiresAt);
+    next.expiresAt = Number.isFinite(parsed) ? new Date(parsed).toISOString() : null;
     next.expiresInSeconds = null;
   }
 
   if (settings.watermarkEnabled !== undefined) next.watermarkEnabled = Boolean(settings.watermarkEnabled);
   if (settings.allowDownload !== undefined) next.allowDownload = Boolean(settings.allowDownload);
-  if (settings.maxViews !== undefined) next.maxViews = settings.maxViews;
+  if (settings.maxViews !== undefined) {
+    if (settings.maxViews == null) {
+      next.maxViews = null;
+    } else {
+      next.maxViews = Math.max(1, Math.min(MAX_MAX_VIEWS, Math.floor(settings.maxViews)));
+    }
+  }
   if (settings.collectRecipient !== undefined) next.collectRecipient = Boolean(settings.collectRecipient);
   if (settings.requireEmail !== undefined) next.requireEmail = Boolean(settings.requireEmail);
   if (settings.requireOtp !== undefined) next.requireOtp = Boolean(settings.requireOtp);
   if (settings.passwordRequired !== undefined) next.passwordRequired = Boolean(settings.passwordRequired);
-  if (settings.passwordMode !== undefined) next.passwordMode = settings.passwordMode;
+  if (settings.passwordMode !== undefined) {
+    next.passwordMode = settings.passwordMode === "generated" || settings.passwordMode === "user"
+      ? settings.passwordMode
+      : null;
+  }
 
   return next;
 }

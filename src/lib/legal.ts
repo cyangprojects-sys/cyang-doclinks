@@ -1,6 +1,9 @@
+const MAX_EMAIL_LEN = 320;
+
 function normEmail(v: string | undefined): string | null {
-  const s = String(v || "").trim().toLowerCase();
+  const s = String(v || "").trim().toLowerCase().slice(0, MAX_EMAIL_LEN);
   if (!s) return null;
+  if (/[\r\n]/.test(s)) return null;
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s)) return null;
   return s;
 }

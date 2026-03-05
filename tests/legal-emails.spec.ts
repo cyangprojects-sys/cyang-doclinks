@@ -91,4 +91,14 @@ test.describe("legal email helpers", () => {
     expect(getPrivacyEmail()).toBe("support@example.com");
     expect(getSecurityEmail()).toBe("rd@example.com");
   });
+
+  test("rejects control characters and overlong email env values", () => {
+    setEnv("SUPPORT_EMAIL", `support@example.com\nx`);
+    expect(getSupportEmail()).toBe("support@cyang.io");
+
+    const veryLong = `${"a".repeat(500)}@example.com`;
+    setEnv("SUPPORT_EMAIL", veryLong);
+    setEnv("CONTACT_EMAIL", "contact@example.com");
+    expect(getSupportEmail()).toBe("contact@example.com");
+  });
 });

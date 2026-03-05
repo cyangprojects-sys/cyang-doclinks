@@ -14,6 +14,8 @@ test.describe("slug sanitization helpers", () => {
   test("doc slugify strips .pdf suffix and clamps length", () => {
     expect(docSlugify("Quarterly Plan.PDF")).toBe("quarterly-plan");
     expect(docSlugify("  weird__name---v2!!.pdf  ")).toBe("weird-name-v2");
+    expect(docSlugify("")).toBe("document");
+    expect(docSlugify("\n\r\\")).toBe("document");
 
     const long = "a".repeat(200);
     expect(docSlugify(long)).toHaveLength(80);

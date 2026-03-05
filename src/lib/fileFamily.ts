@@ -30,15 +30,16 @@ const MICROSOFT_OFFICE_MIME_TYPES = new Set([
 ]);
 
 function extensionOf(filename?: string | null): string {
-  const name = String(filename || "").trim().toLowerCase();
+  const raw = String(filename || "").trim().toLowerCase().slice(0, 256);
+  const name = raw.split(/[?#]/, 1)[0].split(/[\\/]/).filter(Boolean).pop() ?? "";
   if (!name) return "";
   const idx = name.lastIndexOf(".");
   if (idx < 0 || idx === name.length - 1) return "";
-  return name.slice(idx + 1);
+  return name.slice(idx + 1).slice(0, 16);
 }
 
 export function detectFileFamily(args: DetectArgs): FileFamily {
-  const m = String(args.contentType || "").trim().toLowerCase();
+  const m = String(args.contentType || "").trim().toLowerCase().split(";", 1)[0].slice(0, 128);
   const ext = extensionOf(args.filename);
 
   if (m === "application/pdf" || ext === "pdf") return "pdf";
@@ -74,7 +75,7 @@ export function detectFileFamily(args: DetectArgs): FileFamily {
 }
 
 export function isMicrosoftOfficeDocument(args: DetectArgs): boolean {
-  const m = String(args.contentType || "").trim().toLowerCase();
+  const m = String(args.contentType || "").trim().toLowerCase().split(";", 1)[0].slice(0, 128);
   const ext = extensionOf(args.filename);
   return MICROSOFT_OFFICE_MIME_TYPES.has(m) || MICROSOFT_OFFICE_EXTENSIONS.has(ext);
 }

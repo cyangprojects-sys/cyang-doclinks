@@ -7,6 +7,7 @@ test.describe("legal docs helpers", () => {
     const doc = getLegalDocBySlug("terms-of-service");
     expect(doc).not.toBeNull();
     expect(doc?.file).toBe("TERMS_OF_SERVICE.md");
+    expect(getLegalDocBySlug(" TERMS-OF-SERVICE ")).not.toBeNull();
     expect(getLegalDocBySlug("not-a-real-doc")).toBeNull();
   });
 
@@ -20,6 +21,7 @@ test.describe("legal docs helpers", () => {
     await expect(readLegalDocMarkdown("../package.json")).rejects.toThrow("INVALID_LEGAL_DOC_FILE");
     await expect(readLegalDocMarkdown("nested/TERMS_OF_SERVICE.md")).rejects.toThrow("INVALID_LEGAL_DOC_FILE");
     await expect(readLegalDocMarkdown("TERMS_OF_SERVICE")).rejects.toThrow("INVALID_LEGAL_DOC_FILE");
+    await expect(readLegalDocMarkdown("README.md")).rejects.toThrow("INVALID_LEGAL_DOC_FILE");
     await expect(readLegalDocMarkdown("")).rejects.toThrow("INVALID_LEGAL_DOC_FILE");
   });
 });
