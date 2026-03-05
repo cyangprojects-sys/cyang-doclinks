@@ -89,9 +89,11 @@ Status key: `done` | `pending`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\apiKeys.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\alias.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\audit.ts`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\clientIp.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\cookies.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\cronAuth.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\cronTelemetry.ts`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\demo.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\fileFamily.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\immutableAudit.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\keyRotationJobs.ts`
@@ -100,11 +102,13 @@ Status key: `done` | `pending`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\masterKeys.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\mfa.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\orgMembership.ts`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\observability.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\packs.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\publicBaseUrl.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\quarantineOverride.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\rateLimit.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\redirects.ts`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\routeTimeout.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\scanQueue.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\slug.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\viewLimitOverride.ts`

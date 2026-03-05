@@ -61,4 +61,36 @@ test.describe("observability structured logging", () => {
     expect(warned).toBe(1);
     expect(errored).toBe(1);
   });
+
+  test("sanitizes invalid severity and trims unsafe payload fields", () => {
+    const original = console.log as ConsoleMethod;
+    const calls: unknown[][] = [];
+    console.log = (...args: unknown[]) => {
+      calls.push(args);
+    };
+
+    try {
+      logStructured({
+        severity: "invalid" as unknown as "info",
+        event: `evt${"x".repeat(200)}`,
+        message: "hello\nworld",
+        context: { ok: true, "bad\nkey": "nope" },
+      });
+    } finally {
+      console.log = original;
+    }
+
+    expect(calls.length).toBe(1);
+    const parsed = JSON.parse(String(calls[0][0] || "")) as {
+      severity: string;
+      event: string;
+      message: string;
+      context: Record<string, unknown>;
+    };
+    expect(parsed.severity).toBe("info");
+    expect(parsed.event.length).toBeLessThanOrEqual(80);
+    expect(parsed.message).toBe("no_message");
+    expect(parsed.context.ok).toBeTruthy();
+    expect(Object.prototype.hasOwnProperty.call(parsed.context, "bad\nkey")).toBeFalsy();
+  });
 });

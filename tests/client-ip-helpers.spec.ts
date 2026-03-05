@@ -81,4 +81,24 @@ test.describe("client ip trust model", () => {
     });
     expect(getTrustedClientIpFromHeaders(headers)).toBe("8.8.8.8");
   });
+
+  test("normalizes forwarded IPv4 values with ports and rejects malformed values", () => {
+    mutableEnv.NODE_ENV = "production";
+    mutableEnv.TRUST_PROXY_HEADERS = "1";
+    const headers = new Headers({
+      "x-forwarded-for": "1.2.3.4:443, 5.6.7.8",
+      "x-real-ip": "bad-ip-value",
+    });
+    expect(getTrustedClientIpFromHeaders(headers)).toBe("1.2.3.4");
+  });
+
+  test("rejects malformed forwarded values and falls back safely", () => {
+    mutableEnv.NODE_ENV = "production";
+    mutableEnv.TRUST_PROXY_HEADERS = "1";
+    const headers = new Headers({
+      "x-forwarded-for": "8.8.8.8;proto=https",
+      "x-real-ip": "2.2.2.2",
+    });
+    expect(getTrustedClientIpFromHeaders(headers)).toBe("2.2.2.2");
+  });
 });

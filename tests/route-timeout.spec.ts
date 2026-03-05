@@ -26,6 +26,12 @@ test.describe("route timeout helpers", () => {
     expect(getRouteTimeoutMs("TEST_TIMEOUT_MS", 12_345)).toBe(12_345);
   });
 
+  test("getRouteTimeoutMs clamps fallback and ignores unsafe env names", () => {
+    process.env.TEST_TIMEOUT_MS = "5000";
+    expect(getRouteTimeoutMs("TEST_TIMEOUT_MS", 100)).toBe(5_000);
+    expect(getRouteTimeoutMs("bad-name", 100)).toBe(1_000);
+  });
+
   test("withRouteTimeout resolves when work finishes first", async () => {
     const out = await withRouteTimeout(Promise.resolve("ok"), 50);
     expect(out).toBe("ok");
@@ -39,6 +45,11 @@ test.describe("route timeout helpers", () => {
   test("withRouteTimeout preserves underlying work errors", async () => {
     const boom = Promise.reject(new Error("boom"));
     await expect(withRouteTimeout(boom, 200)).rejects.toThrow("boom");
+  });
+
+  test("withRouteTimeout uses safe default when timeout is invalid", async () => {
+    const out = await withRouteTimeout(Promise.resolve("ok"), Number.NaN);
+    expect(out).toBe("ok");
   });
 
   test("isRouteTimeoutError identifies class and message variants", () => {
