@@ -212,6 +212,9 @@ test.describe("api route guardrails", () => {
     const routes = [
       "src/app/api/admin/audit/export/route.ts",
       "src/app/api/admin/security/rollback/route.ts",
+      "src/app/api/admin/security/org-access/route.ts",
+      "src/app/api/admin/security/requeue-scans/route.ts",
+      "src/app/api/admin/security/tenant-freeze/route.ts",
       "src/app/api/admin/upload/abort/route.ts",
     ];
     for (const route of routes) {

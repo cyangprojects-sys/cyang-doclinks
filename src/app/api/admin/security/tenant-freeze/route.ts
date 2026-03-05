@@ -4,6 +4,7 @@ import { sql } from "@/lib/db";
 import { appendImmutableAudit } from "@/lib/immutableAudit";
 import { enforceGlobalApiRateLimit, logSecurityEvent } from "@/lib/securityTelemetry";
 import { resolvePublicAppBaseUrl } from "@/lib/publicBaseUrl";
+import { getRouteTimeoutMs, isRouteTimeoutError, withRouteTimeout } from "@/lib/routeTimeout";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -60,78 +61,90 @@ export async function POST(req: Request) {
   } catch {
     return NextResponse.json({ ok: false, error: "ENV_MISCONFIGURED" }, { status: 500 });
   }
+  const timeoutMs = getRouteTimeoutMs("ROUTE_TIMEOUT_ADMIN_SECURITY_TENANT_FREEZE_MS", 20_000);
 
   try {
-    const rl = await enforceGlobalApiRateLimit({
-      req,
-      scope: "ip:admin_security_tenant_freeze",
-      limit: Number(process.env.RATE_LIMIT_ADMIN_SECURITY_TENANT_FREEZE_PER_MIN || 60),
-      windowSeconds: 60,
-      strict: true,
-    });
-    if (!rl.ok) {
-      if (ct.includes("application/json")) {
-        return NextResponse.json(
-          { ok: false, error: "RATE_LIMIT" },
-          { status: rl.status, headers: { "Retry-After": String(rl.retryAfterSeconds) } }
+    return await withRouteTimeout(
+      (async () => {
+        const rl = await enforceGlobalApiRateLimit({
+          req,
+          scope: "ip:admin_security_tenant_freeze",
+          limit: Number(process.env.RATE_LIMIT_ADMIN_SECURITY_TENANT_FREEZE_PER_MIN || 60),
+          windowSeconds: 60,
+          strict: true,
+        });
+        if (!rl.ok) {
+          if (ct.includes("application/json")) {
+            return NextResponse.json(
+              { ok: false, error: "RATE_LIMIT" },
+              { status: rl.status, headers: { "Retry-After": String(rl.retryAfterSeconds) } }
+            );
+          }
+          return NextResponse.redirect(new URL("/admin/security?error=RATE_LIMIT", appBaseUrl), { status: 303 });
+        }
+        if (parseJsonBodyLength(req) > MAX_SECURITY_TENANT_FREEZE_BODY_BYTES) {
+          if (ct.includes("application/json")) {
+            return NextResponse.json({ ok: false, error: "PAYLOAD_TOO_LARGE" }, { status: 413 });
+          }
+          return NextResponse.redirect(new URL("/admin/security?error=PAYLOAD_TOO_LARGE", appBaseUrl), { status: 303 });
+        }
+        const user = await requireRole("owner");
+        if (!user.orgId) {
+          return NextResponse.json({ ok: false, error: "ORG_REQUIRED" }, { status: 400 });
+        }
+
+        let freeze = false;
+        if (ct.includes("application/json")) {
+          const parsed = await req.json().catch(() => null);
+          if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+            return NextResponse.json({ ok: false, error: "BAD_REQUEST" }, { status: 400 });
+          }
+          const json = parsed as { freeze?: unknown };
+          freeze = asBool(json.freeze);
+        } else {
+          const form = await req.formData();
+          freeze = asBool(form.get("freeze"));
+        }
+
+        await setOrgFreeze(user.orgId, freeze);
+
+        await appendImmutableAudit({
+          streamKey: "security:incident-controls",
+          action: freeze ? "security.tenant.freeze" : "security.tenant.unfreeze",
+          actorUserId: user.id,
+          orgId: user.orgId,
+          payload: {
+            orgId: user.orgId,
+            freeze,
+          },
+        });
+        await logSecurityEvent({
+          type: freeze ? "tenant_freeze_enabled" : "tenant_freeze_disabled",
+          severity: "high",
+          actorUserId: user.id,
+          orgId: user.orgId,
+          scope: "incident_response",
+          message: freeze ? "Tenant serving frozen by owner" : "Tenant serving unfrozen by owner",
+          meta: { freeze },
+        });
+
+        if (ct.includes("application/json")) {
+          return NextResponse.json({ ok: true, freeze });
+        }
+        return NextResponse.redirect(
+          new URL(`/admin/security?saved=${freeze ? "tenant_frozen" : "tenant_unfrozen"}`, appBaseUrl),
+          { status: 303 }
         );
-      }
-      return NextResponse.redirect(new URL("/admin/security?error=RATE_LIMIT", appBaseUrl), { status: 303 });
-    }
-    if (parseJsonBodyLength(req) > MAX_SECURITY_TENANT_FREEZE_BODY_BYTES) {
-      if (ct.includes("application/json")) {
-        return NextResponse.json({ ok: false, error: "PAYLOAD_TOO_LARGE" }, { status: 413 });
-      }
-      return NextResponse.redirect(new URL("/admin/security?error=PAYLOAD_TOO_LARGE", appBaseUrl), { status: 303 });
-    }
-    const user = await requireRole("owner");
-    if (!user.orgId) {
-      return NextResponse.json({ ok: false, error: "ORG_REQUIRED" }, { status: 400 });
-    }
-
-    let freeze = false;
-    if (ct.includes("application/json")) {
-      const parsed = await req.json().catch(() => null);
-      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-        return NextResponse.json({ ok: false, error: "BAD_REQUEST" }, { status: 400 });
-      }
-      const json = parsed as { freeze?: unknown };
-      freeze = asBool(json.freeze);
-    } else {
-      const form = await req.formData();
-      freeze = asBool(form.get("freeze"));
-    }
-
-    await setOrgFreeze(user.orgId, freeze);
-
-    await appendImmutableAudit({
-      streamKey: "security:incident-controls",
-      action: freeze ? "security.tenant.freeze" : "security.tenant.unfreeze",
-      actorUserId: user.id,
-      orgId: user.orgId,
-      payload: {
-        orgId: user.orgId,
-        freeze,
-      },
-    });
-    await logSecurityEvent({
-      type: freeze ? "tenant_freeze_enabled" : "tenant_freeze_disabled",
-      severity: "high",
-      actorUserId: user.id,
-      orgId: user.orgId,
-      scope: "incident_response",
-      message: freeze ? "Tenant serving frozen by owner" : "Tenant serving unfrozen by owner",
-      meta: { freeze },
-    });
-
-    if (ct.includes("application/json")) {
-      return NextResponse.json({ ok: true, freeze });
-    }
-    return NextResponse.redirect(
-      new URL(`/admin/security?saved=${freeze ? "tenant_frozen" : "tenant_unfrozen"}`, appBaseUrl),
-      { status: 303 }
+      })(),
+      timeoutMs
     );
   } catch (e: unknown) {
+    if (isRouteTimeoutError(e)) {
+      if (ct.includes("application/json")) {
+        return NextResponse.json({ ok: false, error: "TIMEOUT" }, { status: 504 });
+      }
+      return NextResponse.redirect(new URL("/admin/security?error=TIMEOUT", appBaseUrl), { status: 303 });
+    }
     const msg = e instanceof Error ? e.message : "SERVER_ERROR";
     const status = msg === "FORBIDDEN" || msg === "UNAUTHENTICATED" ? 403 : 500;
     const safeError = status === 403 ? "FORBIDDEN" : "SERVER_ERROR";
