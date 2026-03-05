@@ -6,6 +6,7 @@ import { sql } from "@/lib/db";
 import { requireRole } from "@/lib/authz";
 import { isDebugApiEnabled } from "@/lib/debugAccess";
 import { enforceGlobalApiRateLimit } from "@/lib/securityTelemetry";
+import { getRouteTimeoutMs, isRouteTimeoutError, withRouteTimeout } from "@/lib/routeTimeout";
 
 import { HeadObjectCommand } from "@aws-sdk/client-s3";
 import { getR2Bucket, r2Client } from "@/lib/r2";
@@ -40,30 +41,33 @@ async function tableExists(regclass: string) {
 }
 
 export async function GET(req: NextRequest) {
+  const timeoutMs = getRouteTimeoutMs("ROUTE_TIMEOUT_ADMIN_DEBUG_MS", 20_000);
   try {
-    const r2Bucket = getR2Bucket();
-    if (!isDebugApiEnabled() || !isAdminDebugGateEnabledInThisRoute()) {
-      return NextResponse.json({ ok: false, error: "NOT_FOUND" }, { status: 404 });
-    }
-    const rl = await enforceGlobalApiRateLimit({
-      req,
-      scope: "ip:admin_debug_inspect",
-      limit: Number(process.env.RATE_LIMIT_ADMIN_DEBUG_PER_MIN || 30),
-      windowSeconds: 60,
-      strict: true,
-    });
-    if (!rl.ok) {
-      return NextResponse.json(
-        { ok: false, error: "RATE_LIMIT" },
-        { status: rl.status, headers: { "Retry-After": String(rl.retryAfterSeconds) } }
-      );
-    }
+    return await withRouteTimeout(
+      (async () => {
+        const r2Bucket = getR2Bucket();
+        if (!isDebugApiEnabled() || !isAdminDebugGateEnabledInThisRoute()) {
+          return NextResponse.json({ ok: false, error: "NOT_FOUND" }, { status: 404 });
+        }
+        const rl = await enforceGlobalApiRateLimit({
+          req,
+          scope: "ip:admin_debug_inspect",
+          limit: Number(process.env.RATE_LIMIT_ADMIN_DEBUG_PER_MIN || 30),
+          windowSeconds: 60,
+          strict: true,
+        });
+        if (!rl.ok) {
+          return NextResponse.json(
+            { ok: false, error: "RATE_LIMIT" },
+            { status: rl.status, headers: { "Retry-After": String(rl.retryAfterSeconds) } }
+          );
+        }
 
-    await requireRole("owner");
+        await requireRole("owner");
 
-    const url = new URL(req.url);
-    const alias = (url.searchParams.get("alias") || "").trim();
-    if (!alias) return NextResponse.json({ ok: false, error: "MISSING_ALIAS" }, { status: 400 });
+        const url = new URL(req.url);
+        const alias = (url.searchParams.get("alias") || "").trim();
+        if (!alias) return NextResponse.json({ ok: false, error: "MISSING_ALIAS" }, { status: 400 });
 
     // Detect what tables exist (helps catch schema drift between old "documents" and new "docs")
     const [hasDocs, hasDocuments, hasDocAliases, hasDocViews] = await Promise.all([
@@ -200,22 +204,28 @@ export async function GET(req: NextRequest) {
       has_object_key: Boolean(docKeyVal),
     };
 
-    return NextResponse.json({
-      ok: true,
-      now: new Date().toISOString(),
-      alias,
-      tables: {
-        "public.docs": hasDocs,
-        "public.documents": hasDocuments,
-        "public.doc_aliases": hasDocAliases,
-        "public.doc_views": hasDocViews,
-      },
-      alias_status: aliasStatus,
-      document_status: documentStatus,
-      storage_status: r2Head,
-      notes,
-    });
+        return NextResponse.json({
+          ok: true,
+          now: new Date().toISOString(),
+          alias,
+          tables: {
+            "public.docs": hasDocs,
+            "public.documents": hasDocuments,
+            "public.doc_aliases": hasDocAliases,
+            "public.doc_views": hasDocViews,
+          },
+          alias_status: aliasStatus,
+          document_status: documentStatus,
+          storage_status: r2Head,
+          notes,
+        });
+      })(),
+      timeoutMs
+    );
   } catch (err: unknown) {
+    if (isRouteTimeoutError(err)) {
+      return NextResponse.json({ ok: false, error: "TIMEOUT" }, { status: 504 });
+    }
     const msg = err instanceof Error ? err.message : "";
     if (msg === "UNAUTHENTICATED") {
       return NextResponse.json({ ok: false, error: "UNAUTHENTICATED" }, { status: 401 });

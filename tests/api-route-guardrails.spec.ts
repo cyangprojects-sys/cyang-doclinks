@@ -189,4 +189,22 @@ test.describe("api route guardrails", () => {
 
     expect(findings).toEqual([]);
   });
+
+  test("high-cost metadata/debug routes use route timeout guards", () => {
+    const routes = [
+      "src/app/api/health/route.ts",
+      "src/app/api/backup/status/route.ts",
+      "src/app/api/admin/dbinfo/route.ts",
+      "src/app/api/admin/db-index-audit/route.ts",
+      "src/app/api/admin/debug/route.ts",
+      "src/app/api/debug/alias/[alias]/route.ts",
+    ];
+    for (const route of routes) {
+      const code = src(route);
+      expect(code.includes("getRouteTimeoutMs(")).toBeTruthy();
+      expect(code.includes("withRouteTimeout(")).toBeTruthy();
+      expect(code.includes("isRouteTimeoutError(")).toBeTruthy();
+      expect(code.includes('error: "TIMEOUT"')).toBeTruthy();
+    }
+  });
 });

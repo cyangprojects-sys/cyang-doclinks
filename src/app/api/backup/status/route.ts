@@ -3,6 +3,7 @@ import { timingSafeEqual } from "node:crypto";
 import { z } from "zod";
 import { sql } from "@/lib/db";
 import { enforceGlobalApiRateLimit } from "@/lib/securityTelemetry";
+import { getRouteTimeoutMs, isRouteTimeoutError, withRouteTimeout } from "@/lib/routeTimeout";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -38,48 +39,57 @@ function parseJsonBodyLength(req: NextRequest): number {
 }
 
 export async function POST(req: NextRequest) {
+  const timeoutMs = getRouteTimeoutMs("ROUTE_TIMEOUT_BACKUP_STATUS_MS", 10_000);
   try {
-    if (!isAuthorized(req)) {
-      return NextResponse.json({ ok: false, error: "NOT_FOUND" }, { status: 404 });
-    }
-    const rl = await enforceGlobalApiRateLimit({
-      req,
-      scope: "ip:backup_status",
-      limit: Number(process.env.RATE_LIMIT_BACKUP_STATUS_IP_PER_MIN || 30),
-      windowSeconds: 60,
-      strict: true,
-    });
-    if (!rl.ok) {
-      return NextResponse.json(
-        { ok: false, error: "RATE_LIMIT" },
-        { status: rl.status, headers: { "Retry-After": String(rl.retryAfterSeconds) } }
-      );
-    }
-    if (parseJsonBodyLength(req) > MAX_BACKUP_STATUS_BODY_BYTES) {
-      return NextResponse.json({ ok: false, error: "PAYLOAD_TOO_LARGE" }, { status: 413 });
-    }
+    return await withRouteTimeout(
+      (async () => {
+        if (!isAuthorized(req)) {
+          return NextResponse.json({ ok: false, error: "NOT_FOUND" }, { status: 404 });
+        }
+        const rl = await enforceGlobalApiRateLimit({
+          req,
+          scope: "ip:backup_status",
+          limit: Number(process.env.RATE_LIMIT_BACKUP_STATUS_IP_PER_MIN || 30),
+          windowSeconds: 60,
+          strict: true,
+        });
+        if (!rl.ok) {
+          return NextResponse.json(
+            { ok: false, error: "RATE_LIMIT" },
+            { status: rl.status, headers: { "Retry-After": String(rl.retryAfterSeconds) } }
+          );
+        }
+        if (parseJsonBodyLength(req) > MAX_BACKUP_STATUS_BODY_BYTES) {
+          return NextResponse.json({ ok: false, error: "PAYLOAD_TOO_LARGE" }, { status: 413 });
+        }
 
-    const body = await req.json().catch(() => null);
-    const parsed = BodySchema.safeParse(body);
-    if (!parsed.success) {
-      return NextResponse.json({ ok: false, error: "BAD_REQUEST" }, { status: 400 });
+        const body = await req.json().catch(() => null);
+        const parsed = BodySchema.safeParse(body);
+        if (!parsed.success) {
+          return NextResponse.json({ ok: false, error: "BAD_REQUEST" }, { status: 400 });
+        }
+
+        const payload = parsed.data;
+        const details = {
+          source: payload.source || "github-actions",
+          backup_file: payload.backup_file || null,
+          reported_at: new Date().toISOString(),
+          ...(payload.details || {}),
+        };
+
+        await sql`
+          insert into public.backup_runs (status, details)
+          values (${payload.status}, ${JSON.stringify(details)}::jsonb)
+        `;
+
+        return NextResponse.json({ ok: true, status: payload.status });
+      })(),
+      timeoutMs
+    );
+  } catch (e: unknown) {
+    if (isRouteTimeoutError(e)) {
+      return NextResponse.json({ ok: false, error: "TIMEOUT" }, { status: 504 });
     }
-
-    const payload = parsed.data;
-    const details = {
-      source: payload.source || "github-actions",
-      backup_file: payload.backup_file || null,
-      reported_at: new Date().toISOString(),
-      ...(payload.details || {}),
-    };
-
-    await sql`
-      insert into public.backup_runs (status, details)
-      values (${payload.status}, ${JSON.stringify(details)}::jsonb)
-    `;
-
-    return NextResponse.json({ ok: true, status: payload.status });
-  } catch {
     return NextResponse.json({ ok: false, error: "SERVER_ERROR" }, { status: 500 });
   }
 }

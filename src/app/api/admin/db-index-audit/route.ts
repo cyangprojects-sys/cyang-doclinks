@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { requireRole } from "@/lib/authz";
 import { enforceGlobalApiRateLimit } from "@/lib/securityTelemetry";
+import { getRouteTimeoutMs, isRouteTimeoutError, withRouteTimeout } from "@/lib/routeTimeout";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -29,24 +30,27 @@ type MissingFkIndexRow = {
 };
 
 export async function GET(req: NextRequest) {
+  const timeoutMs = getRouteTimeoutMs("ROUTE_TIMEOUT_ADMIN_DB_INDEX_AUDIT_MS", 15_000);
   try {
-    const rl = await enforceGlobalApiRateLimit({
-      req,
-      scope: "ip:admin_db_index_audit",
-      limit: Number(process.env.RATE_LIMIT_ADMIN_DB_INDEX_AUDIT_PER_MIN || 20),
-      windowSeconds: 60,
-      strict: true,
-    });
-    if (!rl.ok) {
-      return NextResponse.json(
-        { ok: false, error: "RATE_LIMIT" },
-        { status: rl.status, headers: { "Retry-After": String(rl.retryAfterSeconds) } }
-      );
-    }
+    return await withRouteTimeout(
+      (async () => {
+        const rl = await enforceGlobalApiRateLimit({
+          req,
+          scope: "ip:admin_db_index_audit",
+          limit: Number(process.env.RATE_LIMIT_ADMIN_DB_INDEX_AUDIT_PER_MIN || 20),
+          windowSeconds: 60,
+          strict: true,
+        });
+        if (!rl.ok) {
+          return NextResponse.json(
+            { ok: false, error: "RATE_LIMIT" },
+            { status: rl.status, headers: { "Retry-After": String(rl.retryAfterSeconds) } }
+          );
+        }
 
-    await requireRole("owner");
+        await requireRole("owner");
 
-    const seqScanRisk = (await sql`
+        const seqScanRisk = (await sql`
       select
         st.relname::text as relname,
         st.seq_scan::bigint as seq_scan,
@@ -60,9 +64,9 @@ export async function GET(req: NextRequest) {
       where st.schemaname = 'public'
       order by seq_scan_pct desc, st.seq_scan desc
       limit 30
-    `) as unknown as SeqScanRiskRow[];
+        `) as unknown as SeqScanRiskRow[];
 
-    const unusedIndexes = (await sql`
+        const unusedIndexes = (await sql`
       select
         s.schemaname::text as schemaname,
         s.relname::text as relname,
@@ -77,9 +81,9 @@ export async function GET(req: NextRequest) {
         and not i.indisunique
       order by pg_relation_size(s.indexrelid) desc
       limit 30
-    `) as unknown as UnusedIndexRow[];
+        `) as unknown as UnusedIndexRow[];
 
-    const missingFkIndexes = (await sql`
+        const missingFkIndexes = (await sql`
       with fk as (
         select
           c.conrelid,
@@ -120,16 +124,22 @@ export async function GET(req: NextRequest) {
       )
       order by fk_cols.table_name, fk_cols.conname
       limit 30
-    `) as unknown as MissingFkIndexRow[];
+        `) as unknown as MissingFkIndexRow[];
 
-    return NextResponse.json({
-      ok: true,
-      generated_at: new Date().toISOString(),
-      seq_scan_risk: seqScanRisk,
-      unused_indexes: unusedIndexes,
-      missing_fk_indexes: missingFkIndexes,
-    });
+        return NextResponse.json({
+          ok: true,
+          generated_at: new Date().toISOString(),
+          seq_scan_risk: seqScanRisk,
+          unused_indexes: unusedIndexes,
+          missing_fk_indexes: missingFkIndexes,
+        });
+      })(),
+      timeoutMs
+    );
   } catch (e: unknown) {
+    if (isRouteTimeoutError(e)) {
+      return NextResponse.json({ ok: false, error: "TIMEOUT" }, { status: 504 });
+    }
     const msg = e instanceof Error ? e.message : "SERVER_ERROR";
     const status = msg === "FORBIDDEN" || msg === "UNAUTHENTICATED" ? 403 : 500;
     return NextResponse.json({ ok: false, error: status === 403 ? "FORBIDDEN" : "SERVER_ERROR" }, { status });

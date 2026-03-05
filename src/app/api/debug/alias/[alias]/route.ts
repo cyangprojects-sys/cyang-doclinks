@@ -3,6 +3,7 @@ import { sql } from "@/lib/db";
 import { requireRole } from "@/lib/authz";
 import { isDebugApiEnabled } from "@/lib/debugAccess";
 import { enforceGlobalApiRateLimit } from "@/lib/securityTelemetry";
+import { getRouteTimeoutMs, isRouteTimeoutError, withRouteTimeout } from "@/lib/routeTimeout";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -51,31 +52,35 @@ export async function GET(
   }
 
   try {
-    await requireRole("owner");
-  } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : "";
-    if (msg === "UNAUTHENTICATED") {
-      return NextResponse.json({ ok: false, error: "UNAUTHENTICATED" }, { status: 401 });
-    }
-    return NextResponse.json({ ok: false, error: "FORBIDDEN" }, { status: 403 });
-  }
+    const timeoutMs = getRouteTimeoutMs("ROUTE_TIMEOUT_DEBUG_ALIAS_LOOKUP_MS", 10_000);
+    return await withRouteTimeout(
+      (async () => {
+        try {
+          await requireRole("owner");
+        } catch (e: unknown) {
+          const msg = e instanceof Error ? e.message : "";
+          if (msg === "UNAUTHENTICATED") {
+            return NextResponse.json({ ok: false, error: "UNAUTHENTICATED" }, { status: 401 });
+          }
+          return NextResponse.json({ ok: false, error: "FORBIDDEN" }, { status: 403 });
+        }
 
-  const { alias: rawAlias } = await context.params;
-  const alias = normalizeAliasParam(rawAlias || "");
+        const { alias: rawAlias } = await context.params;
+        const alias = normalizeAliasParam(rawAlias || "");
 
-  if (alias === "") {
-    return NextResponse.json(
-      { ok: false, error: "missing_alias" },
-      { status: 400 }
-    );
-  }
-  if (!alias) {
-    return NextResponse.json({ ok: false, error: "INVALID_ALIAS" }, { status: 400 });
-  }
+        if (alias === "") {
+          return NextResponse.json(
+            { ok: false, error: "missing_alias" },
+            { status: 400 }
+          );
+        }
+        if (!alias) {
+          return NextResponse.json({ ok: false, error: "INVALID_ALIAS" }, { status: 400 });
+        }
 
-  let rowDocAliases: AliasLookupRow[] = [];
-  try {
-    rowDocAliases = await sql`
+        let rowDocAliases: AliasLookupRow[] = [];
+        try {
+          rowDocAliases = await sql`
     select
       'doc_aliases'::text as source_table,
       alias,
@@ -88,13 +93,13 @@ export async function GET(
     where lower(alias) = ${alias}
     limit 1
   `;
-  } catch {
-    rowDocAliases = [];
-  }
+        } catch {
+          rowDocAliases = [];
+        }
 
-  let rowDocumentAliases: AliasLookupRow[] = [];
-  try {
-    rowDocumentAliases = await sql`
+        let rowDocumentAliases: AliasLookupRow[] = [];
+        try {
+          rowDocumentAliases = await sql`
     select
       'document_aliases'::text as source_table,
       alias,
@@ -107,27 +112,36 @@ export async function GET(
     where lower(alias) = ${alias}
     limit 1
   `;
-  } catch {
-    // table may not exist in some environments; ignore
-    rowDocumentAliases = [];
+        } catch {
+          // table may not exist in some environments; ignore
+          rowDocumentAliases = [];
 
-  }
-
-  const row = rowDocAliases?.[0] ?? rowDocumentAliases?.[0] ?? null;
-  const expiresAt = row?.expires_at ? Date.parse(row.expires_at) : NaN;
-  const expired = Number.isFinite(expiresAt) && expiresAt <= Date.now();
-
-  return NextResponse.json({
-    ok: true,
-    alias,
-    found: !!row,
-    source_table: row?.source_table ?? null,
-    state: row
-      ? {
-          active: row.is_active ?? null,
-          revoked: Boolean(row.revoked_at),
-          expired,
         }
-      : null,
-  });
+
+        const row = rowDocAliases?.[0] ?? rowDocumentAliases?.[0] ?? null;
+        const expiresAt = row?.expires_at ? Date.parse(row.expires_at) : NaN;
+        const expired = Number.isFinite(expiresAt) && expiresAt <= Date.now();
+
+        return NextResponse.json({
+          ok: true,
+          alias,
+          found: !!row,
+          source_table: row?.source_table ?? null,
+          state: row
+            ? {
+                active: row.is_active ?? null,
+                revoked: Boolean(row.revoked_at),
+                expired,
+              }
+            : null,
+        });
+      })(),
+      timeoutMs
+    );
+  } catch (e: unknown) {
+    if (isRouteTimeoutError(e)) {
+      return NextResponse.json({ ok: false, error: "TIMEOUT" }, { status: 504 });
+    }
+    return NextResponse.json({ ok: false, error: "SERVER_ERROR" }, { status: 500 });
+  }
 }

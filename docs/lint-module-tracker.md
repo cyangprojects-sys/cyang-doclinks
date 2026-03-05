@@ -241,6 +241,13 @@ Remaining resweep modules in current pass: 0
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\security\rbac\route.ts` (resweep: added GET throttle; POST throttle already present)
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\security\org-access\route.ts` (resweep: added GET throttle; POST throttle already present)
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\tests\admin-get-rate-limit-runtime.spec.ts` (resweep: runtime burst coverage for admin+cron GET throttles)
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\health\route.ts` (resweep: bounded route timeout guard + TIMEOUT fail-closed response)
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\backup\status\route.ts` (resweep: bounded route timeout guard + TIMEOUT fail-closed response)
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\dbinfo\route.ts` (resweep: bounded route timeout guard on metadata queries)
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\db-index-audit\route.ts` (resweep: bounded route timeout guard on index-audit queries)
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\debug\route.ts` (resweep: bounded route timeout guard on debug inspection path)
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\debug\alias\[alias]\route.ts` (resweep: bounded route timeout guard on alias-debug lookup)
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\tests\api-route-guardrails.spec.ts` (resweep: timeout-guard assertions for high-cost metadata/debug routes)
 
 ## Stale actions removed
 
