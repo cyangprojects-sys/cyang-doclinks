@@ -90,6 +90,7 @@ Status key: `done` | `pending`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\alias.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\analytics.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\audit.ts`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\backupRecovery.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\billingFlags.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\clientIp.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\cookies.ts`
@@ -108,6 +109,8 @@ Status key: `done` | `pending`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\masterKeys.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\mfa.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\orgMembership.ts`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\orgs.ts`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\officePreview.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\observability.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\packs.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\password.ts`

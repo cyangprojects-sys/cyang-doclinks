@@ -14,7 +14,27 @@ export type Org = {
 };
 
 function normSlug(s: string): string {
-  return String(s || "").trim().toLowerCase();
+  const slug = String(s || "").trim().toLowerCase();
+  if (!slug || slug.length > 63 || /[\r\n\0]/.test(slug)) return "";
+  if (!/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(slug)) return "";
+  return slug;
+}
+
+function normalizeDomain(value: unknown): string | null {
+  const raw = String(value || "");
+  if (/[\r\n\0]/.test(raw)) return null;
+  const domain = raw.trim().toLowerCase();
+  if (!domain || domain.length > 253) return null;
+  if (!/^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/.test(domain)) return null;
+  return domain;
+}
+
+function emailDomain(value: unknown): string | null {
+  const email = String(value || "").trim().toLowerCase();
+  if (!email || email.length > 320 || /[\r\n\0]/.test(email)) return null;
+  const at = email.lastIndexOf("@");
+  if (at <= 0 || at === email.length - 1) return null;
+  return normalizeDomain(email.slice(at + 1));
 }
 
 export async function getOrgBySlug(slugRaw: string): Promise<Org | null> {
@@ -56,19 +76,27 @@ export async function getOrgBySlug(slugRaw: string): Promise<Org | null> {
     oidcIssuer: r.oidc_issuer,
     oidcClientId: r.oidc_client_id,
     oidcClientSecretEnc: r.oidc_client_secret_enc,
-    allowedDomains: (r.allowed_domains || []).map((d) => String(d || "").trim().toLowerCase()).filter(Boolean),
+    allowedDomains: Array.from(
+      new Set((r.allowed_domains || []).map((d) => normalizeDomain(d)).filter((d): d is string => Boolean(d)))
+    ),
   };
 }
 
 export function orgAllowsEmail(org: Org, emailRaw: string): boolean {
-  const email = String(emailRaw || "").trim().toLowerCase();
-  if (!email) return false;
+  const domain = emailDomain(emailRaw);
+  if (!domain) return false;
   if (!org.allowedDomains?.length) return true; // if not configured, allow all (you can tighten later)
-  const domain = email.split("@")[1] || "";
-  return org.allowedDomains.includes(domain);
+  return org.allowedDomains
+    .map((d) => normalizeDomain(d))
+    .filter((d): d is string => Boolean(d))
+    .includes(domain);
 }
 
 export function getDecryptedClientSecret(org: Org): string | null {
   if (!org.oidcClientSecretEnc) return null;
-  return decryptSecret(org.oidcClientSecretEnc);
+  try {
+    return decryptSecret(org.oidcClientSecretEnc);
+  } catch {
+    return null;
+  }
 }

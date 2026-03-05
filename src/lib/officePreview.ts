@@ -5,6 +5,9 @@ export type OfficePreviewResult =
   | { ok: true; html: string }
   | { ok: false; error: string; message: string };
 
+const MAX_OFFICE_PREVIEW_BYTES = 10 * 1024 * 1024;
+const MAX_MIME_LEN = 160;
+
 function shellHtml(body: string): string {
   return `<!doctype html>
 <html>
@@ -31,7 +34,9 @@ function sanitizeHtml(input: string): string {
   return String(input || "")
     .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, "")
     .replace(/\son\w+="[^"]*"/gi, "")
-    .replace(/\son\w+='[^']*'/gi, "");
+    .replace(/\son\w+='[^']*'/gi, "")
+    .replace(/\son\w+=([^\s>]+)/gi, "")
+    .replace(/\s(href|src)\s*=\s*(['"])\s*javascript:[^'"]*\2/gi, "");
 }
 
 function esc(s: unknown): string {
@@ -53,7 +58,9 @@ function unescXml(s: string): string {
 }
 
 function mimeKind(mimeType: string): "docx" | "sheet" | "pptx" | "unsupported" {
-  const m = String(mimeType || "").toLowerCase();
+  const raw = String(mimeType || "").toLowerCase().split(";", 1)[0].trim().slice(0, MAX_MIME_LEN);
+  if (!raw || /[\r\n\0]/.test(raw)) return "unsupported";
+  const m = raw;
   if (
     m === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
     m === "application/msword" ||
@@ -101,7 +108,7 @@ function convertCsv(csvText: string): string {
 
 async function convertSpreadsheet(bytes: Buffer, mimeType: string): Promise<OfficePreviewResult> {
   try {
-    const mime = String(mimeType || "").toLowerCase();
+    const mime = String(mimeType || "").toLowerCase().split(";", 1)[0].trim();
     if (mime === "text/csv") {
       const table = convertCsv(bytes.toString("utf8"));
       return { ok: true, html: shellHtml(`<h2>Sheet 1</h2>${table}`) };
@@ -220,6 +227,13 @@ export async function convertOfficeBytes(args: {
   bytes: Buffer;
   mimeType: string;
 }): Promise<OfficePreviewResult> {
+  if (!Buffer.isBuffer(args.bytes) || args.bytes.length === 0) {
+    return { ok: false, error: "EMPTY_PAYLOAD", message: "Office payload is empty." };
+  }
+  if (args.bytes.length > MAX_OFFICE_PREVIEW_BYTES) {
+    return { ok: false, error: "PAYLOAD_TOO_LARGE", message: "Office payload is too large for preview." };
+  }
+
   const kind = mimeKind(args.mimeType);
   if (kind === "docx") return convertDocxLike(args.bytes);
   if (kind === "sheet") return convertSpreadsheet(args.bytes, args.mimeType);

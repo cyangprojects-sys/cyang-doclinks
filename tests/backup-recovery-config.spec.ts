@@ -24,6 +24,17 @@ test.describe("backup recovery config parsing", () => {
     expect(out.enabled).toBeFalsy();
   });
 
+  test("fails closed on malformed enabled/webhook values", () => {
+    const out = parseBackupRecoveryConfig(
+      toProcessEnv({
+        BACKUP_AUTOMATION_ENABLED: "true\r\n",
+        BACKUP_WEBHOOK_URL: "javascript:alert(1)",
+      })
+    );
+    expect(out.enabled).toBeFalsy();
+    expect(out.webhook).toBe("");
+  });
+
   test("clamps and falls back numeric values safely", () => {
     const invalid = parseBackupRecoveryConfig(toProcessEnv({
       BACKUP_MAX_AGE_HOURS: "NaN",
@@ -38,5 +49,16 @@ test.describe("backup recovery config parsing", () => {
     }));
     expect(clamped.maxAgeHours).toBe(24 * 365);
     expect(clamped.recoveryDrillDays).toBe(3650);
+  });
+
+  test("falls back numeric parsing when values are malformed", () => {
+    const out = parseBackupRecoveryConfig(
+      toProcessEnv({
+        BACKUP_MAX_AGE_HOURS: "100\r\n",
+        RECOVERY_DRILL_DAYS: `10${"x".repeat(30)}`,
+      })
+    );
+    expect(out.maxAgeHours).toBe(30);
+    expect(out.recoveryDrillDays).toBe(30);
   });
 });

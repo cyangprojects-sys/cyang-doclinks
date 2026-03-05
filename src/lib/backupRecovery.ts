@@ -1,9 +1,33 @@
 import { sql } from "@/lib/db";
 
 function parsePositiveInt(raw: unknown, fallback: number, min = 1, max = 3650): number {
-  const n = Number(raw);
+  const rawInput = String(raw ?? "");
+  if (rawInput.length > 24 || /[\r\n\0]/.test(rawInput)) return fallback;
+  const n = Number(rawInput);
   if (!Number.isFinite(n) || n <= 0) return fallback;
   return Math.max(min, Math.min(max, Math.floor(n)));
+}
+
+function parseTruthy(raw: unknown): boolean {
+  const rawInput = String(raw ?? "");
+  if (/[\r\n\0]/.test(rawInput)) return false;
+  const v = rawInput.trim().toLowerCase();
+  if (!v || v.length > 16) return false;
+  return ["1", "true", "yes", "y", "on"].includes(v);
+}
+
+function normalizeWebhookUrl(raw: unknown): string {
+  const value = String(raw ?? "").trim();
+  if (!value || value.length > 2048 || /[\r\n\0]/.test(value)) return "";
+  let parsed: URL;
+  try {
+    parsed = new URL(value);
+  } catch {
+    return "";
+  }
+  if (parsed.protocol !== "https:" && parsed.protocol !== "http:") return "";
+  if (parsed.username || parsed.password) return "";
+  return parsed.toString();
 }
 
 export function parseBackupRecoveryConfig(env: NodeJS.ProcessEnv = process.env): {
@@ -12,27 +36,30 @@ export function parseBackupRecoveryConfig(env: NodeJS.ProcessEnv = process.env):
   recoveryDrillDays: number;
   webhook: string;
 } {
-  const enabled = ["1", "true", "yes", "y", "on"].includes(
-    String(env.BACKUP_AUTOMATION_ENABLED || "").trim().toLowerCase()
-  );
+  const enabled = parseTruthy(env.BACKUP_AUTOMATION_ENABLED);
   const maxAgeHours = parsePositiveInt(env.BACKUP_MAX_AGE_HOURS, 30, 1, 24 * 365);
   const recoveryDrillDays = parsePositiveInt(env.RECOVERY_DRILL_DAYS, 30, 1, 3650);
-  const webhook = String(env.BACKUP_WEBHOOK_URL || "").trim();
+  const webhook = normalizeWebhookUrl(env.BACKUP_WEBHOOK_URL);
   return { enabled, maxAgeHours, recoveryDrillDays, webhook };
 }
 
 async function pingBackupWebhook(url: string): Promise<{ ok: boolean; status: number; body?: string }> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 12_000);
   try {
     const res = await fetch(url, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ at: new Date().toISOString(), source: "cyang-doclinks" }),
+      signal: controller.signal,
     });
     const text = await res.text().catch(() => "");
     return { ok: res.ok, status: res.status, body: text.slice(0, 400) };
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
     return { ok: false, status: 0, body: msg };
+  } finally {
+    clearTimeout(timeout);
   }
 }
 

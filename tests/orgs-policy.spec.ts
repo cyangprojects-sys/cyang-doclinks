@@ -29,6 +29,7 @@ test.describe("org policy helpers", () => {
     expect(orgAllowsEmail(org, "user@example.com")).toBeTruthy();
     expect(orgAllowsEmail(org, " USER@Example.com ")).toBeTruthy();
     expect(orgAllowsEmail(org, "")).toBeFalsy();
+    expect(orgAllowsEmail(org, "not-an-email")).toBeFalsy();
   });
 
   test("orgAllowsEmail enforces explicit domain allow-list", () => {
@@ -45,5 +46,16 @@ test.describe("org policy helpers", () => {
     const org = mkOrg({ oidcClientSecretEnc: encrypted });
     expect(getDecryptedClientSecret(org)).toBe(secret);
     expect(getDecryptedClientSecret(mkOrg({ oidcClientSecretEnc: null }))).toBeNull();
+  });
+
+  test("returns null for malformed encrypted secrets and ignores invalid domains", () => {
+    process.env.OIDC_SECRETS_KEY = Buffer.alloc(32, 7).toString("base64");
+    const org = mkOrg({
+      allowedDomains: ["acme.com", "bad_domain", "", "example.org\r\n"],
+      oidcClientSecretEnc: "v1:not-valid",
+    });
+    expect(orgAllowsEmail(org, "user@acme.com")).toBeTruthy();
+    expect(orgAllowsEmail(org, "user@example.org")).toBeFalsy();
+    expect(getDecryptedClientSecret(org)).toBeNull();
   });
 });

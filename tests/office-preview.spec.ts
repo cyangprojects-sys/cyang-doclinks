@@ -70,4 +70,21 @@ test.describe("office preview conversion", () => {
     expect(out.ok).toBeFalsy();
     if (!out.ok) expect(out.error).toBe("SHEET_CONVERSION_FAILED");
   });
+
+  test("rejects oversized office payloads", async () => {
+    const out = await convertOfficeBytes({
+      bytes: Buffer.alloc(10 * 1024 * 1024 + 1, 0x41),
+      mimeType: "text/csv",
+    });
+    expect(out.ok).toBeFalsy();
+    if (!out.ok) expect(out.error).toBe("PAYLOAD_TOO_LARGE");
+  });
+
+  test("accepts mime values with parameters after normalization", async () => {
+    const out = await convertOfficeBytes({
+      bytes: Buffer.from("name,notes\nalice,ok", "utf8"),
+      mimeType: "text/csv; charset=utf-8",
+    });
+    expect(out.ok).toBeTruthy();
+  });
 });
