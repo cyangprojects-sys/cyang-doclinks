@@ -9,14 +9,24 @@ import { clientIpKey, logSecurityEvent } from "@/lib/securityTelemetry";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+const MAX_UPLOAD_ABORT_BODY_BYTES = 8 * 1024;
 
 const BodySchema = z.object({
   doc_id: z.string().uuid(),
 });
 
+function parseJsonBodyLength(req: NextRequest): number {
+  const raw = String(req.headers.get("content-length") || "").trim();
+  const out = Number(raw);
+  return Number.isFinite(out) ? Math.max(0, Math.floor(out)) : 0;
+}
+
 export async function POST(req: NextRequest) {
   const ipInfo = clientIpKey(req);
   try {
+    if (parseJsonBodyLength(req) > MAX_UPLOAD_ABORT_BODY_BYTES) {
+      return NextResponse.json({ ok: false, error: "PAYLOAD_TOO_LARGE" }, { status: 413 });
+    }
     await requireUser();
     const body = await req.json().catch(() => null);
     const parsed = BodySchema.safeParse(body);
@@ -73,4 +83,3 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "SERVER_ERROR" }, { status: 500 });
   }
 }
-

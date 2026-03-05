@@ -7,10 +7,17 @@ import { resolvePublicAppBaseUrl } from "@/lib/publicBaseUrl";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+const MAX_SECURITY_TENANT_FREEZE_BODY_BYTES = 8 * 1024;
 
 function asBool(v: unknown): boolean {
   const s = String(v ?? "").trim().toLowerCase();
   return s === "1" || s === "true" || s === "yes" || s === "on";
+}
+
+function parseJsonBodyLength(req: Request): number {
+  const raw = String(req.headers.get("content-length") || "").trim();
+  const out = Number(raw);
+  return Number.isFinite(out) ? Math.max(0, Math.floor(out)) : 0;
 }
 
 async function setOrgFreeze(orgId: string, freeze: boolean): Promise<void> {
@@ -47,6 +54,7 @@ async function setOrgFreeze(orgId: string, freeze: boolean): Promise<void> {
 
 export async function POST(req: Request) {
   let appBaseUrl: string;
+  const ct = String(req.headers.get("content-type") || "").toLowerCase();
   try {
     appBaseUrl = resolvePublicAppBaseUrl(req.url);
   } catch {
@@ -54,15 +62,24 @@ export async function POST(req: Request) {
   }
 
   try {
+    if (parseJsonBodyLength(req) > MAX_SECURITY_TENANT_FREEZE_BODY_BYTES) {
+      if (ct.includes("application/json")) {
+        return NextResponse.json({ ok: false, error: "PAYLOAD_TOO_LARGE" }, { status: 413 });
+      }
+      return NextResponse.redirect(new URL("/admin/security?error=PAYLOAD_TOO_LARGE", appBaseUrl), { status: 303 });
+    }
     const user = await requireRole("owner");
     if (!user.orgId) {
       return NextResponse.json({ ok: false, error: "ORG_REQUIRED" }, { status: 400 });
     }
 
-    const ct = String(req.headers.get("content-type") || "").toLowerCase();
     let freeze = false;
     if (ct.includes("application/json")) {
-      const json = ((await req.json().catch(() => null)) || {}) as { freeze?: unknown };
+      const parsed = await req.json().catch(() => null);
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+        return NextResponse.json({ ok: false, error: "BAD_REQUEST" }, { status: 400 });
+      }
+      const json = parsed as { freeze?: unknown };
       freeze = asBool(json.freeze);
     } else {
       const form = await req.formData();

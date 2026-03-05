@@ -48,6 +48,7 @@ const DOC_FINALIZE_REQUIRED_COLUMNS = [
   "enc_wrap_iv",
   "enc_wrap_tag",
 ] as const;
+const MAX_UPLOAD_COMPLETE_BODY_BYTES = 16 * 1024;
 
 function errorMessage(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
@@ -65,6 +66,13 @@ function extractMissingColumn(message: string): string | null {
   const m2 = /column\s+"?([a-zA-Z0-9_]+)"?\s+does not exist/i.exec(message);
   return m2?.[1] ?? null;
 }
+
+function parseJsonBodyLength(req: NextRequest): number {
+  const raw = String(req.headers.get("content-length") || "").trim();
+  const out = Number(raw);
+  return Number.isFinite(out) ? Math.max(0, Math.floor(out)) : 0;
+}
+
 async function streamToBuffer(body: AsyncIterable<unknown>): Promise<Buffer> {
   const chunks: Buffer[] = [];
   for await (const chunk of body) {
@@ -147,7 +155,14 @@ export async function POST(req: NextRequest) {
         }
 
     stage = "parse_body";
-    const body = (await req.json()) as CompleteRequest;
+    if (parseJsonBodyLength(req) > MAX_UPLOAD_COMPLETE_BODY_BYTES) {
+      return NextResponse.json({ ok: false, error: "PAYLOAD_TOO_LARGE" }, { status: 413 });
+    }
+    const parsedBody = await req.json().catch(() => null);
+    if (!parsedBody || typeof parsedBody !== "object" || Array.isArray(parsedBody)) {
+      return NextResponse.json({ ok: false, error: "bad_request", message: "Request body must be a JSON object." }, { status: 400 });
+    }
+    const body = parsedBody as CompleteRequest;
 
     const title = body.title ?? null;
     const originalFilename = body.original_filename ?? null;

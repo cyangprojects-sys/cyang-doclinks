@@ -24,6 +24,7 @@ import { validateUploadType } from "@/lib/uploadTypeValidation";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+const MAX_UPLOAD_PRESIGN_BODY_BYTES = 16 * 1024;
 
 // Enterprise: encryption is mandatory.
 // We keep "encrypt" in the schema for backward compatibility, but it must be true (or omitted).
@@ -52,9 +53,18 @@ function authErrorCode(err: unknown): "UNAUTHENTICATED" | "FORBIDDEN" | null {
   return null;
 }
 
+function parseJsonBodyLength(req: Request): number {
+  const raw = String(req.headers.get("content-length") || "").trim();
+  const out = Number(raw);
+  return Number.isFinite(out) ? Math.max(0, Math.floor(out)) : 0;
+}
+
 export async function POST(req: Request) {
   const ipInfo = clientIpKey(req);
   try {
+    if (parseJsonBodyLength(req) > MAX_UPLOAD_PRESIGN_BODY_BYTES) {
+      return NextResponse.json({ ok: false, error: "PAYLOAD_TOO_LARGE" }, { status: 413 });
+    }
     const abuseBlock = await enforceIpAbuseBlock({ req, scope: "upload_presign" });
     if (!abuseBlock.ok) {
       return NextResponse.json(

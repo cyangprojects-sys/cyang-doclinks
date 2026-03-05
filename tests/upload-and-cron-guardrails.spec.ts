@@ -5,9 +5,17 @@ test.describe("upload and cron guardrails", () => {
   test("upload presign route maps auth failures and avoids persisting raw error text", () => {
     const code = readFileSync("src/app/api/admin/upload/presign/route.ts", "utf8");
     expect(code.includes("authErrorCode(")).toBeTruthy();
+    expect(code.includes("parseJsonBodyLength(")).toBeTruthy();
+    expect(code.includes('error: "PAYLOAD_TOO_LARGE"')).toBeTruthy();
     expect(code.includes('error: "UNAUTHENTICATED"')).toBeTruthy();
     expect(code.includes('error: "FORBIDDEN"')).toBeTruthy();
     expect(code.includes("meta: { error_type:")).toBeTruthy();
+  });
+
+  test("upload abort route enforces payload-size limits", () => {
+    const code = readFileSync("src/app/api/admin/upload/abort/route.ts", "utf8");
+    expect(code.includes("parseJsonBodyLength(")).toBeTruthy();
+    expect(code.includes('error: "PAYLOAD_TOO_LARGE"')).toBeTruthy();
   });
 
   test("viewer billing checkout route uses auth error classification helper", () => {

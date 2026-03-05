@@ -173,6 +173,13 @@ Remaining resweep modules in current pass: 0
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\security\rotate\route.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\security\rollback\route.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\security\migrate-legacy\route.ts`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\upload\complete\route.ts`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\security\freeze\route.ts`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\security\rbac\route.ts`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\security\tenant-freeze\route.ts`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\upload\presign\route.ts`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\upload\abort\route.ts`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\backup\status\route.ts`
 
 ## Stale actions removed
 

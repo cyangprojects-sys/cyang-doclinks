@@ -8,6 +8,8 @@ test.describe("backup status guardrails", () => {
     expect(code.includes("function isAuthorized(")).toBeTruthy();
     expect(code.includes("enforceGlobalApiRateLimit(")).toBeTruthy();
     expect(code.includes('scope: "ip:backup_status"')).toBeTruthy();
+    expect(code.includes("parseJsonBodyLength(")).toBeTruthy();
+    expect(code.includes('error: "PAYLOAD_TOO_LARGE"')).toBeTruthy();
     expect(code.includes('error: "NOT_FOUND"')).toBeTruthy();
   });
 });

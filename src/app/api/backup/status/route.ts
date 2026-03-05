@@ -6,6 +6,7 @@ import { enforceGlobalApiRateLimit } from "@/lib/securityTelemetry";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+const MAX_BACKUP_STATUS_BODY_BYTES = 16 * 1024;
 
 const BodySchema = z.object({
   status: z.enum(["ok", "failed", "skipped", "success"]).default("ok"),
@@ -30,6 +31,12 @@ function isAuthorized(req: NextRequest): boolean {
   return false;
 }
 
+function parseJsonBodyLength(req: NextRequest): number {
+  const raw = String(req.headers.get("content-length") || "").trim();
+  const out = Number(raw);
+  return Number.isFinite(out) ? Math.max(0, Math.floor(out)) : 0;
+}
+
 export async function POST(req: NextRequest) {
   try {
     if (!isAuthorized(req)) {
@@ -47,6 +54,9 @@ export async function POST(req: NextRequest) {
         { ok: false, error: "RATE_LIMIT" },
         { status: rl.status, headers: { "Retry-After": String(rl.retryAfterSeconds) } }
       );
+    }
+    if (parseJsonBodyLength(req) > MAX_BACKUP_STATUS_BODY_BYTES) {
+      return NextResponse.json({ ok: false, error: "PAYLOAD_TOO_LARGE" }, { status: 413 });
     }
 
     const body = await req.json().catch(() => null);

@@ -5,6 +5,8 @@ test.describe("upload complete URL guardrails", () => {
   test("upload complete route uses trusted base-url resolver for view_url", () => {
     const code = readFileSync("src/app/api/admin/upload/complete/route.ts", "utf8");
     expect(code.includes("resolvePublicAppBaseUrl(req.url)")).toBeTruthy();
+    expect(code.includes("parseJsonBodyLength(")).toBeTruthy();
+    expect(code.includes('error: "PAYLOAD_TOO_LARGE"')).toBeTruthy();
     expect(code.includes("http://localhost:3000")).toBeFalsy();
   });
 

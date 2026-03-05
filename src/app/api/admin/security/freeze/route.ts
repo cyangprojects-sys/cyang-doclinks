@@ -7,10 +7,17 @@ import { resolvePublicAppBaseUrl } from "@/lib/publicBaseUrl";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+const MAX_SECURITY_FREEZE_BODY_BYTES = 8 * 1024;
 
 function asBool(v: unknown): boolean {
   const s = String(v ?? "").trim().toLowerCase();
   return s === "1" || s === "true" || s === "yes" || s === "on";
+}
+
+function parseJsonBodyLength(req: Request): number {
+  const raw = String(req.headers.get("content-length") || "").trim();
+  const out = Number(raw);
+  return Number.isFinite(out) ? Math.max(0, Math.floor(out)) : 0;
 }
 
 export async function GET() {
@@ -27,6 +34,7 @@ export async function GET() {
 
 export async function POST(req: Request) {
   let appBaseUrl: string;
+  const ct = String(req.headers.get("content-type") || "").toLowerCase();
   try {
     appBaseUrl = resolvePublicAppBaseUrl(req.url);
   } catch {
@@ -34,12 +42,21 @@ export async function POST(req: Request) {
   }
 
   try {
+    if (parseJsonBodyLength(req) > MAX_SECURITY_FREEZE_BODY_BYTES) {
+      if (ct.includes("application/json")) {
+        return NextResponse.json({ ok: false, error: "PAYLOAD_TOO_LARGE" }, { status: 413 });
+      }
+      return NextResponse.redirect(new URL("/admin/security?error=PAYLOAD_TOO_LARGE", appBaseUrl), { status: 303 });
+    }
     const user = await requireRole("owner");
-    const ct = String(req.headers.get("content-type") || "").toLowerCase();
 
     let payload: Record<string, unknown> = {};
     if (ct.includes("application/json")) {
-      payload = ((await req.json().catch(() => null)) || {}) as Record<string, unknown>;
+      const parsed = await req.json().catch(() => null);
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+        return NextResponse.json({ ok: false, error: "BAD_REQUEST" }, { status: 400 });
+      }
+      payload = parsed as Record<string, unknown>;
     } else {
       const form = await req.formData();
       payload = {
