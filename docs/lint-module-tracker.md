@@ -85,6 +85,7 @@ Status key: `done` | `pending`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\d\[alias]\SharePanel.tsx`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\signup\page.tsx`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\accessTicket.ts`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\audit.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\rateLimit.ts`
 
 ## Stale actions removed

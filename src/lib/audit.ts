@@ -10,12 +10,38 @@ import { sql } from "@/lib/db";
 import { appendImmutableAudit } from "@/lib/immutableAudit";
 import { getTrustedClientIpFromHeaders } from "@/lib/clientIp";
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const DEVICE_HASH_RE = /^[0-9a-f]{40}$/i;
+const MAX_ALIAS_LEN = 128;
+const MAX_TOKEN_LEN = 256;
+const MAX_EMAIL_LEN = 320;
+const MAX_IP_LEN = 64;
+const MAX_USER_AGENT_LEN = 512;
+
+function normalizeUuidOrNull(value: unknown): string | null {
+  const s = String(value || "").trim();
+  if (!s) return null;
+  return UUID_RE.test(s) ? s : null;
+}
+
+function normalizeTextOrNull(value: unknown, maxLen: number): string | null {
+  const s = String(value || "").trim();
+  if (!s) return null;
+  return s.slice(0, maxLen);
+}
+
+function normalizeDeviceHash(value: unknown): string | null {
+  const s = String(value || "").trim().toLowerCase();
+  if (!s) return null;
+  return DEVICE_HASH_RE.test(s) ? s : null;
+}
+
 export function getClientIpFromHeaders(h: Headers): string {
-  return getTrustedClientIpFromHeaders(h) || "";
+  return normalizeTextOrNull(getTrustedClientIpFromHeaders(h), MAX_IP_LEN) || "";
 }
 
 export function getUserAgentFromHeaders(h: Headers): string {
-  return (h.get("user-agent") || "").trim();
+  return normalizeTextOrNull(h.get("user-agent"), MAX_USER_AGENT_LEN) || "";
 }
 
 export function deviceHashFrom(ip: string, userAgent: string): string | null {
@@ -33,7 +59,8 @@ export async function isDeviceTrustedForDoc(args: {
   docId: string;
   deviceHash: string;
 }): Promise<boolean> {
-  const { docId, deviceHash } = args;
+  const docId = normalizeUuidOrNull(args.docId);
+  const deviceHash = normalizeDeviceHash(args.deviceHash);
   if (!docId || !deviceHash) return false;
 
   try {
@@ -57,8 +84,13 @@ export async function trustDeviceForDoc(args: {
   deviceHash: string;
   trustedUntilIso: string;
 }): Promise<void> {
-  const { docId, deviceHash, trustedUntilIso } = args;
-  if (!docId || !deviceHash || !trustedUntilIso) return;
+  const docId = normalizeUuidOrNull(args.docId);
+  const deviceHash = normalizeDeviceHash(args.deviceHash);
+  const trustedUntilRaw = normalizeTextOrNull(args.trustedUntilIso, 64);
+  if (!docId || !deviceHash || !trustedUntilRaw) return;
+  const parsedTrustedUntil = Date.parse(trustedUntilRaw);
+  if (!Number.isFinite(parsedTrustedUntil)) return;
+  const trustedUntilIso = new Date(parsedTrustedUntil).toISOString();
 
   try {
     await sql`
@@ -87,8 +119,14 @@ export async function logDocAccess(args: {
   ip: string;
   userAgent: string;
 }): Promise<void> {
-  const { docId, alias, shareId, token, emailUsed, ip, userAgent } = args;
+  const docId = normalizeUuidOrNull(args.docId);
   if (!docId) return;
+  const alias = normalizeTextOrNull(args.alias, MAX_ALIAS_LEN);
+  const shareId = normalizeTextOrNull(args.shareId, MAX_TOKEN_LEN);
+  const token = normalizeTextOrNull(args.token, MAX_TOKEN_LEN);
+  const emailUsed = normalizeTextOrNull(args.emailUsed, MAX_EMAIL_LEN);
+  const ip = normalizeTextOrNull(args.ip, MAX_IP_LEN);
+  const userAgent = normalizeTextOrNull(args.userAgent, MAX_USER_AGENT_LEN) || "";
 
   // Hash for doc_audit (privacy-friendly) if VIEW_SALT is configured.
   const ipHash = (() => {

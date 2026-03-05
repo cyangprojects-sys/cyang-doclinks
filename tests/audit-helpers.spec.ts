@@ -1,5 +1,12 @@
 import { expect, test } from "@playwright/test";
-import { deviceHashFrom, getClientIpFromHeaders, getUserAgentFromHeaders } from "../src/lib/audit";
+import {
+  deviceHashFrom,
+  getClientIpFromHeaders,
+  getUserAgentFromHeaders,
+  isDeviceTrustedForDoc,
+  logDocAccess,
+  trustDeviceForDoc,
+} from "../src/lib/audit";
 
 test.describe("audit helper primitives", () => {
   const snapDeviceSalt = process.env.DEVICE_TRUST_SALT;
@@ -42,6 +49,12 @@ test.describe("audit helper primitives", () => {
     expect(getUserAgentFromHeaders(new Headers())).toBe("");
   });
 
+  test("caps oversized user-agent header values", () => {
+    const longUa = `ua-${"x".repeat(800)}`;
+    const out = getUserAgentFromHeaders(new Headers({ "user-agent": longUa }));
+    expect(out.length).toBe(512);
+  });
+
   test("deviceHashFrom is deterministic and requires configured salt", () => {
     delete process.env.DEVICE_TRUST_SALT;
     delete process.env.VIEW_SALT;
@@ -62,5 +75,29 @@ test.describe("audit helper primitives", () => {
     process.env.DEVICE_TRUST_SALT = "device-salt";
     expect(deviceHashFrom("", "")).toBeNull();
     expect(deviceHashFrom("   ", "   ")).toBeNull();
+  });
+
+  test("device trust and audit writers fail closed on malformed identifiers", async () => {
+    await expect(
+      isDeviceTrustedForDoc({ docId: "not-a-uuid", deviceHash: "abcd" })
+    ).resolves.toBeFalsy();
+    await expect(
+      trustDeviceForDoc({
+        docId: "not-a-uuid",
+        deviceHash: "abcd",
+        trustedUntilIso: "not-a-date",
+      })
+    ).resolves.toBeUndefined();
+    await expect(
+      logDocAccess({
+        docId: "not-a-uuid",
+        alias: "a",
+        shareId: "s",
+        token: "t",
+        emailUsed: "u@example.com",
+        ip: "1.2.3.4",
+        userAgent: "ua",
+      })
+    ).resolves.toBeUndefined();
   });
 });
