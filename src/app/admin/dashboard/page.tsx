@@ -8,7 +8,6 @@ import AnalyticsWidgets from "./AnalyticsWidgets";
 import ViewsByDocTableClient, { type ViewsByDocRow } from "./ViewsByDocTableClient";
 import { type ShareRow } from "./SharesTableClient";
 import { type UnifiedDocRow } from "./UnifiedDocsTableClient";
-import ViewerUsageWidget from "./ViewerUsageWidget";
 import ViewerHelpfulTiles from "./ViewerHelpfulTiles";
 import DashboardItemsTabs from "./DashboardItemsTabs";
 import DashboardHeaderActions from "./DashboardHeaderActions";
@@ -230,7 +229,7 @@ const docFilter = sql`${orgFilter} ${ownerFilter}`;
         <DashboardHeaderActions docs={headerDocs} planId={planId} />
       </div>
 
-      <AnalyticsWidgets ownerId={canSeeAll ? undefined : u.id} showHealth={u.role === "owner"} />
+      <AnalyticsWidgets ownerId={canSeeAll ? undefined : u.id} userId={u.id} showHealth={u.role === "owner"} />
 
       {missingCoreTables ? (
         <div className="rounded-lg border border-neutral-800 bg-neutral-950 p-4 text-sm text-neutral-300">
@@ -247,34 +246,24 @@ const docFilter = sql`${orgFilter} ${ownerFilter}`;
         </div>
       ) : null}
 
-      <section id="activity" className="space-y-3">
-        <div className="flex items-center justify-between gap-4">
-          <h2 className="text-lg font-semibold">Recent activity</h2>
-          <a className="text-xs text-neutral-500 hover:underline" href="#views-by-doc">
-            view activity details →
-          </a>
-        </div>
-        <div className="grid gap-4 lg:grid-cols-2">
-          <ViewerUsageWidget userId={u.id} />
-          {!canSeeAll ? <ViewerHelpfulTiles userId={u.id} orgId={u.orgId} hasOrgId={hasOrgId} /> : null}
-        </div>
-      </section>
-
-      {/* Views by doc */}
-      <section id="views-by-doc" className="space-y-3">
-        <div className="flex items-center justify-between gap-4">
-          <h2 className="text-lg font-semibold">Views by document</h2>
-          <a className="text-xs text-neutral-500 hover:underline" href="#shares">
-            jump to shares →
-          </a>
-        </div>
-        <ViewsByDocTableClient rows={viewsRows} canManageShares={canSeeAll} />
-      </section>
+      {!canSeeAll ? (
+        <section id="activity" className="space-y-3">
+          <div className="flex items-center justify-between gap-4">
+            <h2 className="text-lg font-semibold">Recent activity</h2>
+            <a className="text-xs text-neutral-500 hover:underline" href="#views-by-doc">
+              view activity details →
+            </a>
+          </div>
+          <div className="grid gap-4 lg:grid-cols-1">
+            <ViewerHelpfulTiles userId={u.id} orgId={u.orgId} hasOrgId={hasOrgId} />
+          </div>
+        </section>
+      ) : null}
 
       <section className="space-y-3">
         <div className="flex items-center justify-between gap-4">
           <h2 className="text-lg font-semibold">Your items</h2>
-          <a className="text-xs text-neutral-500 hover:underline" href="#settings">
+          <a className="text-xs text-neutral-500 hover:underline" href="#shares">
             jump to settings →
           </a>
         </div>
@@ -286,6 +275,17 @@ const docFilter = sql`${orgFilter} ${ownerFilter}`;
           canCheckEncryptionStatus={canCheckEncryptionStatus}
           showDelete={canSeeAll || hasOwnerId || hasCreatedByEmail}
         />
+      </section>
+
+      {/* Views by doc */}
+      <section id="views-by-doc" className="space-y-3">
+        <div className="flex items-center justify-between gap-4">
+          <h2 className="text-lg font-semibold">Views by document</h2>
+          <a className="text-xs text-neutral-500 hover:underline" href="#settings">
+            jump to settings →
+          </a>
+        </div>
+        <ViewsByDocTableClient rows={viewsRows} canManageShares={canSeeAll} />
       </section>
 
       <section id="settings" className="space-y-3">

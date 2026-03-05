@@ -2,6 +2,13 @@
 import Link from "next/link";
 import { sql } from "@/lib/db";
 import Sparkline from "@/components/Sparkline";
+import {
+  getPlanForUser,
+  getActiveShareCountForOwner,
+  getStorageBytesForOwner,
+  getMonthlyViewCount,
+  getDailyUploadCount,
+} from "@/lib/monetization";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -35,7 +42,28 @@ function fmtMinsAgo(iso: string | null): string {
   return `${hrs}h ago`;
 }
 
-export default async function AnalyticsWidgets({ ownerId, showHealth = false }: { ownerId?: string; showHealth?: boolean }) {
+function fmtBytes(n: number | null): string {
+  if (n == null || !Number.isFinite(n) || n < 0) return "-";
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  let v = n;
+  let i = 0;
+  while (v >= 1024 && i < units.length - 1) {
+    v /= 1024;
+    i += 1;
+  }
+  const digits = i === 0 ? 0 : i <= 2 ? 1 : 2;
+  return `${v.toFixed(digits)} ${units[i]}`;
+}
+
+export default async function AnalyticsWidgets({
+  ownerId,
+  userId,
+  showHealth = false,
+}: {
+  ownerId?: string;
+  userId: string;
+  showHealth?: boolean;
+}) {
   const isViewerScoped = Boolean(ownerId);
   const hasDocViews = await tableExists("public.doc_views");
   const hasDocViewDaily = await tableExists("public.doc_view_daily");
@@ -48,6 +76,50 @@ export default async function AnalyticsWidgets({ ownerId, showHealth = false }: 
 
   const ownerFilterDocs = ownerId ? sql`and d.owner_id = ${ownerId}::uuid` : sql``;
   const ownerFilterShares = ownerId ? sql`and st.owner_id = ${ownerId}::uuid` : sql``;
+
+  // --- usage snapshot (current user)
+  let usagePlanName = "Free";
+  let usagePlanId = "free";
+  let usageMaxActiveShares: number | null = 3;
+  let usageMaxStorageBytes: number | null = 104857600;
+  let usageMaxViewsPerMonth: number | null = 100;
+  let usageMaxUploadsPerDay: number | null = 10;
+  let usageActiveShares = 0;
+  let usageStorage = 0;
+  let usageMonthlyViews: number | null = null;
+  let usageDailyUploads: number | null = null;
+
+  try {
+    const usagePlan = await getPlanForUser(userId);
+    usagePlanName = usagePlan.name || "Free";
+    usagePlanId = String(usagePlan.id || "free").toLowerCase();
+    usageMaxActiveShares = usagePlan.maxActiveShares;
+    usageMaxStorageBytes = usagePlan.maxStorageBytes;
+    usageMaxViewsPerMonth = usagePlan.maxViewsPerMonth;
+    usageMaxUploadsPerDay = usagePlan.maxUploadsPerDay;
+  } catch {
+    // keep defaults
+  }
+  try {
+    usageActiveShares = await getActiveShareCountForOwner(userId);
+  } catch {
+    usageActiveShares = 0;
+  }
+  try {
+    usageStorage = await getStorageBytesForOwner(userId);
+  } catch {
+    usageStorage = 0;
+  }
+  try {
+    usageMonthlyViews = await getMonthlyViewCount(userId);
+  } catch {
+    usageMonthlyViews = null;
+  }
+  try {
+    usageDailyUploads = await getDailyUploadCount(userId);
+  } catch {
+    usageDailyUploads = null;
+  }
 
   // --- totals
   let totalViews = 0;
@@ -479,19 +551,39 @@ export default async function AnalyticsWidgets({ ownerId, showHealth = false }: 
 
   return (
     <section className="mb-6">
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 2xl:grid-cols-4">
         <div className="glass-card-strong rounded-2xl p-4">
-          <div className="text-xs text-white/60">Protection status</div>
-          <div className="mt-2 text-xl font-semibold text-white">
-            {unencryptedDocs === 0 && blockedDocs === 0 && needsReviewDocs === 0 ? "Protected" : "Needs attention"}
-          </div>
+          <div className="text-xs text-white/60">Usage snapshot</div>
+          <div className="mt-2 text-xl font-semibold text-white">{usagePlanName}</div>
           <ul className="mt-2 space-y-1 text-xs text-white/70">
-            <li>{unencryptedDocs === 0 ? "All documents encrypted" : `${fmtInt(unencryptedDocs)} documents need encryption review`}</li>
-            <li>{unencryptedDocs === 0 ? "0 unencrypted docs" : `${fmtInt(unencryptedDocs)} unencrypted docs`}</li>
-            <li>{blockedDocs === 0 ? "No blocked files" : `${fmtInt(blockedDocs)} blocked files`}</li>
-            <li>{needsReviewDocs === 0 ? "No files need review" : `${fmtInt(needsReviewDocs)} files need review`}</li>
-            <li>Last security check: {fmtMinsAgo(lastSecurityEventAt)}</li>
+            <li>
+              Active shares: {fmtInt(usageActiveShares)}
+              {usageMaxActiveShares == null ? " / inf" : ` / ${fmtInt(usageMaxActiveShares)}`}
+            </li>
+            <li>
+              Storage: {fmtBytes(usageStorage)}
+              {usageMaxStorageBytes == null ? " / inf" : ` / ${fmtBytes(usageMaxStorageBytes)}`}
+            </li>
+            <li>
+              Monthly views: {usageMonthlyViews == null ? "-" : fmtInt(usageMonthlyViews)}
+              {usageMaxViewsPerMonth == null ? " / inf" : ` / ${fmtInt(usageMaxViewsPerMonth)}`}
+            </li>
+            <li>
+              Uploads today: {usageDailyUploads == null ? "-" : fmtInt(usageDailyUploads)}
+              {usageMaxUploadsPerDay == null ? " / inf" : ` / ${fmtInt(usageMaxUploadsPerDay)}`}
+            </li>
           </ul>
+          <div className="mt-3">
+            {usagePlanId !== "pro" ? (
+              <Link href="/admin/upgrade" className="inline-flex rounded-lg border border-cyan-400/35 bg-cyan-400/20 px-3 py-1.5 text-xs text-cyan-50 hover:bg-cyan-400/30">
+                Upgrade to Pro
+              </Link>
+            ) : (
+              <span className="inline-flex rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-xs text-white/70">
+                Pro enabled
+              </span>
+            )}
+          </div>
         </div>
 
         <div className="glass-card-strong rounded-2xl p-4">
@@ -515,6 +607,20 @@ export default async function AnalyticsWidgets({ ownerId, showHealth = false }: 
             Most viewed: {topDocs[0]?.doc_title || "No activity yet"}
           </div>
           <div className="mt-1 text-xs text-white/50">All-time views: {fmtInt(totalViews)}</div>
+        </div>
+
+        <div className="glass-card-strong rounded-2xl p-4">
+          <div className="text-xs text-white/60">Protection status</div>
+          <div className="mt-2 text-xl font-semibold text-white">
+            {unencryptedDocs === 0 && blockedDocs === 0 && needsReviewDocs === 0 ? "Protected" : "Needs attention"}
+          </div>
+          <ul className="mt-2 space-y-1 text-xs text-white/70">
+            <li>{unencryptedDocs === 0 ? "All documents encrypted" : `${fmtInt(unencryptedDocs)} documents need encryption review`}</li>
+            <li>{unencryptedDocs === 0 ? "0 unencrypted docs" : `${fmtInt(unencryptedDocs)} unencrypted docs`}</li>
+            <li>{blockedDocs === 0 ? "No blocked files" : `${fmtInt(blockedDocs)} blocked files`}</li>
+            <li>{needsReviewDocs === 0 ? "No files need review" : `${fmtInt(needsReviewDocs)} files need review`}</li>
+            <li>Last security check: {fmtMinsAgo(lastSecurityEventAt)}</li>
+          </ul>
         </div>
       </div>
 
