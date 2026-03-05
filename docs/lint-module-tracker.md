@@ -85,10 +85,11 @@ Status key: `done` | `pending`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\d\[alias]\SharePanel.tsx`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\signup\page.tsx`
 
-## Stale action review queue (security follow-up)
+## Stale actions removed
 
-- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\actions.ts:updateRetentionSettingsAction` (guarded by `ADMIN_ENABLE_STALE_ACTIONS`)
-- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\actions.ts:updateExpirationAlertSettingsAction` (guarded by `ADMIN_ENABLE_STALE_ACTIONS`)
-- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\actions.ts:sendExpirationAlertAction` (guarded by `ADMIN_ENABLE_STALE_ACTIONS`)
-- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\actions.ts:markAdminNotificationReadAction` (guarded by `ADMIN_ENABLE_STALE_ACTIONS`)
-- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\actions.ts:markAllAdminNotificationsReadAction` (guarded by `ADMIN_ENABLE_STALE_ACTIONS`)
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\actions.ts:uploadPdfAction` (removed)
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\actions.ts:updateRetentionSettingsAction` (removed)
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\actions.ts:updateExpirationAlertSettingsAction` (removed)
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\actions.ts:sendExpirationAlertAction` (removed)
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\actions.ts:markAdminNotificationReadAction` (removed)
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\actions.ts:markAllAdminNotificationsReadAction` (removed)

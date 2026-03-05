@@ -9,7 +9,6 @@ import { sql } from "@/lib/db";
 import { getR2Bucket, getR2Prefix, r2Client } from "@/lib/r2";
 import { sendMail } from "@/lib/email";
 import { requireDocWrite, requireRole, requireUser } from "@/lib/authz";
-import { setRetentionSettings, setExpirationAlertSettings, getExpirationAlertSettings } from "@/lib/settings";
 import { generateApiKey, hashApiKey } from "@/lib/apiKeys";
 import { emitWebhook } from "@/lib/webhooks";
 import { appendImmutableAudit } from "@/lib/immutableAudit";
@@ -121,16 +120,6 @@ function parseAliasTtlDays(raw: unknown): number {
   return 30;
 }
 
-function isTruthyEnv(raw: string | undefined): boolean {
-  const v = String(raw || "").trim().toLowerCase();
-  return v === "1" || v === "true" || v === "yes" || v === "on";
-}
-
-function assertStaleAdminActionEnabled(actionName: string): void {
-  if (isTruthyEnv(process.env.ADMIN_ENABLE_STALE_ACTIONS)) return;
-  throw new Error(`ACTION_RETIRED:${actionName}`);
-}
-
 async function purgeDocGraphRows(docId: string): Promise<boolean> {
   const shareTokensExists = await tableExists("public.share_tokens");
   const shareUnlocksExists = await tableExists("public.share_unlocks");
@@ -165,12 +154,6 @@ async function purgeDocGraphRows(docId: string): Promise<boolean> {
     returning id::text as id
   `) as unknown as Array<{ id: string }>;
   return deleted.length > 0;
-}
-
-// Back-compat export expected by older admin UI
-export async function uploadPdfAction(): Promise<void> {
-  await requireRole("admin");
-  throw new Error("uploadPdfAction is deprecated. Use /admin/upload instead.");
 }
 
 // Used as <form action={createOrAssignAliasAction}> — must return void
@@ -399,52 +382,6 @@ export async function emailMagicLinkAction(formData: FormData): Promise<void> {
   revalidatePath("/admin");
   revalidatePath("/admin/dashboard");
 }
-
-// Retention settings (admin toggle)
-export async function updateRetentionSettingsAction(formData: FormData): Promise<void> {
-  assertStaleAdminActionEnabled("updateRetentionSettingsAction");
-  await requireRole("admin");
-
-  const enabledRaw = String(formData.get("retention_enabled") ?? "");
-  const deleteExpiredRaw = String(formData.get("retention_delete_expired_shares") ?? "");
-  const graceRaw = String(formData.get("retention_share_grace_days") ?? "");
-
-  const enabled = enabledRaw === "on" || enabledRaw === "true" || enabledRaw === "1";
-  const deleteExpiredShares = deleteExpiredRaw === "on" || deleteExpiredRaw === "true" || deleteExpiredRaw === "1";
-
-  const graceNum = Number(graceRaw);
-  const shareGraceDays = Number.isFinite(graceNum) ? Math.max(0, Math.floor(graceNum)) : 0;
-
-  const res = await setRetentionSettings({ enabled, deleteExpiredShares, shareGraceDays });
-  if (!res.ok) {
-    throw new Error(`Failed to save retention settings: ${res.error}`);
-  }
-
-  revalidatePath("/admin/dashboard");
-}
-
-
-// Expiration alert settings (admin toggle)
-export async function updateExpirationAlertSettingsAction(formData: FormData): Promise<void> {
-  assertStaleAdminActionEnabled("updateExpirationAlertSettingsAction");
-  await requireRole("admin");
-
-  const enabledRaw = String(formData.get("expiration_alerts_enabled") ?? "");
-  const emailEnabledRaw = String(formData.get("expiration_alert_email_enabled") ?? "");
-  const daysRaw = String(formData.get("expiration_alert_days") ?? "");
-
-  const enabled = enabledRaw === "on" || enabledRaw === "true" || enabledRaw === "1";
-  const emailEnabled = emailEnabledRaw === "on" || emailEnabledRaw === "true" || emailEnabledRaw === "1";
-
-  const daysNum = Number(daysRaw);
-  const days = Number.isFinite(daysNum) ? Math.max(1, Math.min(30, Math.floor(daysNum))) : 3;
-
-  const res = await setExpirationAlertSettings({ enabled, emailEnabled, days });
-  if (!res.ok) throw new Error(`Failed to save expiration settings: ${res.error}`);
-
-  revalidatePath("/admin/dashboard");
-}
-
 
 // Used as <form action={deleteDocAction}> — must return void
 export async function deleteDocAction(formData: FormData): Promise<void> {
@@ -917,114 +854,6 @@ export async function bulkDeleteDocsAction(formData: FormData): Promise<void> {
   revalidatePath("/admin");
 }
 
-// Expiration warning email (best-effort; uses doc_aliases.expires_at + share_tokens.expires_at)
-export async function sendExpirationAlertAction(formData: FormData): Promise<void> {
-  assertStaleAdminActionEnabled("sendExpirationAlertAction");
-  const u = await requireRole("admin");
-
-  const settingsRes = await getExpirationAlertSettings();
-  const settings = settingsRes.ok ? settingsRes.settings : { enabled: true, days: 3, emailEnabled: true };
-
-  const daysRaw = String(formData.get("days") || settings.days || "3").trim();
-  const daysNum = Number(daysRaw);
-  const days = Number.isFinite(daysNum) ? Math.max(1, Math.min(30, Math.floor(daysNum))) : settings.days;
-
-  if (!settings.enabled || !settings.emailEnabled) {
-    // Still revalidate, but do nothing.
-    revalidatePath("/admin/dashboard");
-    revalidatePath("/admin");
-    return;
-  }
-
-  const base = getBaseUrl();
-
-  let aliasRows: Array<{ doc_id: string; title: string | null; alias: string | null; expires_at: string | null }> = [];
-  let shareRows: Array<{ token: string; doc_id: string; title: string | null; to_email: string | null; expires_at: string | null }> = [];
-
-  try {
-    aliasRows = (await sql`
-      select
-        d.id::text as doc_id,
-        d.title,
-        a.alias,
-        a.expires_at::text as expires_at
-      from public.doc_aliases a
-      join public.docs d on d.id = a.doc_id
-      where d.owner_id = ${u.id}::uuid
-        and coalesce(a.is_active, true) = true
-        and a.revoked_at is null
-        and a.expires_at is not null
-        and a.expires_at > now()
-        and a.expires_at <= (now() + (${days}::int * interval '1 day'))
-      order by a.expires_at asc
-      limit 100
-    `) as unknown as Array<{ doc_id: string; title: string | null; alias: string | null; expires_at: string | null }>;
-  } catch {
-    aliasRows = [];
-  }
-
-  try {
-    shareRows = (await sql`
-      select
-        st.token::text as token,
-        d.id::text as doc_id,
-        d.title,
-        st.to_email,
-        st.expires_at::text as expires_at
-      from public.share_tokens st
-      join public.docs d on d.id = st.doc_id
-      where d.owner_id = ${u.id}::uuid
-        and st.revoked_at is null
-        and st.expires_at is not null
-        and st.expires_at > now()
-        and st.expires_at <= (now() + (${days}::int * interval '1 day'))
-      order by st.expires_at asc
-      limit 100
-    `) as unknown as Array<{ token: string; doc_id: string; title: string | null; to_email: string | null; expires_at: string | null }>;
-  } catch {
-    shareRows = [];
-  }
-
-  const lines: string[] = [];
-
-  if (aliasRows.length) {
-    lines.push(`Aliases expiring in the next ${days} day(s):`);
-    for (const r of aliasRows) {
-      const name = r.title || "Untitled";
-      const docUrl = `${base}/admin/docs/${encodeURIComponent(r.doc_id)}`;
-      const aliasUrl = r.alias ? `${base}/d/${encodeURIComponent(r.alias)}` : "";
-      const exp = r.expires_at || "";
-      lines.push(`- ${name} (${r.doc_id})\n  expires: ${exp}\n  admin: ${docUrl}${aliasUrl ? `\n  link: ${aliasUrl}` : ""}`);
-    }
-    lines.push("");
-  }
-
-  if (shareRows.length) {
-    lines.push(`Shares expiring in the next ${days} day(s):`);
-    for (const r of shareRows) {
-      const name = r.title || "Untitled";
-      const docUrl = `${base}/admin/docs/${encodeURIComponent(r.doc_id)}`;
-      const shareUrl = `${base}/s/${encodeURIComponent(r.token)}`;
-      const exp = r.expires_at || "";
-      lines.push(`- ${name} (${r.doc_id})\n  expires: ${exp}\n  token: ${r.token}${r.to_email ? `\n  to: ${r.to_email}` : ""}\n  admin: ${docUrl}\n  link: ${shareUrl}`);
-    }
-    lines.push("");
-  }
-
-  const body =
-    lines.length === 0 ? `No items expiring in the next ${days} day(s).` : lines.join("\n\n");
-
-  await sendMail({
-    to: u.email,
-    subject: `cyang.io: expirations in ${days} day(s)`,
-    text: body,
-  });
-
-  revalidatePath("/admin/dashboard");
-  revalidatePath("/admin");
-}
-
-
 // =========================
 // API Keys (admin/owner)
 // =========================
@@ -1060,43 +889,5 @@ export async function revokeApiKeyAction(formData: FormData) {
   `;
 
   revalidatePath("/admin/api-keys");
-  return { ok: true as const };
-}
-
-
-// --- Admin notifications (expiration alerts) ---
-
-export async function markAdminNotificationReadAction(formData: FormData) {
-  assertStaleAdminActionEnabled("markAdminNotificationReadAction");
-  await requireRole("admin");
-  const u = await requireUser();
-
-  const id = String(formData.get("id") || "").trim();
-  if (!id) throw new Error("Missing id.");
-
-  await sql`
-    update public.admin_notifications
-    set read_at = now()
-    where id = ${id}::uuid
-      and owner_id = ${u.id}::uuid
-  `;
-
-  revalidatePath("/admin/dashboard");
-  return { ok: true as const };
-}
-
-export async function markAllAdminNotificationsReadAction(_: FormData) {
-  assertStaleAdminActionEnabled("markAllAdminNotificationsReadAction");
-  await requireRole("admin");
-  const u = await requireUser();
-
-  await sql`
-    update public.admin_notifications
-    set read_at = now()
-    where owner_id = ${u.id}::uuid
-      and read_at is null
-  `;
-
-  revalidatePath("/admin/dashboard");
   return { ok: true as const };
 }
