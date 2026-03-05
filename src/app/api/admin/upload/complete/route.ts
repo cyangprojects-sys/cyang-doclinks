@@ -34,8 +34,35 @@ type CompleteRequest = {
   original_filename?: string | null;
 };
 
+const DOC_FINALIZE_REQUIRED_COLUMNS = [
+  "status",
+  "scan_status",
+  "risk_level",
+  "risk_flags",
+  "moderation_status",
+  "enc_alg",
+  "enc_iv",
+  "enc_key_version",
+  "enc_wrapped_key",
+  "enc_wrap_iv",
+  "enc_wrap_tag",
+] as const;
+
 function errorMessage(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
+}
+
+function sqlErrorCode(e: unknown): string | null {
+  if (!e || typeof e !== "object") return null;
+  const code = (e as { code?: unknown }).code;
+  return typeof code === "string" ? code : null;
+}
+
+function extractMissingColumn(message: string): string | null {
+  const m = /column\s+"?([a-zA-Z0-9_]+)"?\s+of relation/i.exec(message);
+  if (m?.[1]) return m[1];
+  const m2 = /column\s+"?([a-zA-Z0-9_]+)"?\s+does not exist/i.exec(message);
+  return m2?.[1] ?? null;
 }
 async function streamToBuffer(body: AsyncIterable<unknown>): Promise<Buffer> {
   const chunks: Buffer[] = [];
@@ -169,6 +196,37 @@ export async function POST(req: NextRequest) {
 
     if (!docRows.length) {
       return NextResponse.json({ ok: false, error: "doc_not_found" }, { status: 404 });
+    }
+
+    // Strict schema preflight (no fallback writes): fail fast with actionable detail.
+    const docColumnRows = (await sql`
+      select column_name::text as column_name
+      from information_schema.columns
+      where table_schema = 'public'
+        and table_name = 'docs'
+    `) as Array<{ column_name: string }>;
+    const docColumns = new Set(docColumnRows.map((r) => r.column_name));
+    const missingFinalizeColumns = DOC_FINALIZE_REQUIRED_COLUMNS.filter((c) => !docColumns.has(c));
+    if (missingFinalizeColumns.length > 0) {
+      await logSecurityEvent({
+        type: "upload_complete_schema_mismatch",
+        severity: "high",
+        ip: ipInfo.ip,
+        docId,
+        scope: "upload_complete",
+        message: "Docs schema missing required upload finalization columns",
+        meta: { missingFinalizeColumns },
+      });
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "SCHEMA_MISMATCH",
+          message: "Database schema is missing required columns for upload finalization.",
+          missing_columns: missingFinalizeColumns,
+          required_sql: ["scripts/sql/security_encryption.sql", "scripts/sql/abuse_moderation.sql"],
+        },
+        { status: 500 }
+      );
     }
 
     await sql`
@@ -630,6 +688,9 @@ try {
       timeoutMs
     );
   } catch (e: unknown) {
+    const msg = errorMessage(e) || "server_error";
+    const code = sqlErrorCode(e);
+    const missingColumn = extractMissingColumn(msg);
     if (isRuntimeEnvError(e)) {
       return NextResponse.json({ ok: false, error: "ENV_MISCONFIGURED" }, { status: 503 });
     }
@@ -644,9 +705,31 @@ try {
       });
       return NextResponse.json({ ok: false, error: "TIMEOUT" }, { status: 504 });
     }
+    if (code === "42703" || missingColumn) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "SCHEMA_MISMATCH",
+          message: "Upload finalization failed due to a missing database column.",
+          missing_column: missingColumn,
+          required_sql: ["scripts/sql/security_encryption.sql", "scripts/sql/abuse_moderation.sql"],
+        },
+        { status: 500 }
+      );
+    }
+    if (code === "42P01") {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "SCHEMA_MISMATCH",
+          message: "Upload finalization failed due to a missing database table.",
+        },
+        { status: 500 }
+      );
+    }
     await logDbErrorEvent({
       scope: "upload_complete",
-      message: errorMessage(e) || "server_error",
+      message: msg,
       ip: clientIpKey(req).ip,
       meta: { route: "/api/admin/upload/complete" },
     });
