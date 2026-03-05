@@ -9,6 +9,12 @@ import { ensureUserByEmail } from "@/lib/authz";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+type AdminRole = "viewer" | "admin" | "owner";
+
+function isAdminRole(role: string | undefined): role is AdminRole {
+  return role === "viewer" || role === "admin" || role === "owner";
+}
+
 export default async function AdminLayout({
   children,
 }: {
@@ -19,7 +25,9 @@ export default async function AdminLayout({
   // Require login for all /admin routes
   if (!session?.user) redirect("/signin");
 
-  const role = (session.user as { role?: string })?.role;
+  const rawRole = (session.user as { role?: string })?.role;
+  if (!isAdminRole(rawRole)) redirect("/signin");
+  const role = rawRole;
   const isOwner = role === "owner";
   const email = String(session.user.email || "").trim().toLowerCase();
   const orgId = (session.user as { orgId?: string | null } | undefined)?.orgId ?? null;

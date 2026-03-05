@@ -57,6 +57,11 @@ function fmtDate(s: string | null) {
 
 const card = "glass-card-strong rounded-2xl p-4";
 const subtle = "text-xs text-white/60";
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function isUuid(value: string): boolean {
+  return UUID_RE.test(String(value || "").trim());
+}
 
 export default async function AdminDocDetailPage({
   params,
@@ -72,8 +77,8 @@ export default async function AdminDocDetailPage({
   }
 
   const resolvedParams = await Promise.resolve(params);
-  const docId = resolvedParams?.docId;
-  if (!docId) notFound();
+  const docId = String(resolvedParams?.docId || "").trim();
+  if (!docId || !isUuid(docId)) notFound();
 
   const canSeeAll = roleAtLeast(u.role, "admin");
   const isViewer = !canSeeAll;
@@ -274,7 +279,7 @@ export default async function AdminDocDetailPage({
           {alias ? (
             <Link
               className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-white hover:bg-white/15"
-              href={`/d/${alias}`}
+              href={`/d/${encodeURIComponent(alias)}`}
             >
               Open
             </Link>

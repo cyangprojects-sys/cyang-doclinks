@@ -4,7 +4,7 @@ Total modules with lint warnings:
 66
 
 Remaining pending modules:
-47
+45
 
 Status key: `done` | `pending`
 
@@ -22,8 +22,8 @@ Status key: `done` | `pending`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\(owner)\webhooks\actions.ts`
 - pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\actions.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\dashboard\UploadPanel.tsx`
-- pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\docs\[docId]\page.tsx`
-- pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\layout.tsx`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\docs\[docId]\page.tsx`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\layout.tsx`
 - pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\abuse\route.ts`
 - pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\audit\export\route.ts`
 - pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\billing\checkout\route.ts`
@@ -84,3 +84,11 @@ Status key: `done` | `pending`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\(owner)\security\KeyManagementPanel.tsx`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\d\[alias]\SharePanel.tsx`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\signup\page.tsx`
+
+## Stale action review queue (security follow-up)
+
+- pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\actions.ts:updateRetentionSettingsAction` (no in-repo references)
+- pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\actions.ts:updateExpirationAlertSettingsAction` (no in-repo references)
+- pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\actions.ts:sendExpirationAlertAction` (no in-repo references)
+- pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\actions.ts:markAdminNotificationReadAction` (no in-repo references)
+- pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\actions.ts:markAllAdminNotificationsReadAction` (no in-repo references)
