@@ -257,3 +257,23 @@ Remaining resweep modules in current pass: 0
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\actions.ts:sendExpirationAlertAction` (removed)
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\actions.ts:markAdminNotificationReadAction` (removed)
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\actions.ts:markAllAdminNotificationsReadAction` (removed)
+
+## Timeout guard sweep (SQL-backed API routes)
+
+Remaining timeout-guard modules pending: 12
+
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\audit\export\route.ts` (resweep: bounded route timeout guard + timeout fail-closed response)
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\security\rollback\route.ts` (resweep: bounded route timeout guard on key rollback control plane)
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\upload\abort\route.ts` (resweep: bounded route timeout guard on upload abort path)
+- pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\abuse\route.ts`
+- pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\dmca\route.ts`
+- pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\security\org-access\route.ts`
+- pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\security\requeue-scans\route.ts`
+- pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\security\tenant-freeze\route.ts`
+- pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\upload\presign\route.ts`
+- pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\cron\scan\route.ts`
+- pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\v1\abuse\report\route.ts`
+- pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\v1\aliases\route.ts`
+- pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\v1\shares\route.ts`
+- pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\v1\takedown\route.ts`
+- pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\v1\webhooks\test\route.ts`

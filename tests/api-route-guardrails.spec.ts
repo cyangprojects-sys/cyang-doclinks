@@ -207,4 +207,18 @@ test.describe("api route guardrails", () => {
       expect(code.includes('error: "TIMEOUT"')).toBeTruthy();
     }
   });
+
+  test("admin control-plane routes use route timeout guards", () => {
+    const routes = [
+      "src/app/api/admin/audit/export/route.ts",
+      "src/app/api/admin/security/rollback/route.ts",
+      "src/app/api/admin/upload/abort/route.ts",
+    ];
+    for (const route of routes) {
+      const code = src(route);
+      expect(code.includes("getRouteTimeoutMs(")).toBeTruthy();
+      expect(code.includes("withRouteTimeout(")).toBeTruthy();
+      expect(code.includes("isRouteTimeoutError(")).toBeTruthy();
+    }
+  });
 });
