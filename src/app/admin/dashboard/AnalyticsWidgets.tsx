@@ -248,6 +248,9 @@ export default async function AnalyticsWidgets({ ownerId, showHealth = false }: 
   let topSecurityTypes: Array<{ type: string; c: number }> = [];
   let unencryptedDocs = 0;
   let encryptedMissingKeyVersion = 0;
+  let needsReviewDocs = 0;
+  let blockedDocs = 0;
+  let pendingScanDocs = 0;
   let lastSecurityEventAt: string | null = null;
   let nightlyLastOkAt: string | null = null;
   const backupAutomationEnabled = ["1", "true", "yes", "y", "on"].includes(
@@ -434,20 +437,45 @@ export default async function AnalyticsWidgets({ ownerId, showHealth = false }: 
     }
   }
 
-  if (hasDocs && !isViewerScoped) {
+  if (hasDocs) {
     try {
       const rows = (await sql`
         select
           coalesce(sum(case when coalesce(d.encryption_enabled, false) = false then 1 else 0 end), 0)::int as unencrypted_docs,
-          coalesce(sum(case when coalesce(d.encryption_enabled, false) = true and coalesce(d.enc_key_version::text, '') = '' then 1 else 0 end), 0)::int as encrypted_missing_key
+          coalesce(sum(case when coalesce(d.encryption_enabled, false) = true and coalesce(d.enc_key_version::text, '') = '' then 1 else 0 end), 0)::int as encrypted_missing_key,
+          coalesce(sum(case
+            when lower(coalesce(d.moderation_status::text, 'active')) in ('quarantined', 'disabled', 'deleted')
+              or lower(coalesce(d.scan_status::text, 'unscanned')) in ('infected', 'malicious', 'quarantined')
+            then 1 else 0 end), 0)::int as blocked_docs,
+          coalesce(sum(case
+            when lower(coalesce(d.scan_status::text, 'unscanned')) in ('error', 'failed', 'dead_letter', 'needs_review', 'unknown', 'inconclusive')
+            then 1 else 0 end), 0)::int as needs_review_docs,
+          coalesce(sum(case
+            when lower(coalesce(d.scan_status::text, 'unscanned')) in ('pending', 'queued', 'running', 'unscanned', 'not_scheduled')
+            then 1 else 0 end), 0)::int as pending_scan_docs
         from public.docs d
-      `) as unknown as Array<{ unencrypted_docs: number; encrypted_missing_key: number }>;
+        where lower(coalesce(d.status::text, 'ready')) <> 'deleted'
+          ${ownerFilterDocs}
+      `) as unknown as Array<{
+        unencrypted_docs: number;
+        encrypted_missing_key: number;
+        blocked_docs: number;
+        needs_review_docs: number;
+        pending_scan_docs: number;
+      }>;
       unencryptedDocs = Number(rows?.[0]?.unencrypted_docs ?? 0);
       encryptedMissingKeyVersion = Number(rows?.[0]?.encrypted_missing_key ?? 0);
+      blockedDocs = Number(rows?.[0]?.blocked_docs ?? 0);
+      needsReviewDocs = Number(rows?.[0]?.needs_review_docs ?? 0);
+      pendingScanDocs = Number(rows?.[0]?.pending_scan_docs ?? 0);
     } catch {
       // ignore
     }
   }
+
+  const scanDelayThresholdRaw = Number(process.env.SCAN_PENDING_DELAY_THRESHOLD || 25);
+  const scanDelayThreshold = Number.isFinite(scanDelayThresholdRaw) && scanDelayThresholdRaw > 0 ? Math.floor(scanDelayThresholdRaw) : 25;
+  const scanSystemDelayed = pendingScanDocs > scanDelayThreshold;
 
   return (
     <section className="mb-6">
@@ -455,11 +483,13 @@ export default async function AnalyticsWidgets({ ownerId, showHealth = false }: 
         <div className="glass-card-strong rounded-2xl p-4">
           <div className="text-xs text-white/60">Protection status</div>
           <div className="mt-2 text-xl font-semibold text-white">
-            {unencryptedDocs === 0 && presignErrors24h === 0 && scanFailures24h === 0 ? "Protected" : "Needs attention"}
+            {unencryptedDocs === 0 && blockedDocs === 0 && needsReviewDocs === 0 ? "Protected" : "Needs attention"}
           </div>
           <ul className="mt-2 space-y-1 text-xs text-white/70">
             <li>{unencryptedDocs === 0 ? "All documents encrypted" : `${fmtInt(unencryptedDocs)} documents need encryption review`}</li>
             <li>{unencryptedDocs === 0 ? "0 unencrypted docs" : `${fmtInt(unencryptedDocs)} unencrypted docs`}</li>
+            <li>{blockedDocs === 0 ? "No blocked files" : `${fmtInt(blockedDocs)} blocked files`}</li>
+            <li>{needsReviewDocs === 0 ? "No files need review" : `${fmtInt(needsReviewDocs)} files need review`}</li>
             <li>Last security check: {fmtMinsAgo(lastSecurityEventAt)}</li>
           </ul>
         </div>
@@ -506,17 +536,11 @@ export default async function AnalyticsWidgets({ ownerId, showHealth = false }: 
               <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-white/80">
                 {cronFailures24h === 0 ? "Links working" : "Some link checks failed"}
               </div>
-              <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-white/80">
-                {unencryptedDocs === 0 ? "Encryption OK" : "Encryption needs attention"}
-              </div>
                 <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-white/80">
-                  {!hasBackupRuns
-                    ? "Backups not configured"
-                  : backupRunCount === 0
-                  ? "Backups not started"
-                  : backupFreshOk
-                  ? "Backups healthy"
-                  : "Backups need attention"}
+                  {unencryptedDocs === 0 ? "Encryption OK" : "Encryption needs attention"}
+                </div>
+              <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-white/80">
+                {scanSystemDelayed ? `Scan system delayed (${fmtInt(pendingScanDocs)} pending)` : "Scans running"}
               </div>
             </div>
           </summary>

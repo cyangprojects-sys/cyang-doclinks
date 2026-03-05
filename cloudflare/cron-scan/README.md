@@ -3,10 +3,10 @@
 This Worker runs on Cloudflare Cron Triggers and calls your Next.js cron endpoints on `cyang.io`.
 
 Current schedules:
-- `*/5 * * * *` -> `/api/cron/webhooks`
-- `*/5 * * * *` -> `/api/cron/scan`
-- `*/15 * * * *` -> `/api/cron/key-rotation`
-- `*/30 * * * *` -> `/api/cron/aggregate`
+- `* * * * *` -> `/api/cron/scan`
+- `* * * * *` -> `/api/cron/webhooks` (every 5 minutes via minute modulo)
+- `* * * * *` -> `/api/cron/key-rotation` (every 15 minutes via minute modulo)
+- `* * * * *` -> `/api/cron/aggregate` (every 30 minutes via minute modulo)
 - `5 * * * *` -> `/api/cron/nightly` and `/api/cron/billing-sync`
 - `17 2 * * *` -> `/api/cron/retention`
 

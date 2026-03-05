@@ -15,6 +15,7 @@ import { getPlanForUser } from "@/lib/monetization";
 import { allowUnencryptedServing } from "@/lib/securityPolicy";
 import SecurePdfCanvasViewer from "@/app/components/SecurePdfCanvasViewer";
 import { detectFileFamily, fileFamilyLabel, isMicrosoftOfficeDocument } from "@/lib/fileFamily";
+import { getDocumentUiStatus, getShareEligibility } from "@/lib/documentStatus";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -156,9 +157,21 @@ async function getDocAvailabilityHint(docId: string): Promise<string | null> {
     if (moderation === "quarantined") return "This document is quarantined and cannot be served.";
     if (moderation === "disabled" || moderation === "deleted") return `This document is ${moderation} and unavailable.`;
 
-    const scan = String(r.scan_status || "unscanned").toLowerCase();
-    if (scan !== "clean") {
-      return `Serving is blocked due to scan status: ${r.scan_status}. File must be clean before it can be viewed or downloaded.`;
+    const eligibility = getShareEligibility({
+      docStateRaw: r.status || "ready",
+      scanStateRaw: r.scan_status || "unscanned",
+      moderationStatusRaw: r.moderation_status || "active",
+    });
+    if (!eligibility.canCreateLink) {
+      return eligibility.blockedReason || "This document cannot be shared right now.";
+    }
+    if (eligibility.warning) {
+      const ui = getDocumentUiStatus({
+        docStateRaw: r.status || "ready",
+        scanStateRaw: r.scan_status || "unscanned",
+        moderationStatusRaw: r.moderation_status || "active",
+      });
+      return `${ui.label}: ${ui.subtext}.`;
     }
     return null;
   }

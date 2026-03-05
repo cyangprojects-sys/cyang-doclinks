@@ -9,6 +9,7 @@ import { emitWebhook } from "@/lib/webhooks";
 import { assertCanCreateShare, getPlanForUser, normalizeExpiresAtForPlan, normalizeMaxViewsForPlan } from "@/lib/monetization";
 import { resolveConfiguredPublicAppBaseUrl } from "@/lib/publicBaseUrl";
 import { DEFAULT_SHARE_SETTINGS, PRO_PACK_UPSELL_MESSAGE, applyPack, getPackById, isPackAvailableForPlan } from "@/lib/packs";
+import { getShareEligibility } from "@/lib/documentStatus";
 
 /**
  * NOTE:
@@ -201,14 +202,35 @@ export async function createAndEmailShareToken(
     const blockedCountries = parseCountries(blockedCountriesRaw);
 
     const docRows = (await sql`
-      select id::text as id, title::text as title, owner_id::text as owner_id
+      select
+        id::text as id,
+        title::text as title,
+        owner_id::text as owner_id,
+        coalesce(status::text, 'ready') as doc_state,
+        coalesce(scan_status::text, 'unscanned') as scan_state,
+        coalesce(moderation_status::text, 'active') as moderation_status
       from public.docs
       where id = ${docId}::uuid
       limit 1
-    `) as unknown as { id: string; title: string | null; owner_id: string | null }[];
+    `) as unknown as Array<{
+      id: string;
+      title: string | null;
+      owner_id: string | null;
+      doc_state: string;
+      scan_state: string;
+      moderation_status: string;
+    }>;
 
     if (!docRows || docRows.length === 0) {
       return { ok: false, error: "not_found", message: "Document not found" };
+    }
+    const shareEligibility = getShareEligibility({
+      docStateRaw: docRows[0].doc_state,
+      scanStateRaw: docRows[0].scan_state,
+      moderationStatusRaw: docRows[0].moderation_status,
+    });
+    if (!shareEligibility.canCreateLink) {
+      return { ok: false, error: "DOC_NOT_SHAREABLE", message: shareEligibility.blockedReason || "Document cannot be shared yet." };
     }
 
 

@@ -6,6 +6,7 @@ import { detectFileFamily, fileFamilyLabel, isMicrosoftOfficeDocument } from "@/
 import { ShareBadge, ShareShell } from "../ShareShell";
 import { sql } from "@/lib/db";
 import { getPackById } from "@/lib/packs";
+import { getDocumentUiStatus, getShareEligibility } from "@/lib/documentStatus";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -79,19 +80,22 @@ export default async function ShareTokenViewPage(props: {
     return <FailState token={t} title="Unavailable" body="This document is no longer available." />;
   }
 
+  const shareEligibility = getShareEligibility({
+    docStateRaw: meta.docStatus || "ready",
+    scanStateRaw: meta.scanStatus || "unscanned",
+    moderationStatusRaw: meta.docModerationStatus || "active",
+  });
+  if (!shareEligibility.canCreateLink) {
+    return <FailState token={t} title="Unavailable" body={shareEligibility.blockedReason || "This document is unavailable."} />;
+  }
+  const docUi = getDocumentUiStatus({
+    docStateRaw: meta.docStatus || "ready",
+    scanStateRaw: meta.scanStatus || "unscanned",
+    moderationStatusRaw: meta.docModerationStatus || "active",
+  });
   const scanStatus = (meta.scanStatus || "unscanned").toLowerCase();
-  const clean = scanStatus === "clean";
   const risk = (meta.riskLevel || "low").toLowerCase();
   const risky = risk === "high" || scanStatus === "risky";
-  if (!clean) {
-    return (
-      <FailState
-        token={t}
-        title="Unavailable"
-        body={`This document is not available yet. Current scan status: ${scanStatus}.`}
-      />
-    );
-  }
   const enabled =
     Boolean(meta.watermarkEnabled) ||
     String(process.env.WATERMARK_DEFAULT_ENABLED || "").trim() === "1" ||
@@ -130,8 +134,15 @@ export default async function ShareTokenViewPage(props: {
           {meta.maxViews !== null ? (
             <ShareBadge>{meta.maxViews === 0 ? "No share-level view cap" : `Max views ${meta.maxViews}`}</ShareBadge>
           ) : null}
-          <ShareBadge tone={risky ? "warn" : "good"}>Scan: {clean ? "Clean" : scanStatus}</ShareBadge>
+          <ShareBadge tone={docUi.tone === "danger" || docUi.tone === "warning" ? "warn" : "good"}>
+            {docUi.label}
+          </ShareBadge>
         </div>
+        {shareEligibility.warning ? (
+          <div className="rounded-2xl border border-amber-500/25 bg-amber-500/10 p-3 text-sm text-amber-100">
+            {shareEligibility.warning}
+          </div>
+        ) : null}
         {createdWithPack ? (
           <div className="text-xs text-white/60">Created with: {createdWithPack}</div>
         ) : null}

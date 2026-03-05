@@ -12,6 +12,7 @@ import { clientIpKey, enforceGlobalApiRateLimit } from "@/lib/securityTelemetry"
 import { appendImmutableAudit } from "@/lib/immutableAudit";
 import { resolvePublicAppBaseUrl } from "@/lib/publicBaseUrl";
 import { DEFAULT_SHARE_SETTINGS, PRO_PACK_UPSELL_MESSAGE, applyPack, getPackById, isPackAvailableForPlan } from "@/lib/packs";
+import { getShareEligibility } from "@/lib/documentStatus";
 
 function newToken(): string {
   return crypto.randomBytes(16).toString("hex");
@@ -49,15 +50,37 @@ export async function POST(req: NextRequest) {
   const docId = String(body?.doc_id || body?.docId || "").trim();
   if (!docId) return NextResponse.json({ ok: false, error: "MISSING_DOC_ID" }, { status: 400 });
 
-  // Ensure ownership
-  const owns = (await sql`
-    select 1
+  const docRows = (await sql`
+    select
+      owner_id::text as owner_id,
+      coalesce(status::text, 'ready') as doc_state,
+      coalesce(scan_status::text, 'unscanned') as scan_state,
+      coalesce(moderation_status::text, 'active') as moderation_status
     from public.docs
     where id = ${docId}::uuid
-      and owner_id = ${auth.ownerId}::uuid
     limit 1
-  `) as unknown as Array<{ "?column?": number }>;
-  if (!owns.length) return NextResponse.json({ ok: false, error: "FORBIDDEN" }, { status: 403 });
+  `) as unknown as Array<{
+    owner_id: string | null;
+    doc_state: string;
+    scan_state: string;
+    moderation_status: string;
+  }>;
+  const docRow = docRows?.[0];
+  if (!docRow || docRow.owner_id !== auth.ownerId) {
+    return NextResponse.json({ ok: false, error: "FORBIDDEN" }, { status: 403 });
+  }
+
+  const shareEligibility = getShareEligibility({
+    docStateRaw: docRow.doc_state,
+    scanStateRaw: docRow.scan_state,
+    moderationStatusRaw: docRow.moderation_status,
+  });
+  if (!shareEligibility.canCreateLink) {
+    return NextResponse.json(
+      { ok: false, error: "SHARE_BLOCKED", message: shareEligibility.blockedReason || "Document cannot be shared yet." },
+      { status: 409 }
+    );
+  }
 
   // --- Monetization / plan limits (hidden) ---
   const shareAllowed = await assertCanCreateShare(auth.ownerId);

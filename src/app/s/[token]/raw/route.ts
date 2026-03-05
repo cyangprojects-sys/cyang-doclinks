@@ -22,6 +22,7 @@ import {
 import { assertRuntimeEnv, isRuntimeEnvError } from "@/lib/runtimeEnv";
 import { detectFileFamily, isMicrosoftOfficeDocument } from "@/lib/fileFamily";
 import { resolvePublicAppBaseUrl } from "@/lib/publicBaseUrl";
+import { getShareEligibility } from "@/lib/documentStatus";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -93,6 +94,7 @@ type ShareLookupRow = {
   original_filename: string | null;
 
   // Moderation/scan
+  doc_state: string;
   moderation_status: string;
   scan_status: string;
   risk_level: string;
@@ -280,6 +282,7 @@ export async function GET(
         d.r2_key::text as r2_key,
         d.content_type::text as content_type,
         d.original_filename::text as original_filename,
+        coalesce(d.status::text, 'ready') as doc_state,
         coalesce(d.moderation_status::text, 'active') as moderation_status,
         coalesce(d.scan_status::text, 'unscanned') as scan_status,
         coalesce(d.risk_level::text, 'low') as risk_level,
@@ -303,6 +306,7 @@ export async function GET(
         d.r2_key::text as r2_key,
         d.content_type::text as content_type,
         d.original_filename::text as original_filename,
+        coalesce(d.status::text, 'ready') as doc_state,
         coalesce(d.moderation_status::text, 'active') as moderation_status,
         coalesce(d.scan_status::text, 'unscanned') as scan_status,
         coalesce(d.risk_level::text, 'low') as risk_level,
@@ -322,8 +326,12 @@ export async function GET(
   if (moderation !== "active") {
     return await deny(`moderation_${moderation}`, 404, "Unavailable");
   }
-  // Critical invariant: serve/download only after scan is explicitly clean.
-  if ((share.scan_status || "unscanned").toLowerCase() !== "clean") {
+  const shareEligibility = getShareEligibility({
+    docStateRaw: share.doc_state || "ready",
+    scanStateRaw: share.scan_status || "unscanned",
+    moderationStatusRaw: share.moderation_status || "active",
+  });
+  if (!shareEligibility.canCreateLink) {
     return await deny(`scan_${String(share.scan_status || "unscanned").toLowerCase()}`, 404, "Unavailable");
   }
 

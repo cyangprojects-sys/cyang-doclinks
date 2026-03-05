@@ -4,6 +4,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { getShareEligibility } from "@/lib/documentStatus";
 import {
   revokeAllSharesForDocAction,
   disableAliasForDocAction,
@@ -27,10 +28,6 @@ function fmtDate(s: string | null) {
   const d = new Date(s);
   if (Number.isNaN(d.getTime())) return s;
   return d.toLocaleString();
-}
-
-function isShareReady(scanStatus: string | null): boolean {
-  return String(scanStatus || "").toLowerCase() === "clean";
 }
 
 export default function ViewsByDocTableClient(props: { rows: ViewsByDocRow[]; canManageShares?: boolean }) {
@@ -209,16 +206,23 @@ export default function ViewsByDocTableClient(props: { rows: ViewsByDocRow[]; ca
                     </td>
                     <td className="px-4 py-3">
                       {r.alias ? (
-                        isShareReady(r.scan_status) ? (
-                          <Link
-                            href={`/d/${r.alias}`}
-                            className="inline-flex rounded-md border border-cyan-500/35 bg-cyan-500/15 px-2 py-0.5 text-xs text-cyan-100 hover:bg-cyan-500/25"
-                          >
-                            Share
-                          </Link>
+                        getShareEligibility({ docStateRaw: "ready", scanStateRaw: r.scan_status }).canCreateLink ? (
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Link
+                              href={`/d/${r.alias}`}
+                              className="inline-flex rounded-md border border-cyan-500/35 bg-cyan-500/15 px-2 py-0.5 text-xs text-cyan-100 hover:bg-cyan-500/25"
+                            >
+                              Share
+                            </Link>
+                            {getShareEligibility({ docStateRaw: "ready", scanStateRaw: r.scan_status }).warning ? (
+                              <span className="inline-flex rounded-md border border-amber-500/35 bg-amber-500/15 px-2 py-0.5 text-xs text-amber-100">
+                                Scan pending
+                              </span>
+                            ) : null}
+                          </div>
                         ) : (
-                          <span className="inline-flex rounded-md border border-amber-500/35 bg-amber-500/15 px-2 py-0.5 text-xs text-amber-100">
-                            Pending scan
+                          <span className="inline-flex rounded-md border border-rose-500/35 bg-rose-500/15 px-2 py-0.5 text-xs text-rose-100">
+                            Sharing blocked
                           </span>
                         )
                       ) : (

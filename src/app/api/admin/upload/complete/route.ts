@@ -171,6 +171,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: "doc_not_found" }, { status: 404 });
     }
 
+    await sql`
+      update public.docs
+      set status = 'processing'
+      where id = ${docId}::uuid
+        and lower(coalesce(status::text, 'ready')) in ('uploading', 'processing')
+    `;
+
     const existingName = docRows[0].name;
 
     const docBucket = docRows[0].r2_bucket;
@@ -474,7 +481,7 @@ export async function POST(req: NextRequest) {
     }
 
 // 6) Mark doc ready + update metadata (best-effort)
-    await sql`
+    const updatedRows = (await sql`
       update public.docs
       set
         title = coalesce(${title}, title),
@@ -496,7 +503,15 @@ export async function POST(req: NextRequest) {
           else 'active'
         end
       where id = ${docId}::uuid
-    `;
+      returning
+        coalesce(status::text, 'ready') as doc_state,
+        coalesce(scan_status::text, 'pending') as scan_state,
+        coalesce(moderation_status::text, 'active') as moderation_status
+    `) as unknown as Array<{
+      doc_state: string;
+      scan_state: string;
+      moderation_status: string;
+    }>;
 
 
 
@@ -607,6 +622,9 @@ try {
           doc_id: docId,
           alias: finalAlias,
           view_url: `${baseUrl}/d/${encodeURIComponent(finalAlias)}`,
+          doc_state: updatedRows?.[0]?.doc_state ?? "ready",
+          scan_state: updatedRows?.[0]?.scan_state ?? "pending",
+          moderation_status: updatedRows?.[0]?.moderation_status ?? "active",
         });
       })(),
       timeoutMs

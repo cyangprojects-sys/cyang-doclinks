@@ -19,16 +19,16 @@ export default worker;
 
 async function runScheduled(event: ScheduledEvent, env: Env) {
   const cron = String(event.cron || "").trim();
+  const now = new Date(event.scheduledTime);
+  const minute = now.getUTCMinutes();
   const jobs: Array<{ name: string; url: string; method: "GET" | "POST" }> = [];
 
-  // every 5 minutes
-  if (cron === "*/5 * * * *") {
+  // every 1 minute
+  if (cron === "* * * * *") {
     jobs.push({ name: "scan", url: env.TARGET_SCAN_URL, method: "GET" });
-    jobs.push({ name: "webhooks", url: env.TARGET_WEBHOOKS_URL, method: "GET" });
-  }
-  // every 30 minutes
-  if (cron === "*/30 * * * *") {
-    jobs.push({ name: "aggregate", url: env.TARGET_AGGREGATE_URL, method: "GET" });
+    if (minute % 5 === 0) jobs.push({ name: "webhooks", url: env.TARGET_WEBHOOKS_URL, method: "GET" });
+    if (minute % 15 === 0) jobs.push({ name: "key-rotation", url: env.TARGET_KEY_ROTATION_URL, method: "GET" });
+    if (minute % 30 === 0) jobs.push({ name: "aggregate", url: env.TARGET_AGGREGATE_URL, method: "GET" });
   }
   // hourly at minute 5
   if (cron === "5 * * * *") {
@@ -38,10 +38,6 @@ async function runScheduled(event: ScheduledEvent, env: Env) {
   // daily at 02:17 UTC
   if (cron === "17 2 * * *") {
     jobs.push({ name: "retention", url: env.TARGET_RETENTION_URL, method: "GET" });
-  }
-  // every 15 minutes
-  if (cron === "*/15 * * * *") {
-    jobs.push({ name: "key-rotation", url: env.TARGET_KEY_ROTATION_URL, method: "GET" });
   }
 
   const failures: Array<{ name: string; status: number; body: string }> = [];

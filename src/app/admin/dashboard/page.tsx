@@ -90,8 +90,10 @@ const docFilter = sql`${orgFilter} ${ownerFilter}`;
         select
           d.id::text as doc_id,
           d.title::text as doc_title,
+          coalesce(d.status::text, 'ready') as doc_state,
           a.alias::text as alias,
           coalesce(d.scan_status::text, 'unscanned') as scan_status,
+          coalesce(d.moderation_status::text, 'active') as moderation_status,
           coalesce(v.total_views, 0)::int as total_views,
           v.last_view::text as last_view,
           coalesce(s.active_shares, 0)::int as active_shares,
@@ -131,7 +133,7 @@ const docFilter = sql`${orgFilter} ${ownerFilter}`;
             )
         ) s on true
         where 1=1
-          and coalesce(d.status::text, 'ready') = 'ready'
+          and lower(coalesce(d.status::text, 'ready')) <> 'deleted'
           ${docFilter}
         order by coalesce(v.total_views, 0) desc, d.created_at desc
       `) as unknown as UnifiedDocRow[];
@@ -213,6 +215,9 @@ const docFilter = sql`${orgFilter} ${ownerFilter}`;
   const headerDocs = unifiedRows.map((r) => ({
     docId: r.doc_id,
     title: r.doc_title || "Untitled document",
+    docState: r.doc_state,
+    scanState: r.scan_status,
+    moderationStatus: r.moderation_status,
   }));
 
   return (

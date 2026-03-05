@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { getUploadUiStatus, type StatusTone } from "@/lib/documentStatus";
 
 type PresignResponse =
   | {
@@ -16,7 +17,16 @@ type PresignResponse =
   | { ok: false; error: string; message?: string };
 
 type CompleteResponse =
-  | { ok: true; doc_id: string; alias: string; view_url: string; target_url?: string }
+  | {
+      ok: true;
+      doc_id: string;
+      alias: string;
+      view_url: string;
+      target_url?: string;
+      doc_state?: string;
+      scan_state?: string;
+      moderation_status?: string;
+    }
   | { ok: false; error: string; message?: string };
 
 type KeyStatusResponse =
@@ -26,14 +36,24 @@ type KeyStatusResponse =
 type UploadItem = {
   id: string;
   file: File;
-  status: "queued" | "uploading" | "done" | "error";
+  status: "queued" | "uploading" | "processing" | "done" | "error";
   message?: string;
   viewUrl?: string;
   docId?: string;
+  docState?: string;
+  scanState?: string;
+  moderationStatus?: string;
 };
 
 function isTerminalStatus(status: UploadItem["status"]): boolean {
   return status === "done" || status === "error";
+}
+
+function toneClass(tone: StatusTone): string {
+  if (tone === "positive") return "border-emerald-500/25 bg-emerald-500/10 text-emerald-100";
+  if (tone === "warning") return "border-amber-500/25 bg-amber-500/10 text-amber-100";
+  if (tone === "danger") return "border-rose-500/25 bg-rose-500/10 text-rose-100";
+  return "ui-badge";
 }
 
 const ALLOWED_EXTS = new Set([
@@ -312,6 +332,7 @@ export default function UploadPanel({
       const txt = await putRes.text().catch(() => "");
       throw new Error(`R2 upload failed (${putRes.status})${txt ? `: ${txt}` : ""}`);
     }
+    updateItem(item.id, { status: "processing", message: "Encrypting and preparing" });
 
     const completeRes = await fetch("/api/admin/upload/complete", {
       method: "POST",
@@ -338,6 +359,9 @@ export default function UploadPanel({
       status: "done",
       docId: completeJson.doc_id,
       viewUrl: completeJson.view_url,
+      docState: completeJson.doc_state || "ready",
+      scanState: completeJson.scan_state || "pending",
+      moderationStatus: completeJson.moderation_status || "active",
     });
     } catch (e) {
       await abortIfStaged();
@@ -477,21 +501,41 @@ export default function UploadPanel({
                     <td className="py-2 pr-2 text-white/85">{item.file.name}</td>
                     <td className="py-2 pr-2 text-white/60">{fmtBytes(item.file.size)}</td>
                     <td className="py-2 pr-2">
-                      {item.status === "done"
-                        ? "Done"
-                        : item.status === "error"
-                          ? "Error"
-                          : item.status === "uploading"
-                            ? "Uploading..."
-                            : "Queued"}
+                      {(() => {
+                        const ui = getUploadUiStatus({
+                          uploadStatus: item.status,
+                          docStateRaw: item.docState,
+                          scanStateRaw: item.scanState,
+                          moderationStatusRaw: item.moderationStatus,
+                          errorMessage: item.message ?? null,
+                        });
+                        return (
+                          <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] ${toneClass(ui.tone)}`}>
+                            {ui.label}
+                          </span>
+                        );
+                      })()}
                     </td>
                     <td className="py-2 pr-2 text-white/70">
                       {item.status === "error" ? (
                         <span className="text-red-300">{item.message || "Upload failed."}</span>
                       ) : item.viewUrl ? (
-                        <a href={item.viewUrl} className="text-sky-300 hover:underline">
-                          Open document
-                        </a>
+                        <div className="space-y-1">
+                          <div className="text-white/70">
+                            {
+                              getUploadUiStatus({
+                                uploadStatus: item.status,
+                                docStateRaw: item.docState,
+                                scanStateRaw: item.scanState,
+                                moderationStatusRaw: item.moderationStatus,
+                                errorMessage: item.message ?? null,
+                              }).subtext
+                            }
+                          </div>
+                          <a href={item.viewUrl} className="text-sky-300 hover:underline">
+                            Open document
+                          </a>
+                        </div>
                       ) : (
                         "-"
                       )}

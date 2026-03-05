@@ -6,12 +6,15 @@ import DeleteDocForm from "../DeleteDocForm";
 import { bulkDeleteDocsAction, deleteDocAction } from "../actions";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { getDocumentUiStatus, getShareEligibility, normalizeScanState, type StatusTone } from "@/lib/documentStatus";
 
 export type UnifiedDocRow = {
   doc_id: string;
   doc_title: string | null;
+  doc_state: string | null;
   alias: string | null;
   scan_status: string | null;
+  moderation_status: string | null;
   total_views: number;
   last_view: string | null;
   active_shares: number;
@@ -45,32 +48,36 @@ type SortKey =
 
 type SortDir = "asc" | "desc";
 
-function statusFor(r: UnifiedDocRow): { label: string; tone: "good" | "warn" | "bad" | "muted" } {
+function linkStatusFor(r: UnifiedDocRow): string {
   const now = Date.now();
   const isActive = r.alias_is_active ?? true;
   const revoked = !!r.alias_revoked_at;
   const exp = r.alias_expires_at ? new Date(r.alias_expires_at).getTime() : null;
   const expired = exp != null && Number.isFinite(exp) && exp <= now;
 
-  if (!r.alias) return { label: "No alias", tone: "muted" };
-  if (!isActive || revoked) return { label: "Disabled", tone: "bad" };
-  if (expired) return { label: "Expired", tone: "bad" };
+  if (!r.alias) return "No alias";
+  if (!isActive || revoked) return "Disabled";
+  if (expired) return "Expired";
 
   const d = daysUntil(r.alias_expires_at);
-  if (d != null && d >= 0 && d <= 3) return { label: `Expiring (${d}d)`, tone: "warn" };
-  return { label: "Active", tone: "good" };
+  if (d != null && d >= 0 && d <= 3) return `Expiring (${d}d)`;
+  return "Active";
 }
 
-function Badge({ label, tone }: { label: string; tone: "good" | "warn" | "bad" | "muted" }) {
+function Badge({ label, tone, title }: { label: string; tone: StatusTone; title?: string }) {
   const cls =
-    tone === "good"
+    tone === "positive"
       ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-100"
-      : tone === "warn"
+      : tone === "warning"
       ? "border-amber-500/25 bg-amber-500/10 text-amber-100"
-      : tone === "bad"
+      : tone === "danger"
       ? "border-rose-500/25 bg-rose-500/10 text-rose-100"
       : "ui-badge";
-  return <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] ${cls}`}>{label}</span>;
+  return (
+    <span title={title} className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] ${cls}`}>
+      {label}
+    </span>
+  );
 }
 
 function SortButton({
@@ -136,8 +143,8 @@ export default function UnifiedDocsTableClient(props: {
 
   const hasPendingScans = useMemo(() => {
     return props.rows.some((r) => {
-      const s = String(r.scan_status || "unscanned").toLowerCase();
-      return s === "pending" || s === "queued" || s === "running" || s === "unscanned";
+      const s = normalizeScanState(r.scan_status, r.moderation_status);
+      return s === "PENDING" || s === "RUNNING" || s === "NOT_SCHEDULED";
     });
   }, [props.rows]);
 
@@ -174,7 +181,11 @@ export default function UnifiedDocsTableClient(props: {
           case "alias_expires_at":
             return r.alias_expires_at ? new Date(r.alias_expires_at).getTime() : 0;
           case "status":
-            return r.alias ? statusFor(r).label : "zzzz";
+            return getDocumentUiStatus({
+              docStateRaw: r.doc_state,
+              scanStateRaw: r.scan_status,
+              moderationStatusRaw: r.moderation_status,
+            }).label;
         }
       };
       const vx = getVal(x);
@@ -213,23 +224,6 @@ export default function UnifiedDocsTableClient(props: {
       if (!checked) return prev.filter((id) => !pageDocIds.includes(id));
       return Array.from(new Set([...prev, ...pageDocIds]));
     });
-  }
-
-function scanBadge(scanStatus: string | null) {
-    const s = String(scanStatus || "unscanned").toLowerCase();
-    const cls =
-      s === "clean"
-        ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-100"
-        : s === "pending" || s === "queued" || s === "running"
-        ? "border-amber-500/25 bg-amber-500/10 text-amber-100"
-        : s === "infected" || s === "failed" || s === "quarantined"
-        ? "border-rose-500/25 bg-rose-500/10 text-rose-100"
-        : "ui-badge";
-    return <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] ${cls}`}>{s}</span>;
-  }
-
-  function isShareReady(scanStatus: string | null): boolean {
-    return String(scanStatus || "").toLowerCase() === "clean";
   }
 
   function toggleSort(k: SortKey) {
@@ -314,12 +308,12 @@ function scanBadge(scanStatus: string | null) {
                 </th>
               ) : null}
               <th className="px-4 py-3 text-left"><SortButton label="Doc name" active={sortKey === "doc_title"} dir={sortDir} onClick={() => toggleSort("doc_title")} /></th>
-              <th className="px-4 py-3 text-left text-xs text-white/70">Scan</th>
+              <th className="px-4 py-3 text-left text-xs text-white/70">State</th>
               <th className="px-4 py-3 text-right"><SortButton label="Total views" active={sortKey === "total_views"} dir={sortDir} onClick={() => toggleSort("total_views")} /></th>
               <th className="px-4 py-3 text-left"><SortButton label="Last viewed" active={sortKey === "last_view"} dir={sortDir} onClick={() => toggleSort("last_view")} /></th>
               <th className="px-4 py-3 text-right"><SortButton label="Active shares" active={sortKey === "active_shares"} dir={sortDir} onClick={() => toggleSort("active_shares")} /></th>
               <th className="px-4 py-3 text-left"><SortButton label="Expiration date" active={sortKey === "alias_expires_at"} dir={sortDir} onClick={() => toggleSort("alias_expires_at")} /></th>
-              <th className="px-4 py-3 text-left"><SortButton label="Status" active={sortKey === "status"} dir={sortDir} onClick={() => toggleSort("status")} /></th>
+              <th className="px-4 py-3 text-left"><SortButton label="Link status" active={sortKey === "status"} dir={sortDir} onClick={() => toggleSort("status")} /></th>
               {showDelete ? <th className="px-4 py-3 text-right text-xs text-white/70">Actions</th> : null}
             </tr>
           </thead>
@@ -328,7 +322,16 @@ function scanBadge(scanStatus: string | null) {
               <tr><td colSpan={showDelete ? 9 : 7} className="px-4 py-10 text-white/60">No documents uploaded yet. Upload a document to get started.</td></tr>
             ) : (
               pageRows.map((r) => {
-                const st = statusFor(r);
+                const docStatus = getDocumentUiStatus({
+                  docStateRaw: r.doc_state,
+                  scanStateRaw: r.scan_status,
+                  moderationStatusRaw: r.moderation_status,
+                });
+                const shareEligibility = getShareEligibility({
+                  docStateRaw: r.doc_state,
+                  scanStateRaw: r.scan_status,
+                  moderationStatusRaw: r.moderation_status,
+                });
                 return (
                   <tr key={r.doc_id} className="border-t border-white/10 hover:bg-white/[0.03]">
                     {showDelete ? (
@@ -348,28 +351,38 @@ function scanBadge(scanStatus: string | null) {
                         </Link>
                         <div className="flex flex-wrap items-center gap-2 text-xs text-white/60">
                           {r.alias ? (
-                            isShareReady(r.scan_status) ? (
-                              <Link
-                                href={`/d/${r.alias}`}
-                                className="inline-flex rounded-md border border-cyan-500/35 bg-cyan-500/15 px-2 py-0.5 text-[11px] text-cyan-100 hover:bg-cyan-500/25"
-                              >
-                                Share
-                              </Link>
+                            shareEligibility.canCreateLink ? (
+                              <>
+                                <Link
+                                  href={`/d/${r.alias}`}
+                                  className="inline-flex rounded-md border border-cyan-500/35 bg-cyan-500/15 px-2 py-0.5 text-[11px] text-cyan-100 hover:bg-cyan-500/25"
+                                >
+                                  Share
+                                </Link>
+                                {shareEligibility.warning ? (
+                                  <span className="inline-flex rounded-md border border-amber-500/35 bg-amber-500/15 px-2 py-0.5 text-[11px] text-amber-100">
+                                    Scan pending
+                                  </span>
+                                ) : null}
+                              </>
                             ) : (
-                              <span className="inline-flex rounded-md border border-amber-500/35 bg-amber-500/15 px-2 py-0.5 text-[11px] text-amber-100">
-                                Pending scan
+                              <span className="inline-flex rounded-md border border-rose-500/35 bg-rose-500/15 px-2 py-0.5 text-[11px] text-rose-100">
+                                Sharing blocked
                               </span>
                             )
                           ) : null}
                         </div>
                       </div>
                     </td>
-                    <td className="px-4 py-3">{scanBadge(r.scan_status)}</td>
+                    <td className="px-4 py-3">
+                      <Badge label={docStatus.label} tone={docStatus.tone} title={docStatus.tooltip} />
+                      <div className="mt-1 text-[11px] text-white/60">{docStatus.subtext}</div>
+                    </td>
                     <td className="px-4 py-3 text-right text-white/90">{r.total_views ?? 0}</td>
                     <td className="px-4 py-3 text-white/80">{fmtDate(r.last_view)}</td>
                     <td className="px-4 py-3 text-right text-white/90">{r.active_shares ?? 0}</td>
                     <td className="px-4 py-3 text-white/80">{fmtDate(r.alias_expires_at)}</td>
-                    <td className="px-4 py-3"><Badge label={st.label} tone={st.tone} /></td>
+                    <td className="px-4 py-3 text-xs text-white/75">{linkStatusFor(r)}</td>
                     {showDelete ? (
                       <td className="px-4 py-3 text-right">
                         <DeleteDocForm docId={r.doc_id} title={r.doc_title || r.alias || r.doc_id} action={deleteDocAction} />

@@ -1,6 +1,7 @@
 // src/lib/resolveDoc.ts
 import { sql } from "@/lib/db";
 import { getR2Bucket } from "@/lib/r2";
+import { getShareEligibility } from "@/lib/documentStatus";
 
 export type ResolveInput =
     | { alias: string }
@@ -65,6 +66,7 @@ export type ShareMeta =
         sharedByEmail?: string | null;
 
         // Doc moderation / safety snapshot
+        docStatus?: string;
         docModerationStatus?: string;
         scanStatus?: string;
         riskLevel?: string;
@@ -206,8 +208,12 @@ async function getDocPointer(
     if (r.org_disabled === true || r.org_active === false) return { ok: false };
     if (moderation === "deleted" || moderation === "disabled") return { ok: false };
     if (moderation === "quarantined") return { ok: false };
-    // Critical invariant: public serving is only allowed when scan is explicitly clean.
-    if (scanStatus !== "clean") return { ok: false };
+    const shareEligibility = getShareEligibility({
+        docStateRaw: lifecycle || "ready",
+        scanStateRaw: scanStatus || "unscanned",
+        moderationStatusRaw: moderation || "active",
+    });
+    if (!shareEligibility.canCreateLink) return { ok: false };
     if (!r.bucket || !r.r2_key) return { ok: false };
 
     return {
@@ -369,6 +375,7 @@ export async function resolveShareMeta(tokenInput: string): Promise<ShareMeta> {
         st.pack_version::int as pack_version,
         u.email::text as shared_by_email,
         coalesce(d.moderation_status::text, 'active') as doc_moderation_status,
+        coalesce(d.status::text, 'ready') as doc_status,
         coalesce(d.scan_status::text, 'unscanned') as scan_status,
         coalesce(d.risk_level::text, 'low') as risk_level,
         d.risk_flags as risk_flags,
@@ -395,6 +402,7 @@ export async function resolveShareMeta(tokenInput: string): Promise<ShareMeta> {
             pack_id: string | null;
             pack_version: number | null;
             shared_by_email: string | null;
+            doc_status: string;
             doc_moderation_status: string;
             scan_status: string;
             risk_level: string;
@@ -426,6 +434,7 @@ export async function resolveShareMeta(tokenInput: string): Promise<ShareMeta> {
             packId: r.pack_id ?? null,
             packVersion: r.pack_version ?? null,
             sharedByEmail: r.shared_by_email ?? null,
+            docStatus: r.doc_status ?? "ready",
             docModerationStatus: r.doc_moderation_status ?? "active",
             scanStatus: r.scan_status ?? "unscanned",
             riskLevel: r.risk_level ?? "low",
@@ -448,6 +457,7 @@ export async function resolveShareMeta(tokenInput: string): Promise<ShareMeta> {
           st.password_hash,
           u.email::text as shared_by_email,
           coalesce(d.moderation_status::text, 'active') as doc_moderation_status,
+          coalesce(d.status::text, 'ready') as doc_status,
           coalesce(d.scan_status::text, 'unscanned') as scan_status,
           coalesce(d.risk_level::text, 'low') as risk_level,
           d.risk_flags as risk_flags
@@ -468,6 +478,7 @@ export async function resolveShareMeta(tokenInput: string): Promise<ShareMeta> {
                 revoked_at: string | null;
                 password_hash: string | null;
                 shared_by_email: string | null;
+                doc_status: string;
                 doc_moderation_status: string;
                 scan_status: string;
                 risk_level: string;
@@ -497,6 +508,7 @@ export async function resolveShareMeta(tokenInput: string): Promise<ShareMeta> {
                 packId: null,
                 packVersion: null,
                 sharedByEmail: r.shared_by_email ?? null,
+                docStatus: r.doc_status ?? "ready",
                 docModerationStatus: r.doc_moderation_status ?? "active",
                 scanStatus: r.scan_status ?? "unscanned",
                 riskLevel: r.risk_level ?? "low",

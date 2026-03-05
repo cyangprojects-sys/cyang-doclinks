@@ -1,13 +1,17 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createAndEmailShareToken } from "@/app/d/[alias]/actions";
 import { isPackAvailableForPlan, type PackId } from "@/lib/packs";
+import { getDocumentUiStatus, getShareEligibility } from "@/lib/documentStatus";
 
 type DocOption = {
   docId: string;
   title: string;
+  docState?: string | null;
+  scanState?: string | null;
+  moderationStatus?: string | null;
 };
 
 type ModalPresetId =
@@ -91,19 +95,52 @@ export default function DashboardHeaderActions(props: { docs: DocOption[]; planI
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const [selectedDocId, setSelectedDocId] = useState(props.docs[0]?.docId || "");
+  const [selectedDocId, setSelectedDocId] = useState("");
   const [preset, setPreset] = useState<ModalPresetId>("general_secure");
   const [sendToEmail, setSendToEmail] = useState("");
   const [proUpsellPreset, setProUpsellPreset] = useState<ModalPresetId | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [createdUrl, setCreatedUrl] = useState<string | null>(null);
+  const [shareWarning, setShareWarning] = useState<string | null>(null);
+
+  const docsWithStatus = useMemo(() => {
+    return props.docs.map((d) => {
+      const ui = getDocumentUiStatus({
+        docStateRaw: d.docState,
+        scanStateRaw: d.scanState,
+        moderationStatusRaw: d.moderationStatus,
+      });
+      const eligibility = getShareEligibility({
+        docStateRaw: d.docState,
+        scanStateRaw: d.scanState,
+        moderationStatusRaw: d.moderationStatus,
+      });
+      return { ...d, ui, eligibility };
+    });
+  }, [props.docs]);
+
+  useEffect(() => {
+    if (!docsWithStatus.length) {
+      setSelectedDocId("");
+      setShareWarning(null);
+      return;
+    }
+    if (selectedDocId && docsWithStatus.some((d) => d.docId === selectedDocId)) {
+      const current = docsWithStatus.find((d) => d.docId === selectedDocId);
+      setShareWarning(current?.eligibility.warning ?? null);
+      return;
+    }
+    const firstEligible = docsWithStatus.find((d) => d.eligibility.canCreateLink);
+    setSelectedDocId(firstEligible?.docId || docsWithStatus[0].docId);
+    setShareWarning(firstEligible?.eligibility.warning ?? null);
+  }, [docsWithStatus, selectedDocId]);
 
   const filteredDocs = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return props.docs;
-    return props.docs.filter((d) => `${d.title} ${d.docId}`.toLowerCase().includes(q));
-  }, [props.docs, query]);
+    if (!q) return docsWithStatus;
+    return docsWithStatus.filter((d) => `${d.title} ${d.docId}`.toLowerCase().includes(q));
+  }, [docsWithStatus, query]);
 
   function resetFlow() {
     setErr(null);
@@ -111,12 +148,23 @@ export default function DashboardHeaderActions(props: { docs: DocOption[]; planI
     setPreset("general_secure");
     setSendToEmail("");
     setProUpsellPreset(null);
+    const current = docsWithStatus.find((d) => d.docId === selectedDocId);
+    setShareWarning(current?.eligibility.warning ?? null);
   }
 
   async function onCreateLink() {
     setErr(null);
     if (!selectedDocId) {
       setErr("Pick a document first.");
+      return;
+    }
+    const selectedDoc = docsWithStatus.find((d) => d.docId === selectedDocId);
+    if (!selectedDoc) {
+      setErr("Document not found.");
+      return;
+    }
+    if (!selectedDoc.eligibility.canCreateLink) {
+      setErr(selectedDoc.eligibility.blockedReason || "This file cannot be shared yet.");
       return;
     }
     const selectedPreset = PRESET_OPTIONS.find((p) => p.id === preset);
@@ -226,15 +274,25 @@ export default function DashboardHeaderActions(props: { docs: DocOption[]; planI
                   />
                   <select
                     value={selectedDocId}
-                    onChange={(e) => setSelectedDocId(e.target.value)}
+                    onChange={(e) => {
+                      const nextId = e.target.value;
+                      setSelectedDocId(nextId);
+                      const doc = docsWithStatus.find((d) => d.docId === nextId);
+                      setShareWarning(doc?.eligibility.warning ?? null);
+                    }}
                     className="mt-2 w-full rounded-lg border border-white/20 bg-black/25 px-3 py-2 text-sm text-white"
                   >
                     {filteredDocs.map((d) => (
-                      <option key={d.docId} value={d.docId}>
-                        {d.title}
+                      <option key={d.docId} value={d.docId} disabled={!d.eligibility.canCreateLink} title={d.ui.subtext}>
+                        {`${d.title} - ${d.ui.label}${d.eligibility.canCreateLink ? "" : " (Unavailable)"}`}
                       </option>
                     ))}
                   </select>
+                  {shareWarning ? (
+                    <div className="mt-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-2 text-xs text-amber-100">
+                      {shareWarning}
+                    </div>
+                  ) : null}
                 </div>
 
                 <div>
