@@ -238,9 +238,11 @@ export async function POST(req: NextRequest) {
     }
 
     stage = "mark_processing";
+    // Legacy deployments may enforce docs_status_check without 'processing'.
+    // Keep status as 'uploading' until the final update marks it 'ready'.
     await sql`
       update public.docs
-      set status = 'processing'
+      set status = 'uploading'
       where id = ${docId}::uuid
         and lower(coalesce(status::text, 'ready')) in ('uploading', 'processing')
     `;
