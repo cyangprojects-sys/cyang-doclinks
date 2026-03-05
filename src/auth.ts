@@ -39,6 +39,9 @@ import { hasSignupConsentCookie, recordTermsAcceptance, verifyManualCredentials 
  */
 
 const POST_SIGN_IN_PATH = "/admin/dashboard";
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const EMAIL_MAX_LEN = 254;
+const MANUAL_PASSWORD_MAX_LEN = 4096;
 
 const useSecureCookies =
   (process.env.NEXTAUTH_URL || "").toLowerCase().startsWith("https://") ||
@@ -50,6 +53,12 @@ function hasEnv(...keys: string[]) {
     const v = process.env[k];
     return typeof v === "string" && v.trim().length > 0;
   });
+}
+
+function isLikelyEmail(email: string): boolean {
+  const normalized = String(email || "").trim().toLowerCase();
+  if (!normalized || normalized.length > EMAIL_MAX_LEN) return false;
+  return EMAIL_RE.test(normalized);
 }
 
 export const isGoogleConfigured = hasEnv("GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET");
@@ -186,6 +195,8 @@ export const authOptions: NextAuthOptions = {
       async authorize(credentials) {
         const email = String(credentials?.email || "").trim().toLowerCase();
         const password = String(credentials?.password || "");
+        if (!isLikelyEmail(email)) return null;
+        if (!password || password.length > MANUAL_PASSWORD_MAX_LEN) return null;
         const user = await verifyManualCredentials(email, password);
         if (!user) return null;
         return {
@@ -217,8 +228,8 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async signIn({ user, account, profile }) {
       const email = String((user as { email?: string | null } | undefined)?.email || "").trim().toLowerCase();
-      const provider = String(account?.provider || "");
-      if (!email) return false;
+      const provider = String(account?.provider || "").trim().toLowerCase();
+      if (!isLikelyEmail(email)) return false;
 
       if (provider === "manual-password") {
         return true;

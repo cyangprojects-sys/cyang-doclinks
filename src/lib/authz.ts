@@ -19,9 +19,18 @@ export type AuthedUser = {
   orgSlug: string | null;
 };
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const ORG_SLUG_RE = /^[a-z0-9][a-z0-9-]{0,63}$/i;
+const INVITE_TOKEN_RE = /^[A-Za-z0-9_-]{16,128}$/;
+
+function isUuid(value: string): boolean {
+  return UUID_RE.test(String(value || "").trim());
+}
+
 async function orgAccessDisabled(orgIdRaw: string | null | undefined): Promise<boolean> {
   const orgId = String(orgIdRaw || "").trim();
   if (!orgId) return false;
+  if (!isUuid(orgId)) return true;
   if (!(await organizationsTableExists())) return false;
 
   try {
@@ -148,6 +157,7 @@ async function consumeInviteCookieToken(): Promise<string | null> {
       path: "/",
       maxAge: 0,
     });
+    if (!INVITE_TOKEN_RE.test(token)) return null;
     return token;
   } catch {
     return null;
@@ -176,7 +186,10 @@ export async function ensureUserByEmail(emailRaw: string, ctx: EnsureUserCtx): P
 
   // Resolve org if possible
   let orgId = ctx.orgId ?? null;
-  let orgSlug = ctx.orgSlug ?? null;
+  let orgSlug = String(ctx.orgSlug || "").trim().toLowerCase() || null;
+  if (orgSlug && !ORG_SLUG_RE.test(orgSlug)) {
+    throw new Error("ORG_NOT_FOUND");
+  }
 
   if (!orgId && orgSlug && (await organizationsTableExists())) {
     const org = await getOrgBySlug(orgSlug);
@@ -412,7 +425,8 @@ export async function getOrgSlugHint(): Promise<string | null> {
     const c = await cookies();
     const v = c.get(ORG_COOKIE_NAME)?.value ?? "";
     const slug = String(v || "").trim().toLowerCase();
-    return slug ? slug : null;
+    if (!slug) return null;
+    return ORG_SLUG_RE.test(slug) ? slug : null;
   } catch {
     return null;
   }
@@ -428,7 +442,7 @@ export async function getOrgSlugHint(): Promise<string | null> {
  */
 export async function requireDocWrite(docIdRaw: string): Promise<void> {
   const docId = String(docIdRaw || "").trim();
-  if (!docId) throw new Error("Missing docId.");
+  if (!docId || !isUuid(docId)) throw new Error("FORBIDDEN");
 
   const u = await requireUser();
   await assertOrgActiveForAccess(u.orgId);

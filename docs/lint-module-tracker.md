@@ -4,7 +4,7 @@ Total modules with lint warnings:
 66
 
 Remaining pending modules:
-21
+19
 
 Status key: `done` | `pending`
 
@@ -56,8 +56,8 @@ Status key: `done` | `pending`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\org\[slug]\auth\[provider]\route.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\report\ReportForm.tsx`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\t\[ticketId]\route.ts`
-- pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\auth.ts`
-- pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\authz.ts`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\auth.ts`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\authz.ts`
 - pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\billingSubscription.ts`
 - pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\db.ts`
 - pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\expirationAlerts.ts`
