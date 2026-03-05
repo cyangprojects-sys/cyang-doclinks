@@ -105,6 +105,7 @@ export default function DashboardHeaderActions(props: { docs: DocOption[]; planI
   const [err, setErr] = useState<string | null>(null);
   const [createdUrl, setCreatedUrl] = useState<string | null>(null);
   const [shareWarning, setShareWarning] = useState<string | null>(null);
+  const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
 
   function clearCreateParams() {
     const params = new URLSearchParams(sp.toString());
@@ -170,8 +171,22 @@ export default function DashboardHeaderActions(props: { docs: DocOption[]; planI
     setPreset("general_secure");
     setSendToEmail("");
     setProUpsellPreset(null);
+    setShowUpgradePrompt(false);
     const current = docsWithStatus.find((d) => d.docId === selectedDocId);
     setShareWarning(current?.eligibility.warning ?? null);
+  }
+
+  function shouldShowUpgradePrompt(message: string, errorCode?: string | null): boolean {
+    const code = String(errorCode || "").toUpperCase();
+    if (code === "PACK_REQUIRES_PRO" || code === "PLAN_REQUIRED") return true;
+    const m = message.toLowerCase();
+    return (
+      m.includes("upgrade") ||
+      m.includes("requires pro") ||
+      m.includes("pro preset") ||
+      m.includes("plan") ||
+      m.includes("limit")
+    );
   }
 
   async function onCreateLink() {
@@ -197,6 +212,7 @@ export default function DashboardHeaderActions(props: { docs: DocOption[]; planI
     if (!isPackAvailableForPlan(selectedPreset.packId, props.planId)) {
       setErr("Pro preset selected. Upgrade to enable.");
       setProUpsellPreset(selectedPreset.id);
+      setShowUpgradePrompt(true);
       return;
     }
 
@@ -220,7 +236,9 @@ export default function DashboardHeaderActions(props: { docs: DocOption[]; planI
       }
       const res = await createAndEmailShareToken(fd);
       if (!res.ok) {
-        setErr(res.message || res.error || "Unable to create link.");
+        const msg = res.message || res.error || "Unable to create link.";
+        setErr(msg);
+        setShowUpgradePrompt(shouldShowUpgradePrompt(msg, res.error));
         if (res.error === "PACK_REQUIRES_PRO") {
           setProUpsellPreset(selectedPreset.id);
         }
@@ -231,6 +249,7 @@ export default function DashboardHeaderActions(props: { docs: DocOption[]; planI
         `${window.location.origin}/s/${encodeURIComponent(String(res.token || ""))}`;
       setCreatedUrl(resolvedUrl);
       setProUpsellPreset(null);
+      setShowUpgradePrompt(false);
     } catch {
       setErr("Unable to create link.");
     } finally {
@@ -257,14 +276,14 @@ export default function DashboardHeaderActions(props: { docs: DocOption[]; planI
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="btn-base rounded-lg border border-white/20 bg-white/90 px-3 py-2 text-sm font-medium text-black hover:bg-white"
+          className="btn-base rounded-lg border border-cyan-300/45 bg-cyan-400 px-4 py-2 text-sm font-semibold text-[#04111e] shadow-[0_6px_20px_rgba(34,211,238,0.28)] hover:bg-cyan-300"
         >
           Create protected link
         </button>
         <button
           type="button"
           onClick={() => router.push("/admin/uploads?openPicker=1")}
-          className="btn-base btn-secondary rounded-lg px-3 py-2 text-sm"
+          className="btn-base rounded-lg border border-white/25 bg-transparent px-3 py-2 text-sm text-white/90 hover:bg-white/10"
         >
           Upload document
         </button>
@@ -388,6 +407,14 @@ export default function DashboardHeaderActions(props: { docs: DocOption[]; planI
                   >
                     {busy ? "Creating..." : "Create link"}
                   </button>
+                  {showUpgradePrompt ? (
+                    <div className="mt-2 flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-2 py-2 text-xs text-amber-100">
+                      <span>Need stricter controls or higher limits?</span>
+                      <a href="/admin/upgrade" className="rounded-md border border-amber-400/40 bg-amber-400/15 px-2 py-1 text-amber-50 hover:bg-amber-400/25">
+                        Upgrade to Pro
+                      </a>
+                    </div>
+                  ) : null}
                 </div>
               </div>
             ) : (

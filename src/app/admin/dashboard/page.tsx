@@ -121,7 +121,7 @@ export default async function AdminDashboardPage() {
                           Share
                         </button>
                       )}
-                      <Link href={`/admin/docs/${encodeURIComponent(doc.doc_id)}`} className="btn-base btn-secondary rounded-lg px-2.5 py-1.5 text-xs">
+                      <Link href={`/admin/docs/${encodeURIComponent(doc.doc_id)}`} className="rounded-md border border-white/15 bg-transparent px-2 py-1 text-[11px] text-white/65 hover:bg-white/10 hover:text-white">
                         Details
                       </Link>
                     </div>

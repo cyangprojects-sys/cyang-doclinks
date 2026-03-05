@@ -1,5 +1,4 @@
 // src/app/admin/dashboard/ViewerHelpfulTiles.tsx
-import Link from "next/link";
 import { sql } from "@/lib/db";
 
 export const runtime = "nodejs";
@@ -214,14 +213,9 @@ export default async function ViewerHelpfulTiles({ userId, orgId, hasOrgId }: Pr
       <div className="mt-4 grid gap-3 md:grid-cols-3">
         <Tile title="Most viewed (this month)">
           {mostViewed ? (
-            <div className="flex items-center justify-between gap-3">
-              <div className="min-w-0">
-                <div className="truncate text-sm text-white">{mostViewed.title ?? "Untitled"}</div>
-                <div className="mt-1 text-xs text-white/60">{mostViewed.views} views</div>
-              </div>
-              <Link className="shrink-0 text-xs text-white/75 hover:text-white" href={`/admin/docs/${mostViewed.doc_id}`}>
-                View details
-              </Link>
+            <div className="min-w-0">
+              <div className="truncate text-sm text-white">{mostViewed.title ?? "Untitled"}</div>
+              <div className="mt-1 text-xs text-white/60">{mostViewed.views} views</div>
             </div>
           ) : (
             <div className="text-sm text-white/60">No view activity this month.</div>
@@ -234,12 +228,7 @@ export default async function ViewerHelpfulTiles({ userId, orgId, hasOrgId }: Pr
               {recentShares.map((s) => (
                 <div key={s.token} className="flex items-center justify-between gap-3">
                   <div className="min-w-0 truncate text-sm text-white">{s.title ?? "Untitled"}</div>
-                  <div className="flex items-center gap-3">
-                    <div className="shrink-0 text-xs text-white/60">{fmtDate(s.created_at)}</div>
-                    <Link className="shrink-0 text-xs text-white/75 hover:text-white" href={`/admin/docs/${s.doc_id}`}>
-                      View details
-                    </Link>
-                  </div>
+                  <div className="shrink-0 text-xs text-white/60">{fmtDate(s.created_at)}</div>
                 </div>
               ))}
             </div>
@@ -256,12 +245,7 @@ export default async function ViewerHelpfulTiles({ userId, orgId, hasOrgId }: Pr
                   <div className="min-w-0 truncate text-sm text-white">
                     {it.doc_title ?? "Untitled"} <span className="text-xs text-white/55">({it.kind})</span>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <div className="shrink-0 text-xs text-white/60">{fmtDate(it.expires_at)}</div>
-                    <Link className="shrink-0 text-xs text-white/75 hover:text-white" href={`/admin/docs/${it.doc_id}`}>
-                      View details
-                    </Link>
-                  </div>
+                  <div className="shrink-0 text-xs text-white/60">{fmtDate(it.expires_at)}</div>
                 </div>
               ))}
             </div>

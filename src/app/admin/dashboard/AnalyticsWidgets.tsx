@@ -573,11 +573,16 @@ export default async function AnalyticsWidgets({
             <li>
               Storage used: {fmtStorageUsedForHome(usageStorage)}
             </li>
-            <li>
-              Uploads today: {usageDailyUploads == null ? "-" : fmtInt(usageDailyUploads)}
-              {usageMaxUploadsPerDay == null ? " / inf" : ` / ${fmtInt(usageMaxUploadsPerDay)}`}
-            </li>
           </ul>
+          <div
+            className="mt-2 text-[11px] text-white/55"
+            title={`Uploads today: ${usageDailyUploads == null ? "-" : fmtInt(usageDailyUploads)}${
+              usageMaxUploadsPerDay == null ? " / unlimited" : ` / ${fmtInt(usageMaxUploadsPerDay)}`
+            }`}
+          >
+            Uploads today: {usageDailyUploads == null ? "-" : fmtInt(usageDailyUploads)}
+            {usageMaxUploadsPerDay == null ? " / unlimited" : ` / ${fmtInt(usageMaxUploadsPerDay)}`}
+          </div>
           {usagePlanId !== "pro" ? (
             <div className="mt-2 text-xs text-white/60">Upgrade to Pro for 100MB uploads + Pro presets.</div>
           ) : null}
@@ -627,13 +632,16 @@ export default async function AnalyticsWidgets({
             <li>{unencryptedDocs === 0 ? "0 unencrypted docs" : `${fmtInt(unencryptedDocs)} unencrypted docs`}</li>
             <li>{blockedDocs === 0 ? "No blocked files" : `${fmtInt(blockedDocs)} blocked files`}</li>
             <li>{needsReviewDocs === 0 ? "No files need review" : `${fmtInt(needsReviewDocs)} files need review`}</li>
-            <li>Scanning now: {fmtInt(pendingScanDocs)}</li>
-            {pendingScanDocs > 0 ? <li>Average scan time: ~1-2 min</li> : null}
             <li>Last security check: {fmtMinsAgo(lastSecurityEventAt)}</li>
           </ul>
+          {pendingScanDocs > 0 ? (
+            <div className="mt-2 inline-flex items-center rounded-full border border-amber-500/35 bg-amber-500/15 px-2 py-0.5 text-xs text-amber-100">
+              Scanning now: {fmtInt(pendingScanDocs)}
+            </div>
+          ) : null}
           <div className="mt-3">
             <Link href="/admin/activity" className="inline-flex rounded-lg border border-white/20 bg-white/10 px-3 py-1.5 text-xs text-white hover:bg-white/15">
-              View scanning documents
+              {pendingScanDocs > 0 ? `View scanning (${fmtInt(pendingScanDocs)})` : "View activity"}
             </Link>
           </div>
         </div>
