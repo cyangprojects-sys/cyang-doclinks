@@ -51,6 +51,14 @@ function asSettingsObject(value: unknown): Record<string, unknown> | null {
   return value as Record<string, unknown>;
 }
 
+function settingsErrorCode(errorLike: unknown): string {
+  const msg = errorLike instanceof Error ? errorLike.message.toLowerCase() : String(errorLike || "").toLowerCase();
+  if (msg.includes("relation") && msg.includes("app_settings") && msg.includes("does not exist")) {
+    return "SETTINGS_TABLE_NOT_READY";
+  }
+  return "SETTINGS_UNAVAILABLE";
+}
+
 export async function getRetentionSettings(): Promise<
   | { ok: true; settings: RetentionSettings }
   | { ok: false; error: string }
@@ -77,8 +85,7 @@ export async function getRetentionSettings(): Promise<
       },
     };
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    return { ok: false, error: msg };
+    return { ok: false, error: settingsErrorCode(e) };
   }
 }
 
@@ -108,8 +115,7 @@ export async function setRetentionSettings(next: Partial<RetentionSettings>): Pr
     `;
     return { ok: true, settings: merged };
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    return { ok: false, error: msg };
+    return { ok: false, error: settingsErrorCode(e) };
   }
 }
 
@@ -141,8 +147,7 @@ export async function getExpirationAlertSettings(): Promise<
       },
     };
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    return { ok: false, error: msg };
+    return { ok: false, error: settingsErrorCode(e) };
   }
 }
 
@@ -170,8 +175,7 @@ export async function setExpirationAlertSettings(next: Partial<ExpirationAlertSe
     `;
     return { ok: true, settings: merged };
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    return { ok: false, error: msg };
+    return { ok: false, error: settingsErrorCode(e) };
   }
 }
 
@@ -236,8 +240,7 @@ export async function getBillingFlags(): Promise<
       },
     };
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    return { ok: false, error: msg, flags: { ...envDefaults } };
+    return { ok: false, error: settingsErrorCode(e), flags: { ...envDefaults } };
   }
 }
 
@@ -262,8 +265,7 @@ export async function setBillingFlags(next: Partial<BillingFlags>): Promise<
     `;
     return { ok: true, flags: merged };
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    return { ok: false, error: msg };
+    return { ok: false, error: settingsErrorCode(e) };
   }
 }
 
@@ -310,8 +312,7 @@ export async function getSecurityFreezeSettings(): Promise<
       },
     };
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    return { ok: false, error: msg, settings: { ...DEFAULT_SECURITY_FREEZE } };
+    return { ok: false, error: settingsErrorCode(e), settings: { ...DEFAULT_SECURITY_FREEZE } };
   }
 }
 
@@ -341,7 +342,6 @@ export async function setSecurityFreezeSettings(next: Partial<SecurityFreezeSett
     `;
     return { ok: true, settings: merged };
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    return { ok: false, error: msg };
+    return { ok: false, error: settingsErrorCode(e) };
   }
 }

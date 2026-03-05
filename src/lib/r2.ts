@@ -15,22 +15,59 @@
 
 import { S3Client } from "@aws-sdk/client-s3";
 
+const R2_BUCKET_RE = /^[A-Za-z0-9](?:[A-Za-z0-9._-]{1,62})$/;
+
+function isLoopbackHost(hostname: string): boolean {
+  const h = String(hostname || "").trim().toLowerCase();
+  return h === "localhost" || h === "127.0.0.1" || h === "::1";
+}
+
+function normalizeR2Endpoint(raw: string): string {
+  let parsed: URL;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    throw new Error("Invalid R2_ENDPOINT URL");
+  }
+
+  const protocol = parsed.protocol.toLowerCase();
+  if (protocol !== "https:" && protocol !== "http:") {
+    throw new Error("R2_ENDPOINT must use http or https");
+  }
+  if (protocol === "http:" && process.env.NODE_ENV === "production" && !isLoopbackHost(parsed.hostname)) {
+    throw new Error("R2_ENDPOINT must use https in production");
+  }
+
+  return parsed.toString();
+}
+
 function requireEnv(name: "R2_ENDPOINT" | "R2_ACCESS_KEY_ID" | "R2_SECRET_ACCESS_KEY"): string {
   const value = (process.env[name] || "").trim();
   if (!value) throw new Error(`Missing ${name} env var`);
+  if (name === "R2_ENDPOINT") {
+    return normalizeR2Endpoint(value);
+  }
   return value;
 }
 
 export function getR2Bucket(): string {
   const bucket = (process.env.R2_BUCKET || process.env.R2_BUCKET_NAME || "").trim();
   if (!bucket) throw new Error("Missing R2_BUCKET env var");
+  if (!R2_BUCKET_RE.test(bucket)) throw new Error("Invalid R2 bucket name");
   return bucket;
 }
 
 export function getR2Prefix(): string {
-  const p = process.env.R2_PREFIX || "docs/";
-  if (p.startsWith("r2://")) return "docs/";
-  return p.endsWith("/") ? p : `${p}/`;
+  const raw = String(process.env.R2_PREFIX || "docs/").trim();
+  if (!raw) return "docs/";
+  if (raw.startsWith("r2://")) return "docs/";
+
+  const normalized = raw.replace(/\\/g, "/").replace(/^\/+/, "");
+  if (!normalized || normalized.includes("..") || /[\x00-\x1F]/.test(normalized)) {
+    return "docs/";
+  }
+
+  return normalized.endsWith("/") ? normalized : `${normalized}/`;
 }
 
 let cachedClient: S3Client | null = null;
