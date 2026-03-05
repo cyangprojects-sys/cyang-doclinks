@@ -225,7 +225,7 @@ const docFilter = sql`${orgFilter} ${ownerFilter}`;
         <DashboardHeaderActions docs={headerDocs} planId={planId} />
       </div>
 
-      <AnalyticsWidgets ownerId={canSeeAll ? undefined : u.id} />
+      <AnalyticsWidgets ownerId={canSeeAll ? undefined : u.id} showHealth={u.role === "owner"} />
 
       {missingCoreTables ? (
         <div className="rounded-lg border border-neutral-800 bg-neutral-950 p-4 text-sm text-neutral-300">

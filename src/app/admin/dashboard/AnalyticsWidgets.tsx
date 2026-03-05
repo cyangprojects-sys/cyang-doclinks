@@ -35,7 +35,7 @@ function fmtMinsAgo(iso: string | null): string {
   return `${hrs}h ago`;
 }
 
-export default async function AnalyticsWidgets({ ownerId }: { ownerId?: string; }) {
+export default async function AnalyticsWidgets({ ownerId, showHealth = false }: { ownerId?: string; showHealth?: boolean }) {
   const isViewerScoped = Boolean(ownerId);
   const hasDocViews = await tableExists("public.doc_views");
   const hasDocViewDaily = await tableExists("public.doc_view_daily");
@@ -488,6 +488,7 @@ export default async function AnalyticsWidgets({ ownerId }: { ownerId?: string; 
         </div>
       </div>
 
+      {showHealth ? (
       <div className="mt-3">
         <details className="glass-card-strong rounded-2xl p-4">
           <summary className="cursor-pointer list-none">
@@ -590,6 +591,7 @@ export default async function AnalyticsWidgets({ ownerId }: { ownerId?: string; 
           ) : null}
         </details>
       </div>
+      ) : null}
     </section>
   );
 }
