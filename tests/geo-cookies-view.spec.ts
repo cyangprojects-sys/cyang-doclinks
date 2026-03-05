@@ -66,6 +66,8 @@ test.describe("geo, cookie, and view helpers", () => {
     expect(() => cookieHeader("bad name", "v")).toThrow("INVALID_COOKIE_NAME");
     expect(() => cookieHeader("bad;name", "v")).toThrow("INVALID_COOKIE_NAME");
     expect(() => cookieHeader("session", "abc\r\ndef")).toThrow("INVALID_COOKIE_VALUE");
+    expect(() => cookieHeader("session", "abc;def")).toThrow("INVALID_COOKIE_VALUE");
+    expect(() => cookieHeader("session", "abc", { path: "bad-path" })).toThrow("INVALID_COOKIE_PATH");
   });
 
   test("parses cookie values containing equals sign", () => {
@@ -73,6 +75,11 @@ test.describe("geo, cookie, and view helpers", () => {
       headers: { cookie: "a=1; token=abc=def=ghi; b=2" },
     });
     expect(getCookie(req, "token")).toBe("abc=def=ghi");
+  });
+
+  test("clamps oversized max-age values to a safe upper bound", () => {
+    const h = cookieHeader("session", "v", { maxAgeSeconds: 999999999 });
+    expect(h).toContain("Max-Age=31536000");
   });
 
   test("extracts client IP and hashes it", () => {

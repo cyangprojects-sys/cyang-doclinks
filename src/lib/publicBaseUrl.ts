@@ -1,10 +1,14 @@
 type EnvLike = Record<string, string | undefined>;
+const MAX_BASE_URL_INPUT_LEN = 2048;
 
 function clean(input: unknown): string {
-  return String(input || "").trim();
+  return String(input || "").trim().slice(0, MAX_BASE_URL_INPUT_LEN);
 }
 
 function parseAndValidateBase(candidate: string, isProd: boolean): string {
+  if (!candidate || /[\r\n\\]/.test(candidate)) {
+    throw new Error("APP_BASE_URL_INVALID");
+  }
   let u: URL;
   try {
     u = new URL(candidate);
@@ -47,5 +51,9 @@ export function resolvePublicAppBaseUrl(reqUrl: string, env: EnvLike = process.e
   } catch (e) {
     if (isProd) throw e;
   }
-  return parseAndValidateBase(new URL(reqUrl).origin, false);
+  try {
+    return parseAndValidateBase(new URL(reqUrl).origin, false);
+  } catch {
+    return "http://localhost:3000";
+  }
 }

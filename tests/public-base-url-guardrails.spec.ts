@@ -29,6 +29,14 @@ test.describe("public base url guardrails", () => {
     expect(out).toBe("http://localhost:3000");
   });
 
+  test("falls back to localhost in non-production when req url is malformed", () => {
+    const out = resolvePublicAppBaseUrl(
+      "::::://bad-url",
+      env({ NODE_ENV: "development", APP_URL: "", NEXTAUTH_URL: "", VERCEL_URL: "" })
+    );
+    expect(out).toBe("http://localhost:3000");
+  });
+
   test("billing routes use trusted base-url resolver", () => {
     for (const file of [
       "src/app/api/billing/checkout/route.ts",

@@ -45,4 +45,10 @@ test.describe("cron auth", () => {
     const missing = toNextRequest({});
     expect(isCronAuthorized(missing)).toBeFalsy();
   });
+
+  test("rejects oversized authorization header payloads", () => {
+    process.env.CRON_SECRET = "cron-secret";
+    const req = toNextRequest({ authorization: `Bearer cron-secret-${"x".repeat(4000)}` });
+    expect(isCronAuthorized(req)).toBeFalsy();
+  });
 });

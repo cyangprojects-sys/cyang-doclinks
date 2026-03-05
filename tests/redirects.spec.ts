@@ -15,5 +15,8 @@ test.describe("internal redirect sanitizer", () => {
     expect(sanitizeInternalRedirectPath("//evil.example", fallback)).toBe(fallback);
     expect(sanitizeInternalRedirectPath("/\\evil", fallback)).toBe(fallback);
     expect(sanitizeInternalRedirectPath("/admin\nx", fallback)).toBe(fallback);
+    expect(sanitizeInternalRedirectPath("/%zz", fallback)).toBe(fallback);
+    expect(sanitizeInternalRedirectPath("/../admin", fallback)).toBe(fallback);
+    expect(sanitizeInternalRedirectPath("/a/../b", fallback)).toBe(fallback);
   });
 });

@@ -15,6 +15,15 @@ test.describe("configured base url guardrails", () => {
     expect(resolveConfiguredPublicAppBaseUrl(env({ NODE_ENV: "development" }))).toBe("http://localhost:3000");
   });
 
+  test("rejects malformed configured values with control characters", () => {
+    expect(() =>
+      resolveConfiguredPublicAppBaseUrl(env({ NODE_ENV: "production", APP_URL: "https://good.example\nx" }))
+    ).toThrow("APP_BASE_URL_INVALID");
+    expect(() =>
+      resolveConfiguredPublicAppBaseUrl(env({ NODE_ENV: "production", APP_URL: "https://good.example\\bad" }))
+    ).toThrow("APP_BASE_URL_INVALID");
+  });
+
   test("server-side link builders use configured base-url resolver", () => {
     for (const file of [
       "src/app/admin/actions.ts",
