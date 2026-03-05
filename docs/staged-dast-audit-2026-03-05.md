@@ -24,11 +24,19 @@ Validated `413 PAYLOAD_TOO_LARGE` responses for:
 Executed via staged burst tests in:
 
 - `tests/public-rate-limit-dast.spec.ts`
+- `tests/admin-post-rate-limit-runtime.spec.ts`
 
 Validated throttling (`429`) under low temporary thresholds for:
 
 - `POST /api/auth/manual-signup`
 - `POST /api/auth/signup-consent`
+
+Validated throttling guardrail behavior under constrained thresholds for admin/control routes:
+
+- `POST /api/admin/security/activate` (JSON error path)
+- `POST /api/admin/security/freeze` (redirect error path)
+- `POST /api/admin/billing` (redirect error path)
+- `POST /api/admin/upload/abort` (JSON error path)
 
 ## Outcome
 
