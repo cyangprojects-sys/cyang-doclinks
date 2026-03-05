@@ -6,19 +6,28 @@ import { POST as takedownPost } from "../src/app/api/v1/takedown/route";
 import { POST as aliasesPost } from "../src/app/api/v1/aliases/route";
 import { POST as sharesPost } from "../src/app/api/v1/shares/route";
 import { POST as backupStatusPost } from "../src/app/api/backup/status/route";
+import { POST as viewerOfficePost } from "../src/app/api/viewer/office/route";
+import { POST as webhooksTestPost } from "../src/app/api/v1/webhooks/test/route";
+import { POST as stripeWebhookPost } from "../src/app/api/stripe/webhook/route";
 
 loadDotenv({ path: ".env.local", quiet: true });
 
-function jsonRequest(url: string, bytes: number, headers?: Record<string, string>): NextRequest {
+let ipSeed = 41;
+function nextIp(): string {
+  ipSeed = (ipSeed + 1) % 250;
+  return `198.51.100.${ipSeed}`;
+}
+
+function jsonRequest(url: string, bytes: number, headers?: Record<string, string>, body: string = "{}"): NextRequest {
   return new NextRequest(url, {
     method: "POST",
     headers: {
       "content-type": "application/json",
       "content-length": String(bytes),
-      "x-forwarded-for": "198.51.100.24",
+      "x-forwarded-for": nextIp(),
       ...(headers || {}),
     },
-    body: "{}",
+    body,
   });
 }
 
@@ -67,5 +76,23 @@ test.describe("runtime oversized payload handling", () => {
       }
     }
   });
-});
 
+  test("viewer office rejects oversized payloads at runtime", async () => {
+    const res = await viewerOfficePost(
+      jsonRequest("http://localhost/api/viewer/office", 12 * 1024, undefined, '{"rawPath":"/s/x/raw","mimeType":"text/csv"}')
+    );
+    await expectPayloadTooLarge(res);
+  });
+
+  test("v1 webhook test rejects oversized payloads at runtime", async () => {
+    const res = await webhooksTestPost(jsonRequest("http://localhost/api/v1/webhooks/test", 24 * 1024));
+    await expectPayloadTooLarge(res);
+  });
+
+  test("stripe webhook rejects oversized payloads at runtime", async () => {
+    const res = await stripeWebhookPost(
+      jsonRequest("http://localhost/api/stripe/webhook", 400 * 1024, { "stripe-signature": "t=1,v1=test" })
+    );
+    await expectPayloadTooLarge(res);
+  });
+});
