@@ -32,8 +32,8 @@ export default function DmcaActionsClient({ noticeId, docId, status }: Props) {
     try {
       await post(action);
       setMsg("Done. Refresh to see updates.");
-    } catch (e: unknown) {
-      setMsg(e instanceof Error ? e.message : String(e));
+    } catch {
+      setMsg("Request failed. Please retry.");
     } finally {
       setBusy(null);
     }

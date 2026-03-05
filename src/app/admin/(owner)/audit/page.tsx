@@ -9,7 +9,10 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 type GenericRow = Record<string, unknown>;
 function errorMessage(e: unknown): string {
-  return e instanceof Error ? e.message : String(e);
+  if (process.env.NODE_ENV !== "production") {
+    return e instanceof Error ? e.message : String(e);
+  }
+  return "Access logs query failed.";
 }
 
 

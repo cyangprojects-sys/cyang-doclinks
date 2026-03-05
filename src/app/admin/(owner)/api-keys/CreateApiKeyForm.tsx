@@ -41,8 +41,8 @@ export default function CreateApiKeyForm() {
                 }
                 setName("");
                 setCreatedKey(res.apiKey || null);
-              } catch (e: unknown) {
-                setErr(e instanceof Error ? e.message : "Failed to create key.");
+              } catch {
+                setErr("Failed to create key.");
               }
             })
           }

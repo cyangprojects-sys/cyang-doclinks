@@ -4,21 +4,21 @@ Total modules with lint warnings:
 66
 
 Remaining pending modules:
-65
+57
 
 Status key: `done` | `pending`
 
 ## Modules (low-risk first by manual ordering + remaining alphabetical)
 
-- pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\(owner)\abuse\AbuseActionsClient.tsx`
-- pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\(owner)\api-keys\CreateApiKeyForm.tsx`
-- pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\(owner)\audit\page.tsx`
-- pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\(owner)\billing\stripe\page.tsx`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\(owner)\abuse\AbuseActionsClient.tsx`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\(owner)\api-keys\CreateApiKeyForm.tsx`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\(owner)\audit\page.tsx`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\(owner)\billing\stripe\page.tsx`
 - pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\(owner)\db-debug\page.tsx`
-- pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\(owner)\debug\page.tsx`
-- pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\(owner)\dmca\DmcaActionsClient.tsx`
-- pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\(owner)\layout.tsx`
-- pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\(owner)\viewer-uploads\ViewerUploadsTableClient.tsx`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\(owner)\debug\page.tsx`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\(owner)\dmca\DmcaActionsClient.tsx`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\(owner)\layout.tsx`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\(owner)\viewer-uploads\ViewerUploadsTableClient.tsx`
 - pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\(owner)\webhooks\actions.ts`
 - pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\actions.ts`
 - pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\dashboard\UploadPanel.tsx`

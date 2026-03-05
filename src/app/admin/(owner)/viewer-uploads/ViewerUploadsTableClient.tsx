@@ -26,7 +26,10 @@ export type ViewerUploadRow = {
 
 type SortKey = "created_at" | "title" | "uploader_email" | "size_bytes" | "total_views" | "active_shares";
 function errorMessage(e: unknown): string {
-  return e instanceof Error ? e.message : String(e);
+  if (process.env.NODE_ENV !== "production") {
+    return e instanceof Error ? e.message : String(e);
+  }
+  return "Action failed. Please retry.";
 }
 
 function fmtBytes(n: number | null) {

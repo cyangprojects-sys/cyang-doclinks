@@ -34,8 +34,8 @@ export default function AbuseActionsClient({ reportId, token, docId }: Props) {
       await post({ ...action, reportId, reason: reason || null });
       // simplest refresh
       window.location.reload();
-    } catch (e: unknown) {
-      setErr(e instanceof Error ? e.message : "Failed");
+    } catch {
+      setErr("Request failed. Please retry.");
     } finally {
       setBusy(false);
     }
