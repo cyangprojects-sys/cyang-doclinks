@@ -12,9 +12,19 @@ const Body = z.object({
   dry_run: z.boolean().optional(),
   max_bytes: z.number().int().positive().optional(),
 });
+const MAX_SECURITY_MIGRATE_BODY_BYTES = 8 * 1024;
+
+function parseJsonBodyLength(req: Request): number {
+  const raw = String(req.headers.get("content-length") || "").trim();
+  const out = Number(raw);
+  return Number.isFinite(out) ? Math.max(0, Math.floor(out)) : 0;
+}
 
 export async function POST(req: Request) {
   try {
+    if (parseJsonBodyLength(req) > MAX_SECURITY_MIGRATE_BODY_BYTES) {
+      return NextResponse.json({ ok: false, error: "PAYLOAD_TOO_LARGE" }, { status: 413 });
+    }
     const user = await requirePermission("security.migrate_legacy");
     const json = await req.json().catch(() => null);
     const parsed = Body.safeParse(json);

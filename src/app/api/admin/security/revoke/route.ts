@@ -9,10 +9,17 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const KEY_ID_RE = /^[A-Za-z0-9._:-]{1,128}$/;
+const MAX_SECURITY_REVOKE_BODY_BYTES = 8 * 1024;
 
 const Body = z.object({
   key_id: z.string().trim().regex(KEY_ID_RE),
 }).strict();
+
+function parseJsonBodyLength(req: Request): number {
+  const raw = String(req.headers.get("content-length") || "").trim();
+  const out = Number(raw);
+  return Number.isFinite(out) ? Math.max(0, Math.floor(out)) : 0;
+}
 
 function authErrorCode(e: unknown): "UNAUTHENTICATED" | "FORBIDDEN" | null {
   const message = e instanceof Error ? e.message : String(e || "");
@@ -23,6 +30,9 @@ function authErrorCode(e: unknown): "UNAUTHENTICATED" | "FORBIDDEN" | null {
 
 export async function POST(req: Request) {
   try {
+    if (parseJsonBodyLength(req) > MAX_SECURITY_REVOKE_BODY_BYTES) {
+      return NextResponse.json({ ok: false, error: "PAYLOAD_TOO_LARGE" }, { status: 413 });
+    }
     const u = await requirePermission("security.keys.manage");
     const json = await req.json().catch(() => null);
     const parsed = Body.safeParse(json);

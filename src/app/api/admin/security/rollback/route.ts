@@ -13,9 +13,19 @@ const Body = z.object({
   change_id: z.string().uuid(),
   reason: z.string().max(500).optional(),
 });
+const MAX_SECURITY_ROLLBACK_BODY_BYTES = 8 * 1024;
+
+function parseJsonBodyLength(req: Request): number {
+  const raw = String(req.headers.get("content-length") || "").trim();
+  const out = Number(raw);
+  return Number.isFinite(out) ? Math.max(0, Math.floor(out)) : 0;
+}
 
 export async function POST(req: Request) {
   try {
+    if (parseJsonBodyLength(req) > MAX_SECURITY_ROLLBACK_BODY_BYTES) {
+      return NextResponse.json({ ok: false, error: "PAYLOAD_TOO_LARGE" }, { status: 413 });
+    }
     const u = await requirePermission("security.keys.manage");
     const json = await req.json().catch(() => null);
     const parsed = Body.safeParse(json);
