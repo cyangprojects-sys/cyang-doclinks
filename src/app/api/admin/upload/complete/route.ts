@@ -90,11 +90,14 @@ async function streamToBuffer(body: AsyncIterable<unknown>): Promise<Buffer> {
 
 export async function POST(req: NextRequest) {
   const timeoutMs = getRouteTimeoutMs("ROUTE_TIMEOUT_UPLOAD_COMPLETE_MS", 45_000);
+  let stage = "init";
   try {
     return await withRouteTimeout(
       (async () => {
+        stage = "runtime_env";
         assertRuntimeEnv("upload_complete");
 
+        stage = "auth";
         const r2Bucket = getR2Bucket();
         const user = await requireUser();
         const plan = await getPlanForUser(user.id);
@@ -142,6 +145,7 @@ export async function POST(req: NextRequest) {
           );
         }
 
+    stage = "parse_body";
     const body = (await req.json()) as CompleteRequest;
 
     const title = body.title ?? null;
@@ -150,6 +154,7 @@ export async function POST(req: NextRequest) {
     // 1) Resolve docId either directly or via (bucket,key)
     let docId: string | null = body.doc_id ?? null;
 
+    stage = "resolve_doc";
     if (!docId) {
       const bucket = body.r2_bucket ?? null;
       const key = body.r2_key ?? null;
@@ -179,9 +184,11 @@ export async function POST(req: NextRequest) {
     }
 
     // AuthZ: must be able to manage this doc.
+    stage = "authorize_doc_write";
     await requireDocWrite(docId);
 
     // 2) Fetch existing doc (for slug fallback)
+    stage = "load_doc_row";
     const docRows = (await sql`
       select
         id::text as id,
@@ -198,6 +205,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: "doc_not_found" }, { status: 404 });
     }
 
+    stage = "schema_preflight";
     // Strict schema preflight (no fallback writes): fail fast with actionable detail.
     const docColumnRows = (await sql`
       select column_name::text as column_name
@@ -229,6 +237,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    stage = "mark_processing";
     await sql`
       update public.docs
       set status = 'processing'
@@ -313,6 +322,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: "encryption_required" }, { status: 409 });
     }
 
+    stage = "head_object";
     let head: HeadObjectCommandOutput;
     try {
       head = await r2Client.send(
@@ -434,6 +444,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 4) Read uploaded PDF bytes and validate server-side before encryption.
+    stage = "read_object";
     let scanStatus: string = "pending";
     let riskLevel: string = "low";
     let riskFlags: Record<string, unknown> | null = null;
@@ -452,6 +463,7 @@ export async function POST(req: NextRequest) {
     }
 
     const filenameForValidation = (originalFilename || docRows[0].name || "upload.bin").trim();
+    stage = "validate_type";
     const typeCheck = validateUploadType({
       filename: filenameForValidation,
       declaredMime: metaOrigCt || docRows[0].content_type || null,
@@ -500,6 +512,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 5) Encrypt file server-side and overwrite uploaded plaintext object.
+    stage = "encrypt_overwrite";
     let encAlg = "AES-256-GCM";
     let encIv: Buffer | null = null;
     let encKeyVersion = "";
@@ -538,6 +551,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: "server_side_encrypt_metadata_missing" }, { status: 500 });
     }
 
+    stage = "update_doc";
 // 6) Mark doc ready + update metadata (best-effort)
     const updatedRows = (await sql`
       update public.docs
@@ -573,6 +587,7 @@ export async function POST(req: NextRequest) {
 
 
 
+stage = "enqueue_scan";
 // 4b) Enqueue async malware scan (best-effort; runs via /api/cron/scan)
 try {
   await enqueueDocScan({ docId, bucket: docBucket, key: docKey });
@@ -588,6 +603,7 @@ try {
     meta: { error: errorMessage(e) },
   });
 }
+stage = "usage_counters";
 // --- Monetization counters (hidden) ---
 // Count this as an upload for the doc owner (usually the signed-in user).
 try {
@@ -616,6 +632,7 @@ try {
 }
 
 
+    stage = "create_alias";
     // 4) Generate alias base
     let base = slugify(title || originalFilename || existingName || "document");
     if (!base) base = `doc-${docId.slice(0, 8)}`;
@@ -663,6 +680,7 @@ try {
       return NextResponse.json({ ok: false, error: "alias_generation_failed" }, { status: 500 });
     }
 
+    stage = "build_view_url";
     let baseUrl: string;
     try {
       baseUrl = resolvePublicAppBaseUrl(req.url);
@@ -682,6 +700,7 @@ try {
       baseUrl = reqOrigin;
     }
 
+        stage = "done";
         await logSecurityEvent({
           type: "upload_complete_success",
           severity: "low",
@@ -708,8 +727,15 @@ try {
     const msg = errorMessage(e) || "server_error";
     const code = sqlErrorCode(e);
     const missingColumn = extractMissingColumn(msg);
+    const stack = e instanceof Error ? e.stack || null : null;
+    console.error("upload_complete_failed", {
+      stage,
+      code,
+      message: msg,
+      stack,
+    });
     if (isRuntimeEnvError(e)) {
-      return NextResponse.json({ ok: false, error: "ENV_MISCONFIGURED" }, { status: 503 });
+      return NextResponse.json({ ok: false, error: "ENV_MISCONFIGURED", stage }, { status: 503 });
     }
     if (isRouteTimeoutError(e)) {
       await logSecurityEvent({
@@ -720,7 +746,13 @@ try {
       message: "Upload completion exceeded timeout",
       meta: { timeoutMs },
       });
-      return NextResponse.json({ ok: false, error: "TIMEOUT" }, { status: 504 });
+      return NextResponse.json({ ok: false, error: "TIMEOUT", stage }, { status: 504 });
+    }
+    if (msg === "FORBIDDEN") {
+      return NextResponse.json(
+        { ok: false, error: "FORBIDDEN", message: "You do not have permission to finalize this upload.", stage },
+        { status: 403 }
+      );
     }
     if (code === "42703" || missingColumn) {
       return NextResponse.json(
@@ -729,6 +761,7 @@ try {
           error: "SCHEMA_MISMATCH",
           message: "Upload finalization failed due to a missing database column.",
           missing_column: missingColumn,
+          stage,
           required_sql: ["scripts/sql/security_encryption.sql", "scripts/sql/abuse_moderation.sql"],
         },
         { status: 500 }
@@ -740,6 +773,7 @@ try {
           ok: false,
           error: "SCHEMA_MISMATCH",
           message: "Upload finalization failed due to a missing database table.",
+          stage,
         },
         { status: 500 }
       );
@@ -748,10 +782,10 @@ try {
       scope: "upload_complete",
       message: msg,
       ip: clientIpKey(req).ip,
-      meta: { route: "/api/admin/upload/complete" },
+      meta: { route: "/api/admin/upload/complete", stage, code },
     });
     return NextResponse.json(
-      { ok: false, error: "server_error", message: "Unable to finalize upload." },
+      { ok: false, error: "server_error", message: "Unable to finalize upload.", stage, code },
       { status: 500 }
     );
   }
