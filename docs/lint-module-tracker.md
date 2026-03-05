@@ -4,7 +4,7 @@ Total modules with lint warnings:
 66
 
 Remaining pending modules:
-54
+51
 
 Status key: `done` | `pending`
 
@@ -19,7 +19,7 @@ Status key: `done` | `pending`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\(owner)\dmca\DmcaActionsClient.tsx`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\(owner)\layout.tsx`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\(owner)\viewer-uploads\ViewerUploadsTableClient.tsx`
-- pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\(owner)\webhooks\actions.ts`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\(owner)\webhooks\actions.ts`
 - pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\actions.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\dashboard\UploadPanel.tsx`
 - pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\docs\[docId]\page.tsx`
@@ -45,11 +45,11 @@ Status key: `done` | `pending`
 - pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\cron\webhooks\route.ts`
 - pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\debug\alias\[alias]\route.ts`
 - pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\stripe\webhook\route.ts`
-- pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\v1\aliases\route.ts`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\v1\aliases\route.ts`
 - pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\v1\shares\route.ts`
 - pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\v1\takedown\route.ts`
 - pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\v1\webhooks\test\route.ts`
-- pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\components\SecurePdfCanvasViewer.tsx`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\components\SecurePdfCanvasViewer.tsx`
 - pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\d\[alias]\actions.ts`
 - pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\d\[alias]\raw\route.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\d\[alias]\ShareForm.tsx`

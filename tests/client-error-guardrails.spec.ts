@@ -10,6 +10,7 @@ test.describe("client error guardrails", () => {
       "src/app/admin/(owner)/security/KeyManagementPanel.tsx",
       "src/app/report/ReportForm.tsx",
       "src/app/signup/page.tsx",
+      "src/app/components/SecurePdfCanvasViewer.tsx",
     ];
     const leakPatterns = [
       "setErr(e instanceof Error ? e.message",

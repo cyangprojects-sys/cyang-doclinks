@@ -6,6 +6,8 @@ test.describe("security hardening regressions", () => {
     const code = readFileSync("src/app/api/v1/aliases/route.ts", "utf8");
     expect(code.includes("throw e;")).toBeFalsy();
     expect(code.includes('error: "SERVER_ERROR"')).toBeTruthy();
+    expect(code.includes("alias_create_legacy_insert_failed")).toBeTruthy();
+    expect(code.includes("isLegacyAliasMetadataMissing(")).toBeTruthy();
   });
 
   test("stripe webhook route fails closed on unhandled errors", async () => {

@@ -23,5 +23,13 @@ test.describe("webhook event guardrails", () => {
   test("admin webhook actions normalize selected event values", () => {
     const code = readFileSync("src/app/admin/(owner)/webhooks/actions.ts", "utf8");
     expect(code.includes("normalizeWebhookEvents(")).toBeTruthy();
+    expect(code.includes("sanitizeWebhookErrorForStorage(")).toBeTruthy();
+    expect(code.includes("set last_error = ${String(e instanceof Error ? e.message")).toBeFalsy();
+  });
+
+  test("webhook delivery worker sanitizes errors before persisting", () => {
+    const code = readFileSync("src/lib/webhooks.ts", "utf8");
+    expect(code.includes("sanitizeWebhookErrorForStorage(")).toBeTruthy();
+    expect(code.includes("error: e instanceof Error ? e.message")).toBeFalsy();
   });
 });

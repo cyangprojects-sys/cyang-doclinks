@@ -19,6 +19,13 @@ type PdfDocLike = {
 
 type PageDims = { width: number; height: number };
 
+function toViewerError(e: unknown, fallback: string): string {
+  if (process.env.NODE_ENV !== "production") {
+    return e instanceof Error ? e.message : fallback;
+  }
+  return fallback;
+}
+
 function PdfPageCanvas({
   doc,
   pageNo,
@@ -155,7 +162,7 @@ export default function SecurePdfCanvasViewer(props: {
           setPageDims({ 1: { width: vp.width, height: vp.height } });
         }
       } catch (e: unknown) {
-        if (!cancelled) setError(e instanceof Error ? e.message : "Unable to load PDF.");
+        if (!cancelled) setError(toViewerError(e, "Unable to load PDF."));
       } finally {
         if (!cancelled) setLoading(false);
       }

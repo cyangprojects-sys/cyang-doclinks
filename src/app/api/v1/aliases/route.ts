@@ -8,6 +8,34 @@ import { emitWebhook } from "@/lib/webhooks";
 import { clientIpKey, enforceGlobalApiRateLimit, logDbErrorEvent } from "@/lib/securityTelemetry";
 import { appendImmutableAudit } from "@/lib/immutableAudit";
 
+type PgErrorLike = { code?: unknown; message?: unknown };
+
+function pgErrorCode(e: unknown): string {
+  if (!e || typeof e !== "object") return "";
+  return String((e as PgErrorLike).code || "").trim();
+}
+
+function pgErrorMessage(e: unknown): string {
+  if (!e || typeof e !== "object") return "";
+  return String((e as PgErrorLike).message || "").trim();
+}
+
+function isUniqueViolation(e: unknown): boolean {
+  return pgErrorCode(e) === "23505";
+}
+
+function isLegacyAliasMetadataMissing(e: unknown): boolean {
+  const msg = pgErrorMessage(e).toLowerCase();
+  if (
+    !msg.includes("column") ||
+    (!msg.includes("expires_at") && !msg.includes("revoked_at") && !msg.includes("is_active"))
+  ) {
+    return false;
+  }
+  const code = pgErrorCode(e);
+  return !code || code === "42703";
+}
+
 export async function POST(req: NextRequest) {
   const ipInfo = clientIpKey(req);
   const rl = await enforceGlobalApiRateLimit({
@@ -63,53 +91,67 @@ export async function POST(req: NextRequest) {
       returning alias::text as alias
     `) as unknown as Array<{ alias: string }>;
   } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : String(e || "");
-    const missingCol =
-      msg.includes("column") &&
-      (msg.includes("expires_at") || msg.includes("revoked_at") || msg.includes("is_active"));
-    if (missingCol) {
-      created = (await sql`
-        insert into public.doc_aliases (alias, doc_id)
-        values (${alias}, ${docId}::uuid)
-        returning alias::text as alias
-      `) as unknown as Array<{ alias: string }>;
+    if (isLegacyAliasMetadataMissing(e)) {
+      try {
+        created = (await sql`
+          insert into public.doc_aliases (alias, doc_id)
+          values (${alias}, ${docId}::uuid)
+          returning alias::text as alias
+        `) as unknown as Array<{ alias: string }>;
+      } catch (legacyInsertError: unknown) {
+        if (isUniqueViolation(legacyInsertError)) {
+          return NextResponse.json({ ok: false, error: "ALIAS_TAKEN" }, { status: 409 });
+        }
+        await logDbErrorEvent({
+          scope: "api_v1_aliases",
+          message: "alias_create_legacy_insert_failed",
+          ip: ipInfo.ip,
+          actorUserId: auth.ownerId,
+          meta: {
+            route: "/api/v1/aliases",
+            code: pgErrorCode(legacyInsertError) || null,
+          },
+        });
+        return NextResponse.json({ ok: false, error: "SERVER_ERROR" }, { status: 500 });
+      }
       if (!created.length) {
         return NextResponse.json({ ok: false, error: "ALIAS_TAKEN" }, { status: 409 });
       }
       return NextResponse.json({ ok: true, alias: created[0].alias, doc_id: docId });
     }
-    if (typeof e === "object" && e !== null && "code" in e && String((e as { code?: string }).code || "") === "23505") {
+    if (isUniqueViolation(e)) {
       return NextResponse.json({ ok: false, error: "ALIAS_TAKEN" }, { status: 409 });
     }
     await logDbErrorEvent({
       scope: "api_v1_aliases",
-      message: msg || "alias_create_failed",
+      message: "alias_create_failed",
       ip: ipInfo.ip,
       actorUserId: auth.ownerId,
-      meta: { route: "/api/v1/aliases" },
+      meta: { route: "/api/v1/aliases", code: pgErrorCode(e) || null },
     });
     return NextResponse.json({ ok: false, error: "SERVER_ERROR" }, { status: 500 });
   }
   if (!created.length) {
     return NextResponse.json({ ok: false, error: "ALIAS_TAKEN" }, { status: 409 });
   }
+  const createdAlias = created[0].alias;
 
-  emitWebhook("alias.created", { alias, doc_id: docId, created_via: "api" });
+  emitWebhook("alias.created", { alias: createdAlias, doc_id: docId, created_via: "api" });
   await appendImmutableAudit(
     {
       streamKey: `doc:${docId}`,
       action: "doc.alias_created",
       actorUserId: auth.ownerId,
       docId,
-      subjectId: alias,
+      subjectId: createdAlias,
       ipHash: ipInfo.ipHash,
       payload: {
-        alias,
+        alias: createdAlias,
         via: "api",
       },
     },
     { strict: true }
   );
 
-  return NextResponse.json({ ok: true, alias, doc_id: docId });
+  return NextResponse.json({ ok: true, alias: createdAlias, doc_id: docId });
 }

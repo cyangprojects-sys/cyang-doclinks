@@ -4,7 +4,12 @@
 import { revalidatePath } from "next/cache";
 import { sql } from "@/lib/db";
 import { requireUser } from "@/lib/authz";
-import { normalizeWebhookEvents, normalizeWebhookUrl, processWebhookDeliveries } from "@/lib/webhooks";
+import {
+  normalizeWebhookEvents,
+  normalizeWebhookUrl,
+  processWebhookDeliveries,
+  sanitizeWebhookErrorForStorage,
+} from "@/lib/webhooks";
 import { encryptWebhookSecretForStorage } from "@/lib/webhookSecrets";
 
 function parseEvents(formData: FormData): string[] {
@@ -122,9 +127,10 @@ export async function testWebhookAction(formData: FormData): Promise<void> {
     // Try to deliver immediately for nicer UX.
     await processWebhookDeliveries({ maxBatch: 5, maxAttempts: 8 });
   } catch (e: unknown) {
+    const safeError = sanitizeWebhookErrorForStorage(e, "Failed to enqueue test webhook delivery.");
     await sql`
       update public.webhooks
-      set last_error = ${String(e instanceof Error ? e.message : e || "Failed to enqueue test")}
+      set last_error = ${safeError}
       where id = ${id}::uuid and owner_id = ${u.id}::uuid
     `;
   }

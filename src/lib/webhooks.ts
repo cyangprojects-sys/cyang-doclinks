@@ -127,6 +127,21 @@ export function normalizeWebhookUrl(input: string, env: NodeJS.ProcessEnv = proc
   return u.toString();
 }
 
+export function sanitizeWebhookErrorForStorage(error: unknown, fallback = "Delivery failed."): string {
+  const raw =
+    typeof error === "string"
+      ? error.trim()
+      : error instanceof Error
+        ? String(error.message || "").trim()
+        : "";
+  if (!raw) return fallback;
+  if (/^HTTP\s+\d{3}$/i.test(raw)) return raw.toUpperCase();
+  if (/timed out|timeout/i.test(raw)) return "Request timed out.";
+  if (/\baborted?\b/i.test(raw)) return "Request aborted.";
+  if (/network|fetch failed|econn|enotfound|ehostunreach|socket/i.test(raw)) return "Network error.";
+  return fallback;
+}
+
 function hmac(secret: string, body: string): string {
   return crypto.createHmac("sha256", secret).update(body).digest("hex");
 }
@@ -208,7 +223,7 @@ async function deliverOnce(args: {
     if (res.ok) return { ok: true, status: res.status, error: null };
     return { ok: false, status: res.status, error: `HTTP ${res.status}` };
   } catch (e: unknown) {
-    return { ok: false, status: null, error: e instanceof Error ? e.message : String(e || "unknown error") };
+    return { ok: false, status: null, error: sanitizeWebhookErrorForStorage(e) };
   }
 }
 
@@ -413,6 +428,6 @@ export async function processWebhookDeliveries(opts?: {
 
     return { ok: true, processed, succeeded, dead, failed };
   } catch (e: unknown) {
-    return { ok: false, error: e instanceof Error ? e.message : String(e || "unknown error") };
+    return { ok: false, error: sanitizeWebhookErrorForStorage(e, "Failed to process webhook deliveries.") };
   }
 }
