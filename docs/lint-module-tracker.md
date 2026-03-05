@@ -3,6 +3,9 @@
 Total modules with lint warnings: 
 66
 
+Remaining pending modules:
+65
+
 Status key: `done` | `pending`
 
 ## Modules (low-risk first by manual ordering + remaining alphabetical)
@@ -33,7 +36,7 @@ Status key: `done` | `pending`
 - pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\security\keys\route.ts`
 - pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\security\revoke\route.ts`
 - pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\security\rotate\route.ts`
-- pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\upload\complete\route.ts`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\upload\complete\route.ts`
 - pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\upload\presign\route.ts`
 - pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\billing\checkout\route.ts`
 - pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\cron\aggregate\route.ts`
@@ -73,3 +76,8 @@ Status key: `done` | `pending`
 - pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\usageMaintenance.ts`
 - pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\webhooks.ts`
 - pending - `C:\Users\tsaab\Projects\cyang-doclinks\tests\attack-sim.spec.ts`
+
+## Additional security-swept modules (not in lint-warning backlog)
+
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\backup\status\route.ts`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\mfa\actions.ts`

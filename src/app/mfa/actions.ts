@@ -17,7 +17,7 @@ import {
 } from "@/lib/mfa";
 import { sanitizeInternalRedirectPath } from "@/lib/redirects";
 
-async function getPrivilegedAuthedUser() {
+async function getAuthedUser() {
   const session = await getServerSession(authOptions);
   const email = String(session?.user?.email || "").trim().toLowerCase();
   const role = String((session?.user as { role?: string } | undefined)?.role || "viewer");
@@ -33,7 +33,7 @@ async function getPrivilegedAuthedUser() {
 
 export async function beginMfaSetupAction(formData: FormData): Promise<void> {
   const next = sanitizeInternalRedirectPath(String(formData.get("next") || "/admin/dashboard"));
-  const user = await getPrivilegedAuthedUser();
+  const user = await getAuthedUser();
   if (!(await mfaTableExists())) {
     redirect(`/mfa?error=table_missing&next=${encodeURIComponent(next)}`);
   }
@@ -44,7 +44,7 @@ export async function beginMfaSetupAction(formData: FormData): Promise<void> {
 export async function enableMfaAction(formData: FormData): Promise<void> {
   const next = sanitizeInternalRedirectPath(String(formData.get("next") || "/admin/dashboard"));
   const code = String(formData.get("code") || "").trim();
-  const user = await getPrivilegedAuthedUser();
+  const user = await getAuthedUser();
   const ok = await enableMfa({ userId: user.id, code });
   if (!ok) {
     redirect(`/mfa?error=invalid_code&setup=1&next=${encodeURIComponent(next)}`);
@@ -61,7 +61,7 @@ export async function enableMfaAction(formData: FormData): Promise<void> {
 export async function verifyMfaAction(formData: FormData): Promise<void> {
   const next = sanitizeInternalRedirectPath(String(formData.get("next") || "/admin/dashboard"));
   const code = String(formData.get("code") || "").trim();
-  const user = await getPrivilegedAuthedUser();
+  const user = await getAuthedUser();
   const ok = await verifyMfaCode({ userId: user.id, code });
   if (!ok) {
     redirect(`/mfa?error=invalid_code&next=${encodeURIComponent(next)}`);
@@ -77,7 +77,7 @@ export async function clearMfaSessionAction(): Promise<void> {
 
 export async function regenerateRecoveryCodesAction(formData: FormData): Promise<void> {
   const next = sanitizeInternalRedirectPath(String(formData.get("next") || "/admin/dashboard"));
-  const user = await getPrivilegedAuthedUser();
+  const user = await getAuthedUser();
   const codes = await regenerateRecoveryCodes(user.id);
   if (!codes?.length) {
     redirect(`/mfa?error=recovery_unavailable&next=${encodeURIComponent(next)}`);

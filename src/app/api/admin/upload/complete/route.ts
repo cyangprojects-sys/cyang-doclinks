@@ -21,6 +21,7 @@ import { getRouteTimeoutMs, isRouteTimeoutError, withRouteTimeout } from "@/lib/
 import { assertRuntimeEnv, isRuntimeEnvError } from "@/lib/runtimeEnv";
 import { validateUploadType } from "@/lib/uploadTypeValidation";
 import { resolvePublicAppBaseUrl } from "@/lib/publicBaseUrl";
+import { findMissingPublicTableColumns } from "@/lib/dbSchema";
 
 type CompleteRequest = {
   // Newer flow: doc_id from /presign response
@@ -207,14 +208,7 @@ export async function POST(req: NextRequest) {
 
     stage = "schema_preflight";
     // Strict schema preflight (no fallback writes): fail fast with actionable detail.
-    const docColumnRows = (await sql`
-      select column_name::text as column_name
-      from information_schema.columns
-      where table_schema = 'public'
-        and table_name = 'docs'
-    `) as Array<{ column_name: string }>;
-    const docColumns = new Set(docColumnRows.map((r) => r.column_name));
-    const missingFinalizeColumns = DOC_FINALIZE_REQUIRED_COLUMNS.filter((c) => !docColumns.has(c));
+    const missingFinalizeColumns = await findMissingPublicTableColumns("docs", DOC_FINALIZE_REQUIRED_COLUMNS);
     if (missingFinalizeColumns.length > 0) {
       await logSecurityEvent({
         type: "upload_complete_schema_mismatch",

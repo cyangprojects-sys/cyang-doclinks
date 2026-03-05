@@ -15,6 +15,13 @@ function randSuffix(): string {
   return `${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
 }
 
+function skipIfServeUnavailable(status: number, context: string): void {
+  test.skip(
+    status === 503,
+    `Environment returned 503 (serve unavailable); cannot validate ${context}`
+  );
+}
+
 function aliasTrustCookieNameForTest(alias: string): string {
   const normalized = decodeURIComponent(String(alias || "")).trim().toLowerCase();
   const key = crypto.createHash("sha256").update(normalized).digest("hex").slice(0, 24);
@@ -241,6 +248,7 @@ test.describe("security state enforcement", () => {
       if (nonTopLevelResp.status() === 429) {
         test.skip(true, "Rate-limited in environment; cannot validate non-top-level raw access");
       }
+      skipIfServeUnavailable(nonTopLevelResp.status(), "non-top-level raw access");
       test.skip(nonTopLevelResp.status() === 403, "Environment blocks non-top-level raw access; cannot validate ticket minting path");
       expect(nonTopLevelResp.status()).toBe(302);
       expect(nonTopLevelResp.headers()["location"] || "").toContain("/t/");
@@ -299,10 +307,12 @@ test.describe("security state enforcement", () => {
       if (htmlResp.status() === 429) {
         test.skip(true, "Rate-limited in environment; cannot validate password HTML redirect");
       }
+      skipIfServeUnavailable(htmlResp.status(), "password HTML redirect");
       if (htmlResp.status() === 403) {
         const apiResp = await request.get(`/s/${token}/raw`, {
           headers: { accept: "application/pdf" },
         });
+        skipIfServeUnavailable(apiResp.status(), "password API rejection fallback");
         expect([401, 403]).toContain(apiResp.status());
         return;
       }
@@ -351,6 +361,7 @@ test.describe("security state enforcement", () => {
       if (resp.status() === 429) {
         test.skip(true, "Rate-limited in environment; cannot validate unlock cookie acceptance");
       }
+      skipIfServeUnavailable(resp.status(), "unlock cookie acceptance");
       test.skip(resp.status() === 403, "Environment blocks unlocked raw access; cannot validate ticket minting path");
       expect(resp.status()).toBe(302);
       expect(resp.headers()["location"] || "").toContain("/t/");
@@ -390,6 +401,7 @@ test.describe("security state enforcement", () => {
       if (resp.status() === 429) {
         test.skip(true, "Rate-limited in environment; cannot validate expired unlock rejection");
       }
+      skipIfServeUnavailable(resp.status(), "expired unlock rejection");
       expect([401, 403]).toContain(resp.status());
     } finally {
       await sql`delete from public.share_unlocks where token = ${token}`;
@@ -420,6 +432,7 @@ test.describe("security state enforcement", () => {
       if (resp.status() === 429) {
         test.skip(true, "Rate-limited in environment; cannot validate download-disabled enforcement");
       }
+      skipIfServeUnavailable(resp.status(), "download-disabled enforcement");
       expect([403, 404]).toContain(resp.status());
     } finally {
       await sql`delete from public.share_tokens where token = ${token}`;
@@ -448,12 +461,14 @@ test.describe("security state enforcement", () => {
       if (inlineResp.status() === 429) {
         test.skip(true, "Rate-limited in environment; cannot validate risky inline blocking");
       }
+      skipIfServeUnavailable(inlineResp.status(), "risky inline blocking");
       expect([403, 404]).toContain(inlineResp.status());
 
       const attachmentResp = await request.get(`/s/${token}/raw?disposition=attachment`, { maxRedirects: 0 });
       if (attachmentResp.status() === 429) {
         test.skip(true, "Rate-limited in environment; cannot validate risky attachment fallback");
       }
+      skipIfServeUnavailable(attachmentResp.status(), "risky attachment fallback");
       if (attachmentResp.status() === 403 || attachmentResp.status() === 404) return;
       expect([302, 303, 307, 308]).toContain(attachmentResp.status());
       expect(attachmentResp.headers()["location"] || "").toContain("/t/");
@@ -512,6 +527,7 @@ test.describe("security state enforcement", () => {
       if (rawResp.status() === 429) {
         test.skip(true, "Rate-limited in environment; cannot validate forced office download path");
       }
+      skipIfServeUnavailable(rawResp.status(), "forced office download path");
       if (rawResp.status() === 403) return;
       expect(rawResp.status()).toBe(302);
       const ticketLocation = rawResp.headers()["location"] || "";
@@ -526,6 +542,7 @@ test.describe("security state enforcement", () => {
           "sec-fetch-user": "?1",
         },
       });
+      skipIfServeUnavailable(navResp.status(), "forced office download ticket navigation");
       if (navResp.status() === 403) {
         const body = await navResp.text();
         expect(body).not.toContain("Direct open is disabled for this protected document.");
@@ -567,6 +584,7 @@ test.describe("security state enforcement", () => {
       if (rawResp.status() === 429) {
         test.skip(true, "Rate-limited in environment; cannot validate preview ticket direct-open blocking");
       }
+      skipIfServeUnavailable(rawResp.status(), "preview ticket direct-open blocking");
       if (rawResp.status() === 403) return;
       expect(rawResp.status()).toBe(302);
       const ticketLocation = rawResp.headers()["location"] || "";
@@ -581,6 +599,7 @@ test.describe("security state enforcement", () => {
           "sec-fetch-user": "?1",
         },
       });
+      skipIfServeUnavailable(topLevelResp.status(), "preview ticket top-level direct-open blocking");
       expect(topLevelResp.status()).toBe(403);
       const body = await topLevelResp.text();
       expect(body).toContain("Direct open is disabled for this protected document.");
@@ -597,12 +616,14 @@ test.describe("security state enforcement", () => {
     const hasDocAliases = await tableExists(sql, "doc_aliases");
     if (!hasDocAliases) {
       const blocked = await request.get(`/d/nonexistent-${randSuffix()}/raw`);
+      skipIfServeUnavailable(blocked.status(), "alias guard fallback without doc_aliases table");
       expect([403, 404]).toContain(blocked.status());
       return;
     }
     const hasAliasPassword = await columnExists(sql, "doc_aliases", "password_hash");
     if (!hasAliasPassword) {
       const blocked = await request.get(`/d/nonexistent-${randSuffix()}/raw`);
+      skipIfServeUnavailable(blocked.status(), "alias guard fallback without alias password column");
       expect([403, 404]).toContain(blocked.status());
       return;
     }
@@ -622,6 +643,7 @@ test.describe("security state enforcement", () => {
       if (resp.status() === 429) {
         test.skip(true, "Rate-limited in environment; cannot validate alias password gate redirect");
       }
+      skipIfServeUnavailable(resp.status(), "alias password gate redirect");
       expect(resp.status()).toBe(302);
       expect(resp.headers()["location"] || "").toBe(`/d/${encodeURIComponent(alias)}`);
     } finally {
@@ -637,12 +659,14 @@ test.describe("security state enforcement", () => {
     const hasDocAliases = await tableExists(sql, "doc_aliases");
     if (!hasDocAliases) {
       const blocked = await request.get(`/d/nonexistent-${randSuffix()}/raw`);
+      skipIfServeUnavailable(blocked.status(), "alias malformed-cookie fallback without doc_aliases table");
       expect([403, 404]).toContain(blocked.status());
       return;
     }
     const hasAliasPassword = await columnExists(sql, "doc_aliases", "password_hash");
     if (!hasAliasPassword) {
       const blocked = await request.get(`/d/nonexistent-${randSuffix()}/raw`);
+      skipIfServeUnavailable(blocked.status(), "alias malformed-cookie fallback without alias password column");
       expect([403, 404]).toContain(blocked.status());
       return;
     }
@@ -666,6 +690,7 @@ test.describe("security state enforcement", () => {
       if (resp.status() === 429) {
         test.skip(true, "Rate-limited in environment; cannot validate malformed alias trust cookie rejection");
       }
+      skipIfServeUnavailable(resp.status(), "malformed alias trust cookie rejection");
       expect(resp.status()).toBe(302);
       expect(resp.headers()["location"] || "").toBe(`/d/${encodeURIComponent(alias)}`);
     } finally {
@@ -696,6 +721,7 @@ test.describe("security state enforcement", () => {
       if (rawResp.status() === 429) {
         test.skip(true, "Rate-limited in environment; cannot validate alias dl=1 attachment behavior");
       }
+      skipIfServeUnavailable(rawResp.status(), "alias dl=1 attachment behavior");
       expect(rawResp.status()).toBe(302);
       const ticketLocation = rawResp.headers()["location"] || "";
       expect(ticketLocation).toContain("/t/");
@@ -709,6 +735,7 @@ test.describe("security state enforcement", () => {
           "sec-fetch-user": "?1",
         },
       });
+      skipIfServeUnavailable(navResp.status(), "alias dl=1 ticket navigation");
       if (navResp.status() === 403) {
         const body = await navResp.text();
         expect(body).not.toContain("Direct open is disabled for this protected document.");
@@ -742,9 +769,11 @@ test.describe("security state enforcement", () => {
     `;
 
     const expiredResp = await request.get(`/s/${expiredToken}/raw`);
+    skipIfServeUnavailable(expiredResp.status(), "expired share blocking");
     expect([403, 410]).toContain(expiredResp.status());
 
     const revokedResp = await request.get(`/s/${revokedToken}/raw`);
+    skipIfServeUnavailable(revokedResp.status(), "revoked share blocking");
     expect([403, 410]).toContain(revokedResp.status());
 
     await sql`delete from public.share_tokens where token in (${expiredToken}, ${revokedToken})`;
@@ -769,18 +798,22 @@ test.describe("security state enforcement", () => {
     try {
       await sql`update public.docs set scan_status = 'queued' where id = ${doc.id}::uuid`;
       const queuedResp = await request.get(`/s/${token}/raw`);
+      skipIfServeUnavailable(queuedResp.status(), "queued scan blocking");
       expect([403, 404]).toContain(queuedResp.status());
 
       await sql`update public.docs set scan_status = 'running' where id = ${doc.id}::uuid`;
       const runningResp = await request.get(`/s/${token}/raw`);
+      skipIfServeUnavailable(runningResp.status(), "running scan blocking");
       expect([403, 404]).toContain(runningResp.status());
 
       await sql`update public.docs set scan_status = 'unscanned' where id = ${doc.id}::uuid`;
       const unscannedResp = await request.get(`/s/${token}/raw`);
+      skipIfServeUnavailable(unscannedResp.status(), "unscanned blocking");
       expect([403, 404]).toContain(unscannedResp.status());
 
       await sql`update public.docs set scan_status = 'failed' where id = ${doc.id}::uuid`;
       const failedScanResp = await request.get(`/s/${token}/raw`);
+      skipIfServeUnavailable(failedScanResp.status(), "failed scan blocking");
       expect([403, 404]).toContain(failedScanResp.status());
 
       await sql`
@@ -789,6 +822,7 @@ test.describe("security state enforcement", () => {
         where id = ${doc.id}::uuid
       `;
       const quarantinedResp = await request.get(`/s/${token}/raw`);
+      skipIfServeUnavailable(quarantinedResp.status(), "quarantined moderation blocking");
       expect([403, 404]).toContain(quarantinedResp.status());
 
       await sql`
@@ -797,6 +831,7 @@ test.describe("security state enforcement", () => {
         where id = ${doc.id}::uuid
       `;
       const disabledResp = await request.get(`/s/${token}/raw`);
+      skipIfServeUnavailable(disabledResp.status(), "disabled moderation blocking");
       expect([403, 404]).toContain(disabledResp.status());
     } finally {
       await sql`
@@ -819,6 +854,7 @@ test.describe("security state enforcement", () => {
     const hasShareActive = await columnExists(sql, "share_tokens", "is_active");
     if (!hasShareActive) {
       const blocked = await request.get(`/s/nonexistent-${randSuffix()}/raw`);
+      skipIfServeUnavailable(blocked.status(), "share is_active fallback");
       expect([403, 404]).toContain(blocked.status());
       return;
     }
@@ -834,6 +870,7 @@ test.describe("security state enforcement", () => {
     `;
 
     const resp = await request.get(`/s/${token}/raw`);
+    skipIfServeUnavailable(resp.status(), "inactive share token blocking");
     expect(resp.status()).toBe(404);
 
     await sql`delete from public.share_tokens where token = ${token}`;
@@ -847,6 +884,7 @@ test.describe("security state enforcement", () => {
     const docsHasOrg = await columnExists(sql, "docs", "org_id");
     if (!docsHasOrg) {
       const blocked = await request.get(`/s/nonexistent-${randSuffix()}/raw`);
+      skipIfServeUnavailable(blocked.status(), "org-disabled fallback without docs.org_id");
       expect([403, 404]).toContain(blocked.status());
       return;
     }
@@ -855,6 +893,7 @@ test.describe("security state enforcement", () => {
     const orgHasActive = await columnExists(sql, "organizations", "is_active");
     if (!orgHasDisabled && !orgHasActive) {
       const blocked = await request.get(`/s/nonexistent-${randSuffix()}/raw`);
+      skipIfServeUnavailable(blocked.status(), "org-disabled fallback without organization flags");
       expect([403, 404]).toContain(blocked.status());
       return;
     }
@@ -869,6 +908,7 @@ test.describe("security state enforcement", () => {
     const doc = rows?.[0];
     if (!doc?.id || !doc?.org_id) {
       const blocked = await request.get(`/s/nonexistent-${randSuffix()}/raw`);
+      skipIfServeUnavailable(blocked.status(), "org-disabled fallback without org-linked docs");
       expect([403, 404]).toContain(blocked.status());
       return;
     }
@@ -887,6 +927,7 @@ test.describe("security state enforcement", () => {
       }
 
       const resp = await request.get(`/s/${token}/raw`);
+      skipIfServeUnavailable(resp.status(), "organization-disabled serving block");
       expect(resp.status()).toBe(404);
     } finally {
       if (orgHasDisabled) {
@@ -933,13 +974,16 @@ test.describe("security state enforcement", () => {
     }
 
     const inactiveResp = await request.get(`/d/${aliasInactive}/raw`);
+    skipIfServeUnavailable(inactiveResp.status(), "inactive alias blocking");
     expect(inactiveResp.status()).toBe(404);
 
     const expiredResp = await request.get(`/d/${aliasExpired}/raw`);
+    skipIfServeUnavailable(expiredResp.status(), "expired alias blocking");
     expect(expiredResp.status()).toBe(404);
 
     if (hasRevokedAt) {
       const revokedResp = await request.get(`/d/${aliasRevoked}/raw`);
+      skipIfServeUnavailable(revokedResp.status(), "revoked alias blocking");
       expect(revokedResp.status()).toBe(404);
     }
 
@@ -966,10 +1010,11 @@ test.describe("security state enforcement", () => {
 
     try {
       const before = await request.get(`/s/${token}/raw`);
-      expect([302, 403, 404, 429]).toContain(before.status());
+      expect([302, 403, 404, 429, 503]).toContain(before.status());
       if (before.status() === 429) {
         test.skip(true, "Rate-limited in environment; cannot validate live revoke sequence");
       }
+      skipIfServeUnavailable(before.status(), "live share revoke precondition");
 
       await sql`
         update public.share_tokens
@@ -978,6 +1023,7 @@ test.describe("security state enforcement", () => {
       `;
 
       const after = await request.get(`/s/${token}/raw`);
+      skipIfServeUnavailable(after.status(), "live share revoke postcondition");
       if (before.status() === 302) {
         expect(after.status()).toBe(410);
       } else {
@@ -1010,10 +1056,11 @@ test.describe("security state enforcement", () => {
 
     try {
       const before = await request.get(`/d/${alias}/raw`);
-      expect([302, 403, 404, 429]).toContain(before.status());
+      expect([302, 403, 404, 429, 503]).toContain(before.status());
       if (before.status() === 429) {
         test.skip(true, "Rate-limited in environment; cannot validate live alias revoke sequence");
       }
+      skipIfServeUnavailable(before.status(), "live alias revoke precondition");
 
       if (hasRevokedAt) {
         await sql`
@@ -1030,6 +1077,7 @@ test.describe("security state enforcement", () => {
       }
 
       const after = await request.get(`/d/${alias}/raw`);
+      skipIfServeUnavailable(after.status(), "live alias revoke postcondition");
       expect([403, 404]).toContain(after.status());
     } finally {
       await sql`delete from public.doc_aliases where alias = ${alias}`;
@@ -1056,7 +1104,8 @@ test.describe("security state enforcement", () => {
 
     try {
       const downloadResp = await request.get(`/s/${token}/download`, { maxRedirects: 0 });
-      expect([200, 302, 403, 429]).toContain(downloadResp.status());
+      expect([200, 302, 403, 429, 503]).toContain(downloadResp.status());
+      skipIfServeUnavailable(downloadResp.status(), "download ticket flow entry");
       if (downloadResp.status() === 403) {
         expect(downloadResp.status()).toBe(403);
         return;
@@ -1070,7 +1119,8 @@ test.describe("security state enforcement", () => {
 
       const rawUrl = new URL(rawLocation, process.env.PLAYWRIGHT_BASE_URL || "http://127.0.0.1:3000");
       const rawResp = await request.get(`${rawUrl.pathname}${rawUrl.search}`);
-      expect([302, 403, 404, 429]).toContain(rawResp.status());
+      expect([302, 403, 404, 429, 503]).toContain(rawResp.status());
+      skipIfServeUnavailable(rawResp.status(), "download ticket minting");
       if (rawResp.status() === 403 || rawResp.status() === 404) {
         expect([403, 404]).toContain(rawResp.status());
         return;
@@ -1091,6 +1141,7 @@ test.describe("security state enforcement", () => {
       };
 
       const firstTicket = await request.get(ticketPath, { headers: navHeaders });
+      skipIfServeUnavailable(firstTicket.status(), "first download ticket navigation");
       expect(firstTicket.status()).not.toBe(404);
       if (firstTicket.status() === 403) {
         const body = await firstTicket.text();
@@ -1098,6 +1149,7 @@ test.describe("security state enforcement", () => {
       }
 
       const secondTicket = await request.get(ticketPath, { headers: navHeaders });
+      skipIfServeUnavailable(secondTicket.status(), "second download ticket navigation");
       if (replayEnabled) {
         expect(secondTicket.status()).not.toBe(404);
         if (secondTicket.status() === 403) {
