@@ -3,6 +3,11 @@ type StripeRequestOptions = {
   body?: Record<string, string>;
 };
 
+const STRIPE_API_PATH_RE = /^[A-Za-z0-9._/-]{1,256}$/;
+const STRIPE_FORM_KEY_MAX_LEN = 128;
+const STRIPE_FORM_VALUE_MAX_LEN = 4000;
+const STRIPE_FORM_MAX_FIELDS = 100;
+
 function isAllowedStripeHost(hostname: string): boolean {
   const h = String(hostname || "").trim().toLowerCase();
   return h === "stripe.com" || h.endsWith(".stripe.com");
@@ -34,18 +39,41 @@ function mustGetStripeSecretKey(): string {
 
 function encodeFormBody(body: Record<string, string>): string {
   const params = new URLSearchParams();
+  let count = 0;
   for (const [k, v] of Object.entries(body)) {
-    params.set(k, v);
+    const key = String(k || "").trim();
+    if (!key) continue;
+    if (key.length > STRIPE_FORM_KEY_MAX_LEN) {
+      throw new Error("Stripe form parameter key is too long");
+    }
+    const value = String(v ?? "");
+    if (value.length > STRIPE_FORM_VALUE_MAX_LEN) {
+      throw new Error("Stripe form parameter value is too long");
+    }
+    params.set(key, value);
+    count += 1;
+    if (count > STRIPE_FORM_MAX_FIELDS) {
+      throw new Error("Too many Stripe form parameters");
+    }
   }
   return params.toString();
 }
 
+function normalizeStripeApiPath(path: string): string {
+  const normalized = String(path || "").trim().replace(/^\/+/, "");
+  if (!normalized || !STRIPE_API_PATH_RE.test(normalized) || normalized.includes("..")) {
+    throw new Error("Invalid Stripe API path");
+  }
+  return normalized;
+}
+
 export async function stripeApi(path: string, opts?: StripeRequestOptions): Promise<Record<string, unknown>> {
   const key = mustGetStripeSecretKey();
+  const normalizedPath = normalizeStripeApiPath(path);
   const method = opts?.method || "POST";
   const body = opts?.body || {};
 
-  const r = await fetch(`https://api.stripe.com/v1/${path.replace(/^\/+/, "")}`, {
+  const r = await fetch(`https://api.stripe.com/v1/${normalizedPath}`, {
     method,
     headers: {
       Authorization: `Bearer ${key}`,
@@ -66,7 +94,8 @@ export async function stripeApi(path: string, opts?: StripeRequestOptions): Prom
 
   if (!r.ok) {
     const errorObj = (json.error && typeof json.error === "object" ? json.error : {}) as Record<string, unknown>;
-    const msg = String(errorObj.message || text || `Stripe API ${path} failed`);
+    const rawMsg = String(errorObj.message || text || "").trim();
+    const msg = rawMsg ? rawMsg.slice(0, 240) : `Stripe API ${normalizedPath} failed`;
     throw new Error(msg);
   }
 

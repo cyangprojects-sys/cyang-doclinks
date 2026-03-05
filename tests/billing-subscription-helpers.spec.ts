@@ -1,6 +1,8 @@
 import { expect, test } from "@playwright/test";
 import {
   classifyBillingEntitlement,
+  getBillingSnapshotForUser,
+  syncUserPlanFromSubscription,
   type BillingSubscriptionSnapshot,
   unixToIso,
 } from "../src/lib/billingSubscription";
@@ -48,5 +50,13 @@ test.describe("billing subscription helper primitives", () => {
     expect(classifyBillingEntitlement(expiredActive)).toBe("at_risk");
 
     expect(classifyBillingEntitlement(sub({ status: "mystery_status" }))).toBe("at_risk");
+  });
+
+  test("helpers fail closed on invalid user ids before db lookups", async () => {
+    await expect(syncUserPlanFromSubscription("not-a-uuid")).resolves.toBeNull();
+    await expect(getBillingSnapshotForUser("not-a-uuid")).resolves.toEqual({
+      subscription: null,
+      events: [],
+    });
   });
 });

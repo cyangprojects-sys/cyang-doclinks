@@ -11,6 +11,10 @@ type VerifyResult =
   | { ok: true; payload: Record<string, unknown>; eventId: string; eventType: string }
   | { ok: false; error: string };
 
+const STRIPE_SIG_HEX_RE = /^[a-f0-9]{64}$/i;
+const STRIPE_EVENT_ID_RE = /^evt_[A-Za-z0-9_]{2,128}$/;
+const STRIPE_EVENT_TYPE_RE = /^[a-z0-9._-]{3,128}$/i;
+
 function parseSigHeader(header: string): { ts: number | null; v1: string[] } {
   const parts = String(header || "")
     .split(",")
@@ -27,7 +31,7 @@ function parseSigHeader(header: string): { ts: number | null; v1: string[] } {
       const n = Number(v);
       if (Number.isFinite(n)) ts = n;
     } else if (k === "v1") {
-      v1.push(v);
+      if (STRIPE_SIG_HEX_RE.test(v)) v1.push(v);
     }
   }
 
@@ -53,7 +57,9 @@ export function verifyStripeWebhookSignature(args: VerifyArgs): VerifyResult {
   const parsed = parseSigHeader(args.signatureHeader);
   if (!parsed.ts || parsed.v1.length === 0) return { ok: false, error: "INVALID_SIGNATURE_HEADER" };
 
-  const tolerance = Number.isFinite(args.toleranceSeconds) ? Number(args.toleranceSeconds) : 300;
+  const tolerance = Number.isFinite(args.toleranceSeconds)
+    ? Math.max(0, Math.floor(Number(args.toleranceSeconds)))
+    : 300;
   const now = Math.floor(Date.now() / 1000);
   if (Math.abs(now - parsed.ts) > tolerance) {
     return { ok: false, error: "SIGNATURE_TIMESTAMP_OUT_OF_TOLERANCE" };
@@ -76,6 +82,9 @@ export function verifyStripeWebhookSignature(args: VerifyArgs): VerifyResult {
   const eventId = String(payload?.id || "").trim();
   const eventType = String(payload?.type || "").trim();
   if (!eventId || !eventType) return { ok: false, error: "MALFORMED_EVENT" };
+  if (!STRIPE_EVENT_ID_RE.test(eventId) || !STRIPE_EVENT_TYPE_RE.test(eventType)) {
+    return { ok: false, error: "MALFORMED_EVENT" };
+  }
 
   return { ok: true, payload, eventId, eventType };
 }

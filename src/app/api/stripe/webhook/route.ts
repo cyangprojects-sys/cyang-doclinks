@@ -28,6 +28,8 @@ import {
 import { getRouteTimeoutMs, isRouteTimeoutError, withRouteTimeout } from "@/lib/routeTimeout";
 import { assertRuntimeEnv, isRuntimeEnvError } from "@/lib/runtimeEnv";
 
+const DEFAULT_STRIPE_WEBHOOK_MAX_BODY_BYTES = 256 * 1024;
+
 function planFromStripePriceId(priceId: string | null): "free" | "pro" {
   const proPrices = String(process.env.STRIPE_PRO_PRICE_IDS || "")
     .split(",")
@@ -51,6 +53,25 @@ function getGraceDays(): number {
   const n = Number(process.env.STRIPE_GRACE_DAYS || 7);
   if (!Number.isFinite(n)) return 7;
   return Math.max(0, Math.floor(n));
+}
+
+function getMaxWebhookBodyBytes(): number {
+  const raw = Number(process.env.STRIPE_WEBHOOK_MAX_BODY_BYTES || DEFAULT_STRIPE_WEBHOOK_MAX_BODY_BYTES);
+  if (!Number.isFinite(raw)) return DEFAULT_STRIPE_WEBHOOK_MAX_BODY_BYTES;
+  return Math.max(1024, Math.min(1024 * 1024, Math.floor(raw)));
+}
+
+function parseContentLength(headerValue: string | null): number | null {
+  const n = Number(String(headerValue || "").trim());
+  if (!Number.isFinite(n) || n < 0) return null;
+  return Math.floor(n);
+}
+
+function safeWebhookMessage(errorLike: unknown): string {
+  const raw = errorLike instanceof Error ? errorLike.message : String(errorLike || "webhook_failed");
+  const trimmed = raw.trim();
+  if (!trimmed) return "webhook_failed";
+  return trimmed.slice(0, 240);
 }
 
 export async function POST(req: NextRequest) {
@@ -81,7 +102,33 @@ export async function POST(req: NextRequest) {
           );
         }
 
+        const maxBodyBytes = getMaxWebhookBodyBytes();
+        const contentLength = parseContentLength(req.headers.get("content-length"));
+        if (contentLength != null && contentLength > maxBodyBytes) {
+          await logSecurityEvent({
+            type: "stripe_webhook_payload_too_large",
+            severity: "medium",
+            ip: requestIp,
+            scope: "billing_webhook",
+            message: "Stripe webhook content-length exceeds max body size",
+            meta: { contentLength, maxBodyBytes },
+          });
+          return NextResponse.json({ ok: false, error: "PAYLOAD_TOO_LARGE" }, { status: 413 });
+        }
+
         const rawBody = await req.text();
+        if (Buffer.byteLength(rawBody, "utf8") > maxBodyBytes) {
+          await logSecurityEvent({
+            type: "stripe_webhook_payload_too_large",
+            severity: "medium",
+            ip: requestIp,
+            scope: "billing_webhook",
+            message: "Stripe webhook body exceeds max body size",
+            meta: { maxBodyBytes },
+          });
+          return NextResponse.json({ ok: false, error: "PAYLOAD_TOO_LARGE" }, { status: 413 });
+        }
+
         const signature = req.headers.get("stripe-signature");
         const verified = verifyStripeWebhookSignature({
           rawBody,
@@ -127,7 +174,7 @@ export async function POST(req: NextRequest) {
         const eventObj = (event && typeof event === "object" ? event : {}) as Record<string, unknown>;
         const eventData = (eventObj.data && typeof eventObj.data === "object" ? eventObj.data : {}) as Record<string, unknown>;
         const obj = (eventData.object && typeof eventData.object === "object" ? eventData.object : {}) as Record<string, unknown>;
-        const eventType = String(eventObj.type || "");
+        const eventType = verified.eventType;
         const eventCreatedUnix = Number.isFinite(Number(eventObj.created))
           ? Math.max(0, Math.floor(Number(eventObj.created)))
           : null;
@@ -221,7 +268,7 @@ export async function POST(req: NextRequest) {
           });
         } catch (e: unknown) {
           webhookStatus = "failed";
-          webhookMessage = e instanceof Error ? e.message : String(e || "webhook_failed");
+          webhookMessage = safeWebhookMessage(e);
           await logDbErrorEvent({
             scope: "billing_webhook",
             message: webhookMessage,

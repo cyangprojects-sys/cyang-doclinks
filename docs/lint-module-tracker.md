@@ -4,7 +4,7 @@ Total modules with lint warnings:
 66
 
 Remaining pending modules:
-19
+15
 
 Status key: `done` | `pending`
 
@@ -44,7 +44,7 @@ Status key: `done` | `pending`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\cron\nightly\route.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\cron\webhooks\route.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\debug\alias\[alias]\route.ts`
-- pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\stripe\webhook\route.ts`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\stripe\webhook\route.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\v1\aliases\route.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\v1\shares\route.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\v1\takedown\route.ts`
@@ -58,7 +58,7 @@ Status key: `done` | `pending`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\t\[ticketId]\route.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\auth.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\authz.ts`
-- pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\billingSubscription.ts`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\billingSubscription.ts`
 - pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\db.ts`
 - pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\expirationAlerts.ts`
 - pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\geo.ts`
@@ -71,8 +71,8 @@ Status key: `done` | `pending`
 - pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\securityTelemetry.ts`
 - pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\settings.ts`
 - pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\shareLifecycle.ts`
-- pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\stripeClient.ts`
-- pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\stripeWebhook.ts`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\stripeClient.ts`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\stripeWebhook.ts`
 - pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\usageMaintenance.ts`
 - pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\webhooks.ts`
 - pending - `C:\Users\tsaab\Projects\cyang-doclinks\tests\attack-sim.spec.ts`

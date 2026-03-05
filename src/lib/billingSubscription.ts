@@ -1,5 +1,7 @@
 import { sql } from "@/lib/db";
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 type StripeSubUpsertArgs = {
   userId: string | null;
   stripeCustomerId: string | null;
@@ -13,6 +15,12 @@ type StripeSubUpsertArgs = {
 };
 
 let billingTableExistsCache: boolean | null = null;
+
+function normalizeUuid(value: string | null | undefined): string | null {
+  const normalized = String(value || "").trim();
+  if (!normalized) return null;
+  return UUID_RE.test(normalized) ? normalized : null;
+}
 
 async function billingTableExists(): Promise<boolean> {
   if (billingTableExistsCache != null) return billingTableExistsCache;
@@ -75,7 +83,11 @@ export async function resolveUserIdForStripeWebhookEvent(args: {
 }): Promise<{ ok: true; userId: string | null } | { ok: false; error: string }> {
   const subscriptionId = String(args.stripeSubscriptionId || "").trim() || null;
   const customerId = String(args.stripeCustomerId || "").trim() || null;
-  const metadataUserId = String(args.metadataUserId || "").trim() || null;
+  const metadataUserIdRaw = String(args.metadataUserId || "").trim() || null;
+  const metadataUserId = normalizeUuid(metadataUserIdRaw);
+  if (metadataUserIdRaw && !metadataUserId) {
+    return { ok: false, error: "BILLING_BINDING_METADATA_USER_INVALID" };
+  }
 
   const [subscriptionUserId, customerUserId] = await Promise.all([
     getUserIdByStripeSubscriptionId(subscriptionId),
@@ -129,7 +141,8 @@ export async function resolveUserIdForStripeWebhookEvent(args: {
 
 export async function upsertStripeSubscription(args: StripeSubUpsertArgs): Promise<void> {
   if (!(await billingTableExists())) return;
-  if (!args.userId && !args.stripeCustomerId) return;
+  const userId = normalizeUuid(args.userId);
+  if (!userId && !args.stripeCustomerId) return;
 
   const eventCreated = Number.isFinite(args.eventCreatedUnix as number)
     ? Math.max(0, Math.floor(Number(args.eventCreatedUnix)))
@@ -148,7 +161,7 @@ export async function upsertStripeSubscription(args: StripeSubUpsertArgs): Promi
         last_event_created,
         updated_at
       ) values (
-        ${args.userId}::uuid,
+        ${userId}::uuid,
         ${args.stripeCustomerId},
         ${args.stripeSubscriptionId},
         ${args.status},
@@ -186,7 +199,7 @@ export async function upsertStripeSubscription(args: StripeSubUpsertArgs): Promi
         grace_until,
         updated_at
       ) values (
-        ${args.userId}::uuid,
+        ${userId}::uuid,
         ${args.stripeCustomerId},
         ${args.stripeSubscriptionId},
         ${args.status},
@@ -209,12 +222,12 @@ export async function upsertStripeSubscription(args: StripeSubUpsertArgs): Promi
     `;
   }
 
-  if (args.userId && args.stripeCustomerId) {
+  if (userId && args.stripeCustomerId) {
     try {
       await sql`
         update public.users
         set stripe_customer_id = ${args.stripeCustomerId}
-        where id = ${args.userId}::uuid
+        where id = ${userId}::uuid
       `;
     } catch {
       // optional column in older envs
@@ -308,7 +321,7 @@ export async function markPaymentSucceeded(args: {
 }
 
 export async function syncUserPlanFromSubscription(userId: string | null): Promise<"free" | "pro" | null> {
-  const uid = String(userId || "").trim();
+  const uid = normalizeUuid(userId);
   if (!uid) return null;
   if (!(await billingTableExists())) return null;
 
@@ -540,6 +553,8 @@ export async function getBillingSnapshotForUser(userId: string): Promise<{
   subscription: BillingSubscriptionSnapshot;
   events: BillingWebhookEventRow[];
 }> {
+  const uid = normalizeUuid(userId);
+  if (!uid) return { subscription: null, events: [] };
   if (!(await billingTableExists())) return { subscription: null, events: [] };
 
   const subRows = (await sql`
@@ -553,7 +568,7 @@ export async function getBillingSnapshotForUser(userId: string): Promise<{
       grace_until::text as grace_until,
       updated_at::text as updated_at
     from public.billing_subscriptions
-    where user_id = ${userId}::uuid
+    where user_id = ${uid}::uuid
     order by updated_at desc
     limit 1
   `) as unknown as Array<{
@@ -606,7 +621,7 @@ export async function getBillingSnapshotForUser(userId: string): Promise<{
             ${customerId} <> ''
             and coalesce(payload #>> '{data,object,customer}', '') = ${customerId}
           )
-          or coalesce(payload #>> '{data,object,metadata,user_id}', '') = ${userId}
+          or coalesce(payload #>> '{data,object,metadata,user_id}', '') = ${uid}
         order by received_at desc
         limit 20
       `) as unknown as Array<{

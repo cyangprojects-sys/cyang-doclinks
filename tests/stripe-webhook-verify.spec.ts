@@ -104,6 +104,34 @@ test.describe("stripe webhook signature verifier", () => {
     if (!out.ok) expect(out.error).toBe("MALFORMED_EVENT");
   });
 
+  test("rejects signed payload with invalid event id format", () => {
+    const secret = "whsec_test";
+    const rawBody = JSON.stringify({ id: "not_evt_format", type: "invoice.payment_succeeded", data: { object: {} } });
+    const ts = Math.floor(Date.now() / 1000);
+    const out = verifyStripeWebhookSignature({
+      rawBody,
+      signatureHeader: signRaw(rawBody, secret, ts),
+      secret,
+      toleranceSeconds: 300,
+    });
+    expect(out.ok).toBeFalsy();
+    if (!out.ok) expect(out.error).toBe("MALFORMED_EVENT");
+  });
+
+  test("rejects signed payload with invalid event type format", () => {
+    const secret = "whsec_test";
+    const rawBody = JSON.stringify({ id: "evt_bad_type", type: "bad type with spaces", data: { object: {} } });
+    const ts = Math.floor(Date.now() / 1000);
+    const out = verifyStripeWebhookSignature({
+      rawBody,
+      signatureHeader: signRaw(rawBody, secret, ts),
+      secret,
+      toleranceSeconds: 300,
+    });
+    expect(out.ok).toBeFalsy();
+    if (!out.ok) expect(out.error).toBe("MALFORMED_EVENT");
+  });
+
   test("accepts valid signature and payload", () => {
     const secret = "whsec_test";
     const payload = { id: "evt_ok", type: "invoice.payment_succeeded", data: { object: {} } };
