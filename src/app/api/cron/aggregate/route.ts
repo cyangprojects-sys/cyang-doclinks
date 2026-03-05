@@ -16,7 +16,14 @@ export async function GET(req: NextRequest) {
   // Optional query param: ?daysBack=120
   const url = new URL(req.url);
   const daysBackRaw = (url.searchParams.get("daysBack") || "").trim();
-  const daysBack = daysBackRaw ? Math.max(1, Math.min(3650, Number(daysBackRaw) || 0)) : undefined;
+  if (daysBackRaw && !/^\d{1,4}$/.test(daysBackRaw)) {
+    return NextResponse.json({ ok: false, error: "INVALID_DAYS_BACK" }, { status: 400 });
+  }
+  const daysBackNum = daysBackRaw ? Number(daysBackRaw) : NaN;
+  const daysBack =
+    daysBackRaw && Number.isFinite(daysBackNum)
+      ? Math.max(1, Math.min(3650, Math.floor(daysBackNum)))
+      : undefined;
 
   try {
     const aggregate = await aggregateDocViewDaily(daysBack ? { daysBack: Math.floor(daysBack) } : undefined);
@@ -39,12 +46,11 @@ export async function GET(req: NextRequest) {
     });
   } catch (e: unknown) {
     const duration = Date.now() - startedAt;
-    const msg = e instanceof Error ? e.message : String(e);
     await logCronRun({
       job: "aggregate",
       ok: false,
       durationMs: duration,
-      meta: { error: msg, daysBack: daysBack ?? null },
+      meta: { error: "CRON_AGGREGATE_FAILED", daysBack: daysBack ?? null },
     });
     return NextResponse.json({ ok: false, error: "CRON_AGGREGATE_FAILED" }, { status: 500 });
   }

@@ -45,6 +45,13 @@ function getKeyPrefix() {
   return p.endsWith("/") ? p : `${p}/`;
 }
 
+function authErrorCode(err: unknown): "UNAUTHENTICATED" | "FORBIDDEN" | null {
+  const msg = err instanceof Error ? err.message : String(err || "");
+  if (msg === "UNAUTHENTICATED") return "UNAUTHENTICATED";
+  if (msg === "FORBIDDEN") return "FORBIDDEN";
+  return null;
+}
+
 export async function POST(req: Request) {
   const ipInfo = clientIpKey(req);
   try {
@@ -286,13 +293,20 @@ export async function POST(req: Request) {
       },
     });
   } catch (err: unknown) {
+    const authCode = authErrorCode(err);
+    if (authCode === "UNAUTHENTICATED") {
+      return NextResponse.json({ ok: false, error: "UNAUTHENTICATED" }, { status: 401 });
+    }
+    if (authCode === "FORBIDDEN") {
+      return NextResponse.json({ ok: false, error: "FORBIDDEN" }, { status: 403 });
+    }
     await logSecurityEvent({
       type: "upload_presign_error",
       severity: "high",
       ip: ipInfo.ip,
       scope: "upload_presign",
       message: "Unhandled presign error",
-      meta: { error: err instanceof Error ? err.message : String(err) },
+      meta: { error_type: err instanceof Error ? err.name || "Error" : typeof err },
     });
     await detectPresignFailureSpike({ ip: ipInfo.ip });
     await reportException({

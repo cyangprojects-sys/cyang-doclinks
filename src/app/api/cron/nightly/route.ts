@@ -124,6 +124,7 @@ export async function GET(req: NextRequest) {
       keyRotationProcessed: keyRotationJobsObj.processed ?? null,
       revokedExpiredShares: expiredSharesRevoked.revoked,
       backupStatus: backupRecoveryObj.backupStatus ?? null,
+      billingSyncOk: billingSyncObj.ok ?? null,
       billingUsersScanned: billingSyncObj.usersScanned ?? null,
     },
   });
@@ -145,12 +146,11 @@ export async function GET(req: NextRequest) {
   });
   } catch (e: unknown) {
     const duration = Date.now() - startedAt;
-    const msg = e instanceof Error ? e.message : String(e);
     await logCronRun({
       job: "nightly",
       ok: false,
       durationMs: duration,
-      meta: { error: msg },
+      meta: { error: "CRON_NIGHTLY_FAILED" },
     });
     return NextResponse.json({ ok: false, error: "CRON_NIGHTLY_FAILED" }, { status: 500 });
   }

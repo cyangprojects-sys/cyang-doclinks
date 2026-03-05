@@ -18,9 +18,24 @@ export async function GET(req: NextRequest) {
     });
 
     const duration = Date.now() - startedAt;
+    if (!result.ok) {
+      await logCronRun({
+        job: "billing-sync",
+        ok: false,
+        durationMs: duration,
+        meta: { error: "CRON_BILLING_SYNC_FAILED", usersScanned: result.usersScanned ?? null },
+      });
+      return NextResponse.json({
+        ok: false,
+        error: "CRON_BILLING_SYNC_FAILED",
+        now: new Date().toISOString(),
+        duration_ms: duration,
+      }, { status: 500 });
+    }
+
     await logCronRun({
       job: "billing-sync",
-      ok: Boolean(result.ok),
+      ok: true,
       durationMs: duration,
       meta: result,
     });
