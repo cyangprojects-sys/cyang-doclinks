@@ -218,6 +218,7 @@ test.describe("api route guardrails", () => {
       "src/app/api/admin/security/requeue-scans/route.ts",
       "src/app/api/admin/security/tenant-freeze/route.ts",
       "src/app/api/admin/upload/abort/route.ts",
+      "src/app/api/admin/upload/presign/route.ts",
     ];
     for (const route of routes) {
       const code = src(route);
@@ -231,6 +232,7 @@ test.describe("api route guardrails", () => {
     const routes = [
       "src/app/api/v1/abuse/report/route.ts",
       "src/app/api/v1/aliases/route.ts",
+      "src/app/api/v1/shares/route.ts",
       "src/app/api/v1/takedown/route.ts",
       "src/app/api/v1/webhooks/test/route.ts",
     ];
@@ -240,5 +242,12 @@ test.describe("api route guardrails", () => {
       expect(code.includes("withRouteTimeout(")).toBeTruthy();
       expect(code.includes("isRouteTimeoutError(")).toBeTruthy();
     }
+  });
+
+  test("critical cron scan route uses route timeout guards", () => {
+    const code = src("src/app/api/cron/scan/route.ts");
+    expect(code.includes("getRouteTimeoutMs(")).toBeTruthy();
+    expect(code.includes("withRouteTimeout(")).toBeTruthy();
+    expect(code.includes("isRouteTimeoutError(")).toBeTruthy();
   });
 });

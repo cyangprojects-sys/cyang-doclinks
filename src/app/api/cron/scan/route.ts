@@ -10,6 +10,7 @@ import { logSecurityEvent, detectScanFailureSpike, enforceGlobalApiRateLimit } f
 import { healScanQueue } from "@/lib/scanQueue";
 import { reportException } from "@/lib/observability";
 import { logCronRun } from "@/lib/cronTelemetry";
+import { getRouteTimeoutMs, isRouteTimeoutError, withRouteTimeout } from "@/lib/routeTimeout";
 
 type Job = {
   id: string;
@@ -22,6 +23,7 @@ type Job = {
 const SCANNER_VERSION = "v3-external-clam-only";
 
 export async function GET(req: NextRequest) {
+  const timeoutMs = getRouteTimeoutMs("ROUTE_TIMEOUT_CRON_SCAN_MS", 120_000);
   const rl = await enforceGlobalApiRateLimit({
     req,
     scope: "ip:cron_scan",
@@ -42,14 +44,16 @@ export async function GET(req: NextRequest) {
 
   const startedAt = Date.now();
   try {
-  const maxJobs = Math.max(1, Math.min(100, Number(process.env.SCAN_CRON_BATCH || 25)));
-  const absMaxBytes = Math.max(1024 * 1024, Number(process.env.SCAN_ABS_MAX_BYTES || 25_000_000)); // default 25MB
-  const maxAttempts = Math.max(1, Number(process.env.SCAN_MAX_ATTEMPTS || 5));
-  const retryBase = Math.max(1, Number(process.env.SCAN_RETRY_BASE_MINUTES || 5));
-  const retryMax = Math.max(retryBase, Number(process.env.SCAN_RETRY_MAX_MINUTES || 720));
-  const staleMinutes = Math.max(1, Number(process.env.SCAN_QUEUE_STALE_ALERT_MINUTES || 5));
-  const staleCountThreshold = Math.max(1, Number(process.env.SCAN_QUEUE_STALE_ALERT_COUNT || 1));
-  const queueHealth = await healScanQueue();
+    return await withRouteTimeout(
+      (async () => {
+        const maxJobs = Math.max(1, Math.min(100, Number(process.env.SCAN_CRON_BATCH || 25)));
+        const absMaxBytes = Math.max(1024 * 1024, Number(process.env.SCAN_ABS_MAX_BYTES || 25_000_000)); // default 25MB
+        const maxAttempts = Math.max(1, Number(process.env.SCAN_MAX_ATTEMPTS || 5));
+        const retryBase = Math.max(1, Number(process.env.SCAN_RETRY_BASE_MINUTES || 5));
+        const retryMax = Math.max(retryBase, Number(process.env.SCAN_RETRY_MAX_MINUTES || 720));
+        const staleMinutes = Math.max(1, Number(process.env.SCAN_QUEUE_STALE_ALERT_MINUTES || 5));
+        const staleCountThreshold = Math.max(1, Number(process.env.SCAN_QUEUE_STALE_ALERT_COUNT || 1));
+        const queueHealth = await healScanQueue();
 
   if (queueHealth.staleDeadLettered > 0) {
     await logSecurityEvent({
@@ -253,22 +257,34 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  const duration = Date.now() - startedAt;
-  await logCronRun({
-    job: "scan",
-    ok: true,
-    durationMs: duration,
-    meta: {
-      claimed: jobs.length,
-      failed: results.filter((r) => r.ok === false).length,
-      deadLetterBacklog: queueHealth.maxAttemptJobs,
-      queuedStaleCount,
-      oldestQueuedAgeSeconds,
-    },
-  });
-  return NextResponse.json({ ok: true, duration_ms: duration, claimed: jobs.length, queue_health: queueHealth, results });
+        const duration = Date.now() - startedAt;
+        await logCronRun({
+          job: "scan",
+          ok: true,
+          durationMs: duration,
+          meta: {
+            claimed: jobs.length,
+            failed: results.filter((r) => r.ok === false).length,
+            deadLetterBacklog: queueHealth.maxAttemptJobs,
+            queuedStaleCount,
+            oldestQueuedAgeSeconds,
+          },
+        });
+        return NextResponse.json({ ok: true, duration_ms: duration, claimed: jobs.length, queue_health: queueHealth, results });
+      })(),
+      timeoutMs
+    );
   } catch (e: unknown) {
     const duration = Date.now() - startedAt;
+    if (isRouteTimeoutError(e)) {
+      await logCronRun({
+        job: "scan",
+        ok: false,
+        durationMs: duration,
+        meta: { error: "ROUTE_TIMEOUT" },
+      });
+      return NextResponse.json({ ok: false, error: "TIMEOUT" }, { status: 504 });
+    }
     const msg = e instanceof Error ? e.message : String(e);
     await logCronRun({
       job: "scan",

@@ -260,7 +260,7 @@ Remaining resweep modules in current pass: 0
 
 ## Timeout guard sweep (SQL-backed API routes)
 
-Remaining timeout-guard modules pending: 3
+Remaining timeout-guard modules pending: 0
 
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\audit\export\route.ts` (resweep: bounded route timeout guard + timeout fail-closed response)
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\security\rollback\route.ts` (resweep: bounded route timeout guard on key rollback control plane)
@@ -270,10 +270,10 @@ Remaining timeout-guard modules pending: 3
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\security\org-access\route.ts` (resweep: bounded route timeout guard for org membership read/write controls)
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\security\requeue-scans\route.ts` (resweep: bounded route timeout guard for scan requeue operation)
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\security\tenant-freeze\route.ts` (resweep: bounded route timeout guard for tenant freeze control-plane endpoint)
-- pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\upload\presign\route.ts`
-- pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\cron\scan\route.ts`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\upload\presign\route.ts` (resweep: bounded route timeout guard for upload presign bootstrap path)
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\cron\scan\route.ts` (resweep: bounded route timeout guard for malware scan cron execution path)
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\v1\abuse\report\route.ts` (resweep: bounded route timeout guard for public abuse intake)
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\v1\aliases\route.ts` (resweep: bounded route timeout guard for alias creation endpoint)
-- pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\v1\shares\route.ts`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\v1\shares\route.ts` (resweep: bounded route timeout guard for share creation endpoint)
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\v1\takedown\route.ts` (resweep: bounded route timeout guard for takedown notice intake)
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\v1\webhooks\test\route.ts` (resweep: bounded route timeout guard for API-key webhook test endpoint)

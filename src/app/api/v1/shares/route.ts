@@ -13,6 +13,7 @@ import { appendImmutableAudit } from "@/lib/immutableAudit";
 import { resolvePublicAppBaseUrl } from "@/lib/publicBaseUrl";
 import { DEFAULT_SHARE_SETTINGS, PRO_PACK_UPSELL_MESSAGE, applyPack, getPackById, isPackAvailableForPlan } from "@/lib/packs";
 import { getShareEligibility } from "@/lib/documentStatus";
+import { getRouteTimeoutMs, isRouteTimeoutError, withRouteTimeout } from "@/lib/routeTimeout";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const BASIC_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -57,38 +58,42 @@ function parseSharePassword(value: unknown): string | null | "INVALID" {
 
 export async function POST(req: NextRequest) {
   const ipInfo = clientIpKey(req);
-  const rl = await enforceGlobalApiRateLimit({
-    req,
-    scope: "ip:api",
-    limit: Number(process.env.RATE_LIMIT_API_IP_PER_MIN || 240),
-    windowSeconds: 60,
-    strict: true,
-  });
-  if (!rl.ok) {
-    return NextResponse.json(
-      { ok: false, error: "RATE_LIMIT" },
-      { status: rl.status, headers: { "Retry-After": String(rl.retryAfterSeconds) } }
-    );
-  }
-  if (parseJsonBodyLength(req) > MAX_SHARE_BODY_BYTES) {
-    return NextResponse.json({ ok: false, error: "PAYLOAD_TOO_LARGE" }, { status: 413 });
-  }
-
-  const auth = await verifyApiKeyFromRequest(req);
-  if (!auth.ok) {
-    return NextResponse.json({ ok: false, error: auth.error }, { status: auth.status });
-  }
-
-  let body: Record<string, unknown> | null = null;
+  const timeoutMs = getRouteTimeoutMs("ROUTE_TIMEOUT_API_V1_SHARES_MS", 20_000);
   try {
-    const parsed: unknown = await req.json();
-    body = parsed && typeof parsed === "object" && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : null;
-  } catch {
-    return NextResponse.json({ ok: false, error: "INVALID_JSON" }, { status: 400 });
-  }
-  if (!body) {
-    return NextResponse.json({ ok: false, error: "INVALID_JSON" }, { status: 400 });
-  }
+    return await withRouteTimeout(
+      (async () => {
+        const rl = await enforceGlobalApiRateLimit({
+          req,
+          scope: "ip:api",
+          limit: Number(process.env.RATE_LIMIT_API_IP_PER_MIN || 240),
+          windowSeconds: 60,
+          strict: true,
+        });
+        if (!rl.ok) {
+          return NextResponse.json(
+            { ok: false, error: "RATE_LIMIT" },
+            { status: rl.status, headers: { "Retry-After": String(rl.retryAfterSeconds) } }
+          );
+        }
+        if (parseJsonBodyLength(req) > MAX_SHARE_BODY_BYTES) {
+          return NextResponse.json({ ok: false, error: "PAYLOAD_TOO_LARGE" }, { status: 413 });
+        }
+
+        const auth = await verifyApiKeyFromRequest(req);
+        if (!auth.ok) {
+          return NextResponse.json({ ok: false, error: auth.error }, { status: auth.status });
+        }
+
+        let body: Record<string, unknown> | null = null;
+        try {
+          const parsed: unknown = await req.json();
+          body = parsed && typeof parsed === "object" && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : null;
+        } catch {
+          return NextResponse.json({ ok: false, error: "INVALID_JSON" }, { status: 400 });
+        }
+        if (!body) {
+          return NextResponse.json({ ok: false, error: "INVALID_JSON" }, { status: 400 });
+        }
 
   const docId = String(body?.doc_id || body?.docId || "").trim();
   if (!docId) return NextResponse.json({ ok: false, error: "MISSING_DOC_ID" }, { status: 400 });
@@ -344,12 +349,21 @@ export async function POST(req: NextRequest) {
     },
   });
 
-  return NextResponse.json({
-    ok: true,
-    token,
-    url,
-    pack_id: selectedPack.id,
-    pack_version: selectedPack.version,
-    adjusted_for_plan: adjustedForPlan,
-  });
+        return NextResponse.json({
+          ok: true,
+          token,
+          url,
+          pack_id: selectedPack.id,
+          pack_version: selectedPack.version,
+          adjusted_for_plan: adjustedForPlan,
+        });
+      })(),
+      timeoutMs
+    );
+  } catch (e: unknown) {
+    if (isRouteTimeoutError(e)) {
+      return NextResponse.json({ ok: false, error: "TIMEOUT" }, { status: 504 });
+    }
+    return NextResponse.json({ ok: false, error: "SERVER_ERROR" }, { status: 500 });
+  }
 }
