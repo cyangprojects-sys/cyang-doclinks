@@ -9,6 +9,9 @@ import crypto from "crypto";
 import { sql } from "@/lib/db";
 import { decryptWebhookSecretForUse } from "@/lib/webhookSecrets";
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const WEBHOOK_BODY_MAX_BYTES = 64 * 1024;
+
 export type WebhookEvent =
   | "doc.accessed"
   | "doc.viewed"
@@ -66,7 +69,8 @@ function payloadDocId(payload: unknown): string | null {
   if (!payload || typeof payload !== "object") return null;
   const r = payload as Record<string, unknown>;
   const docId = String(r.doc_id || r.docId || "").trim();
-  return docId || null;
+  if (!docId || !UUID_RE.test(docId)) return null;
+  return docId;
 }
 
 function parseIpv4(hostname: string): number[] | null {
@@ -194,10 +198,16 @@ async function resolveWebhookOwnerId(payload: unknown): Promise<string | null> {
 }
 
 function buildBody(event: string, payload: unknown): string {
-  return JSON.stringify({
+  const body = JSON.stringify({
     event,
     sent_at: new Date().toISOString(),
     payload,
+  });
+  if (Buffer.byteLength(body, "utf8") <= WEBHOOK_BODY_MAX_BYTES) return body;
+  return JSON.stringify({
+    event,
+    sent_at: new Date().toISOString(),
+    payload: { truncated: true },
   });
 }
 
@@ -210,15 +220,28 @@ async function deliverOnce(args: {
   try {
     const safeUrl = normalizeWebhookUrl(args.url);
     const sig = args.secret ? hmac(args.secret, args.body) : null;
-    const res = await fetch(safeUrl, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-cyang-event": args.event,
-        ...(sig ? { "x-cyang-signature": sig } : {}),
-      },
-      body: args.body,
-    });
+    const timeoutMsRaw = Number(process.env.WEBHOOK_DELIVERY_TIMEOUT_MS || 10_000);
+    const timeoutMs = Number.isFinite(timeoutMsRaw)
+      ? Math.max(1000, Math.min(60_000, Math.floor(timeoutMsRaw)))
+      : 10_000;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+    const res = await (async () => {
+      try {
+        return await fetch(safeUrl, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "x-cyang-event": args.event,
+            ...(sig ? { "x-cyang-signature": sig } : {}),
+          },
+          body: args.body,
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timeout);
+      }
+    })();
 
     if (res.ok) return { ok: true, status: res.status, error: null };
     return { ok: false, status: res.status, error: `HTTP ${res.status}` };
@@ -311,8 +334,10 @@ export async function processWebhookDeliveries(opts?: {
   maxBatch?: number;
   maxAttempts?: number;
 }): Promise<{ ok: true; processed: number; succeeded: number; dead: number; failed: number } | { ok: false; error: string }> {
-  const maxBatch = opts?.maxBatch ?? 25;
-  const maxAttempts = opts?.maxAttempts ?? 8;
+  const maxBatchRaw = Number(opts?.maxBatch ?? 25);
+  const maxAttemptsRaw = Number(opts?.maxAttempts ?? 8);
+  const maxBatch = Number.isFinite(maxBatchRaw) ? Math.max(1, Math.min(200, Math.floor(maxBatchRaw))) : 25;
+  const maxAttempts = Number.isFinite(maxAttemptsRaw) ? Math.max(1, Math.min(20, Math.floor(maxAttemptsRaw))) : 8;
 
   try {
     // Grab a small batch of due deliveries. Using FOR UPDATE SKIP LOCKED for concurrency.

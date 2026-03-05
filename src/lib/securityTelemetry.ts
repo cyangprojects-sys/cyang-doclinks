@@ -4,8 +4,34 @@ import { rateLimit } from "@/lib/rateLimit";
 import { appendImmutableAudit } from "@/lib/immutableAudit";
 import { getTrustedClientIpFromHeaders } from "@/lib/clientIp";
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 function logTelemetryFailure(message: string) {
   console.warn(message);
+}
+
+function clampText(value: unknown, maxLen: number): string | null {
+  const s = String(value || "").trim();
+  if (!s) return null;
+  return s.slice(0, maxLen);
+}
+
+function normalizeUuidOrNull(value: unknown): string | null {
+  const s = String(value || "").trim();
+  if (!s) return null;
+  return UUID_RE.test(s) ? s : null;
+}
+
+function sanitizeMeta(meta: Record<string, unknown> | null | undefined): Record<string, unknown> | null {
+  if (!meta || typeof meta !== "object") return null;
+  const out: Record<string, unknown> = {};
+  const entries = Object.entries(meta).slice(0, 64);
+  for (const [k, v] of entries) {
+    const key = String(k || "").trim().slice(0, 64);
+    if (!key) continue;
+    out[key] = typeof v === "string" ? v.slice(0, 256) : v;
+  }
+  return Object.keys(out).length ? out : null;
 }
 
 function securityTelemetryDbEnabled(): boolean {
@@ -208,6 +234,19 @@ export async function logSecurityEvent(
       ev = typeOrEvent;
     }
 
+    const safeType = clampText(ev.type, 64) ?? "unknown_event";
+    const safeSeverity: "low" | "medium" | "high" =
+      ev.severity === "high" || ev.severity === "medium" || ev.severity === "low"
+        ? ev.severity
+        : "low";
+    const safeIp = clampText(ev.ip, 64);
+    const safeActorUserId = normalizeUuidOrNull(ev.actorUserId);
+    const safeOrgId = normalizeUuidOrNull(ev.orgId);
+    const safeDocId = normalizeUuidOrNull(ev.docId);
+    const safeScope = clampText(ev.scope, 80);
+    const safeMessage = clampText(ev.message, 240);
+    const safeMeta = sanitizeMeta(ev.meta);
+
     await sql`
       insert into public.security_events (
         type,
@@ -221,30 +260,30 @@ export async function logSecurityEvent(
         meta
       )
       values (
-        ${ev.type},
-        ${ev.severity},
-        ${ev.ip ? hashIp(ev.ip) : null},
-        ${ev.actorUserId ? (ev.actorUserId as unknown) : null}::uuid,
-        ${ev.orgId ? (ev.orgId as unknown) : null}::uuid,
-        ${ev.docId ? (ev.docId as unknown) : null}::uuid,
-        ${ev.scope ?? null},
-        ${ev.message ?? null},
-        ${ev.meta ? JSON.stringify(ev.meta) : null}::jsonb
+        ${safeType},
+        ${safeSeverity},
+        ${safeIp ? hashIp(safeIp) : null},
+        ${safeActorUserId}::uuid,
+        ${safeOrgId}::uuid,
+        ${safeDocId}::uuid,
+        ${safeScope},
+        ${safeMessage},
+        ${safeMeta ? JSON.stringify(safeMeta) : null}::jsonb
       )
     `;
 
     await appendImmutableAudit({
-      streamKey: `security:${ev.type}`,
+      streamKey: `security:${safeType}`,
       action: "security.event",
-      actorUserId: ev.actorUserId ?? null,
-      orgId: ev.orgId ?? null,
-      docId: ev.docId ?? null,
-      ipHash: ev.ip ? hashIp(ev.ip) : null,
+      actorUserId: safeActorUserId,
+      orgId: safeOrgId,
+      docId: safeDocId,
+      ipHash: safeIp ? hashIp(safeIp) : null,
       payload: {
-        severity: ev.severity,
-        scope: ev.scope ?? null,
-        message: ev.message ?? null,
-        meta: ev.meta ?? null,
+        severity: safeSeverity,
+        scope: safeScope,
+        message: safeMessage,
+        meta: safeMeta,
       },
     });
   } catch (err) {
@@ -571,7 +610,8 @@ export async function logDbErrorEvent(args: {
   orgId?: string | null;
   meta?: Record<string, unknown>;
 }) {
-  if (!looksLikeDbErrorMessage(args.message)) return;
+  const safeMessage = String(args.message || "").slice(0, 240);
+  if (!looksLikeDbErrorMessage(safeMessage)) return;
   await logSecurityEvent({
     type: "db_error",
     severity: "high",
@@ -579,7 +619,7 @@ export async function logDbErrorEvent(args: {
     actorUserId: args.actorUserId ?? null,
     orgId: args.orgId ?? null,
     scope: args.scope,
-    message: args.message,
-    meta: args.meta ?? null,
+    message: safeMessage,
+    meta: sanitizeMeta(args.meta ?? null),
   });
 }

@@ -4,6 +4,8 @@ import { hasActiveViewLimitOverride } from "@/lib/viewLimitOverride";
 import { rateLimit } from "@/lib/rateLimit";
 import { logSecurityEvent } from "@/lib/securityTelemetry";
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 export type Plan = {
   id: "free" | "pro" | (string & {});
   name: string;
@@ -58,6 +60,12 @@ const OWNER_UNLIMITED_PLAN: Plan = {
 
 let billingSubscriptionsTableExistsCache: boolean | null = null;
 
+function normalizeUuid(value: string | null | undefined): string | null {
+  const normalized = String(value || "").trim();
+  if (!normalized) return null;
+  return UUID_RE.test(normalized) ? normalized : null;
+}
+
 function envFlag(name: string, fallback: boolean): boolean {
   const raw = String(process.env[name] || "").trim().toLowerCase();
   if (!raw) return fallback;
@@ -78,6 +86,8 @@ async function billingSubscriptionsTableExists(): Promise<boolean> {
 }
 
 async function userHasActiveProEntitlement(userId: string): Promise<boolean> {
+  const uid = normalizeUuid(userId);
+  if (!uid) return false;
   if (!(await billingSubscriptionsTableExists())) return false;
   const allowTrialing = envFlag("STRIPE_ALLOW_TRIALING_ENTITLEMENT", false);
   const allowGrace = envFlag("STRIPE_ALLOW_GRACE_ENTITLEMENT", false);
@@ -85,7 +95,7 @@ async function userHasActiveProEntitlement(userId: string): Promise<boolean> {
     const rows = (await sql`
       select 1
       from public.billing_subscriptions bs
-      where bs.user_id = ${userId}::uuid
+      where bs.user_id = ${uid}::uuid
         and bs.plan_id = 'pro'
         and (
           lower(coalesce(bs.status, '')) = 'active'
@@ -109,26 +119,12 @@ async function userHasActiveProEntitlement(userId: string): Promise<boolean> {
 }
 
 export async function getPlanForUser(userId: string): Promise<Plan> {
+  const uid = normalizeUuid(userId);
+  if (!uid) return FREE_PLAN;
   const billingRes = await getBillingFlags();
   const billing = billingRes.flags;
 
-  const rows = (await sql`
-    select
-      u.role::text as role,
-      p.id::text as id,
-      p.name::text as name,
-      p.max_views_per_month::int as max_views_per_month,
-      p.max_active_shares::int as max_active_shares,
-      p.max_storage_bytes::bigint as max_storage_bytes,
-      p.max_uploads_per_day::int as max_uploads_per_day,
-      p.max_file_size_bytes::bigint as max_file_size_bytes,
-      p.allow_custom_expiration::bool as allow_custom_expiration,
-      p.allow_audit_export::bool as allow_audit_export
-    from public.users u
-    join public.plans p on p.id = u.plan_id
-    where u.id = ${userId}::uuid
-    limit 1
-  `) as unknown as Array<{
+  let rows: Array<{
     role: string | null;
     id: string | null;
     name: string | null;
@@ -139,7 +135,28 @@ export async function getPlanForUser(userId: string): Promise<Plan> {
     max_file_size_bytes: number | string | null;
     allow_custom_expiration: boolean | null;
     allow_audit_export: boolean | null;
-  }>;
+  }> = [];
+  try {
+    rows = (await sql`
+      select
+        u.role::text as role,
+        p.id::text as id,
+        p.name::text as name,
+        p.max_views_per_month::int as max_views_per_month,
+        p.max_active_shares::int as max_active_shares,
+        p.max_storage_bytes::bigint as max_storage_bytes,
+        p.max_uploads_per_day::int as max_uploads_per_day,
+        p.max_file_size_bytes::bigint as max_file_size_bytes,
+        p.allow_custom_expiration::bool as allow_custom_expiration,
+        p.allow_audit_export::bool as allow_audit_export
+      from public.users u
+      join public.plans p on p.id = u.plan_id
+      where u.id = ${uid}::uuid
+      limit 1
+    `) as unknown as typeof rows;
+  } catch {
+    return FREE_PLAN;
+  }
 
   const r = rows?.[0];
   if (!r) {
@@ -165,7 +182,7 @@ export async function getPlanForUser(userId: string): Promise<Plan> {
   if (String(r.id) === "pro") {
     const enforceStripeEntitlement = String(process.env.STRIPE_ENFORCE_ENTITLEMENT || "1").trim() !== "0";
     if (enforceStripeEntitlement) {
-      const entitled = await userHasActiveProEntitlement(userId);
+      const entitled = await userHasActiveProEntitlement(uid);
       if (!entitled) {
         return FREE_PLAN;
       }
@@ -190,22 +207,26 @@ export async function getPlanForUser(userId: string): Promise<Plan> {
 }
 
 export async function getOwnerIdForDoc(docId: string): Promise<string | null> {
+  const id = normalizeUuid(docId);
+  if (!id) return null;
   const rows = (await sql`
     select owner_id::text as owner_id
     from public.docs
-    where id = ${docId}::uuid
+    where id = ${id}::uuid
     limit 1
   `) as unknown as Array<{ owner_id: string | null }>;
   return rows?.[0]?.owner_id ?? null;
 }
 
 export async function getActiveShareCountForOwner(ownerId: string): Promise<number> {
+  const uid = normalizeUuid(ownerId);
+  if (!uid) return 0;
   // Active = not revoked, not expired
   const rows = (await sql`
     select count(*)::int as c
     from public.share_tokens st
     join public.docs d on d.id = st.doc_id
-    where d.owner_id = ${ownerId}::uuid
+    where d.owner_id = ${uid}::uuid
       and st.revoked_at is null
       and (st.expires_at is null or st.expires_at > now())
   `) as unknown as Array<{ c: number }>;
@@ -213,10 +234,12 @@ export async function getActiveShareCountForOwner(ownerId: string): Promise<numb
 }
 
 export async function getStorageBytesForOwner(ownerId: string): Promise<number> {
+  const uid = normalizeUuid(ownerId);
+  if (!uid) return 0;
   const rows = (await sql`
     select coalesce(sum(coalesce(d.size_bytes, 0)), 0)::bigint as total
     from public.docs d
-    where d.owner_id = ${ownerId}::uuid
+    where d.owner_id = ${uid}::uuid
       and coalesce(d.status, 'ready') <> 'deleted'
   `) as unknown as Array<{ total: number | string | null }>;
   // neon returns bigint as string sometimes
@@ -225,10 +248,12 @@ export async function getStorageBytesForOwner(ownerId: string): Promise<number> 
 }
 
 export async function getMonthlyViewCount(userId: string): Promise<number> {
+  const uid = normalizeUuid(userId);
+  if (!uid) return 0;
   const rows = (await sql`
     select view_count::int as v
     from public.user_usage_monthly
-    where user_id = ${userId}::uuid
+    where user_id = ${uid}::uuid
       and month = date_trunc('month', now())::date
     limit 1
   `) as unknown as Array<{ v: number }>;
@@ -236,19 +261,24 @@ export async function getMonthlyViewCount(userId: string): Promise<number> {
 }
 
 export async function incrementMonthlyViews(userId: string, delta: number = 1): Promise<void> {
+  const uid = normalizeUuid(userId);
+  const safeDelta = Number.isFinite(delta) ? Math.max(0, Math.floor(delta)) : 0;
+  if (!uid || safeDelta <= 0) return;
   await sql`
     insert into public.user_usage_monthly (user_id, month, view_count, upload_count)
-    values (${userId}::uuid, date_trunc('month', now())::date, ${delta}::int, 0)
+    values (${uid}::uuid, date_trunc('month', now())::date, ${safeDelta}::int, 0)
     on conflict (user_id, month)
-    do update set view_count = public.user_usage_monthly.view_count + ${delta}::int
+    do update set view_count = public.user_usage_monthly.view_count + ${safeDelta}::int
   `;
 }
 
 export async function getDailyUploadCount(userId: string): Promise<number> {
+  const uid = normalizeUuid(userId);
+  if (!uid) return 0;
   const rows = (await sql`
     select upload_count::int as u
     from public.user_usage_daily
-    where user_id = ${userId}::uuid
+    where user_id = ${uid}::uuid
       and day = (now() at time zone 'utc')::date
     limit 1
   `) as unknown as Array<{ u: number }>;
@@ -256,20 +286,23 @@ export async function getDailyUploadCount(userId: string): Promise<number> {
 }
 
 export async function incrementUploads(userId: string, delta: number = 1): Promise<void> {
+  const uid = normalizeUuid(userId);
+  const safeDelta = Number.isFinite(delta) ? Math.max(0, Math.floor(delta)) : 0;
+  if (!uid || safeDelta <= 0) return;
   // daily
   await sql`
     insert into public.user_usage_daily (user_id, day, upload_count)
-    values (${userId}::uuid, (now() at time zone 'utc')::date, ${delta}::int)
+    values (${uid}::uuid, (now() at time zone 'utc')::date, ${safeDelta}::int)
     on conflict (user_id, day)
-    do update set upload_count = public.user_usage_daily.upload_count + ${delta}::int
+    do update set upload_count = public.user_usage_daily.upload_count + ${safeDelta}::int
   `;
 
   // monthly
   await sql`
     insert into public.user_usage_monthly (user_id, month, view_count, upload_count)
-    values (${userId}::uuid, date_trunc('month', now())::date, 0, ${delta}::int)
+    values (${uid}::uuid, date_trunc('month', now())::date, 0, ${safeDelta}::int)
     on conflict (user_id, month)
-    do update set upload_count = public.user_usage_monthly.upload_count + ${delta}::int
+    do update set upload_count = public.user_usage_monthly.upload_count + ${safeDelta}::int
   `;
 }
 
@@ -287,26 +320,29 @@ export async function assertCanUpload(args: {
   userId: string;
   sizeBytes: number | null;
 }): Promise<LimitResult> {
+  const uid = normalizeUuid(args.userId);
+  if (!uid) return { ok: false, error: "LIMIT_REACHED", message: "Invalid owner context." };
   const billingRes = await getBillingFlags();
   if (!billingRes.flags.enforcePlanLimits) return { ok: true };
 
-  const plan = await getPlanForUser(args.userId);
+  const plan = await getPlanForUser(uid);
 
-  const size = args.sizeBytes ?? 0;
+  const sizeRaw = Number(args.sizeBytes ?? 0);
+  const size = Number.isFinite(sizeRaw) ? Math.max(0, Math.floor(sizeRaw)) : 0;
 
   if (plan.maxFileSizeBytes != null && size > plan.maxFileSizeBytes) {
     return { ok: false, error: "LIMIT_REACHED", message: "File is too large for this account." };
   }
 
   if (plan.maxUploadsPerDay != null) {
-    const used = await getDailyUploadCount(args.userId);
+    const used = await getDailyUploadCount(uid);
     if (used >= plan.maxUploadsPerDay) {
       return { ok: false, error: "LIMIT_REACHED", message: "Daily upload limit reached." };
     }
   }
 
   if (plan.maxStorageBytes != null) {
-    const used = await getStorageBytesForOwner(args.userId);
+    const used = await getStorageBytesForOwner(uid);
     if (used + size > plan.maxStorageBytes) {
       return { ok: false, error: "LIMIT_REACHED", message: "Storage limit reached." };
     }
@@ -316,11 +352,13 @@ export async function assertCanUpload(args: {
 }
 
 export async function assertCanCreateShare(ownerId: string): Promise<LimitResult> {
+  const uid = normalizeUuid(ownerId);
+  if (!uid) return { ok: false, error: "LIMIT_REACHED", message: "Invalid owner context." };
   const billingRes = await getBillingFlags();
   if (!billingRes.flags.enforcePlanLimits) return { ok: true };
 
-  const plan = await getPlanForUser(ownerId);
-  const active = await getActiveShareCountForOwner(ownerId);
+  const plan = await getPlanForUser(uid);
+  const active = await getActiveShareCountForOwner(uid);
 
   if (plan.id === "pro") {
     const softActiveShares = envInt("PRO_SOFT_MAX_ACTIVE_SHARES", 1000);
@@ -328,7 +366,7 @@ export async function assertCanCreateShare(ownerId: string): Promise<LimitResult
       void logSecurityEvent({
         type: "pro_share_soft_cap_reached",
         severity: "medium",
-        actorUserId: ownerId,
+        actorUserId: uid,
         scope: "share_create",
         message: "Pro active-share soft cap reached",
         meta: { activeShares: active, softCap: softActiveShares },
@@ -338,7 +376,7 @@ export async function assertCanCreateShare(ownerId: string): Promise<LimitResult
 
     const perMinute = await rateLimit({
       scope: "pro:share_create:user:min",
-      id: ownerId,
+      id: uid,
       limit: envInt("PRO_SHARE_CREATE_PER_MIN", 90),
       windowSeconds: 60,
     });
@@ -348,7 +386,7 @@ export async function assertCanCreateShare(ownerId: string): Promise<LimitResult
 
     const burst = await rateLimit({
       scope: "pro:share_create:user:burst",
-      id: ownerId,
+      id: uid,
       limit: envInt("PRO_SHARE_CREATE_BURST_LIMIT", 300),
       windowSeconds: envInt("PRO_SHARE_CREATE_BURST_WINDOW_SECONDS", 300),
     });
@@ -366,21 +404,23 @@ export async function assertCanCreateShare(ownerId: string): Promise<LimitResult
 }
 
 export async function assertCanServeView(ownerId: string): Promise<LimitResult> {
+  const uid = normalizeUuid(ownerId);
+  if (!uid) return { ok: false, error: "LIMIT_REACHED", message: "Invalid owner context." };
   const billingRes = await getBillingFlags();
   if (!billingRes.flags.enforcePlanLimits) return { ok: true };
 
-  const overridden = await hasActiveViewLimitOverride(ownerId);
+  const overridden = await hasActiveViewLimitOverride(uid);
   if (overridden) return { ok: true };
 
-  const plan = await getPlanForUser(ownerId);
+  const plan = await getPlanForUser(uid);
   if (plan.id === "pro") {
-    void maybeFlagHeavyProEgress(ownerId);
+    void maybeFlagHeavyProEgress(uid);
     const softViews = envInt("PRO_SOFT_MAX_VIEWS_PER_MONTH", 50000);
-    const used = await getMonthlyViewCount(ownerId);
+    const used = await getMonthlyViewCount(uid);
     if (used >= softViews) {
       const throttle = await rateLimit({
         scope: "pro:view_overage:user:min",
-        id: ownerId,
+        id: uid,
         limit: envInt("PRO_VIEW_OVERAGE_PER_MIN", 120),
         windowSeconds: 60,
       });
@@ -390,7 +430,7 @@ export async function assertCanServeView(ownerId: string): Promise<LimitResult> 
 
       const alertGate = await rateLimit({
         scope: "pro:view_soft_cap_alert:user:day",
-        id: ownerId,
+        id: uid,
         limit: 1,
         windowSeconds: 86400,
       });
@@ -398,7 +438,7 @@ export async function assertCanServeView(ownerId: string): Promise<LimitResult> 
         void logSecurityEvent({
           type: "pro_view_soft_cap_exceeded",
           severity: "medium",
-          actorUserId: ownerId,
+          actorUserId: uid,
           scope: "view_limit",
           message: "Pro monthly view soft cap exceeded",
           meta: { viewsUsed: used, softCap: softViews },
@@ -410,7 +450,7 @@ export async function assertCanServeView(ownerId: string): Promise<LimitResult> 
 
   if (plan.maxViewsPerMonth == null) return { ok: true };
 
-  const used = await getMonthlyViewCount(ownerId);
+  const used = await getMonthlyViewCount(uid);
   if (used >= plan.maxViewsPerMonth) {
     return { ok: false, error: "LIMIT_REACHED", message: "Monthly view limit reached." };
   }
@@ -418,12 +458,14 @@ export async function assertCanServeView(ownerId: string): Promise<LimitResult> 
 }
 
 export async function getMonthlyEstimatedEgressBytesForOwner(ownerId: string): Promise<number> {
+  const uid = normalizeUuid(ownerId);
+  if (!uid) return 0;
   try {
     const rows = (await sql`
       select coalesce(sum(coalesce(d.size_bytes, 0)), 0)::bigint as total
       from public.doc_views v
       join public.docs d on d.id = v.doc_id
-      where d.owner_id = ${ownerId}::uuid
+      where d.owner_id = ${uid}::uuid
         and v.created_at >= date_trunc('month', now())
         and v.created_at < date_trunc('month', now()) + interval '1 month'
         and coalesce(d.status, 'ready') <> 'deleted'
@@ -436,21 +478,23 @@ export async function getMonthlyEstimatedEgressBytesForOwner(ownerId: string): P
 }
 
 async function maybeFlagHeavyProEgress(ownerId: string): Promise<void> {
+  const uid = normalizeUuid(ownerId);
+  if (!uid) return;
   const probeGate = await rateLimit({
     scope: "pro:egress_probe:user:15m",
-    id: ownerId,
+    id: uid,
     limit: 1,
     windowSeconds: 900,
   });
   if (!(probeGate.ok && probeGate.count === 1)) return;
 
   const softCap = envInt("PRO_SOFT_MAX_EGRESS_BYTES", 30 * 1024 * 1024 * 1024);
-  const estimated = await getMonthlyEstimatedEgressBytesForOwner(ownerId);
+  const estimated = await getMonthlyEstimatedEgressBytesForOwner(uid);
   if (estimated < softCap) return;
 
   const alertGate = await rateLimit({
     scope: "pro:egress_alert:user:day",
-    id: ownerId,
+    id: uid,
     limit: 1,
     windowSeconds: 86400,
   });
@@ -459,7 +503,7 @@ async function maybeFlagHeavyProEgress(ownerId: string): Promise<void> {
   await logSecurityEvent({
     type: "pro_egress_soft_cap_exceeded",
     severity: "high",
-    actorUserId: ownerId,
+    actorUserId: uid,
     scope: "bandwidth_guardrail",
     message: "Estimated monthly egress exceeded Pro soft cap",
     meta: { estimatedBytes: estimated, softCapBytes: softCap },

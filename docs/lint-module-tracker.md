@@ -4,7 +4,7 @@ Total modules with lint warnings:
 66
 
 Remaining pending modules:
-5
+0
 
 Status key: `done` | `pending`
 
@@ -63,19 +63,19 @@ Status key: `done` | `pending`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\expirationAlerts.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\geo.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\malwareScan.ts`
-- pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\monetization.ts`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\monetization.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\pdfSafety.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\r2.ts`
-- pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\resolveDoc.ts`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\resolveDoc.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\retention.ts`
-- pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\securityTelemetry.ts`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\securityTelemetry.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\settings.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\shareLifecycle.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\stripeClient.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\stripeWebhook.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\usageMaintenance.ts`
-- pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\webhooks.ts`
-- pending - `C:\Users\tsaab\Projects\cyang-doclinks\tests\attack-sim.spec.ts`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\webhooks.ts`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\tests\attack-sim.spec.ts`
 
 ## Additional security-swept modules (not in lint-warning backlog)
 

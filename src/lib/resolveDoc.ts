@@ -3,6 +3,10 @@ import { sql } from "@/lib/db";
 import { getR2Bucket } from "@/lib/r2";
 import { getShareEligibility } from "@/lib/documentStatus";
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const ALIAS_RE = /^[a-z0-9][a-z0-9_-]{1,127}$/i;
+const TOKEN_MAX_LEN = 128;
+
 export type ResolveInput =
     | { alias: string }
     | { token: string }
@@ -77,7 +81,11 @@ export type ShareMeta =
 
 
 function norm(s: string): string {
-    return decodeURIComponent(String(s || "")).trim().toLowerCase();
+    try {
+        return decodeURIComponent(String(s || "")).trim().toLowerCase();
+    } catch {
+        return "";
+    }
 }
 
 function normEmail(s: string | null | undefined): string | null {
@@ -104,6 +112,7 @@ function isMaxed(viewCount: number, maxViews: number | null): boolean {
 // Generate both variants and query using both.
 function tokenVariants(tokenInput: string): { raw: string; dashed: string | null } {
     const raw = String(tokenInput || "").trim();
+    if (raw.length > TOKEN_MAX_LEN) return { raw: "", dashed: null };
     if (!raw) return { raw: "", dashed: null };
 
     // Already dashed UUID?
@@ -140,7 +149,7 @@ async function getDocPointer(
     | { ok: false }
 > {
     const id = String(docId || "").trim();
-    if (!id) return { ok: false };
+    if (!id || !UUID_RE.test(id)) return { ok: false };
     const defaultBucket = getR2Bucket();
 
     let rows: Array<{
@@ -597,7 +606,9 @@ export async function consumeShareTokenView(
 export async function resolveDoc(input: ResolveInput): Promise<ResolvedDoc> {
     // DIRECT
     if ("docId" in input) {
-        const doc = await getDocPointer(String(input.docId || "").trim());
+        const docId = String(input.docId || "").trim();
+        if (!docId || !UUID_RE.test(docId)) return { ok: false, error: "NOT_FOUND" };
+        const doc = await getDocPointer(docId);
         if (!doc.ok) return { ok: false, error: "NOT_FOUND" };
 
         return {
@@ -617,7 +628,7 @@ export async function resolveDoc(input: ResolveInput): Promise<ResolvedDoc> {
     // ALIAS
     if ("alias" in input) {
         const alias = String(input.alias || "").trim();
-        if (!alias) return { ok: false, error: "NOT_FOUND" };
+        if (!alias || !ALIAS_RE.test(alias)) return { ok: false, error: "NOT_FOUND" };
 
         const a = await resolveAliasToDocId(alias);
         if (!a.ok) return { ok: false, error: "NOT_FOUND" };
@@ -645,7 +656,7 @@ export async function resolveDoc(input: ResolveInput): Promise<ResolvedDoc> {
     // TOKEN
     if ("token" in input) {
         const token = String(input.token || "").trim();
-        if (!token) return { ok: false, error: "NOT_FOUND" };
+        if (!token || token.length > TOKEN_MAX_LEN) return { ok: false, error: "NOT_FOUND" };
 
         const t = await resolveTokenNoIncrement(token);
         if (!t.ok) return { ok: false, error: t.error };
