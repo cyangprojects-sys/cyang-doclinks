@@ -210,6 +210,14 @@ Remaining resweep modules in current pass: 0
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\security\org-access\route.ts` (resweep: explicit per-IP throttle)
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\security\requeue-scans\route.ts` (resweep: explicit per-IP throttle)
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\upload\abort\route.ts` (resweep: explicit per-IP throttle)
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\abuse\route.ts` (resweep: throttle executes before auth path)
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\dmca\route.ts` (resweep: throttle executes before auth path)
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\upload\presign\route.ts` (resweep: global throttle executes before auth path)
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\upload\complete\route.ts` (resweep: global throttle executes before auth path)
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\.env.example` (resweep: added missing rate-limit and webhook guardrail env keys)
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\health\route.ts` (resweep: explicit per-IP throttle)
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\debug\alias\[alias]\route.ts` (resweep: debug lookup throttle before owner auth)
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\analytics\aggregate\route.ts` (resweep: expensive aggregate GET throttle)
 
 ## Stale actions removed
 

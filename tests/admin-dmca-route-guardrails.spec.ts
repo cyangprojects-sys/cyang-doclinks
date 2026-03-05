@@ -5,6 +5,9 @@ test.describe("admin dmca route guardrails", () => {
   test("dmca admin route validates action, ids, and payload size", () => {
     const code = readFileSync("src/app/api/admin/dmca/route.ts", "utf8");
     expect(code.includes("MAX_DMCA_BODY_BYTES")).toBeTruthy();
+    expect(code.includes("enforceGlobalApiRateLimit(")).toBeTruthy();
+    expect(code.includes("strict: true")).toBeTruthy();
+    expect(code.includes("RATE_LIMITED")).toBeTruthy();
     expect(code.includes("INVALID_NOTICE_ID")).toBeTruthy();
     expect(code.includes("INVALID_DOC_ID")).toBeTruthy();
     expect(code.includes("INVALID_STATUS")).toBeTruthy();

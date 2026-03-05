@@ -49,6 +49,20 @@ function bodyOptString(body: JsonBody, key: string, max: number): string | null 
 }
 
 export async function POST(req: NextRequest) {
+  // Throttle admin abuse actions (safety)
+  const rl = await enforceGlobalApiRateLimit({
+    req,
+    scope: "ip:admin_abuse_actions",
+    limit: Number(process.env.RATE_LIMIT_ADMIN_ABUSE_PER_MIN || 120),
+    windowSeconds: 60,
+    strict: true,
+  });
+  if (!rl.ok) {
+    return NextResponse.json(
+      { ok: false, error: "RATE_LIMIT" },
+      { status: rl.status, headers: { "Retry-After": String(rl.retryAfterSeconds) } }
+    );
+  }
   let user;
   try {
     user = await requirePermission("abuse.manage");
@@ -59,20 +73,6 @@ export async function POST(req: NextRequest) {
   }
 
   const ipInfo = clientIpKey(req);
-
-  // Throttle admin abuse actions (safety)
-  const rl = await enforceGlobalApiRateLimit({
-    req,
-    scope: "ip:admin_abuse_actions",
-    limit: Number(process.env.RATE_LIMIT_ADMIN_ABUSE_PER_MIN || 120),
-    windowSeconds: 60,
-  });
-  if (!rl.ok) {
-    return NextResponse.json(
-      { ok: false, error: "RATE_LIMIT" },
-      { status: rl.status, headers: { "Retry-After": String(rl.retryAfterSeconds) } }
-    );
-  }
   if (parseJsonBodyLength(req) > MAX_ADMIN_ABUSE_BODY_BYTES) {
     return NextResponse.json({ ok: false, error: "PAYLOAD_TOO_LARGE" }, { status: 413 });
   }

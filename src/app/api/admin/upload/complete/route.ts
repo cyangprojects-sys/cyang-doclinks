@@ -106,11 +106,7 @@ export async function POST(req: NextRequest) {
         stage = "runtime_env";
         assertRuntimeEnv("upload_complete");
 
-        stage = "auth";
-        const r2Bucket = getR2Bucket();
-        const user = await requireUser();
-        const plan = await getPlanForUser(user.id);
-        // Global API throttle (best-effort)
+        stage = "global_rate_limit";
         const globalRl = await enforceGlobalApiRateLimit({
           req,
           scope: "ip:api",
@@ -124,6 +120,11 @@ export async function POST(req: NextRequest) {
             { status: globalRl.status, headers: { "Retry-After": String(globalRl.retryAfterSeconds) } }
           );
         }
+
+        stage = "auth";
+        const r2Bucket = getR2Bucket();
+        const user = await requireUser();
+        const plan = await getPlanForUser(user.id);
 
         // Upload complete throttle per-IP
         const ipInfo = clientIpKey(req);

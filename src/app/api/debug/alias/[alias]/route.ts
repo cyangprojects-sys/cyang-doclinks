@@ -1,7 +1,8 @@
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import { sql } from "@/lib/db";
 import { requireRole } from "@/lib/authz";
 import { isDebugApiEnabled } from "@/lib/debugAccess";
+import { enforceGlobalApiRateLimit } from "@/lib/securityTelemetry";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -29,11 +30,24 @@ function normalizeAliasParam(rawAlias: string): string | null {
 }
 
 export async function GET(
-  _req: Request,
+  req: NextRequest,
   context: { params: Promise<{ alias: string }> }
 ) {
   if (!isDebugApiEnabled()) {
     return NextResponse.json({ ok: false, error: "NOT_FOUND" }, { status: 404 });
+  }
+  const rl = await enforceGlobalApiRateLimit({
+    req,
+    scope: "ip:debug_alias_lookup",
+    limit: Number(process.env.RATE_LIMIT_DEBUG_ALIAS_LOOKUP_PER_MIN || 60),
+    windowSeconds: 60,
+    strict: true,
+  });
+  if (!rl.ok) {
+    return NextResponse.json(
+      { ok: false, error: "RATE_LIMIT" },
+      { status: rl.status, headers: { "Retry-After": String(rl.retryAfterSeconds) } }
+    );
   }
 
   try {

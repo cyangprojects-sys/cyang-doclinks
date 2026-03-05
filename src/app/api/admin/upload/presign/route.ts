@@ -72,18 +72,12 @@ export async function POST(req: Request) {
         { status: 403, headers: { "Retry-After": String(abuseBlock.retryAfterSeconds) } }
       );
     }
-    const r2Bucket = getR2Bucket();
-    const user = await requireUser();
-    const plan = await getPlanForUser(user.id);
-
     // Global API throttle (best-effort)
     const globalRl = await enforceGlobalApiRateLimit({
       req,
       scope: "ip:api",
       limit: Number(process.env.RATE_LIMIT_API_IP_PER_MIN || 240),
       windowSeconds: 60,
-      actorUserId: user.id,
-      orgId: user.orgId ?? null,
       strict: true,
     });
     if (!globalRl.ok) {
@@ -92,6 +86,9 @@ export async function POST(req: Request) {
         { status: globalRl.status, headers: { "Retry-After": String(globalRl.retryAfterSeconds) } }
       );
     }
+    const r2Bucket = getR2Bucket();
+    const user = await requireUser();
+    const plan = await getPlanForUser(user.id);
 
     // Upload presign throttle per-IP (stronger)
     const basePresignLimit = Number(process.env.RATE_LIMIT_UPLOAD_PRESIGN_IP_PER_MIN || 30);

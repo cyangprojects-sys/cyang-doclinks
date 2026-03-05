@@ -67,10 +67,19 @@ test.describe("api route guardrails", () => {
 
   test("debug alias lookup route requires owner role and debug gate", () => {
     const code = src("src/app/api/debug/alias/[alias]/route.ts");
+    expect(code.includes("enforceGlobalApiRateLimit(")).toBeTruthy();
+    expect(code.includes("RATE_LIMIT_DEBUG_ALIAS_LOOKUP_PER_MIN")).toBeTruthy();
     expect(code.includes('await requireRole("owner")')).toBeTruthy();
     expect(code.includes("isDebugApiEnabled()")).toBeTruthy();
     expect(code.includes("UNAUTHENTICATED")).toBeTruthy();
     expect(code.includes("FORBIDDEN")).toBeTruthy();
+  });
+
+  test("admin analytics aggregate route is rate-limited", () => {
+    const code = src("src/app/api/admin/analytics/aggregate/route.ts");
+    expect(code.includes("enforceGlobalApiRateLimit(")).toBeTruthy();
+    expect(code.includes("RATE_LIMIT_ADMIN_ANALYTICS_AGGREGATE_PER_MIN")).toBeTruthy();
+    expect(code.includes('requireRole("admin")')).toBeTruthy();
   });
 
   test("cron unauthorized responses do not include setup hints", () => {

@@ -44,15 +44,15 @@ function bodyOptText(body: JsonBody, key: string, maxLen: number): string | null
 
 export async function POST(req: NextRequest) {
   try {
-    const user = await requirePermission("dmca.manage");
-
     const globalRl = await enforceGlobalApiRateLimit({
       req,
       scope: "ip:api",
       limit: Number(process.env.RATE_LIMIT_API_IP_PER_MIN || 240),
       windowSeconds: 60,
+      strict: true,
     });
     if (!globalRl.ok) return NextResponse.json({ ok: false, error: "RATE_LIMITED" }, { status: 429 });
+    const user = await requirePermission("dmca.manage");
     if (parseJsonBodyLength(req) > MAX_DMCA_BODY_BYTES) {
       return NextResponse.json({ ok: false, error: "PAYLOAD_TOO_LARGE" }, { status: 413 });
     }
