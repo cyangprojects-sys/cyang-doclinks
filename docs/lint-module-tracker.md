@@ -240,6 +240,7 @@ Remaining resweep modules in current pass: 0
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\security\freeze\route.ts` (resweep: added GET throttle; POST throttle already present)
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\security\rbac\route.ts` (resweep: added GET throttle; POST throttle already present)
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\security\org-access\route.ts` (resweep: added GET throttle; POST throttle already present)
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\tests\admin-get-rate-limit-runtime.spec.ts` (resweep: runtime burst coverage for admin+cron GET throttles)
 
 ## Stale actions removed
 
