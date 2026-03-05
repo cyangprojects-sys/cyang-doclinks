@@ -4,7 +4,7 @@ Total modules with lint warnings:
 66
 
 Remaining pending modules:
-45
+42
 
 Status key: `done` | `pending`
 
@@ -24,8 +24,8 @@ Status key: `done` | `pending`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\dashboard\UploadPanel.tsx`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\docs\[docId]\page.tsx`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\layout.tsx`
-- pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\abuse\route.ts`
-- pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\audit\export\route.ts`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\abuse\route.ts`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\audit\export\route.ts`
 - pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\billing\checkout\route.ts`
 - pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\billing\invoices\route.ts`
 - pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\billing\portal\route.ts`
@@ -42,7 +42,7 @@ Status key: `done` | `pending`
 - pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\cron\aggregate\route.ts`
 - pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\cron\billing-sync\route.ts`
 - pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\cron\nightly\route.ts`
-- pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\cron\webhooks\route.ts`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\cron\webhooks\route.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\debug\alias\[alias]\route.ts`
 - pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\stripe\webhook\route.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\v1\aliases\route.ts`

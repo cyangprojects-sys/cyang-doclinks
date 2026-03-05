@@ -24,6 +24,13 @@ function parseIntParam(raw: string | null, fallback: number, min: number, max: n
   return Math.max(min, Math.min(max, i));
 }
 
+function parseExportType(raw: string | null): ExportType {
+  const value = String(raw || "").trim().toLowerCase();
+  if (value === "access") return "access";
+  if (value === "views") return "views";
+  return "audit";
+}
+
 // NOTE: Our DB client (Neon `sql`) is a *tagged template* function.
 // That means we can't pass a raw string query into it without fighting types.
 // For export we keep the query fully static (by `type`) and parameterize values.
@@ -36,7 +43,11 @@ export async function GET(req: NextRequest) {
   try {
     const u = await requirePermission("audit.export");
     userId = u.id;
-  } catch {
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : "";
+    if (msg === "UNAUTHENTICATED") {
+      return new Response("Unauthorized", { status: 401 });
+    }
     return new Response("Forbidden", { status: 403 });
   }
 
@@ -48,7 +59,7 @@ export async function GET(req: NextRequest) {
   }
 
   const url = new URL(req.url);
-  const type = (url.searchParams.get("type") || "audit").toLowerCase() as ExportType;
+  const type = parseExportType(url.searchParams.get("type"));
   const days = parseIntParam(url.searchParams.get("days"), 30, 1, 365);
   const limit = parseIntParam(url.searchParams.get("limit"), 20000, 1, 50000);
 
@@ -58,7 +69,7 @@ export async function GET(req: NextRequest) {
     views: { table: "doc_views", filename: "views.csv" },
   };
 
-  const picked = map[type] ?? map.audit;
+  const picked = map[type];
 
   // Build query (static per table) so we can keep using the tagged template.
   // We assume these tables have `created_at` (true for our schemas).

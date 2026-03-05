@@ -14,16 +14,26 @@ export async function GET(req: NextRequest) {
   const startedAt = Date.now();
   try {
     const res = await processWebhookDeliveries({ maxBatch: 25, maxAttempts: 8 });
-    const resObj = (res && typeof res === "object" ? res : {}) as Record<string, unknown>;
     const duration = Date.now() - startedAt;
+    if (!res.ok) {
+      await logCronRun({
+        job: "webhooks",
+        ok: false,
+        durationMs: duration,
+        meta: { error: res.error || "CRON_WEBHOOKS_FAILED" },
+      });
+      return NextResponse.json({ ok: false, error: "CRON_WEBHOOKS_FAILED", now: new Date().toISOString(), duration_ms: duration }, { status: 500 });
+    }
+
     await logCronRun({
       job: "webhooks",
       ok: true,
       durationMs: duration,
       meta: {
-        attempted: resObj.attempted ?? null,
-        delivered: resObj.delivered ?? null,
-        failed: resObj.failed ?? null,
+        processed: res.processed,
+        succeeded: res.succeeded,
+        dead: res.dead,
+        failed: res.failed,
       },
     });
     return NextResponse.json({
@@ -33,12 +43,11 @@ export async function GET(req: NextRequest) {
     });
   } catch (e: unknown) {
     const duration = Date.now() - startedAt;
-    const msg = e instanceof Error ? e.message : String(e);
     await logCronRun({
       job: "webhooks",
       ok: false,
       durationMs: duration,
-      meta: { error: msg },
+      meta: { error: "CRON_WEBHOOKS_FAILED" },
     });
     return NextResponse.json({ ok: false, error: "CRON_WEBHOOKS_FAILED" }, { status: 500 });
   }

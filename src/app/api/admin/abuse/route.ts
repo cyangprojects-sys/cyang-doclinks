@@ -18,9 +18,16 @@ type Action =
   | { action: "close_report"; reportId: string; notes?: string | null };
 
 type JsonBody = Record<string, unknown>;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 function norm(s: unknown): string {
   return String(s || "").trim();
 }
+
+function isUuid(value: string): boolean {
+  return UUID_RE.test(String(value || "").trim());
+}
+
 function bodyString(body: JsonBody, key: string): string {
   return norm(body[key]);
 }
@@ -72,6 +79,7 @@ export async function POST(req: NextRequest) {
   if (act === "disable_doc" || act === "quarantine_doc") {
     const docId = bodyString(rawBody, "docId");
     if (!docId) return NextResponse.json({ ok: false, error: "MISSING_DOC" }, { status: 400 });
+    if (!isUuid(docId)) return NextResponse.json({ ok: false, error: "INVALID_DOC" }, { status: 400 });
     const appliedAction = "disable_doc";
     const normalizedReason =
       act === "quarantine_doc"
@@ -91,6 +99,7 @@ export async function POST(req: NextRequest) {
     if (rawBody.reportId) {
       const reportId = bodyString(rawBody, "reportId");
       if (reportId) {
+        if (!isUuid(reportId)) return NextResponse.json({ ok: false, error: "INVALID_REPORT" }, { status: 400 });
         await sql`
           update public.abuse_reports
           set status = 'reviewing'
@@ -125,6 +134,7 @@ export async function POST(req: NextRequest) {
     const confirm = bodyString(rawBody, "confirm");
     const ttlMinutes = Number(rawBody.ttlMinutes ?? 30);
     if (!docId) return NextResponse.json({ ok: false, error: "MISSING_DOC" }, { status: 400 });
+    if (!isUuid(docId)) return NextResponse.json({ ok: false, error: "INVALID_DOC" }, { status: 400 });
     if (confirm !== `OVERRIDE ${docId}`) {
       return NextResponse.json(
         { ok: false, error: "CONFIRMATION_REQUIRED", message: `confirm must equal "OVERRIDE ${docId}"` },
@@ -168,6 +178,7 @@ export async function POST(req: NextRequest) {
     const docId = bodyString(rawBody, "docId");
     const confirm = bodyString(rawBody, "confirm");
     if (!docId) return NextResponse.json({ ok: false, error: "MISSING_DOC" }, { status: 400 });
+    if (!isUuid(docId)) return NextResponse.json({ ok: false, error: "INVALID_DOC" }, { status: 400 });
     if (confirm !== `REVOKE_OVERRIDE ${docId}`) {
       return NextResponse.json(
         { ok: false, error: "CONFIRMATION_REQUIRED", message: `confirm must equal "REVOKE_OVERRIDE ${docId}"` },
@@ -216,6 +227,7 @@ export async function POST(req: NextRequest) {
     if (rawBody.reportId) {
       const reportId = bodyString(rawBody, "reportId");
       if (reportId) {
+        if (!isUuid(reportId)) return NextResponse.json({ ok: false, error: "INVALID_REPORT" }, { status: 400 });
         await sql`
           update public.abuse_reports
           set status = 'reviewing'
@@ -248,6 +260,7 @@ export async function POST(req: NextRequest) {
     const reportId = bodyString(rawBody, "reportId");
     const notes = bodyOptString(rawBody, "notes", 2000);
     if (!reportId) return NextResponse.json({ ok: false, error: "MISSING_REPORT" }, { status: 400 });
+    if (!isUuid(reportId)) return NextResponse.json({ ok: false, error: "INVALID_REPORT" }, { status: 400 });
 
     await sql`
       update public.abuse_reports
