@@ -1,6 +1,10 @@
 import { sql } from "@/lib/db";
 import { countDocsEncryptedWithKey, rotateDocKeys } from "@/lib/masterKeys";
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const MAX_KEY_ID_LEN = 64;
+const MAX_ERROR_LEN = 240;
+
 export type KeyRotationJob = {
   id: string;
   created_at: string;
@@ -16,6 +20,22 @@ export type KeyRotationJob = {
   max_batch: number;
   last_error: string | null;
 };
+
+function boundedInt(raw: unknown, fallback: number, min: number, max: number): number {
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(max, Math.max(min, Math.floor(n)));
+}
+
+function normalizeUuidOrNull(value: unknown): string | null {
+  const s = String(value || "").trim();
+  if (!s) return null;
+  return UUID_RE.test(s) ? s : null;
+}
+
+function normalizeKeyId(value: unknown): string {
+  return String(value || "").trim().slice(0, MAX_KEY_ID_LEN);
+}
 
 async function jobsTableExists(): Promise<boolean> {
   try {
@@ -33,12 +53,16 @@ export async function enqueueKeyRotationJob(args: {
   requestedByUserId?: string | null;
 }): Promise<{ id: string }> {
   if (!(await jobsTableExists())) throw new Error("MISSING_KEY_ROTATION_JOBS_TABLE");
-  const maxBatch = Math.max(1, Math.min(2000, Number(args.maxBatch ?? 250)));
+  const fromKeyId = normalizeKeyId(args.fromKeyId);
+  const toKeyId = normalizeKeyId(args.toKeyId);
+  if (!fromKeyId || !toKeyId) throw new Error("INVALID_KEY_ROTATION_ARGS");
+  const maxBatch = boundedInt(args.maxBatch ?? 250, 250, 1, 2000);
+  const requestedByUserId = normalizeUuidOrNull(args.requestedByUserId);
   const rows = (await sql`
     insert into public.key_rotation_jobs
       (from_key_id, to_key_id, status, max_batch, requested_by_user_id)
     values
-      (${args.fromKeyId}, ${args.toKeyId}, 'queued', ${maxBatch}::int, ${args.requestedByUserId ?? null}::uuid)
+      (${fromKeyId}, ${toKeyId}, 'queued', ${maxBatch}::int, ${requestedByUserId}::uuid)
     returning id::text as id
   `) as unknown as Array<{ id: string }>;
   const id = rows?.[0]?.id;
@@ -48,7 +72,7 @@ export async function enqueueKeyRotationJob(args: {
 
 export async function listKeyRotationJobs(limit: number = 30): Promise<KeyRotationJob[]> {
   if (!(await jobsTableExists())) return [];
-  const safeLimit = Math.max(1, Math.min(200, Math.floor(limit)));
+  const safeLimit = boundedInt(limit, 30, 1, 200);
   try {
     return (await sql`
       select
@@ -114,7 +138,7 @@ async function claimNextKeyRotationJob(): Promise<KeyRotationJob | null> {
 export async function processKeyRotationJobs(args?: { maxJobs?: number }) {
   if (!(await jobsTableExists())) return { claimed: 0, processed: 0, results: [] as Array<Record<string, unknown>> };
 
-  const maxJobs = Math.max(1, Math.min(25, Number(args?.maxJobs ?? 5)));
+  const maxJobs = boundedInt(args?.maxJobs ?? 5, 5, 1, 25);
   let claimed = 0;
   let processed = 0;
   const results: Array<Record<string, unknown>> = [];
@@ -159,7 +183,7 @@ export async function processKeyRotationJobs(args?: { maxJobs?: number }) {
         status: done ? "completed" : "running",
       });
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
+      const msg = (e instanceof Error ? e.message : String(e)).slice(0, MAX_ERROR_LEN);
       await sql`
         update public.key_rotation_jobs
         set
