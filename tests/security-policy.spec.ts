@@ -39,4 +39,11 @@ test.describe("security policy primitives", () => {
     process.env.SECURITY_TEST_NO_DB = "garbage";
     expect(isSecurityTestNoDbMode()).toBeFalsy();
   });
+
+  test("security test no-db mode ignores malformed values", () => {
+    process.env.SECURITY_TEST_NO_DB = `yes${"x".repeat(32)}`;
+    expect(isSecurityTestNoDbMode()).toBeFalsy();
+    process.env.SECURITY_TEST_NO_DB = "on\r\n";
+    expect(isSecurityTestNoDbMode()).toBeFalsy();
+  });
 });

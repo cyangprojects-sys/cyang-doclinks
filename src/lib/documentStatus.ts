@@ -13,8 +13,13 @@ export type StatusTone = "positive" | "warning" | "danger" | "neutral";
 export const SCAN_PENDING_SHARE_WARNING =
   "Security scan is still running. You can share now, and we'll automatically restrict access if it's flagged.";
 
+const MAX_STATE_INPUT_LEN = 64;
+const MAX_UPLOAD_ERROR_LEN = 180;
+
 function norm(v: string | null | undefined): string {
-  return String(v || "").trim().toLowerCase();
+  const raw = String(v || "").trim().toLowerCase();
+  if (!raw || raw.length > MAX_STATE_INPUT_LEN || /[\r\n\0]/.test(raw)) return "";
+  return raw;
 }
 
 export function normalizeDocState(raw: string | null | undefined): DocState {
@@ -194,7 +199,10 @@ export function getUploadUiStatus(args: {
   errorMessage?: string | null;
 }): { label: string; subtext: string; tone: StatusTone } {
   if (args.uploadStatus === "error") {
-    return { label: "Upload failed", subtext: args.errorMessage || "Try again", tone: "danger" };
+    const errorText = String(args.errorMessage || "").trim();
+    const safeError =
+      errorText && errorText.length <= MAX_UPLOAD_ERROR_LEN && !/[\r\n\0]/.test(errorText) ? errorText : "Try again";
+    return { label: "Upload failed", subtext: safeError, tone: "danger" };
   }
   if (args.uploadStatus === "queued") {
     return { label: "Queued", subtext: "Waiting to upload", tone: "neutral" };

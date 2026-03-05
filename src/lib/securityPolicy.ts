@@ -7,8 +7,10 @@ export function allowUnencryptedServing(): boolean {
 }
 
 function envBool(name: string, fallback: boolean): boolean {
-  const raw = String(process.env[name] || "").trim().toLowerCase();
-  if (!raw) return fallback;
+  const input = String(process.env[name] || "");
+  if (/[\r\n\0]/.test(input)) return fallback;
+  const raw = input.trim().toLowerCase();
+  if (!raw || raw.length > 16) return fallback;
   if (["1", "true", "yes", "y", "on"].includes(raw)) return true;
   if (["0", "false", "no", "n", "off"].includes(raw)) return false;
   return fallback;

@@ -1,10 +1,15 @@
 // src/lib/billingFlags.ts
 // Centralized feature flags for monetization / pricing.
 
+const MAX_ENV_BOOL_LEN = 16;
+
 function envBool(name: string, fallback: boolean): boolean {
   const v = process.env[name];
   if (v == null) return fallback;
-  const s = String(v).trim().toLowerCase();
+  const raw = String(v);
+  if (/[\r\n\0]/.test(raw)) return fallback;
+  const s = raw.trim().toLowerCase();
+  if (!s || s.length > MAX_ENV_BOOL_LEN) return fallback;
   if (s === "1" || s === "true" || s === "yes" || s === "y" || s === "on") return true;
   if (s === "0" || s === "false" || s === "no" || s === "n" || s === "off") return false;
   return fallback;

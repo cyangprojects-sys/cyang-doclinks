@@ -57,4 +57,13 @@ test.describe("billing flag helpers", () => {
     expect(proPlanEnabled()).toBeFalsy();
     expect(pricingUiEnabled()).toBeFalsy();
   });
+
+  test("fails closed on malformed env values", () => {
+    setEnv("ENFORCE_PLAN_LIMITS", `yes${"x".repeat(32)}`);
+    setEnv("PRO_PLAN_ENABLED", "true\r\n");
+    setEnv("PRICING_UI_ENABLED", `on${"x".repeat(32)}`);
+    expect(enforcePlanLimitsEnabled()).toBeTruthy();
+    expect(proPlanEnabled()).toBeFalsy();
+    expect(pricingUiEnabled()).toBeFalsy();
+  });
 });
