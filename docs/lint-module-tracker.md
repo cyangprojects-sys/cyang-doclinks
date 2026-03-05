@@ -79,7 +79,7 @@ Status key: `done` | `pending`
 
 ## Additional security-swept modules (not in lint-warning backlog)
 
-Remaining additional high-sensitivity modules pending: 4
+Remaining additional high-sensitivity modules pending: 0
 
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\backup\status\route.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\mfa\actions.ts`
@@ -142,13 +142,14 @@ Remaining additional high-sensitivity modules pending: 4
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\keyRotation.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\pdfWatermark.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\rbac.ts`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\crypto.ts`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\cryptoSecrets.ts`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\encryption.ts`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\encryptionMigration.ts`
 
 ### Remaining additional modules (critical)
 
-- pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\crypto.ts`
-- pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\cryptoSecrets.ts`
-- pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\encryption.ts`
-- pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\encryptionMigration.ts`
+- none
 
 ## Stale actions removed
 

@@ -38,4 +38,20 @@ test.describe("crypto signing helpers", () => {
     expect(token.length).toBeGreaterThan(0);
     expect(/^[A-Za-z0-9_-]+$/.test(token)).toBeTruthy();
   });
+
+  test("token helpers clamp invalid randomToken sizes and reject malformed signed input", () => {
+    const t1 = randomToken(-5);
+    const t2 = randomToken(999999);
+    expect(t1.length).toBeGreaterThan(0);
+    expect(t2.length).toBeGreaterThan(0);
+
+    const signed = signPayload({ x: 1 });
+    expect(verifySignedPayload(`${signed}\n`)).toBeNull();
+    expect(verifySignedPayload(`${"a".repeat(20_000)}.${"b".repeat(20_000)}`)).toBeNull();
+  });
+
+  test("signPayload enforces payload size bound", () => {
+    const huge = { data: "x".repeat(9000) };
+    expect(() => signPayload(huge)).toThrow(/INVALID_PAYLOAD_SIZE/);
+  });
 });

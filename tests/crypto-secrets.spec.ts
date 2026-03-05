@@ -56,4 +56,15 @@ test.describe("crypto secret helpers", () => {
     const tampered = `${parts[0]}:${parts[1]}:${parts[2]}:${ct.toString("base64")}`;
     expect(() => decryptSecret(tampered)).toThrow();
   });
+
+  test("rejects malformed iv/tag and oversized plaintext", () => {
+    process.env[KEY_NAME] = makeKeyBase64(13);
+    const badIv = `v1:${Buffer.alloc(8, 1).toString("base64")}:${Buffer.alloc(16, 2).toString("base64")}:${Buffer.from("a").toString("base64")}`;
+    expect(() => decryptSecret(badIv)).toThrow(/Invalid encrypted secret format/);
+
+    const badTag = `v1:${Buffer.alloc(12, 1).toString("base64")}:${Buffer.alloc(8, 2).toString("base64")}:${Buffer.from("a").toString("base64")}`;
+    expect(() => decryptSecret(badTag)).toThrow(/Invalid encrypted secret format/);
+
+    expect(() => encryptSecret("x".repeat(17_000))).toThrow(/between 1 and 16384/);
+  });
 });

@@ -13,26 +13,58 @@ type LegacyDoc = {
   size_bytes: number | string | null;
 };
 
-async function streamToBuffer(body: unknown): Promise<Buffer> {
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const DEFAULT_BATCH_LIMIT = 25;
+const MAX_BATCH_LIMIT = 250;
+const DEFAULT_MAX_BYTES = 100 * 1024 * 1024;
+const MIN_MAX_BYTES = 1024 * 1024;
+const HARD_MAX_MIGRATION_BYTES = 512 * 1024 * 1024;
+const MAX_R2_KEY_LEN = 1024;
+const MAX_ERROR_LEN = 240;
+
+function clampInt(value: unknown, fallback: number, min: number, max: number): number {
+  const raw = Number(value);
+  if (!Number.isFinite(raw)) return fallback;
+  return Math.max(min, Math.min(max, Math.floor(raw)));
+}
+
+function sanitizeError(error: unknown): string {
+  const msg = error instanceof Error ? error.message : String(error);
+  return msg.replace(/[\r\n\0]+/g, " ").trim().slice(0, MAX_ERROR_LEN) || "UNKNOWN_ERROR";
+}
+
+async function streamToBuffer(body: unknown, maxBytes: number): Promise<Buffer> {
   if (!body || typeof (body as AsyncIterable<unknown>)[Symbol.asyncIterator] !== "function") {
     return Buffer.alloc(0);
   }
   const chunks: Buffer[] = [];
+  let total = 0;
   for await (const chunk of body as AsyncIterable<unknown>) {
     if (Buffer.isBuffer(chunk)) {
+      total += chunk.length;
+      if (total > maxBytes) throw new Error("STREAM_TOO_LARGE");
       chunks.push(chunk);
       continue;
     }
     if (chunk instanceof Uint8Array) {
-      chunks.push(Buffer.from(chunk));
+      const out = Buffer.from(chunk);
+      total += out.length;
+      if (total > maxBytes) throw new Error("STREAM_TOO_LARGE");
+      chunks.push(out);
       continue;
     }
     if (typeof chunk === "string") {
-      chunks.push(Buffer.from(chunk));
+      const out = Buffer.from(chunk);
+      total += out.length;
+      if (total > maxBytes) throw new Error("STREAM_TOO_LARGE");
+      chunks.push(out);
       continue;
     }
     if (chunk instanceof ArrayBuffer) {
-      chunks.push(Buffer.from(new Uint8Array(chunk)));
+      const out = Buffer.from(new Uint8Array(chunk));
+      total += out.length;
+      if (total > maxBytes) throw new Error("STREAM_TOO_LARGE");
+      chunks.push(out);
       continue;
     }
     throw new Error("UNSUPPORTED_STREAM_CHUNK");
@@ -48,12 +80,10 @@ export async function migrateLegacyEncryptionBatch(args: {
   orgId?: string | null;
 }) {
   const r2Bucket = getR2Bucket();
-  const limit = Math.max(1, Math.min(250, Math.floor(args.limit || 25)));
+  const limit = clampInt(args.limit, DEFAULT_BATCH_LIMIT, 1, MAX_BATCH_LIMIT);
   const dryRun = Boolean(args.dryRun);
-  const maxBytes = Math.max(
-    1024 * 1024,
-    Number(args.maxBytes || process.env.LEGACY_MIGRATION_MAX_BYTES || 100 * 1024 * 1024)
-  );
+  const maxBytesRaw = args.maxBytes ?? process.env.LEGACY_MIGRATION_MAX_BYTES ?? DEFAULT_MAX_BYTES;
+  const maxBytes = clampInt(maxBytesRaw, DEFAULT_MAX_BYTES, MIN_MAX_BYTES, HARD_MAX_MIGRATION_BYTES);
 
   const rows = (await sql`
     select
@@ -80,10 +110,10 @@ export async function migrateLegacyEncryptionBatch(args: {
   const errors: Array<{ docId: string; error: string }> = [];
 
   for (const row of rows) {
-    const docId = row.id;
+    const docId = String(row.id || "").trim();
     const bucket = row.r2_bucket || r2Bucket;
-    const key = row.r2_key || "";
-    if (!key || bucket !== r2Bucket) {
+    const key = String(row.r2_key || "").trim();
+    if (!UUID_RE.test(docId) || !key || key.length > MAX_R2_KEY_LEN || bucket !== r2Bucket) {
       skipped += 1;
       continue;
     }
@@ -101,7 +131,7 @@ export async function migrateLegacyEncryptionBatch(args: {
       }
 
       const getObj = await r2Client.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
-      const plaintext = await streamToBuffer((getObj as { Body?: unknown }).Body);
+      const plaintext = await streamToBuffer((getObj as { Body?: unknown }).Body, maxBytes);
       if (!plaintext.length || plaintext.length > maxBytes) {
         throw new Error("INVALID_SIZE");
       }
@@ -148,7 +178,7 @@ export async function migrateLegacyEncryptionBatch(args: {
 
       migrated += 1;
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
+      const msg = sanitizeError(e);
       failed += 1;
       errors.push({ docId, error: msg });
     }
