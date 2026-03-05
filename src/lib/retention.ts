@@ -55,6 +55,10 @@ function envBool(name: string, fallback: boolean): boolean {
   return fallback;
 }
 
+function safeRetentionError(prefix: string): string {
+  return `${prefix}_failed`;
+}
+
 async function deleteOlderThan(args: {
   table:
     | "public.doc_views"
@@ -151,7 +155,7 @@ async function deleteOlderThan(args: {
       }
       // Continue to next column candidate.
       if (col === columnCandidates[columnCandidates.length - 1]) {
-        return { table, ok: false, error: msg };
+        return { table, ok: false, error: safeRetentionError("delete_older_than") };
       }
     }
   }
@@ -189,8 +193,7 @@ async function deleteExpiredShareTokens(args: { graceDays: number }): Promise<Re
     if (isPgErrCode(e, "42P01")) {
       return { table: "public.share_tokens", ok: false, error: "Table not found (SQLSTATE 42P01)." };
     }
-    const msg = e instanceof Error ? e.message : String(e);
-    return { table: "public.share_tokens", ok: false, error: msg };
+    return { table: "public.share_tokens", ok: false, error: safeRetentionError("delete_expired_share_tokens") };
   }
 }
 
@@ -284,8 +287,7 @@ async function auditR2OrphanedObjects(args: {
       note: noteParts.join("; ") || undefined,
     };
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    return { table: "r2.orphaned_objects", ok: false, error: msg };
+    return { table: "r2.orphaned_objects", ok: false, error: safeRetentionError("r2_orphan_sweep") };
   }
 }
 
@@ -302,7 +304,10 @@ export async function runR2OrphanSweep(args?: {
   maxObjects?: number;
   deleteOrphans?: boolean;
 }): Promise<RetentionResult> {
-  const maxObjects = Math.max(1, Math.min(50_000, Math.floor(Number(args?.maxObjects || envInt("RETENTION_R2_AUDIT_MAX_OBJECTS", 5000)))));
+  const rawMaxObjects = Number(args?.maxObjects ?? envInt("RETENTION_R2_AUDIT_MAX_OBJECTS", 5000));
+  const maxObjects = Number.isFinite(rawMaxObjects)
+    ? Math.max(1, Math.min(50_000, Math.floor(rawMaxObjects)))
+    : 5000;
   const deleteOrphans =
     typeof args?.deleteOrphans === "boolean"
       ? args.deleteOrphans

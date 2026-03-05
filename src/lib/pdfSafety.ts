@@ -35,6 +35,9 @@ export type PdfSafetyResult =
       details?: Record<string, unknown>;
     };
 
+const PDF_TEXT_SCAN_MAX_BYTES = 4 * 1024 * 1024;
+const PDF_FULL_PAGE_COUNT_MAX_BYTES = 25 * 1024 * 1024;
+
 function bufToAscii(b: Buffer): string {
   // loss-tolerant scan string
   return b.toString("latin1");
@@ -117,8 +120,10 @@ function validatePdfBufferInternal(args: {
 }): PdfSafetyResult {
   const bytes = args.bytes;
   const size = bytes.length;
-  const absMaxBytes = Number(args.absMaxBytes ?? 1_000_000_000);
-  const maxPdfPages = Math.max(0, Number(args.maxPdfPages ?? 0));
+  const absMaxRaw = Number(args.absMaxBytes ?? 1_000_000_000);
+  const absMaxBytes = Number.isFinite(absMaxRaw) && absMaxRaw > 0 ? Math.floor(absMaxRaw) : 1_000_000_000;
+  const maxPdfPagesRaw = Number(args.maxPdfPages ?? 0);
+  const maxPdfPages = Number.isFinite(maxPdfPagesRaw) ? Math.max(0, Math.floor(maxPdfPagesRaw)) : 0;
 
   if (!Number.isFinite(size) || size <= 0) {
     return { ok: false, error: "UNREADABLE", message: "Object size is invalid." };
@@ -130,10 +135,15 @@ function validatePdfBufferInternal(args: {
     return { ok: false, error: "NOT_PDF", message: "Missing %PDF- header (not a valid PDF)." };
   }
 
-  const sample = bufToAscii(bytes);
+  const scanBytes = bytes.subarray(0, Math.min(bytes.length, PDF_TEXT_SCAN_MAX_BYTES));
+  const sample = bufToAscii(scanBytes);
   const flags = findFlags(sample);
   const riskLevel = riskFromFlags(flags);
-  const pageCount = countPdfPages(sample);
+  let pageCount = countPdfPages(sample);
+
+  if (maxPdfPages > 0 && bytes.length <= PDF_FULL_PAGE_COUNT_MAX_BYTES && bytes.length > scanBytes.length) {
+    pageCount = countPdfPages(bufToAscii(bytes));
+  }
 
   if (maxPdfPages > 0 && pageCount > maxPdfPages) {
     return {
@@ -149,7 +159,7 @@ function validatePdfBufferInternal(args: {
     isPdf: true,
     riskLevel,
     flags,
-    details: { sampledBytes: bytes.length, size, pageCount, maxPdfPages: maxPdfPages || null },
+    details: { sampledBytes: scanBytes.length, size, pageCount, maxPdfPages: maxPdfPages || null },
   };
 }
 
@@ -184,10 +194,18 @@ export async function validatePdfInR2(args: {
   // Max object size eligible for full page-count pass.
   pageCountCheckMaxBytes?: number;
 }): Promise<PdfSafetyResult> {
-  const sampleBytes = Math.max(4 * 1024, Math.min(Number(args.sampleBytes ?? 256 * 1024), 1024 * 1024));
-  const absMaxBytes = Number(args.absMaxBytes ?? 1_000_000_000);
-  const maxPdfPages = Math.max(0, Number(args.maxPdfPages ?? 0));
-  const pageCountCheckMaxBytes = Math.max(1024 * 1024, Number(args.pageCountCheckMaxBytes ?? 25 * 1024 * 1024));
+  const sampleBytesRaw = Number(args.sampleBytes ?? 256 * 1024);
+  const sampleBytes = Number.isFinite(sampleBytesRaw)
+    ? Math.max(4 * 1024, Math.min(Math.floor(sampleBytesRaw), 1024 * 1024))
+    : 256 * 1024;
+  const absMaxRaw = Number(args.absMaxBytes ?? 1_000_000_000);
+  const absMaxBytes = Number.isFinite(absMaxRaw) && absMaxRaw > 0 ? Math.floor(absMaxRaw) : 1_000_000_000;
+  const maxPdfPagesRaw = Number(args.maxPdfPages ?? 0);
+  const maxPdfPages = Number.isFinite(maxPdfPagesRaw) ? Math.max(0, Math.floor(maxPdfPagesRaw)) : 0;
+  const pageCountCheckMaxRaw = Number(args.pageCountCheckMaxBytes ?? PDF_FULL_PAGE_COUNT_MAX_BYTES);
+  const pageCountCheckMaxBytes = Number.isFinite(pageCountCheckMaxRaw)
+    ? Math.max(1024 * 1024, Math.floor(pageCountCheckMaxRaw))
+    : PDF_FULL_PAGE_COUNT_MAX_BYTES;
 
   try {
     const head = await r2Client.send(new HeadObjectCommand({ Bucket: args.bucket, Key: args.key }));

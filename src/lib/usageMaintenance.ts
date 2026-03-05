@@ -1,5 +1,14 @@
 import { sql } from "@/lib/db";
 
+function isPgErrCode(err: unknown, code: string): boolean {
+  return (
+    !!err &&
+    typeof err === "object" &&
+    "code" in err &&
+    String((err as { code?: unknown }).code || "") === code
+  );
+}
+
 export async function runUsageMaintenance(): Promise<{
   seededCurrentMonth: number;
   deletedOldDailyRows: number;
@@ -35,7 +44,7 @@ export async function runUsageMaintenance(): Promise<{
       deletedOldDailyRows: Number(dailyRows?.[0]?.c ?? 0),
     };
   } catch (e: unknown) {
-    if (typeof e === "object" && e !== null && "code" in e && String((e as { code?: string }).code || "") === "42P01") {
+    if (isPgErrCode(e, "42P01") || isPgErrCode(e, "42703")) {
       return { seededCurrentMonth: 0, deletedOldDailyRows: 0 };
     }
     throw e;
