@@ -210,6 +210,7 @@ test.describe("api route guardrails", () => {
 
   test("admin control-plane routes use route timeout guards", () => {
     const routes = [
+      "src/app/api/admin/abuse/route.ts",
       "src/app/api/admin/audit/export/route.ts",
       "src/app/api/admin/dmca/route.ts",
       "src/app/api/admin/security/rollback/route.ts",
@@ -229,6 +230,8 @@ test.describe("api route guardrails", () => {
   test("public abuse and webhook intake routes use route timeout guards", () => {
     const routes = [
       "src/app/api/v1/abuse/report/route.ts",
+      "src/app/api/v1/aliases/route.ts",
+      "src/app/api/v1/takedown/route.ts",
       "src/app/api/v1/webhooks/test/route.ts",
     ];
     for (const route of routes) {

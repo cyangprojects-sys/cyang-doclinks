@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { enforceGlobalApiRateLimit, clientIpKey, logSecurityEvent } from "@/lib/securityTelemetry";
 import { resolveShareMeta, resolveDoc } from "@/lib/resolveDoc";
+import { getRouteTimeoutMs, isRouteTimeoutError, withRouteTimeout } from "@/lib/routeTimeout";
 
 type Body = {
   token?: string | null;
@@ -70,129 +71,142 @@ function parseEmail(value: unknown): string | null {
 }
 
 export async function POST(req: NextRequest) {
-  // Basic global throttle
-  const globalRl = await enforceGlobalApiRateLimit({
-    req,
-    scope: "ip:api",
-    limit: Number(process.env.RATE_LIMIT_API_IP_PER_MIN || 240),
-    windowSeconds: 60,
-    strict: true,
-  });
-  if (!globalRl.ok) {
-    return NextResponse.json({ ok: false, error: "RATE_LIMITED" }, { status: 429 });
-  }
-  if (parseJsonBodyLength(req) > MAX_TAKEDOWN_BODY_BYTES) {
-    return NextResponse.json({ ok: false, error: "PAYLOAD_TOO_LARGE" }, { status: 413 });
-  }
-
-  const ipInfo = clientIpKey(req);
-  let body: Body | null = null;
+  const timeoutMs = getRouteTimeoutMs("ROUTE_TIMEOUT_API_V1_TAKEDOWN_MS", 20_000);
   try {
-    const parsed = await req.json();
-    body = parsed && typeof parsed === "object" && !Array.isArray(parsed) ? (parsed as Body) : null;
-  } catch {
-    body = null;
-  }
-  if (!body) return NextResponse.json({ ok: false, error: "BAD_JSON" }, { status: 400 });
+    return await withRouteTimeout(
+      (async () => {
+        // Basic global throttle
+        const globalRl = await enforceGlobalApiRateLimit({
+          req,
+          scope: "ip:api",
+          limit: Number(process.env.RATE_LIMIT_API_IP_PER_MIN || 240),
+          windowSeconds: 60,
+          strict: true,
+        });
+        if (!globalRl.ok) {
+          return NextResponse.json({ ok: false, error: "RATE_LIMITED" }, { status: 429 });
+        }
+        if (parseJsonBodyLength(req) > MAX_TAKEDOWN_BODY_BYTES) {
+          return NextResponse.json({ ok: false, error: "PAYLOAD_TOO_LARGE" }, { status: 413 });
+        }
 
-  const tokenRaw = String(body.token ?? "").trim();
-  const token = parseToken(body.token);
-  if (tokenRaw && !token) {
-    return NextResponse.json({ ok: false, error: "INVALID_TOKEN" }, { status: 400 });
-  }
+        const ipInfo = clientIpKey(req);
+        let body: Body | null = null;
+        try {
+          const parsed = await req.json();
+          body = parsed && typeof parsed === "object" && !Array.isArray(parsed) ? (parsed as Body) : null;
+        } catch {
+          body = null;
+        }
+        if (!body) return NextResponse.json({ ok: false, error: "BAD_JSON" }, { status: 400 });
 
-  const aliasRaw = String(body.alias ?? "").trim();
-  const alias = parseAlias(body.alias);
-  if (aliasRaw && !alias) {
-    return NextResponse.json({ ok: false, error: "INVALID_ALIAS" }, { status: 400 });
-  }
+        const tokenRaw = String(body.token ?? "").trim();
+        const token = parseToken(body.token);
+        if (tokenRaw && !token) {
+          return NextResponse.json({ ok: false, error: "INVALID_TOKEN" }, { status: 400 });
+        }
 
-  const docIdInput = norm(body.doc_id, MAX_DOC_ID_INPUT_LEN);
-  if (docIdInput && !isUuid(docIdInput)) {
-    return NextResponse.json({ ok: false, error: "INVALID_DOC_ID" }, { status: 400 });
-  }
+        const aliasRaw = String(body.alias ?? "").trim();
+        const alias = parseAlias(body.alias);
+        if (aliasRaw && !alias) {
+          return NextResponse.json({ ok: false, error: "INVALID_ALIAS" }, { status: 400 });
+        }
 
-  const requesterName = norm(body.requester_name, MAX_REQUESTER_FIELD_LEN);
-  const requesterEmailRaw = String(body.requester_email ?? "").trim();
-  const requesterEmail = parseEmail(body.requester_email);
-  if (requesterEmailRaw && !requesterEmail) {
-    return NextResponse.json({ ok: false, error: "INVALID_REQUESTER_EMAIL" }, { status: 400 });
-  }
-  const claimantCompany = norm(body.claimant_company, MAX_REQUESTER_FIELD_LEN);
+        const docIdInput = norm(body.doc_id, MAX_DOC_ID_INPUT_LEN);
+        if (docIdInput && !isUuid(docIdInput)) {
+          return NextResponse.json({ ok: false, error: "INVALID_DOC_ID" }, { status: 400 });
+        }
 
-  const message = norm(body.message, MAX_MESSAGE_LEN);
-  const statement = norm(body.statement, MAX_MESSAGE_LEN);
-  const signature = norm(body.signature, MAX_SIGNATURE_LEN);
+        const requesterName = norm(body.requester_name, MAX_REQUESTER_FIELD_LEN);
+        const requesterEmailRaw = String(body.requester_email ?? "").trim();
+        const requesterEmail = parseEmail(body.requester_email);
+        if (requesterEmailRaw && !requesterEmail) {
+          return NextResponse.json({ ok: false, error: "INVALID_REQUESTER_EMAIL" }, { status: 400 });
+        }
+        const claimantCompany = norm(body.claimant_company, MAX_REQUESTER_FIELD_LEN);
 
-  if (!token && !alias && !docIdInput) {
-    return NextResponse.json({ ok: false, error: "MISSING_TARGET" }, { status: 400 });
-  }
+        const message = norm(body.message, MAX_MESSAGE_LEN);
+        const statement = norm(body.statement, MAX_MESSAGE_LEN);
+        const signature = norm(body.signature, MAX_SIGNATURE_LEN);
 
-  // Resolve to doc_id (best-effort). Prefer token -> alias -> explicit.
-  let docId: string | null = null;
-  let shareToken: string | null = token || null;
+        if (!token && !alias && !docIdInput) {
+          return NextResponse.json({ ok: false, error: "MISSING_TARGET" }, { status: 400 });
+        }
 
-  try {
-    if (token) {
-      const meta = await resolveShareMeta(token);
-      if (meta.ok) docId = meta.docId;
-    } else if (alias) {
-      const r = await resolveDoc({ alias });
-      if (r.ok) docId = r.docId;
-    } else if (docIdInput) {
-      docId = docIdInput;
+        // Resolve to doc_id (best-effort). Prefer token -> alias -> explicit.
+        let docId: string | null = null;
+        let shareToken: string | null = token || null;
+
+        try {
+          if (token) {
+            const meta = await resolveShareMeta(token);
+            if (meta.ok) docId = meta.docId;
+          } else if (alias) {
+            const r = await resolveDoc({ alias });
+            if (r.ok) docId = r.docId;
+          } else if (docIdInput) {
+            docId = docIdInput;
+          }
+        } catch {
+          // ignore resolution errors; we still store notice
+        }
+        if (docId && !isUuid(docId)) {
+          docId = null;
+        }
+
+        const rows = (await sql`
+          insert into public.dmca_notices (
+            doc_id, share_token,
+            requester_name, requester_email, claimant_company,
+            message, statement, signature,
+            ip_hash, user_agent
+          )
+          values (
+            ${docId ? sql`${docId}::uuid` : sql`null`},
+            ${shareToken},
+            ${requesterName}, ${requesterEmail}, ${claimantCompany},
+            ${message}, ${statement}, ${signature},
+            ${ipInfo.ipHash},
+            ${req.headers.get("user-agent") || ""}
+          )
+          returning id::text as id
+        `) as unknown as Array<{ id: string }>;
+
+        const noticeId = rows?.[0]?.id ?? null;
+
+        // Put doc into disabled pending review (if we could resolve it).
+        // Manual quarantine is deprecated; quarantine should come from high-risk scan policy only.
+        if (docId) {
+          await sql`
+            update public.docs
+            set
+              dmca_status = 'pending',
+              dmca_last_notice_id = ${noticeId ? sql`${noticeId}::uuid` : sql`null`},
+              moderation_status = 'disabled',
+              disabled_at = now(),
+              disabled_reason = coalesce(disabled_reason, 'dmca:pending')
+            where id = ${docId}::uuid
+          `;
+        }
+
+        await logSecurityEvent({
+          type: "dmca_notice_submitted",
+          severity: "medium",
+          ip: ipInfo.ip,
+          docId: docId || undefined,
+          scope: "dmca",
+          message: "DMCA/takedown notice submitted",
+          meta: { noticeId, hasDocId: !!docId, hasToken: !!token, hasAlias: !!alias },
+        });
+
+        return NextResponse.json({ ok: true, id: noticeId });
+      })(),
+      timeoutMs
+    );
+  } catch (e: unknown) {
+    if (isRouteTimeoutError(e)) {
+      return NextResponse.json({ ok: false, error: "TIMEOUT" }, { status: 504 });
     }
-  } catch {
-    // ignore resolution errors; we still store notice
+    return NextResponse.json({ ok: false, error: "SERVER_ERROR" }, { status: 500 });
   }
-  if (docId && !isUuid(docId)) {
-    docId = null;
-  }
-
-  const rows = (await sql`
-    insert into public.dmca_notices (
-      doc_id, share_token,
-      requester_name, requester_email, claimant_company,
-      message, statement, signature,
-      ip_hash, user_agent
-    )
-    values (
-      ${docId ? sql`${docId}::uuid` : sql`null`},
-      ${shareToken},
-      ${requesterName}, ${requesterEmail}, ${claimantCompany},
-      ${message}, ${statement}, ${signature},
-      ${ipInfo.ipHash},
-      ${req.headers.get("user-agent") || ""}
-    )
-    returning id::text as id
-  `) as unknown as Array<{ id: string }>;
-
-  const noticeId = rows?.[0]?.id ?? null;
-
-  // Put doc into disabled pending review (if we could resolve it).
-  // Manual quarantine is deprecated; quarantine should come from high-risk scan policy only.
-  if (docId) {
-    await sql`
-      update public.docs
-      set
-        dmca_status = 'pending',
-        dmca_last_notice_id = ${noticeId ? sql`${noticeId}::uuid` : sql`null`},
-        moderation_status = 'disabled',
-        disabled_at = now(),
-        disabled_reason = coalesce(disabled_reason, 'dmca:pending')
-      where id = ${docId}::uuid
-    `;
-  }
-
-  await logSecurityEvent({
-    type: "dmca_notice_submitted",
-    severity: "medium",
-    ip: ipInfo.ip,
-    docId: docId || undefined,
-    scope: "dmca",
-    message: "DMCA/takedown notice submitted",
-    meta: { noticeId, hasDocId: !!docId, hasToken: !!token, hasAlias: !!alias },
-  });
-
-  return NextResponse.json({ ok: true, id: noticeId });
 }
