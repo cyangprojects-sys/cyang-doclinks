@@ -85,10 +85,12 @@ Status key: `done` | `pending`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\d\[alias]\SharePanel.tsx`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\signup\page.tsx`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\accessTicket.ts`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\admin.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\apiAuth.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\apiKeys.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\alias.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\analytics.ts`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\auth.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\audit.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\backupRecovery.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\billingFlags.ts`
@@ -114,6 +116,7 @@ Status key: `done` | `pending`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\oauth-google.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\officePreview.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\observability.ts`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\owner.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\packs.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\password.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\publicBaseUrl.ts`
