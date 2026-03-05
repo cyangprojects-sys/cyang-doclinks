@@ -4,7 +4,7 @@ Total modules with lint warnings:
 66
 
 Remaining pending modules:
-42
+41
 
 Status key: `done` | `pending`
 
@@ -20,7 +20,7 @@ Status key: `done` | `pending`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\(owner)\layout.tsx`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\(owner)\viewer-uploads\ViewerUploadsTableClient.tsx`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\(owner)\webhooks\actions.ts`
-- pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\actions.ts`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\actions.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\dashboard\UploadPanel.tsx`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\docs\[docId]\page.tsx`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\layout.tsx`
@@ -87,8 +87,8 @@ Status key: `done` | `pending`
 
 ## Stale action review queue (security follow-up)
 
-- pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\actions.ts:updateRetentionSettingsAction` (no in-repo references)
-- pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\actions.ts:updateExpirationAlertSettingsAction` (no in-repo references)
-- pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\actions.ts:sendExpirationAlertAction` (no in-repo references)
-- pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\actions.ts:markAdminNotificationReadAction` (no in-repo references)
-- pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\actions.ts:markAllAdminNotificationsReadAction` (no in-repo references)
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\actions.ts:updateRetentionSettingsAction` (guarded by `ADMIN_ENABLE_STALE_ACTIONS`)
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\actions.ts:updateExpirationAlertSettingsAction` (guarded by `ADMIN_ENABLE_STALE_ACTIONS`)
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\actions.ts:sendExpirationAlertAction` (guarded by `ADMIN_ENABLE_STALE_ACTIONS`)
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\actions.ts:markAdminNotificationReadAction` (guarded by `ADMIN_ENABLE_STALE_ACTIONS`)
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\actions.ts:markAllAdminNotificationsReadAction` (guarded by `ADMIN_ENABLE_STALE_ACTIONS`)

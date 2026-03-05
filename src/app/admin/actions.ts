@@ -121,6 +121,16 @@ function parseAliasTtlDays(raw: unknown): number {
   return 30;
 }
 
+function isTruthyEnv(raw: string | undefined): boolean {
+  const v = String(raw || "").trim().toLowerCase();
+  return v === "1" || v === "true" || v === "yes" || v === "on";
+}
+
+function assertStaleAdminActionEnabled(actionName: string): void {
+  if (isTruthyEnv(process.env.ADMIN_ENABLE_STALE_ACTIONS)) return;
+  throw new Error(`ACTION_RETIRED:${actionName}`);
+}
+
 async function purgeDocGraphRows(docId: string): Promise<boolean> {
   const shareTokensExists = await tableExists("public.share_tokens");
   const shareUnlocksExists = await tableExists("public.share_unlocks");
@@ -392,6 +402,7 @@ export async function emailMagicLinkAction(formData: FormData): Promise<void> {
 
 // Retention settings (admin toggle)
 export async function updateRetentionSettingsAction(formData: FormData): Promise<void> {
+  assertStaleAdminActionEnabled("updateRetentionSettingsAction");
   await requireRole("admin");
 
   const enabledRaw = String(formData.get("retention_enabled") ?? "");
@@ -415,6 +426,7 @@ export async function updateRetentionSettingsAction(formData: FormData): Promise
 
 // Expiration alert settings (admin toggle)
 export async function updateExpirationAlertSettingsAction(formData: FormData): Promise<void> {
+  assertStaleAdminActionEnabled("updateExpirationAlertSettingsAction");
   await requireRole("admin");
 
   const enabledRaw = String(formData.get("expiration_alerts_enabled") ?? "");
@@ -907,6 +919,7 @@ export async function bulkDeleteDocsAction(formData: FormData): Promise<void> {
 
 // Expiration warning email (best-effort; uses doc_aliases.expires_at + share_tokens.expires_at)
 export async function sendExpirationAlertAction(formData: FormData): Promise<void> {
+  assertStaleAdminActionEnabled("sendExpirationAlertAction");
   const u = await requireRole("admin");
 
   const settingsRes = await getExpirationAlertSettings();
@@ -1054,6 +1067,7 @@ export async function revokeApiKeyAction(formData: FormData) {
 // --- Admin notifications (expiration alerts) ---
 
 export async function markAdminNotificationReadAction(formData: FormData) {
+  assertStaleAdminActionEnabled("markAdminNotificationReadAction");
   await requireRole("admin");
   const u = await requireUser();
 
@@ -1072,6 +1086,7 @@ export async function markAdminNotificationReadAction(formData: FormData) {
 }
 
 export async function markAllAdminNotificationsReadAction(_: FormData) {
+  assertStaleAdminActionEnabled("markAllAdminNotificationsReadAction");
   await requireRole("admin");
   const u = await requireUser();
 
