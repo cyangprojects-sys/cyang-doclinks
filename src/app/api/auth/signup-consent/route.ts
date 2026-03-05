@@ -1,8 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { enforceGlobalApiRateLimit } from "@/lib/securityTelemetry";
-import { setSignupConsentCookie } from "@/lib/signup";
+import { isTermsAccepted, setSignupConsentCookie } from "@/lib/signup";
 
 export const runtime = "nodejs";
+const MAX_CONSENT_BODY_BYTES = 8 * 1024;
+
+function parseJsonBodyLength(req: NextRequest): number {
+  const raw = String(req.headers.get("content-length") || "").trim();
+  const out = Number(raw);
+  return Number.isFinite(out) ? Math.max(0, Math.floor(out)) : 0;
+}
 
 export async function POST(req: NextRequest) {
   const rl = await enforceGlobalApiRateLimit({
@@ -19,8 +26,12 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  if (parseJsonBodyLength(req) > MAX_CONSENT_BODY_BYTES) {
+    return NextResponse.json({ ok: false, error: "PAYLOAD_TOO_LARGE" }, { status: 413 });
+  }
+
   const body = (await req.json().catch(() => ({}))) as { acceptTerms?: boolean };
-  if (!body.acceptTerms) {
+  if (!isTermsAccepted(body.acceptTerms)) {
     return NextResponse.json({ ok: false, error: "TERMS_REQUIRED" }, { status: 400 });
   }
 

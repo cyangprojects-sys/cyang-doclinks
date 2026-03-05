@@ -3,6 +3,7 @@ import { sendAccountActivationEmail } from "@/lib/email";
 import { enforceGlobalApiRateLimit } from "@/lib/securityTelemetry";
 import {
   createOrRefreshManualSignup,
+  isTermsAccepted,
   recordTermsAcceptance,
   SIGNUP_TERMS_VERSION,
   validatePasswordComplexity,
@@ -23,8 +24,33 @@ type Payload = {
   acceptTerms?: boolean;
 };
 
+const MAX_SIGNUP_BODY_BYTES = 32 * 1024;
+const MAX_FIRST_LAST_LEN = 120;
+const MAX_COMPANY_LEN = 200;
+const MAX_JOB_TITLE_LEN = 160;
+const MAX_COUNTRY_LEN = 120;
+
 function isEmail(value: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
+function parseJsonBodyLength(req: NextRequest): number {
+  const raw = String(req.headers.get("content-length") || "").trim();
+  const out = Number(raw);
+  return Number.isFinite(out) ? Math.max(0, Math.floor(out)) : 0;
+}
+
+function cleanRequiredText(valueRaw: unknown, maxLen: number): string {
+  const value = String(valueRaw || "").trim();
+  if (!value || value.length > maxLen || /[\r\n\0]/.test(value)) return "";
+  return value;
+}
+
+function cleanOptionalText(valueRaw: unknown, maxLen: number): string {
+  const value = String(valueRaw || "").trim();
+  if (!value) return "";
+  if (value.length > maxLen || /[\r\n\0]/.test(value)) return "";
+  return value;
 }
 
 export async function POST(req: NextRequest) {
@@ -42,16 +68,20 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  if (parseJsonBodyLength(req) > MAX_SIGNUP_BODY_BYTES) {
+    return NextResponse.json({ ok: false, error: "PAYLOAD_TOO_LARGE" }, { status: 413 });
+  }
+
   const body = (await req.json().catch(() => ({}))) as Payload;
 
-  const firstName = String(body.firstName || "").trim();
-  const lastName = String(body.lastName || "").trim();
+  const firstName = cleanRequiredText(body.firstName, MAX_FIRST_LAST_LEN);
+  const lastName = cleanRequiredText(body.lastName, MAX_FIRST_LAST_LEN);
   const email = String(body.email || "").trim().toLowerCase();
   const password = String(body.password || "");
   const confirmPassword = String(body.confirmPassword || "");
-  const company = String(body.company || "").trim();
-  const jobTitle = String(body.jobTitle || "").trim();
-  const country = String(body.country || "").trim();
+  const company = cleanRequiredText(body.company, MAX_COMPANY_LEN);
+  const jobTitle = cleanOptionalText(body.jobTitle, MAX_JOB_TITLE_LEN);
+  const country = cleanRequiredText(body.country, MAX_COUNTRY_LEN);
 
   if (!firstName || !lastName || !email || !password || !confirmPassword || !company || !country) {
     return NextResponse.json({ ok: false, error: "MISSING_FIELDS" }, { status: 400 });
@@ -62,7 +92,7 @@ export async function POST(req: NextRequest) {
   if (password !== confirmPassword) {
     return NextResponse.json({ ok: false, error: "PASSWORD_MISMATCH" }, { status: 400 });
   }
-  if (!body.acceptTerms) {
+  if (!isTermsAccepted(body.acceptTerms)) {
     return NextResponse.json({ ok: false, error: "TERMS_REQUIRED" }, { status: 400 });
   }
 
@@ -87,6 +117,9 @@ export async function POST(req: NextRequest) {
     await recordTermsAcceptance(email, `manual_signup:${SIGNUP_TERMS_VERSION}`);
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : "SIGNUP_FAILED";
+    if (message.includes("INVALID_SIGNUP_INPUT")) {
+      return NextResponse.json({ ok: false, error: "INVALID_INPUT" }, { status: 400 });
+    }
     if (message.includes("SIGNUP_TABLES_MISSING")) {
       return NextResponse.json(
         { ok: false, error: "SIGNUP_NOT_CONFIGURED", message: "Run scripts/sql/signup_activation.sql first." },

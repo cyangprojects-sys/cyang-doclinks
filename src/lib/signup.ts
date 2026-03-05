@@ -18,6 +18,12 @@ export type ManualSignupInput = {
 
 const MAX_EMAIL_LEN = 320;
 const MAX_COMPLEXITY_PASSWORD_LEN = 1024;
+const MAX_SIGNUP_NAME_LEN = 120;
+const MAX_SIGNUP_COMPANY_LEN = 200;
+const MAX_SIGNUP_JOB_TITLE_LEN = 160;
+const MAX_SIGNUP_COUNTRY_LEN = 120;
+const MAX_ACCEPTANCE_SOURCE_LEN = 80;
+const MAX_ACTIVATION_TOKEN_LEN = 512;
 const BASIC_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function normalizeEmail(emailRaw: string): string {
@@ -26,6 +32,28 @@ function normalizeEmail(emailRaw: string): string {
   if (/[\r\n\0]/.test(email)) return "";
   if (!BASIC_EMAIL_RE.test(email)) return "";
   return email;
+}
+
+function normalizeTextField(valueRaw: string, maxLen: number): string {
+  const value = String(valueRaw || "").trim();
+  if (!value || value.length > maxLen) return "";
+  if (/[\r\n\0]/.test(value)) return "";
+  return value;
+}
+
+function normalizeOptionalTextField(valueRaw: string, maxLen: number): string {
+  const value = String(valueRaw || "").trim();
+  if (!value) return "";
+  if (value.length > maxLen || /[\r\n\0]/.test(value)) return "";
+  return value;
+}
+
+export function isTermsAccepted(value: unknown): boolean {
+  if (typeof value === "boolean") return value;
+  const raw = String(value ?? "");
+  if (!raw || /[\r\n\0]/.test(raw)) return false;
+  const normalized = raw.trim().toLowerCase();
+  return normalized === "1" || normalized === "true" || normalized === "yes" || normalized === "on";
 }
 
 async function signupTablesReady(): Promise<boolean> {
@@ -76,6 +104,8 @@ export async function hasSignupConsentCookie(): Promise<boolean> {
 export async function recordTermsAcceptance(emailRaw: string, source: string): Promise<void> {
   const email = normalizeEmail(emailRaw);
   if (!email) return;
+  const sourceValue = normalizeTextField(source, MAX_ACCEPTANCE_SOURCE_LEN);
+  if (!sourceValue) return;
   if (!(await legalAcceptancesReady())) return;
 
   let userAgent: string | null = null;
@@ -97,7 +127,7 @@ export async function recordTermsAcceptance(emailRaw: string, source: string): P
       ${email},
       ${SIGNUP_TERMS_VERSION},
       now(),
-      ${source},
+      ${sourceValue},
       ${userAgent}
     )
     on conflict (email, terms_version) do update
@@ -108,14 +138,24 @@ export async function recordTermsAcceptance(emailRaw: string, source: string): P
 }
 
 export async function createOrRefreshManualSignup(input: ManualSignupInput): Promise<{ token: string }> {
+  const email = normalizeEmail(input.email);
+  const firstName = normalizeTextField(input.firstName, MAX_SIGNUP_NAME_LEN);
+  const lastName = normalizeTextField(input.lastName, MAX_SIGNUP_NAME_LEN);
+  const company = normalizeTextField(input.company, MAX_SIGNUP_COMPANY_LEN);
+  const jobTitle = normalizeOptionalTextField(input.jobTitle, MAX_SIGNUP_JOB_TITLE_LEN);
+  const country = normalizeTextField(input.country, MAX_SIGNUP_COUNTRY_LEN);
+  const password = String(input.password || "");
+  if (!email || !firstName || !lastName || !company || !country || !password || password.length > MAX_COMPLEXITY_PASSWORD_LEN) {
+    throw new Error("INVALID_SIGNUP_INPUT");
+  }
+
   if (!(await signupTablesReady())) {
     throw new Error("SIGNUP_TABLES_MISSING");
   }
 
-  const email = normalizeEmail(input.email);
   const token = randomToken(32);
   const tokenHash = hmacSha256Hex(token);
-  const passwordHash = hashPassword(input.password);
+  const passwordHash = hashPassword(password);
 
   await sql`
     insert into public.signup_accounts (
@@ -134,11 +174,11 @@ export async function createOrRefreshManualSignup(input: ManualSignupInput): Pro
     )
     values (
       ${email},
-      ${input.firstName.trim()},
-      ${input.lastName.trim()},
-      ${input.company.trim() || null},
-      ${input.jobTitle.trim() || null},
-      ${input.country.trim() || null},
+      ${firstName},
+      ${lastName},
+      ${company || null},
+      ${jobTitle || null},
+      ${country || null},
       ${passwordHash},
       ${SIGNUP_TERMS_VERSION},
       now(),
@@ -165,13 +205,17 @@ export async function createOrRefreshManualSignup(input: ManualSignupInput): Pro
 }
 
 export async function activateManualSignup(emailRaw: string, tokenRaw: string): Promise<{ ok: true; email: string }> {
+  const email = normalizeEmail(emailRaw);
+  const token = String(tokenRaw || "").trim();
+  if (!email || !token || token.length > MAX_ACTIVATION_TOKEN_LEN || /[\r\n\0]/.test(token)) {
+    throw new Error("INVALID_TOKEN");
+  }
+
   if (!(await signupTablesReady())) {
     throw new Error("SIGNUP_TABLES_MISSING");
   }
 
-  const email = normalizeEmail(emailRaw);
-  const tokenHash = hmacSha256Hex(String(tokenRaw || "").trim());
-  if (!email || !tokenHash) throw new Error("INVALID_TOKEN");
+  const tokenHash = hmacSha256Hex(token);
 
   const rows = (await sql`
     select
@@ -230,7 +274,8 @@ export async function activateManualSignup(emailRaw: string, tokenRaw: string): 
 export async function verifyManualCredentials(emailRaw: string, password: string): Promise<null | { email: string; name: string }> {
   if (!(await signupTablesReady())) return null;
   const email = normalizeEmail(emailRaw);
-  if (!email || !password) return null;
+  const rawPassword = String(password || "");
+  if (!email || !rawPassword || rawPassword.length > MAX_COMPLEXITY_PASSWORD_LEN || /[\0]/.test(rawPassword)) return null;
 
   const rows = (await sql`
     select
@@ -252,6 +297,6 @@ export async function verifyManualCredentials(emailRaw: string, password: string
 
   const row = rows?.[0];
   if (!row || !row.activated_at) return null;
-  if (!verifyPassword(password, row.password_hash)) return null;
+  if (!verifyPassword(rawPassword, row.password_hash)) return null;
   return { email: row.email, name: `${row.first_name} ${row.last_name}`.trim() };
 }

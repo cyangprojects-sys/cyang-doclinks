@@ -151,6 +151,14 @@ Remaining additional high-sensitivity modules pending: 0
 
 - none
 
+## Reswept modules (latest pass)
+
+Remaining resweep modules in current pass: 0
+
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\auth\manual-signup\route.ts`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\auth\signup-consent\route.ts`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\signup.ts`
+
 ## Stale actions removed
 
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\actions.ts:uploadPdfAction` (removed)
