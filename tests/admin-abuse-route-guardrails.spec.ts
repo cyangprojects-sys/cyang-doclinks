@@ -7,5 +7,6 @@ test.describe("admin abuse route guardrails", () => {
     expect(code.includes("const UUID_RE =")).toBeTruthy();
     expect(code.includes('error: "INVALID_DOC"')).toBeTruthy();
     expect(code.includes('error: "INVALID_REPORT"')).toBeTruthy();
+    expect(code.includes('"quarantine_doc"')).toBeFalsy();
   });
 });

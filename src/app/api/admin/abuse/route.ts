@@ -10,8 +10,6 @@ import { appendImmutableAudit } from "@/lib/immutableAudit";
 
 type Action =
   | { action: "disable_doc"; docId: string; reason?: string | null; reportId?: string | null }
-  // Backward-compat alias: manual quarantine has been retired; treated as disable_doc.
-  | { action: "quarantine_doc"; docId: string; reason?: string | null; reportId?: string | null }
   | { action: "override_quarantine"; docId: string; reason?: string | null; ttlMinutes?: number; confirm: string }
   | { action: "revoke_override"; docId: string; reason?: string | null; confirm: string }
   | { action: "revoke_share"; token: string; reason?: string | null; reportId?: string | null }
@@ -76,15 +74,12 @@ export async function POST(req: NextRequest) {
   const act = bodyString(rawBody, "action");
   const reason = bodyOptString(rawBody, "reason", 500);
 
-  if (act === "disable_doc" || act === "quarantine_doc") {
+  if (act === "disable_doc") {
     const docId = bodyString(rawBody, "docId");
     if (!docId) return NextResponse.json({ ok: false, error: "MISSING_DOC" }, { status: 400 });
     if (!isUuid(docId)) return NextResponse.json({ ok: false, error: "INVALID_DOC" }, { status: 400 });
     const appliedAction = "disable_doc";
-    const normalizedReason =
-      act === "quarantine_doc"
-        ? (reason ? `[from_quarantine_action] ${reason}` : "Manual quarantine action deprecated; doc disabled instead")
-        : reason;
+    const normalizedReason = reason;
 
     await sql`
       update public.docs
