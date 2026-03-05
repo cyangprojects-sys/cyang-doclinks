@@ -96,6 +96,7 @@ Status key: `done` | `pending`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\cookies.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\cronAuth.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\cronTelemetry.ts`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\dbSchema.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\debugAccess.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\demo.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\documentStatus.ts`
@@ -110,6 +111,7 @@ Status key: `done` | `pending`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\mfa.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\orgMembership.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\orgs.ts`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\oauth-google.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\officePreview.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\observability.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\packs.ts`

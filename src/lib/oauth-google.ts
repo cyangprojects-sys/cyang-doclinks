@@ -1,10 +1,35 @@
 // src/lib/oauth-google.ts
 import * as client from "openid-client";
 
+const MAX_ENV_VALUE_LEN = 512;
+const MAX_CHECK_LEN = 512;
+
 function requireEnv(name: "APP_URL" | "GOOGLE_CLIENT_ID" | "GOOGLE_CLIENT_SECRET"): string {
-  const value = (process.env[name] || "").trim();
+  const raw = String(process.env[name] || "");
+  if (!raw || raw.length > MAX_ENV_VALUE_LEN || /[\r\n\0]/.test(raw)) throw new Error(`Missing ${name}`);
+  const value = raw.trim();
   if (!value) throw new Error(`Missing ${name}`);
   return value;
+}
+
+function normalizeAppBaseUrl(value: string): string {
+  let parsed: URL;
+  try {
+    parsed = new URL(value);
+  } catch {
+    throw new Error("INVALID_APP_URL");
+  }
+  if (parsed.protocol !== "https:" && parsed.protocol !== "http:") throw new Error("INVALID_APP_URL");
+  if (parsed.username || parsed.password) throw new Error("INVALID_APP_URL");
+  return parsed.toString().replace(/\/+$/, "");
+}
+
+function normalizeCheckValue(value: string, name: "codeVerifier" | "state" | "nonce"): string {
+  const raw = String(value || "").trim();
+  if (!raw || raw.length > MAX_CHECK_LEN || /[\r\n\0]/.test(raw)) {
+    throw new Error(`INVALID_${name.toUpperCase()}`);
+  }
+  return raw;
 }
 
 /**
@@ -34,7 +59,8 @@ export async function getGoogleConfig(): Promise<client.Configuration> {
  * Update this path if your callback route differs.
  */
 export function googleRedirectUri(): string {
-  return `${requireEnv("APP_URL")}/auth/google/callback`;
+  const appBaseUrl = normalizeAppBaseUrl(requireEnv("APP_URL"));
+  return `${appBaseUrl}/auth/google/callback`;
 }
 
 export type GoogleAuthRequest = {
@@ -98,15 +124,20 @@ export async function exchangeGoogleCode(
   tokens: client.TokenEndpointResponse & client.TokenEndpointResponseHelpers;
   claims: client.IDToken | undefined;
 }> {
+  const safeChecks = {
+    codeVerifier: normalizeCheckValue(checks.codeVerifier, "codeVerifier"),
+    state: normalizeCheckValue(checks.state, "state"),
+    nonce: normalizeCheckValue(checks.nonce, "nonce"),
+  };
   const config = await getGoogleConfig();
 
   const tokens = await client.authorizationCodeGrant(
     config,
     req,
     {
-      pkceCodeVerifier: checks.codeVerifier,
-      expectedState: checks.state,
-      expectedNonce: checks.nonce,
+      pkceCodeVerifier: safeChecks.codeVerifier,
+      expectedState: safeChecks.state,
+      expectedNonce: safeChecks.nonce,
     }
   );
 
