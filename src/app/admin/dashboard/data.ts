@@ -1,0 +1,318 @@
+import { sql } from "@/lib/db";
+import { getPlanForUser } from "@/lib/monetization";
+import { roleAtLeast, type AuthedUser } from "@/lib/authz";
+import { type ShareRow } from "./SharesTableClient";
+import { type UnifiedDocRow } from "./UnifiedDocsTableClient";
+import { type ViewsByDocRow } from "./ViewsByDocTableClient";
+
+export type HeaderDoc = {
+  docId: string;
+  title: string;
+  docState?: string | null;
+  scanState?: string | null;
+  moderationStatus?: string | null;
+};
+
+export type RecentDocRow = {
+  doc_id: string;
+  doc_title: string | null;
+  doc_state: string | null;
+  scan_status: string | null;
+  moderation_status: string | null;
+  created_at: string | null;
+};
+
+type DashboardCtx = {
+  canSeeAll: boolean;
+  canCheckEncryptionStatus: boolean;
+  planId: "free" | "pro";
+  nowTs: number;
+  hasDocs: boolean;
+  hasDocViews: boolean;
+  hasShareTokens: boolean;
+  hasDocAliases: boolean;
+  hasOwnerId: boolean;
+  hasOrgId: boolean;
+  hasCreatedByEmail: boolean;
+  docFilter: ReturnType<typeof sql>;
+};
+
+async function tableExists(fqTable: string): Promise<boolean> {
+  try {
+    const rows = (await sql`select to_regclass(${fqTable})::text as reg`) as unknown as Array<{ reg: string | null }>;
+    return !!rows?.[0]?.reg;
+  } catch {
+    return false;
+  }
+}
+
+async function columnExists(table: string, column: string): Promise<boolean> {
+  try {
+    const rows = (await sql`
+      select 1
+      from information_schema.columns
+      where table_schema = 'public'
+        and table_name = ${table}
+        and column_name = ${column}
+      limit 1
+    `) as unknown as Array<{ "?column?": number }>;
+    return rows.length > 0;
+  } catch {
+    return false;
+  }
+}
+
+async function getCtx(u: AuthedUser): Promise<DashboardCtx> {
+  const canSeeAll = roleAtLeast(u.role, "admin");
+  const canCheckEncryptionStatus = roleAtLeast(u.role, "owner");
+  const userPlan = await getPlanForUser(u.id);
+  const planId = String(userPlan.id || "free").toLowerCase() === "free" ? "free" : "pro";
+  const nowTs = Date.now();
+
+  const hasDocs = await tableExists("public.docs");
+  const hasDocViews = await tableExists("public.doc_views");
+  const hasShareTokens = await tableExists("public.share_tokens");
+  const hasDocAliases = await tableExists("public.doc_aliases");
+  const hasOwnerId = await columnExists("docs", "owner_id");
+  const hasOrgId = await columnExists("docs", "org_id");
+  const hasCreatedByEmail = await columnExists("docs", "created_by_email");
+
+  const orgFilter = hasOrgId && u.orgId ? sql`and d.org_id = ${u.orgId}::uuid` : sql``;
+  const ownerFilter = !canSeeAll
+    ? hasOwnerId
+      ? hasCreatedByEmail
+        ? sql`and (d.owner_id = ${u.id}::uuid or (d.owner_id is null and lower(coalesce(d.created_by_email,'')) = lower(${u.email})))`
+        : sql`and d.owner_id = ${u.id}::uuid`
+      : hasCreatedByEmail
+        ? sql`and lower(coalesce(d.created_by_email,'')) = lower(${u.email})`
+        : sql``
+    : sql``;
+  const docFilter = sql`${orgFilter} ${ownerFilter}`;
+
+  return {
+    canSeeAll,
+    canCheckEncryptionStatus,
+    planId,
+    nowTs,
+    hasDocs,
+    hasDocViews,
+    hasShareTokens,
+    hasDocAliases,
+    hasOwnerId,
+    hasOrgId,
+    hasCreatedByEmail,
+    docFilter,
+  };
+}
+
+export async function getDashboardHomeData(u: AuthedUser) {
+  const ctx = await getCtx(u);
+
+  let headerDocs: HeaderDoc[] = [];
+  let recentDocs: RecentDocRow[] = [];
+
+  if (ctx.hasDocs) {
+    try {
+      headerDocs = (await sql`
+        select
+          d.id::text as "docId",
+          coalesce(d.title::text, 'Untitled document') as title,
+          coalesce(d.status::text, 'ready') as "docState",
+          coalesce(d.scan_status::text, 'unscanned') as "scanState",
+          coalesce(d.moderation_status::text, 'active') as "moderationStatus"
+        from public.docs d
+        where 1=1
+          and lower(coalesce(d.status::text, 'ready')) <> 'deleted'
+          ${ctx.docFilter}
+        order by d.created_at desc
+        limit 2000
+      `) as unknown as HeaderDoc[];
+    } catch {
+      headerDocs = [];
+    }
+
+    try {
+      recentDocs = (await sql`
+        select
+          d.id::text as doc_id,
+          d.title::text as doc_title,
+          coalesce(d.status::text, 'ready') as doc_state,
+          coalesce(d.scan_status::text, 'unscanned') as scan_status,
+          coalesce(d.moderation_status::text, 'active') as moderation_status,
+          d.created_at::text as created_at
+        from public.docs d
+        where 1=1
+          and lower(coalesce(d.status::text, 'ready')) <> 'deleted'
+          ${ctx.docFilter}
+        order by d.created_at desc
+        limit 5
+      `) as unknown as RecentDocRow[];
+    } catch {
+      recentDocs = [];
+    }
+  }
+
+  return {
+    ...ctx,
+    headerDocs,
+    recentDocs,
+    missingCoreTables: !ctx.hasDocs || (!ctx.hasDocViews && !ctx.hasShareTokens),
+  };
+}
+
+export async function getDashboardDocumentsData(u: AuthedUser) {
+  const ctx = await getCtx(u);
+  let unifiedRows: UnifiedDocRow[] = [];
+
+  if (ctx.hasDocs) {
+    try {
+      unifiedRows = (await sql`
+        select
+          d.id::text as doc_id,
+          d.title::text as doc_title,
+          coalesce(d.status::text, 'ready') as doc_state,
+          a.alias::text as alias,
+          coalesce(d.scan_status::text, 'unscanned') as scan_status,
+          coalesce(d.moderation_status::text, 'active') as moderation_status,
+          coalesce(v.total_views, 0)::int as total_views,
+          v.last_view::text as last_view,
+          coalesce(s.active_shares, 0)::int as active_shares,
+          a.expires_at::text as alias_expires_at,
+          a.is_active as alias_is_active,
+          a.revoked_at::text as alias_revoked_at
+        from public.docs d
+        left join lateral (
+          select
+            da.alias,
+            da.expires_at,
+            da.is_active,
+            da.revoked_at
+          from public.doc_aliases da
+          where da.doc_id = d.id
+          order by da.created_at desc nulls last
+          limit 1
+        ) a on true
+        left join lateral (
+          select
+            count(*)::int as total_views,
+            max(vv.created_at) as last_view
+          from public.doc_views vv
+          where vv.doc_id = d.id
+        ) v on true
+        left join lateral (
+          select
+            count(*)::int as active_shares
+          from public.share_tokens st
+          where st.doc_id = d.id
+            and st.revoked_at is null
+            and (st.expires_at is null or st.expires_at > now())
+            and (
+              st.max_views is null
+              or st.max_views = 0
+              or coalesce(st.views_count, 0) < st.max_views
+            )
+        ) s on true
+        where 1=1
+          and lower(coalesce(d.status::text, 'ready')) <> 'deleted'
+          ${ctx.docFilter}
+        order by d.created_at desc
+      `) as unknown as UnifiedDocRow[];
+    } catch {
+      unifiedRows = [];
+    }
+  }
+
+  return {
+    ...ctx,
+    unifiedRows,
+    showDelete: ctx.canSeeAll || ctx.hasOwnerId || ctx.hasCreatedByEmail,
+    missingCoreTables: !ctx.hasDocs,
+  };
+}
+
+export async function getDashboardLinksData(u: AuthedUser) {
+  const ctx = await getCtx(u);
+  let shares: ShareRow[] = [];
+
+  if (ctx.hasShareTokens && ctx.hasDocs) {
+    try {
+      shares = (await sql`
+        select
+          st.token::text as token,
+          st.doc_id::text as doc_id,
+          st.to_email::text as to_email,
+          st.created_at::text as created_at,
+          st.expires_at::text as expires_at,
+          st.max_views as max_views,
+          coalesce(st.views_count, 0)::int as view_count,
+          st.revoked_at::text as revoked_at,
+          d.title::text as doc_title,
+          a.alias::text as alias,
+          (st.password_hash is not null)::boolean as has_password
+        from public.share_tokens st
+        join public.docs d on d.id = st.doc_id
+        left join lateral (
+          select da.alias
+          from public.doc_aliases da
+          where da.doc_id = d.id
+          order by da.created_at desc nulls last
+          limit 1
+        ) a on true
+        where 1=1
+          ${ctx.docFilter}
+        order by st.created_at desc
+        limit 2000
+      `) as unknown as ShareRow[];
+    } catch {
+      shares = [];
+    }
+  }
+
+  return {
+    ...ctx,
+    shares,
+    missingCoreTables: !ctx.hasShareTokens || !ctx.hasDocs,
+  };
+}
+
+export async function getDashboardActivityData(u: AuthedUser) {
+  const ctx = await getCtx(u);
+  let viewsRows: ViewsByDocRow[] = [];
+
+  if (ctx.hasDocs && ctx.hasDocViews) {
+    try {
+      viewsRows = (await sql`
+        select
+          d.id::text as doc_id,
+          d.title::text as doc_title,
+          a.alias::text as alias,
+          coalesce(d.scan_status::text, 'unscanned') as scan_status,
+          count(v.id)::int as views,
+          count(distinct v.ip_hash)::int as unique_ips,
+          max(v.created_at)::text as last_view
+        from public.docs d
+        left join public.doc_views v on v.doc_id = d.id
+        left join lateral (
+          select da.alias
+          from public.doc_aliases da
+          where da.doc_id = d.id
+          order by da.created_at desc nulls last
+          limit 1
+        ) a on true
+        where 1=1
+          and coalesce(d.status::text, 'ready') = 'ready'
+          ${ctx.docFilter}
+        group by d.id, d.title, a.alias
+        order by views desc, last_view desc nulls last
+      `) as unknown as ViewsByDocRow[];
+    } catch {
+      viewsRows = [];
+    }
+  }
+
+  return {
+    ...ctx,
+    viewsRows,
+    missingCoreTables: !ctx.hasDocs || !ctx.hasDocViews,
+  };
+}

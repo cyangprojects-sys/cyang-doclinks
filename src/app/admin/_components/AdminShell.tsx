@@ -21,9 +21,10 @@ type NavItem = {
 
 const PRIMARY_NAV_ITEMS: NavItem[] = [
   { href: "/admin/dashboard", label: "Home" },
-  { href: "/admin/dashboard#docs", label: "Documents" },
-  { href: "/admin/dashboard#shares", label: "Links" },
-  { href: "/admin/dashboard#activity", label: "Activity" },
+  { href: "/admin/documents", label: "Documents" },
+  { href: "/admin/links", label: "Links" },
+  { href: "/admin/uploads", label: "Uploads" },
+  { href: "/admin/activity", label: "Activity" },
   { href: "/admin/security", label: "Security", ownerOnly: true },
   { href: "/admin/dashboard#settings", label: "Settings" },
   { href: "/admin/billing", label: "Billing", ownerOnly: true },

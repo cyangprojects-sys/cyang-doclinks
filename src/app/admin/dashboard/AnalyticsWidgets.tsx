@@ -55,6 +55,13 @@ function fmtBytes(n: number | null): string {
   return `${v.toFixed(digits)} ${units[i]}`;
 }
 
+function fmtStorageUsedForHome(n: number | null): string {
+  if (n == null || !Number.isFinite(n) || n <= 0) return "0 MB";
+  const mb = n / (1024 * 1024);
+  if (mb < 1) return "< 1 MB";
+  return `${Math.round(mb)} MB`;
+}
+
 export default async function AnalyticsWidgets({
   ownerId,
   userId,
@@ -554,25 +561,26 @@ export default async function AnalyticsWidgets({
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 2xl:grid-cols-4">
         <div className="glass-card-strong rounded-2xl p-4">
           <div className="text-xs text-white/60">Usage snapshot</div>
-          <div className="mt-2 text-xl font-semibold text-white">{usagePlanName}</div>
+          <div className="mt-2 text-xl font-semibold text-white">Your plan: {usagePlanName}</div>
           <ul className="mt-2 space-y-1 text-xs text-white/70">
             <li>
-              Active shares: {fmtInt(usageActiveShares)}
-              {usageMaxActiveShares == null ? " / inf" : ` / ${fmtInt(usageMaxActiveShares)}`}
+              Links: {fmtInt(usageActiveShares)} of{" "}
+              {usageMaxActiveShares == null ? "unlimited" : fmtInt(usageMaxActiveShares)} active
             </li>
             <li>
-              Storage: {fmtBytes(usageStorage)}
-              {usageMaxStorageBytes == null ? " / inf" : ` / ${fmtBytes(usageMaxStorageBytes)}`}
+              File size limit: {usagePlanId === "pro" ? "100MB" : "25MB"} ({usagePlanName})
             </li>
             <li>
-              Monthly views: {usageMonthlyViews == null ? "-" : fmtInt(usageMonthlyViews)}
-              {usageMaxViewsPerMonth == null ? " / inf" : ` / ${fmtInt(usageMaxViewsPerMonth)}`}
+              Storage used: {fmtStorageUsedForHome(usageStorage)}
             </li>
             <li>
               Uploads today: {usageDailyUploads == null ? "-" : fmtInt(usageDailyUploads)}
               {usageMaxUploadsPerDay == null ? " / inf" : ` / ${fmtInt(usageMaxUploadsPerDay)}`}
             </li>
           </ul>
+          {usagePlanId !== "pro" ? (
+            <div className="mt-2 text-xs text-white/60">Upgrade to Pro for 100MB uploads + Pro presets.</div>
+          ) : null}
           <div className="mt-3">
             {usagePlanId !== "pro" ? (
               <Link href="/admin/upgrade" className="inline-flex rounded-lg border border-cyan-400/35 bg-cyan-400/20 px-3 py-1.5 text-xs text-cyan-50 hover:bg-cyan-400/30">
@@ -619,8 +627,15 @@ export default async function AnalyticsWidgets({
             <li>{unencryptedDocs === 0 ? "0 unencrypted docs" : `${fmtInt(unencryptedDocs)} unencrypted docs`}</li>
             <li>{blockedDocs === 0 ? "No blocked files" : `${fmtInt(blockedDocs)} blocked files`}</li>
             <li>{needsReviewDocs === 0 ? "No files need review" : `${fmtInt(needsReviewDocs)} files need review`}</li>
+            <li>Scanning now: {fmtInt(pendingScanDocs)}</li>
+            {pendingScanDocs > 0 ? <li>Average scan time: ~1-2 min</li> : null}
             <li>Last security check: {fmtMinsAgo(lastSecurityEventAt)}</li>
           </ul>
+          <div className="mt-3">
+            <Link href="/admin/activity" className="inline-flex rounded-lg border border-white/20 bg-white/10 px-3 py-1.5 text-xs text-white hover:bg-white/15">
+              View scanning documents
+            </Link>
+          </div>
         </div>
       </div>
 

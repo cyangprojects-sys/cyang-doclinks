@@ -200,7 +200,7 @@ export default function ViewsByDocTableClient(props: { rows: ViewsByDocRow[]; ca
                       <div className="text-white">{r.doc_title || "Untitled"}</div>
                       <div className="mt-1 text-xs">
                         <Link href={`/admin/docs/${encodeURIComponent(r.doc_id)}`} className="text-cyan-200 hover:underline">
-                          Investigate
+                          View details
                         </Link>
                       </div>
                     </td>
@@ -261,11 +261,7 @@ export default function ViewsByDocTableClient(props: { rows: ViewsByDocRow[]; ca
                               <button aria-label={`Disable alias for ${r.doc_title || r.doc_id}`} type="submit" className="btn-base btn-danger rounded-lg px-2.5 py-1.5 text-xs">Disable alias</button>
                             </form>
                           </>
-                        ) : (
-                          <span className="inline-flex items-center rounded-md border border-white/15 px-2 py-0.5 text-[11px] text-white/60">
-                            Admin only
-                          </span>
-                        )}
+                        ) : null}
                       </div>
                     </td>
                   </tr>

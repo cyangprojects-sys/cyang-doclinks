@@ -9,5 +9,5 @@ export default async function AdminUploadRedirectPage() {
   const u = await getAuthedUser();
   if (!u) redirect("/api/auth/signin");
 
-  redirect("/admin/dashboard");
+  redirect("/admin/uploads");
 }

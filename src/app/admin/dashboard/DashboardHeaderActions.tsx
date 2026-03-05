@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { createAndEmailShareToken } from "@/app/d/[alias]/actions";
 import { isPackAvailableForPlan, type PackId } from "@/lib/packs";
 import { getDocumentUiStatus, getShareEligibility } from "@/lib/documentStatus";
@@ -93,6 +93,8 @@ const PRESET_OPTIONS: readonly ModalPreset[] = [
 
 export default function DashboardHeaderActions(props: { docs: DocOption[]; planId: string }) {
   const router = useRouter();
+  const pathname = usePathname();
+  const sp = useSearchParams();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [selectedDocId, setSelectedDocId] = useState("");
@@ -103,6 +105,14 @@ export default function DashboardHeaderActions(props: { docs: DocOption[]; planI
   const [err, setErr] = useState<string | null>(null);
   const [createdUrl, setCreatedUrl] = useState<string | null>(null);
   const [shareWarning, setShareWarning] = useState<string | null>(null);
+
+  function clearCreateParams() {
+    const params = new URLSearchParams(sp.toString());
+    params.delete("createLink");
+    params.delete("docId");
+    const qs = params.toString();
+    router.replace(`${pathname}${qs ? `?${qs}` : ""}`, { scroll: false });
+  }
 
   const docsWithStatus = useMemo(() => {
     return props.docs.map((d) => {
@@ -135,6 +145,18 @@ export default function DashboardHeaderActions(props: { docs: DocOption[]; planI
     setSelectedDocId(firstEligible?.docId || docsWithStatus[0].docId);
     setShareWarning(firstEligible?.eligibility.warning ?? null);
   }, [docsWithStatus, selectedDocId]);
+
+  useEffect(() => {
+    const requestedOpen = sp.get("createLink") === "1";
+    if (requestedOpen) setOpen(true);
+
+    const requestedDocId = String(sp.get("docId") || "").trim();
+    if (!requestedDocId) return;
+    const doc = docsWithStatus.find((d) => d.docId === requestedDocId);
+    if (!doc) return;
+    setSelectedDocId(doc.docId);
+    setShareWarning(doc.eligibility.warning ?? null);
+  }, [sp, docsWithStatus]);
 
   const filteredDocs = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -241,7 +263,7 @@ export default function DashboardHeaderActions(props: { docs: DocOption[]; planI
         </button>
         <button
           type="button"
-          onClick={() => router.push("/admin/dashboard?tab=uploads&openPicker=1#docs")}
+          onClick={() => router.push("/admin/uploads?openPicker=1")}
           className="btn-base btn-secondary rounded-lg px-3 py-2 text-sm"
         >
           Upload document
@@ -256,7 +278,14 @@ export default function DashboardHeaderActions(props: { docs: DocOption[]; planI
                 <h3 className="text-lg font-semibold text-white">Create protected link</h3>
                 <p className="mt-1 text-xs text-white/60">Choose document, choose preset, create and share.</p>
               </div>
-              <button type="button" onClick={() => setOpen(false)} className="btn-base btn-secondary rounded-lg px-2 py-1 text-xs">
+              <button
+                type="button"
+                onClick={() => {
+                  setOpen(false);
+                  clearCreateParams();
+                }}
+                className="btn-base btn-secondary rounded-lg px-2 py-1 text-xs"
+              >
                 Close
               </button>
             </div>

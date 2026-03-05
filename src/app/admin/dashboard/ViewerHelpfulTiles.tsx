@@ -202,8 +202,8 @@ export default async function ViewerHelpfulTiles({ userId, orgId, hasOrgId }: Pr
     <section className="glass-card-strong rounded-2xl p-4">
       <div className="flex items-center justify-between">
         <div>
-          <div className="text-sm font-medium text-white">Quick Insights</div>
-          <div className="mt-1 text-xs text-white/60">Shortcuts for your controlled delivery workflow</div>
+          <div className="text-sm font-medium text-white">Shortcuts</div>
+          <div className="mt-1 text-xs text-white/60">Common actions</div>
         </div>
         <div className="flex gap-2">
           {!hasDocs ? chip("Tracking off") : null}
@@ -211,7 +211,7 @@ export default async function ViewerHelpfulTiles({ userId, orgId, hasOrgId }: Pr
         </div>
       </div>
 
-      <div className="mt-4 grid gap-3">
+      <div className="mt-4 grid gap-3 md:grid-cols-3">
         <Tile title="Most viewed (this month)">
           {mostViewed ? (
             <div className="flex items-center justify-between gap-3">
@@ -220,7 +220,7 @@ export default async function ViewerHelpfulTiles({ userId, orgId, hasOrgId }: Pr
                 <div className="mt-1 text-xs text-white/60">{mostViewed.views} views</div>
               </div>
               <Link className="shrink-0 text-xs text-white/75 hover:text-white" href={`/admin/docs/${mostViewed.doc_id}`}>
-                Manage
+                View details
               </Link>
             </div>
           ) : (
@@ -237,7 +237,7 @@ export default async function ViewerHelpfulTiles({ userId, orgId, hasOrgId }: Pr
                   <div className="flex items-center gap-3">
                     <div className="shrink-0 text-xs text-white/60">{fmtDate(s.created_at)}</div>
                     <Link className="shrink-0 text-xs text-white/75 hover:text-white" href={`/admin/docs/${s.doc_id}`}>
-                      Manage
+                      View details
                     </Link>
                   </div>
                 </div>
@@ -259,7 +259,7 @@ export default async function ViewerHelpfulTiles({ userId, orgId, hasOrgId }: Pr
                   <div className="flex items-center gap-3">
                     <div className="shrink-0 text-xs text-white/60">{fmtDate(it.expires_at)}</div>
                     <Link className="shrink-0 text-xs text-white/75 hover:text-white" href={`/admin/docs/${it.doc_id}`}>
-                      Manage
+                      View details
                     </Link>
                   </div>
                 </div>
