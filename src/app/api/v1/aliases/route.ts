@@ -9,6 +9,20 @@ import { clientIpKey, enforceGlobalApiRateLimit, logDbErrorEvent } from "@/lib/s
 import { appendImmutableAudit } from "@/lib/immutableAudit";
 
 type PgErrorLike = { code?: unknown; message?: unknown };
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const MAX_ALIASES_BODY_BYTES = 16 * 1024;
+const MAX_ALIAS_TTL_DAYS = 365;
+const MIN_ALIAS_TTL_DAYS = 1;
+
+function isUuid(value: string): boolean {
+  return UUID_RE.test(String(value || "").trim());
+}
+
+function parseJsonBodyLength(req: NextRequest): number {
+  const raw = String(req.headers.get("content-length") || "").trim();
+  const out = Number(raw);
+  return Number.isFinite(out) ? Math.max(0, Math.floor(out)) : 0;
+}
 
 function pgErrorCode(e: unknown): string {
   if (!e || typeof e !== "object") return "";
@@ -51,6 +65,9 @@ export async function POST(req: NextRequest) {
       { status: rl.status, headers: { "Retry-After": String(rl.retryAfterSeconds) } }
     );
   }
+  if (parseJsonBodyLength(req) > MAX_ALIASES_BODY_BYTES) {
+    return NextResponse.json({ ok: false, error: "PAYLOAD_TOO_LARGE" }, { status: 413 });
+  }
 
   const auth = await verifyApiKeyFromRequest(req);
   if (!auth.ok) {
@@ -59,16 +76,23 @@ export async function POST(req: NextRequest) {
 
   let body: Record<string, unknown> | null = null;
   try {
-    body = await req.json();
+    const parsed = await req.json();
+    body = parsed && typeof parsed === "object" && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : null;
   } catch {
+    return NextResponse.json({ ok: false, error: "INVALID_JSON" }, { status: 400 });
+  }
+  if (!body) {
     return NextResponse.json({ ok: false, error: "INVALID_JSON" }, { status: 400 });
   }
 
   const docId = String(body?.doc_id || body?.docId || "").trim();
   const alias = String(body?.alias || "").trim();
   const expiresDaysRaw = Number(body?.expires_days ?? body?.expiresDays ?? process.env.ALIAS_DEFAULT_TTL_DAYS ?? 30);
-  const expiresDays = Number.isFinite(expiresDaysRaw) ? Math.max(1, Math.min(365, Math.floor(expiresDaysRaw))) : 30;
+  const expiresDays = Number.isFinite(expiresDaysRaw)
+    ? Math.max(MIN_ALIAS_TTL_DAYS, Math.min(MAX_ALIAS_TTL_DAYS, Math.floor(expiresDaysRaw)))
+    : 30;
   if (!docId) return NextResponse.json({ ok: false, error: "MISSING_DOC_ID" }, { status: 400 });
+  if (!isUuid(docId)) return NextResponse.json({ ok: false, error: "INVALID_DOC_ID" }, { status: 400 });
   if (!alias) return NextResponse.json({ ok: false, error: "MISSING_ALIAS" }, { status: 400 });
   if (!/^[a-zA-Z0-9_-]{3,80}$/.test(alias)) {
     return NextResponse.json({ ok: false, error: "INVALID_ALIAS" }, { status: 400 });

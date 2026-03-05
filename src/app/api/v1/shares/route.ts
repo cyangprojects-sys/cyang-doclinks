@@ -15,6 +15,15 @@ import { DEFAULT_SHARE_SETTINGS, PRO_PACK_UPSELL_MESSAGE, applyPack, getPackById
 import { getShareEligibility } from "@/lib/documentStatus";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const BASIC_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const MAX_SHARE_BODY_BYTES = 64 * 1024;
+const MAX_TO_EMAIL_LEN = 320;
+const MAX_SHARE_PASSWORD_LEN = 256;
+const MAX_COUNTRY_ITEMS = 64;
+const MAX_WATERMARK_TEXT_LEN = 400;
+const MAX_PACK_ID_LEN = 64;
+const MAX_ISO_LEN = 64;
+const MAX_MAX_VIEWS = 1_000_000;
 
 function newToken(): string {
   return crypto.randomBytes(16).toString("hex");
@@ -22,6 +31,28 @@ function newToken(): string {
 
 function isUuid(value: string): boolean {
   return UUID_RE.test(String(value || "").trim());
+}
+
+function parseJsonBodyLength(req: NextRequest): number {
+  const raw = String(req.headers.get("content-length") || "").trim();
+  const out = Number(raw);
+  return Number.isFinite(out) ? Math.max(0, Math.floor(out)) : 0;
+}
+
+function parseOptionalEmail(value: unknown): string | null {
+  const email = String(value ?? "").trim().toLowerCase();
+  if (!email) return null;
+  if (email.length > MAX_TO_EMAIL_LEN || /[\r\n\0]/.test(email)) return null;
+  return BASIC_EMAIL_RE.test(email) ? email : null;
+}
+
+function parseSharePassword(value: unknown): string | null | "INVALID" {
+  const raw = String(value ?? "");
+  if (!raw) return null;
+  const pwd = raw.trim();
+  if (!pwd) return null;
+  if (pwd.length > MAX_SHARE_PASSWORD_LEN || /[\0]/.test(pwd)) return "INVALID";
+  return pwd;
 }
 
 export async function POST(req: NextRequest) {
@@ -39,6 +70,9 @@ export async function POST(req: NextRequest) {
       { status: rl.status, headers: { "Retry-After": String(rl.retryAfterSeconds) } }
     );
   }
+  if (parseJsonBodyLength(req) > MAX_SHARE_BODY_BYTES) {
+    return NextResponse.json({ ok: false, error: "PAYLOAD_TOO_LARGE" }, { status: 413 });
+  }
 
   const auth = await verifyApiKeyFromRequest(req);
   if (!auth.ok) {
@@ -48,8 +82,11 @@ export async function POST(req: NextRequest) {
   let body: Record<string, unknown> | null = null;
   try {
     const parsed: unknown = await req.json();
-    body = parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>) : null;
+    body = parsed && typeof parsed === "object" && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : null;
   } catch {
+    return NextResponse.json({ ok: false, error: "INVALID_JSON" }, { status: 400 });
+  }
+  if (!body) {
     return NextResponse.json({ ok: false, error: "INVALID_JSON" }, { status: 400 });
   }
 
@@ -99,10 +136,16 @@ export async function POST(req: NextRequest) {
   }
   const plan = await getPlanForUser(auth.ownerId);
 
-  const toEmailRaw = String(body?.to_email || body?.toEmail || "").trim();
-  const toEmail = toEmailRaw ? toEmailRaw.toLowerCase() : null;
+  const rawEmailInput = body?.to_email ?? body?.toEmail ?? "";
+  const toEmail = parseOptionalEmail(rawEmailInput);
+  if (String(rawEmailInput || "").trim() && !toEmail) {
+    return NextResponse.json({ ok: false, error: "INVALID_TO_EMAIL" }, { status: 400 });
+  }
 
-  const passwordRaw = String(body?.password || "").trim();
+  const passwordRaw = parseSharePassword(body?.password);
+  if (passwordRaw === "INVALID") {
+    return NextResponse.json({ ok: false, error: "INVALID_PASSWORD" }, { status: 400 });
+  }
   const passwordHash = passwordRaw ? await bcrypt.hash(passwordRaw, 12) : null;
 
   const allowedCountriesRaw = body?.allowed_countries ?? body?.allowedCountries ?? null;
@@ -110,24 +153,29 @@ export async function POST(req: NextRequest) {
 
   const normCountries = (v: unknown): string[] | null => {
     if (v == null) return null;
-    const arr = Array.isArray(v) ? v : String(v).split(/[,\s]+/g);
+    const raw = String(v ?? "");
+    if (raw.length > 4096 || /[\r\n\0]/.test(raw)) return [];
+    const arr = Array.isArray(v) ? v : raw.split(/[,\s]+/g);
     const out = arr
       .map((x) => String(x || "").trim().toUpperCase())
-      .filter((x) => /^[A-Z]{2}$/.test(x));
-    return out.length ? out : [];
+      .filter((x) => /^[A-Z]{2}$/.test(x))
+      .slice(0, MAX_COUNTRY_ITEMS);
+    return out.length ? Array.from(new Set(out)) : [];
   };
 
   const allowedCountries = normCountries(allowedCountriesRaw);
   const blockedCountries = normCountries(blockedCountriesRaw);
 
   const overrides =
-    body?.overrides && typeof body.overrides === "object"
+    body?.overrides && typeof body.overrides === "object" && !Array.isArray(body.overrides)
       ? (body.overrides as Record<string, unknown>)
       : null;
 
   const parseOptionalBoolean = (v: unknown): boolean | null => {
     if (v == null) return null;
-    const raw = String(v).trim().toLowerCase();
+    const input = String(v);
+    if (/[\r\n\0]/.test(input)) return null;
+    const raw = input.trim().toLowerCase();
     if (!raw) return null;
     if (["1", "true", "on", "yes"].includes(raw)) return true;
     if (["0", "false", "off", "no"].includes(raw)) return false;
@@ -136,6 +184,7 @@ export async function POST(req: NextRequest) {
 
   const parseOptionalIso = (v: unknown): string | null => {
     const raw = String(v ?? "").trim();
+    if (raw.length > MAX_ISO_LEN || /[\r\n\0]/.test(raw)) return null;
     if (!raw) return null;
     const t = Date.parse(raw);
     if (Number.isNaN(t)) return null;
@@ -144,13 +193,16 @@ export async function POST(req: NextRequest) {
 
   const parseOptionalMaxViews = (v: unknown): number | null => {
     const raw = String(v ?? "").trim();
+    if (!raw || raw.length > 16 || /[\r\n\0]/.test(raw)) return null;
     if (!raw) return null;
     const n = Number(raw);
     if (!Number.isFinite(n)) return null;
-    return Math.max(0, Math.floor(n));
+    return Math.max(0, Math.min(MAX_MAX_VIEWS, Math.floor(n)));
   };
 
-  const selectedPack = getPackById(String(body?.pack_id ?? body?.packId ?? "").trim());
+  const packInput = String(body?.pack_id ?? body?.packId ?? "").trim();
+  const safePackInput = /[\r\n\0]/.test(packInput) ? "" : packInput.slice(0, MAX_PACK_ID_LEN);
+  const selectedPack = getPackById(safePackInput);
   if (!isPackAvailableForPlan(selectedPack, plan.id)) {
     return NextResponse.json(
       { ok: false, error: "PACK_REQUIRES_PRO", message: PRO_PACK_UPSELL_MESSAGE },
@@ -215,8 +267,11 @@ export async function POST(req: NextRequest) {
   normalizedExpiresAt = planExpiresAt;
   maxViews = planMaxViews;
 
-  const watermarkTextRaw = String(body?.watermark_text ?? body?.watermarkText ?? "").trim();
-  const watermarkText = watermarkTextRaw ? watermarkTextRaw.slice(0, 400) : null;
+  const watermarkTextRaw = String(body?.watermark_text ?? body?.watermarkText ?? "");
+  const watermarkTextClean = watermarkTextRaw.replace(/[\r\n]+/g, " ").trim();
+  const watermarkText = watermarkTextClean && !/[\0]/.test(watermarkTextClean)
+    ? watermarkTextClean.slice(0, MAX_WATERMARK_TEXT_LEN)
+    : null;
 
   const token = newToken();
   // Newer schema supports geo + watermark columns; fall back silently if not present.
