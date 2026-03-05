@@ -32,8 +32,15 @@ test.describe("device trust cookie helpers", () => {
   });
 
   test("rejects expired trust cookie", () => {
-    const signed = makeAliasTrustCookieValue("expired-alias", Date.now() - 1_000);
-    expect(isAliasTrusted("expired-alias", signed)).toBeFalsy();
+    expect(() => makeAliasTrustCookieValue("expired-alias", Date.now() - 1_000)).toThrow(/INVALID_EXPIRY/);
+  });
+
+  test("rejects invalid alias and malformed expiry when creating cookie value", () => {
+    expect(() => makeAliasTrustCookieValue("", Date.now() + 1_000)).toThrow(/INVALID_ALIAS/);
+    expect(() => makeAliasTrustCookieValue("alias-safe", Number.NaN)).toThrow(/INVALID_EXPIRY/);
+    expect(() => makeAliasTrustCookieValue("alias-safe", Date.now() + DEVICE_TRUST_HOURS * 60 * 60 * 1000 * 3)).toThrow(
+      /INVALID_EXPIRY/
+    );
   });
 
   test("rejects tampered trust cookie", () => {

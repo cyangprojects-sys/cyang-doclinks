@@ -9,21 +9,36 @@ import crypto from "crypto";
 import { signPayload, verifySignedPayload } from "@/lib/crypto";
 
 export const DEVICE_TRUST_HOURS = 8;
+const MAX_ALIAS_LEN = 160;
+const MAX_TRUST_WINDOW_MS = DEVICE_TRUST_HOURS * 60 * 60 * 1000;
 
 type AliasTrustPayload = {
-    v: 1;
-    alias: string;
-    exp: number; // epoch ms
+  v: 1;
+  alias: string;
+  exp: number; // epoch ms
 };
 
 function normAlias(alias: string): string {
-    return decodeURIComponent(String(alias || "")).trim().toLowerCase();
+  const raw = String(alias || "").trim();
+  if (!raw) return "";
+  const decoded = (() => {
+    try {
+      return decodeURIComponent(raw);
+    } catch {
+      return raw;
+    }
+  })();
+  const out = decoded.trim().toLowerCase();
+  if (!out || out.length > MAX_ALIAS_LEN || /[\r\n\0]/.test(out)) return "";
+  return out;
 }
 
 function aliasKey(alias: string): string {
-    // Cookie names are size-limited; hash the alias so any characters are safe.
-    const a = normAlias(alias);
-    return crypto.createHash("sha256").update(a).digest("hex").slice(0, 24);
+  // Cookie names are size-limited; hash the alias so any characters are safe.
+  const normalized = normAlias(alias);
+  const fallback = String(alias || "").trim().toLowerCase().replace(/[\r\n\0]/g, "").slice(0, MAX_ALIAS_LEN);
+  const keyMaterial = normalized || fallback || "invalid";
+  return crypto.createHash("sha256").update(keyMaterial).digest("hex").slice(0, 24);
 }
 
 export function aliasTrustCookieName(alias: string): string {
@@ -31,12 +46,20 @@ export function aliasTrustCookieName(alias: string): string {
 }
 
 export function makeAliasTrustCookieValue(alias: string, expMs: number): string {
-    const payload: AliasTrustPayload = {
-        v: 1,
-        alias: normAlias(alias),
-        exp: expMs,
-    };
-    return signPayload(payload);
+  const safeAlias = normAlias(alias);
+  if (!safeAlias) throw new Error("INVALID_ALIAS");
+  if (!Number.isFinite(expMs)) throw new Error("INVALID_EXPIRY");
+
+  const now = Date.now();
+  const exp = Math.floor(expMs);
+  if (exp <= now || exp > now + MAX_TRUST_WINDOW_MS * 2) throw new Error("INVALID_EXPIRY");
+
+  const payload: AliasTrustPayload = {
+    v: 1,
+    alias: safeAlias,
+    exp,
+  };
+  return signPayload(payload);
 }
 
 export function isAliasTrusted(alias: string, cookieValue: string | null | undefined): boolean {
@@ -51,5 +74,8 @@ export function isAliasTrusted(alias: string, cookieValue: string | null | undef
     if (!a) return false;
     if (payload.alias !== a) return false;
 
-    return Number.isFinite(payload.exp) && payload.exp > Date.now();
+    if (!Number.isFinite(payload.exp)) return false;
+    if (payload.exp <= Date.now()) return false;
+    if (payload.exp > Date.now() + MAX_TRUST_WINDOW_MS * 2) return false;
+    return true;
 }

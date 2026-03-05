@@ -26,8 +26,14 @@ export type WatermarkSpec = {
   customText?: string | null;
 };
 
+const MAX_WATERMARK_LINE_LEN = 240;
+const MAX_INPUT_PDF_BYTES = 50 * 1024 * 1024;
+const MAX_WATERMARK_PAGES = 1000;
+
 function safeLine(s: string) {
-  return String(s || "").replace(/[\r\n]+/g, " ").trim();
+  const line = String(s || "").replace(/[\r\n]+/g, " ").trim();
+  if (!line || /[\0]/.test(line)) return "";
+  return line.slice(0, MAX_WATERMARK_LINE_LEN);
 }
 
 function buildLines(spec: WatermarkSpec) {
@@ -54,12 +60,22 @@ function buildLines(spec: WatermarkSpec) {
  * Apply a repeating diagonal watermark + footer line to each page.
  */
 export async function stampPdfWithWatermark(inputPdf: Buffer, spec: WatermarkSpec): Promise<Buffer> {
+  if (!Buffer.isBuffer(inputPdf) || inputPdf.length === 0) {
+    throw new Error("INVALID_PDF_INPUT");
+  }
+  if (inputPdf.length > MAX_INPUT_PDF_BYTES) {
+    throw new Error("PDF_TOO_LARGE");
+  }
+
   const pdfDoc = await PDFDocument.load(inputPdf, { ignoreEncryption: true });
 
   const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
   const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
   const pages = pdfDoc.getPages();
+  if (pages.length > MAX_WATERMARK_PAGES) {
+    throw new Error("PDF_PAGE_LIMIT_EXCEEDED");
+  }
   const { line1, line2, line3 } = buildLines(spec);
 
   for (const page of pages) {

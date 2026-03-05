@@ -1,11 +1,24 @@
 import { rotateDocKeys } from "@/lib/masterKeys";
 
+const MAX_FROM_IDS = 64;
+const KEY_ID_RE = /^[a-z0-9][a-z0-9._-]{0,63}$/i;
+
 function parseIds(raw: string): string[] {
-  const ids = raw
+  const input = String(raw ?? "");
+  if (/[\r\n\0]/.test(input)) return [];
+  const ids = input
     .split(",")
     .map((v) => v.trim())
-    .filter(Boolean);
-  return Array.from(new Set(ids));
+    .filter((v) => Boolean(v) && KEY_ID_RE.test(v))
+    .slice(0, MAX_FROM_IDS);
+  return Array.from(new Set(ids.map((v) => v.toLowerCase())));
+}
+
+function parseTruthy(raw: unknown): boolean {
+  const input = String(raw ?? "");
+  if (/[\r\n\0]/.test(input)) return false;
+  const value = input.trim().toLowerCase();
+  return ["1", "true", "yes", "on"].includes(value);
 }
 
 export function parseAutomatedKeyRotationConfig(env: NodeJS.ProcessEnv = process.env): {
@@ -13,13 +26,12 @@ export function parseAutomatedKeyRotationConfig(env: NodeJS.ProcessEnv = process
   fromIds: string[];
   limit: number;
 } {
-  const enabled = ["1", "true", "yes", "on"].includes(
-    String(env.AUTO_KEY_ROTATION_ENABLED || "").trim().toLowerCase()
-  );
+  const enabled = parseTruthy(env.AUTO_KEY_ROTATION_ENABLED);
 
   const fromIds = parseIds(String(env.AUTO_KEY_ROTATE_FROM || ""));
 
-  const rawLimit = Number(env.AUTO_KEY_ROTATE_BATCH || 250);
+  const rawInput = String(env.AUTO_KEY_ROTATE_BATCH || 250);
+  const rawLimit = /[\r\n\0]/.test(rawInput) ? Number.NaN : Number(rawInput);
   const limit = Number.isFinite(rawLimit) ? Math.max(1, Math.min(2000, Math.floor(rawLimit))) : 250;
 
   return { enabled, fromIds, limit };
