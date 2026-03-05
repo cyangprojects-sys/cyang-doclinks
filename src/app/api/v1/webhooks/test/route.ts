@@ -8,15 +8,25 @@ import { processWebhookDeliveries } from "@/lib/webhooks";
 import { clientIpKey, enforceGlobalApiRateLimit, logSecurityEvent } from "@/lib/securityTelemetry";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const MAX_WEBHOOK_TEST_BODY_BYTES = 16 * 1024;
+const MAX_WEBHOOK_MESSAGE_LEN = 1000;
+const MAX_WEBHOOK_ID_LEN = 64;
 
 function isUuid(value: string): boolean {
   return UUID_RE.test(String(value || "").trim());
 }
 
 function safeWebhookMessage(value: unknown): string {
-  const text = String(value ?? "").trim();
+  const text = String(value ?? "").replace(/[\r\n]+/g, " ").trim();
+  if (/[\0]/.test(text)) return "Hello from cyang.io";
   if (!text) return "Hello from cyang.io";
-  return text.slice(0, 1000);
+  return text.slice(0, MAX_WEBHOOK_MESSAGE_LEN);
+}
+
+function parseJsonBodyLength(req: NextRequest): number {
+  const raw = String(req.headers.get("content-length") || "").trim();
+  const out = Number(raw);
+  return Number.isFinite(out) ? Math.max(0, Math.floor(out)) : 0;
 }
 
 export async function POST(req: NextRequest) {
@@ -34,6 +44,9 @@ export async function POST(req: NextRequest) {
       { status: rl.status, headers: { "Retry-After": String(rl.retryAfterSeconds) } }
     );
   }
+  if (parseJsonBodyLength(req) > MAX_WEBHOOK_TEST_BODY_BYTES) {
+    return NextResponse.json({ ok: false, error: "PAYLOAD_TOO_LARGE" }, { status: 413 });
+  }
 
   const auth = await verifyApiKeyFromRequest(req);
   if (!auth.ok) {
@@ -42,12 +55,17 @@ export async function POST(req: NextRequest) {
 
   let body: Record<string, unknown> | null = null;
   try {
-    body = await req.json();
+    const parsed = await req.json();
+    body = parsed && typeof parsed === "object" && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : null;
   } catch {
     body = {};
   }
 
-  const webhookId = String(body?.webhook_id || body?.webhookId || "").trim() || null;
+  const webhookIdRaw = String(body?.webhook_id || body?.webhookId || "").trim();
+  if (webhookIdRaw.length > MAX_WEBHOOK_ID_LEN || /[\r\n\0]/.test(webhookIdRaw)) {
+    return NextResponse.json({ ok: false, error: "INVALID_WEBHOOK_ID" }, { status: 400 });
+  }
+  const webhookId = webhookIdRaw || null;
   if (webhookId && !isUuid(webhookId)) {
     return NextResponse.json({ ok: false, error: "INVALID_WEBHOOK_ID" }, { status: 400 });
   }

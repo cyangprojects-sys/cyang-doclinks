@@ -8,6 +8,8 @@ test.describe("api v1 webhook test guardrails", () => {
     expect(code.includes("error: \"DELIVERY_QUEUE_UNAVAILABLE\"")).toBeTruthy();
     expect(code.includes("INVALID_WEBHOOK_ID")).toBeTruthy();
     expect(code.includes("safeWebhookMessage(")).toBeTruthy();
+    expect(code.includes("MAX_WEBHOOK_TEST_BODY_BYTES")).toBeTruthy();
+    expect(code.includes("PAYLOAD_TOO_LARGE")).toBeTruthy();
     expect(code.includes("hint:")).toBeFalsy();
     expect(code.includes("logSecurityEvent({")).toBeTruthy();
   });

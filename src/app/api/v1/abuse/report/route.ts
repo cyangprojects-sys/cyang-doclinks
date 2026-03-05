@@ -13,18 +13,44 @@ type Body = {
   message?: string | null;
 };
 
+const MAX_ABUSE_REPORT_BODY_BYTES = 16 * 1024;
+const MAX_TOKEN_LEN = 256;
+const MAX_ALIAS_LEN = 160;
+const MAX_REPORT_EMAIL_LEN = 320;
+const MAX_REPORT_MESSAGE_LEN = 4000;
+const BASIC_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function parseJsonBodyLength(req: NextRequest): number {
+  const raw = String(req.headers.get("content-length") || "").trim();
+  const out = Number(raw);
+  return Number.isFinite(out) ? Math.max(0, Math.floor(out)) : 0;
+}
+
 function normToken(s: string | null | undefined): string | null {
   const v = String(s || "").trim();
+  if (!v || v.length > MAX_TOKEN_LEN || /[\r\n\0]/.test(v)) return null;
   return v ? v : null;
 }
 
 function normAlias(s: string | null | undefined): string | null {
-  const v = decodeURIComponent(String(s || "")).trim().toLowerCase();
+  const raw = String(s || "").trim();
+  if (!raw || raw.length > MAX_ALIAS_LEN || /[\r\n\0]/.test(raw)) return null;
+  const decoded = (() => {
+    try {
+      return decodeURIComponent(raw);
+    } catch {
+      return "";
+    }
+  })();
+  const v = decoded.trim().toLowerCase();
   return v ? v : null;
 }
 
 function normEmail(s: string | null | undefined): string | null {
   const v = String(s || "").trim().toLowerCase();
+  if (!v) return null;
+  if (v.length > MAX_REPORT_EMAIL_LEN || /[\r\n\0]/.test(v)) return null;
+  if (!BASIC_EMAIL_RE.test(v)) return null;
   return v ? v : null;
 }
 
@@ -46,18 +72,29 @@ export async function POST(req: NextRequest) {
         { status: rl.status, headers: { "Retry-After": String(rl.retryAfterSeconds) } }
       );
     }
+    if (parseJsonBodyLength(req) > MAX_ABUSE_REPORT_BODY_BYTES) {
+      return NextResponse.json({ ok: false, error: "PAYLOAD_TOO_LARGE" }, { status: 413 });
+    }
 
-    let body: Body;
+    let body: Body | null;
     try {
-      body = (await req.json()) as Body;
+      const parsed = await req.json();
+      body = parsed && typeof parsed === "object" && !Array.isArray(parsed) ? (parsed as Body) : null;
     } catch {
+      return NextResponse.json({ ok: false, error: "BAD_JSON", message: "Invalid JSON." }, { status: 400 });
+    }
+    if (!body) {
       return NextResponse.json({ ok: false, error: "BAD_JSON", message: "Invalid JSON." }, { status: 400 });
     }
 
     const token = normToken(body.token);
     const alias = normAlias(body.alias);
     const reporterEmail = normEmail(body.reporter_email);
-    const message = String(body.message || "").trim() || null;
+    const message = (() => {
+      const text = String(body.message || "").replace(/[\r\n]+/g, " ").trim();
+      if (!text || /[\0]/.test(text)) return null;
+      return text.slice(0, MAX_REPORT_MESSAGE_LEN);
+    })();
 
     if (!token && !alias) {
       return NextResponse.json({ ok: false, error: "MISSING_TARGET", message: "Missing token or alias." }, { status: 400 });
