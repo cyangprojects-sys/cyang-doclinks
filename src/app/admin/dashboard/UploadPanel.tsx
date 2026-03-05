@@ -161,7 +161,10 @@ function fmtBytes(n: number) {
   return `${(n / (1024 * 1024)).toFixed(2)} MB`;
 }
 function errorMessage(e: unknown): string {
-  return e instanceof Error ? e.message : String(e);
+  if (process.env.NODE_ENV !== "production") {
+    return e instanceof Error ? e.message : String(e);
+  }
+  return "Upload failed.";
 }
 
 export default function UploadPanel({

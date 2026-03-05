@@ -31,8 +31,8 @@ export default function SignupPage() {
     try {
       await prepareSignupConsent(true);
       await signIn(provider, { callbackUrl: "/admin/dashboard" });
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Unable to start sign up.");
+    } catch {
+      setError("Unable to start sign up.");
       setBusy(false);
     }
   }

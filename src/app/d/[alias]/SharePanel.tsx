@@ -95,7 +95,8 @@ export default function SharePanel({
                 upsertRow(newRow);
                 setSelectedToken(newRow.token);
             } catch (e: unknown) {
-                setErr(e instanceof Error ? e.message : "Unexpected error creating share token.");
+                void e;
+                setErr("Unexpected error creating share token.");
             }
         });
     }
@@ -113,7 +114,8 @@ export default function SharePanel({
                 setStats(res);
                 upsertRow(res.row);
             } catch (e: unknown) {
-                setErr(e instanceof Error ? e.message : "Unexpected error loading stats.");
+                void e;
+                setErr("Unexpected error loading stats.");
                 setStats(null);
             }
         });
@@ -141,7 +143,8 @@ export default function SharePanel({
                     return { ...prev, row: { ...prev.row, revoked_at: nowIso } };
                 });
             } catch (e: unknown) {
-                setErr(e instanceof Error ? e.message : "Unexpected error revoking token.");
+                void e;
+                setErr("Unexpected error revoking token.");
             }
         });
     }

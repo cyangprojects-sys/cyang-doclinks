@@ -199,7 +199,10 @@ export default function ShareForm({
   planId?: string;
 }) {
   function errorMessage(e: unknown): string {
-    return e instanceof Error ? e.message : String(e);
+    if (process.env.NODE_ENV !== "production") {
+      return e instanceof Error ? e.message : String(e);
+    }
+    return "Unexpected error.";
   }
 
   const [mode, setMode] = useState<Mode>("simple");

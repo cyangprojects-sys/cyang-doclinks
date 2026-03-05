@@ -53,6 +53,13 @@ function statusClass(status: RotationJob["status"]): string {
   return "border-white/15 bg-white/5 text-white/70";
 }
 
+function toUserError(e: unknown, fallback: string): string {
+  if (process.env.NODE_ENV !== "production") {
+    return e instanceof Error ? e.message : fallback;
+  }
+  return fallback;
+}
+
 export default function KeyManagementPanel() {
   const [data, setData] = useState<KeysResponse | null>(null);
   const [busy, setBusy] = useState(false);
@@ -104,7 +111,7 @@ export default function KeyManagementPanel() {
       if (!r.ok || !j?.ok) throw new Error(j?.error || "Activate failed.");
       await refresh();
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Activate failed.");
+      setError(toUserError(e, "Activate failed."));
     } finally {
       setBusy(false);
     }
@@ -124,7 +131,7 @@ export default function KeyManagementPanel() {
       if (!r.ok || !j?.ok) throw new Error(j?.error || "Revoke failed.");
       await refresh();
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Revoke failed.");
+      setError(toUserError(e, "Revoke failed."));
     } finally {
       setBusy(false);
     }
@@ -156,7 +163,7 @@ export default function KeyManagementPanel() {
       if (!r.ok || !j?.ok) throw new Error(j?.error || "Failed to enqueue rotation job.");
       await refresh();
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Failed to enqueue rotation job.");
+      setError(toUserError(e, "Failed to enqueue rotation job."));
     } finally {
       setBusy(false);
     }
@@ -177,7 +184,7 @@ export default function KeyManagementPanel() {
       if (!r.ok || !j?.ok) throw new Error(j?.error || "Rollback failed.");
       await refresh();
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Rollback failed.");
+      setError(toUserError(e, "Rollback failed."));
     } finally {
       setBusy(false);
     }

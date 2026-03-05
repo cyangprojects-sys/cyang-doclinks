@@ -4,7 +4,7 @@ Total modules with lint warnings:
 66
 
 Remaining pending modules:
-57
+54
 
 Status key: `done` | `pending`
 
@@ -21,7 +21,7 @@ Status key: `done` | `pending`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\(owner)\viewer-uploads\ViewerUploadsTableClient.tsx`
 - pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\(owner)\webhooks\actions.ts`
 - pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\actions.ts`
-- pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\dashboard\UploadPanel.tsx`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\dashboard\UploadPanel.tsx`
 - pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\docs\[docId]\page.tsx`
 - pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\layout.tsx`
 - pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\abuse\route.ts`
@@ -52,9 +52,9 @@ Status key: `done` | `pending`
 - pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\components\SecurePdfCanvasViewer.tsx`
 - pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\d\[alias]\actions.ts`
 - pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\d\[alias]\raw\route.ts`
-- pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\d\[alias]\ShareForm.tsx`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\d\[alias]\ShareForm.tsx`
 - pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\org\[slug]\auth\[provider]\route.ts`
-- pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\report\ReportForm.tsx`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\report\ReportForm.tsx`
 - pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\t\[ticketId]\route.ts`
 - pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\auth.ts`
 - pending - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\authz.ts`
@@ -81,3 +81,6 @@ Status key: `done` | `pending`
 
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\backup\status\route.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\mfa\actions.ts`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\(owner)\security\KeyManagementPanel.tsx`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\d\[alias]\SharePanel.tsx`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\signup\page.tsx`

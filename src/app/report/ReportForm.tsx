@@ -43,7 +43,8 @@ export default function ReportForm({ token, alias }: Props) {
       setStatus("sent");
     } catch (e: unknown) {
       setStatus("error");
-      setErr(e instanceof Error ? e.message : "Network error.");
+      void e;
+      setErr("Network error.");
     }
   }
 
