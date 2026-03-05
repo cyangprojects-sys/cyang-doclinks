@@ -8,9 +8,18 @@ import { appendImmutableAudit } from "@/lib/immutableAudit";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+const KEY_ID_RE = /^[A-Za-z0-9._:-]{1,128}$/;
+
 const Body = z.object({
-  key_id: z.string().min(1),
-});
+  key_id: z.string().trim().regex(KEY_ID_RE),
+}).strict();
+
+function authErrorCode(e: unknown): "UNAUTHENTICATED" | "FORBIDDEN" | null {
+  const message = e instanceof Error ? e.message : String(e || "");
+  if (message === "UNAUTHENTICATED") return "UNAUTHENTICATED";
+  if (message === "FORBIDDEN") return "FORBIDDEN";
+  return null;
+}
 
 export async function POST(req: Request) {
   try {
@@ -47,8 +56,13 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ ok: true });
   } catch (e: unknown) {
-    const message = e instanceof Error ? e.message : "";
-    const status = message === "FORBIDDEN" || message === "UNAUTHENTICATED" ? 403 : 500;
-    return NextResponse.json({ ok: false, error: status === 403 ? "FORBIDDEN" : "SERVER_ERROR" }, { status });
+    const authCode = authErrorCode(e);
+    if (authCode === "UNAUTHENTICATED") {
+      return NextResponse.json({ ok: false, error: "UNAUTHENTICATED" }, { status: 401 });
+    }
+    if (authCode === "FORBIDDEN") {
+      return NextResponse.json({ ok: false, error: "FORBIDDEN" }, { status: 403 });
+    }
+    return NextResponse.json({ ok: false, error: "SERVER_ERROR" }, { status: 500 });
   }
 }

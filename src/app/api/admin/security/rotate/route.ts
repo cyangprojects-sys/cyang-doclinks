@@ -9,12 +9,21 @@ import { appendImmutableAudit } from "@/lib/immutableAudit";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+const KEY_ID_RE = /^[A-Za-z0-9._:-]{1,128}$/;
+
 const Body = z.object({
-  from_key_id: z.string().min(1),
-  to_key_id: z.string().optional(),
+  from_key_id: z.string().trim().regex(KEY_ID_RE),
+  to_key_id: z.string().trim().regex(KEY_ID_RE).optional(),
   limit: z.number().int().positive().max(2000).optional(),
   async_job: z.boolean().optional(),
-});
+}).strict();
+
+function authErrorCode(e: unknown): "UNAUTHENTICATED" | "FORBIDDEN" | null {
+  const message = e instanceof Error ? e.message : String(e || "");
+  if (message === "UNAUTHENTICATED") return "UNAUTHENTICATED";
+  if (message === "FORBIDDEN") return "FORBIDDEN";
+  return null;
+}
 
 export async function POST(req: Request) {
   try {
@@ -32,6 +41,9 @@ export async function POST(req: Request) {
           { ok: false, error: "TO_KEY_REQUIRED", message: "to_key_id is required for async rotation job." },
           { status: 400 }
         );
+      }
+      if (toKeyId === parsed.data.from_key_id) {
+        return NextResponse.json({ ok: false, error: "NOOP_ROTATION" }, { status: 400 });
       }
       const job = await enqueueKeyRotationJob({
         fromKeyId: parsed.data.from_key_id,
@@ -68,6 +80,10 @@ export async function POST(req: Request) {
       });
 
       return NextResponse.json({ ok: true, job_id: job.id, mode: "async" });
+    }
+
+    if (parsed.data.to_key_id && parsed.data.to_key_id === parsed.data.from_key_id) {
+      return NextResponse.json({ ok: false, error: "NOOP_ROTATION" }, { status: 400 });
     }
 
     const res = await rotateDocKeys({
@@ -109,8 +125,13 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ ok: true, mode: "sync", rotated: res.rotated, failed: res.failed, scanned: res.scanned, remaining: res.remaining });
   } catch (e: unknown) {
-    const message = e instanceof Error ? e.message : "";
-    const status = message === "FORBIDDEN" || message === "UNAUTHENTICATED" ? 403 : 500;
-    return NextResponse.json({ ok: false, error: status === 403 ? "FORBIDDEN" : "SERVER_ERROR" }, { status });
+    const authCode = authErrorCode(e);
+    if (authCode === "UNAUTHENTICATED") {
+      return NextResponse.json({ ok: false, error: "UNAUTHENTICATED" }, { status: 401 });
+    }
+    if (authCode === "FORBIDDEN") {
+      return NextResponse.json({ ok: false, error: "FORBIDDEN" }, { status: 403 });
+    }
+    return NextResponse.json({ ok: false, error: "SERVER_ERROR" }, { status: 500 });
   }
 }

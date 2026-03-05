@@ -7,6 +7,13 @@ import { listKeyRotationJobs, getKeyRotationStatusSummary } from "@/lib/keyRotat
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+function authErrorCode(e: unknown): "UNAUTHENTICATED" | "FORBIDDEN" | null {
+  const message = e instanceof Error ? e.message : String(e || "");
+  if (message === "UNAUTHENTICATED") return "UNAUTHENTICATED";
+  if (message === "FORBIDDEN") return "FORBIDDEN";
+  return null;
+}
+
 export async function GET() {
   try {
     await requirePermission("security.keys.manage");
@@ -38,8 +45,13 @@ export async function GET() {
       job_summary: jobSummary,
     });
   } catch (e: unknown) {
-    const message = e instanceof Error ? e.message : "";
-    const status = message === "FORBIDDEN" || message === "UNAUTHENTICATED" ? 403 : 500;
-    return NextResponse.json({ ok: false, error: status === 403 ? "FORBIDDEN" : "SERVER_ERROR" }, { status });
+    const authCode = authErrorCode(e);
+    if (authCode === "UNAUTHENTICATED") {
+      return NextResponse.json({ ok: false, error: "UNAUTHENTICATED" }, { status: 401 });
+    }
+    if (authCode === "FORBIDDEN") {
+      return NextResponse.json({ ok: false, error: "FORBIDDEN" }, { status: 403 });
+    }
+    return NextResponse.json({ ok: false, error: "SERVER_ERROR" }, { status: 500 });
   }
 }
