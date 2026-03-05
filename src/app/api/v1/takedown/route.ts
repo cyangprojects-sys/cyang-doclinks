@@ -22,15 +22,51 @@ type Body = {
 };
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const ALIAS_RE = /^[a-z0-9][a-z0-9_-]{2,159}$/i;
+const BASIC_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const MAX_TAKEDOWN_BODY_BYTES = 24 * 1024;
+const MAX_TARGET_TOKEN_LEN = 256;
+const MAX_TARGET_ALIAS_LEN = 160;
+const MAX_DOC_ID_INPUT_LEN = 128;
+const MAX_REQUESTER_FIELD_LEN = 256;
+const MAX_MESSAGE_LEN = 8000;
+const MAX_SIGNATURE_LEN = 512;
+
+function parseJsonBodyLength(req: NextRequest): number {
+  const raw = String(req.headers.get("content-length") || "").trim();
+  const out = Number(raw);
+  return Number.isFinite(out) ? Math.max(0, Math.floor(out)) : 0;
+}
 
 function norm(s: unknown, max = 4000): string | null {
-  const v = String(s ?? "").trim();
+  const v = String(s ?? "").replace(/[\r\n]+/g, " ").trim();
   if (!v) return null;
+  if (/[\0]/.test(v)) return null;
   return v.length > max ? v.slice(0, max) : v;
 }
 
 function isUuid(value: string): boolean {
   return UUID_RE.test(String(value || "").trim());
+}
+
+function parseToken(value: unknown): string | null {
+  const token = norm(value, MAX_TARGET_TOKEN_LEN);
+  if (!token) return null;
+  return /[\s]/.test(token) ? null : token;
+}
+
+function parseAlias(value: unknown): string | null {
+  const raw = norm(value, MAX_TARGET_ALIAS_LEN);
+  if (!raw) return null;
+  const alias = raw.toLowerCase();
+  return ALIAS_RE.test(alias) ? alias : null;
+}
+
+function parseEmail(value: unknown): string | null {
+  const email = norm(value, MAX_REQUESTER_FIELD_LEN)?.toLowerCase() ?? null;
+  if (!email) return null;
+  if (!BASIC_EMAIL_RE.test(email)) return null;
+  return email;
 }
 
 export async function POST(req: NextRequest) {
@@ -45,25 +81,48 @@ export async function POST(req: NextRequest) {
   if (!globalRl.ok) {
     return NextResponse.json({ ok: false, error: "RATE_LIMITED" }, { status: 429 });
   }
+  if (parseJsonBodyLength(req) > MAX_TAKEDOWN_BODY_BYTES) {
+    return NextResponse.json({ ok: false, error: "PAYLOAD_TOO_LARGE" }, { status: 413 });
+  }
 
   const ipInfo = clientIpKey(req);
-  const body = (await req.json().catch(() => null)) as Body | null;
+  let body: Body | null = null;
+  try {
+    const parsed = await req.json();
+    body = parsed && typeof parsed === "object" && !Array.isArray(parsed) ? (parsed as Body) : null;
+  } catch {
+    body = null;
+  }
   if (!body) return NextResponse.json({ ok: false, error: "BAD_JSON" }, { status: 400 });
 
-  const token = norm(body.token, 256);
-  const alias = norm(body.alias, 256)?.toLowerCase() ?? null;
-  const docIdInput = norm(body.doc_id, 128);
+  const tokenRaw = String(body.token ?? "").trim();
+  const token = parseToken(body.token);
+  if (tokenRaw && !token) {
+    return NextResponse.json({ ok: false, error: "INVALID_TOKEN" }, { status: 400 });
+  }
+
+  const aliasRaw = String(body.alias ?? "").trim();
+  const alias = parseAlias(body.alias);
+  if (aliasRaw && !alias) {
+    return NextResponse.json({ ok: false, error: "INVALID_ALIAS" }, { status: 400 });
+  }
+
+  const docIdInput = norm(body.doc_id, MAX_DOC_ID_INPUT_LEN);
   if (docIdInput && !isUuid(docIdInput)) {
     return NextResponse.json({ ok: false, error: "INVALID_DOC_ID" }, { status: 400 });
   }
 
-  const requesterName = norm(body.requester_name, 256);
-  const requesterEmail = norm(body.requester_email, 256)?.toLowerCase() ?? null;
-  const claimantCompany = norm(body.claimant_company, 256);
+  const requesterName = norm(body.requester_name, MAX_REQUESTER_FIELD_LEN);
+  const requesterEmailRaw = String(body.requester_email ?? "").trim();
+  const requesterEmail = parseEmail(body.requester_email);
+  if (requesterEmailRaw && !requesterEmail) {
+    return NextResponse.json({ ok: false, error: "INVALID_REQUESTER_EMAIL" }, { status: 400 });
+  }
+  const claimantCompany = norm(body.claimant_company, MAX_REQUESTER_FIELD_LEN);
 
-  const message = norm(body.message, 8000);
-  const statement = norm(body.statement, 8000);
-  const signature = norm(body.signature, 512);
+  const message = norm(body.message, MAX_MESSAGE_LEN);
+  const statement = norm(body.statement, MAX_MESSAGE_LEN);
+  const signature = norm(body.signature, MAX_SIGNATURE_LEN);
 
   if (!token && !alias && !docIdInput) {
     return NextResponse.json({ ok: false, error: "MISSING_TARGET" }, { status: 400 });

@@ -6,5 +6,9 @@ test.describe("api v1 takedown guardrails", () => {
     const code = readFileSync("src/app/api/v1/takedown/route.ts", "utf8");
     expect(code.includes("UUID_RE")).toBeTruthy();
     expect(code.includes("INVALID_DOC_ID")).toBeTruthy();
+    expect(code.includes("MAX_TAKEDOWN_BODY_BYTES")).toBeTruthy();
+    expect(code.includes("INVALID_TOKEN")).toBeTruthy();
+    expect(code.includes("INVALID_ALIAS")).toBeTruthy();
+    expect(code.includes("INVALID_REQUESTER_EMAIL")).toBeTruthy();
   });
 });
