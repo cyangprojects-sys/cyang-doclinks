@@ -379,9 +379,7 @@ export default async function AdminDocDetailPage({
                 </form>
               ) : null}
             </div>
-          ) : (
-            <div className="mt-3 text-xs text-white/55">Alias management is available to admins and owners.</div>
-          )}
+          ) : null}
         </div>
 
         <div className={card}>
