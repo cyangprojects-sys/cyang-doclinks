@@ -284,3 +284,10 @@ Remaining timeout env parity modules pending: 0
 
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\.env.example` (resweep: added complete route-timeout env key set used by guardrails)
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\tests\api-route-guardrails.spec.ts` (resweep: asserts .env.example contains all timeout env keys referenced by route guards)
+
+## Rate-limit env parity sweep
+
+Remaining rate-limit env parity modules pending: 0
+
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\.env.example` (resweep: added missing RATE_LIMIT_PER_MIN and RATE_LIMIT_PER_10MIN keys for share password gate)
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\tests\api-route-guardrails.spec.ts` (resweep: asserts .env.example contains all process.env RATE_LIMIT_* and ABUSE_BLOCK_* keys)

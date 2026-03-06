@@ -34,6 +34,18 @@ function timeoutEnvKeysFromSource(): string[] {
   return Array.from(keys).sort();
 }
 
+function envKeysFromSource(pattern: RegExp): string[] {
+  const keys = new Set<string>();
+  for (const file of sourceFiles()) {
+    const code = src(file);
+    const matches = code.matchAll(pattern);
+    for (const m of matches) {
+      if (m[1]) keys.add(m[1]);
+    }
+  }
+  return Array.from(keys).sort();
+}
+
 test.describe("api route guardrails", () => {
   test("admin routes are authenticated", () => {
     const files = routeFiles().filter((f) => f.includes("src/app/api/admin/"));
@@ -273,6 +285,20 @@ test.describe("api route guardrails", () => {
 
   test(".env.example includes timeout env keys used by route guards", () => {
     const keys = timeoutEnvKeysFromSource();
+    const envExample = src(".env.example");
+    const missing = keys.filter((k) => !new RegExp(`^${k}=`, "m").test(envExample));
+    expect(missing).toEqual([]);
+  });
+
+  test(".env.example includes RATE_LIMIT env keys used in process.env", () => {
+    const keys = envKeysFromSource(/process\.env\.(RATE_LIMIT_[A-Z0-9_]+)/g);
+    const envExample = src(".env.example");
+    const missing = keys.filter((k) => !new RegExp(`^${k}=`, "m").test(envExample));
+    expect(missing).toEqual([]);
+  });
+
+  test(".env.example includes ABUSE_BLOCK env keys used in process.env", () => {
+    const keys = envKeysFromSource(/process\.env\.(ABUSE_BLOCK_[A-Z0-9_]+)/g);
     const envExample = src(".env.example");
     const missing = keys.filter((k) => !new RegExp(`^${k}=`, "m").test(envExample));
     expect(missing).toEqual([]);
