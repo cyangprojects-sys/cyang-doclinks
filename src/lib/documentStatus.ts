@@ -10,8 +10,7 @@ export type ScanState =
 export type SharePolicyState = "SHARE_ALLOWED" | "SHARE_ALLOWED_WITH_WARNING" | "SHARE_BLOCKED" | "SHARE_LIMITED";
 export type StatusTone = "positive" | "warning" | "danger" | "neutral";
 
-export const SCAN_PENDING_SHARE_WARNING =
-  "Security scan is still running. You can share now, and we'll automatically restrict access if it's flagged.";
+export const SCAN_PENDING_SHARE_WARNING = "Available after scan completes.";
 
 const MAX_STATE_INPUT_LEN = 64;
 const MAX_UPLOAD_ERROR_LEN = 180;
@@ -79,7 +78,7 @@ export function deriveSharePolicyState(args: {
   if (scanState === "NEEDS_REVIEW") return allowNeedsReview ? "SHARE_ALLOWED_WITH_WARNING" : "SHARE_BLOCKED";
   if (scanState === "CLEAN") return "SHARE_ALLOWED";
   if (scanState === "PENDING" || scanState === "RUNNING" || scanState === "NOT_SCHEDULED" || scanState === "SKIPPED") {
-    return "SHARE_ALLOWED_WITH_WARNING";
+    return "SHARE_BLOCKED";
   }
   return "SHARE_BLOCKED";
 }
@@ -119,6 +118,9 @@ export function getShareEligibility(args: {
   }
   if (scanState === "MALICIOUS") {
     return { canCreateLink: false, sharePolicyState, warning: null, blockedReason: "File failed security checks." };
+  }
+  if (scanState === "PENDING" || scanState === "RUNNING" || scanState === "NOT_SCHEDULED" || scanState === "SKIPPED") {
+    return { canCreateLink: false, sharePolicyState, warning: null, blockedReason: "Available after scan completes." };
   }
   if (scanState === "NEEDS_REVIEW") {
     return { canCreateLink: false, sharePolicyState, warning: null, blockedReason: "This file needs review before sharing." };
@@ -175,6 +177,22 @@ export function getDocumentUiStatus(args: {
       tooltip: `doc_state=${docState} • scan_state=${scanState} • share_policy_state=${policy}`,
     };
   }
+  if (scanState === "RUNNING") {
+    return {
+      label: "Scanning...",
+      subtext: "Available after scan completes",
+      tone: "warning",
+      tooltip: `doc_state=${docState} • scan_state=${scanState} • share_policy_state=${policy}`,
+    };
+  }
+  if (scanState === "PENDING" || scanState === "NOT_SCHEDULED" || scanState === "SKIPPED") {
+    return {
+      label: "Scan pending",
+      subtext: "Available after scan completes",
+      tone: "warning",
+      tooltip: `doc_state=${docState} • scan_state=${scanState} • share_policy_state=${policy}`,
+    };
+  }
   if (scanState === "CLEAN") {
     return {
       label: "Ready",
@@ -184,9 +202,9 @@ export function getDocumentUiStatus(args: {
     };
   }
   return {
-    label: "Ready to share",
-    subtext: "Security scan running in background",
-    tone: "positive",
+    label: "Unavailable",
+    subtext: "Waiting for security checks",
+    tone: "neutral",
     tooltip: `doc_state=${docState} • scan_state=${scanState} • share_policy_state=${policy}`,
   };
 }

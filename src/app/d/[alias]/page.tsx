@@ -158,7 +158,17 @@ async function getDocAvailabilityHint(docId: string): Promise<{ hint: string | n
     }
 
     const moderation = String(r.moderation_status || "active").toLowerCase();
+    const scanRaw = String(r.scan_status || "unscanned").toLowerCase();
     if (moderation === "quarantined") {
+      const rescanInProgress =
+        scanRaw === "pending" ||
+        scanRaw === "queued" ||
+        scanRaw === "running" ||
+        scanRaw === "unscanned" ||
+        scanRaw === "not_scheduled";
+      if (rescanInProgress) {
+        return { hint: "Security rescan in progress. Available after scan completes.", shouldAutoRefresh: true };
+      }
       return { hint: "This document is quarantined and cannot be served.", shouldAutoRefresh: false };
     }
     if (moderation === "disabled" || moderation === "deleted") {
