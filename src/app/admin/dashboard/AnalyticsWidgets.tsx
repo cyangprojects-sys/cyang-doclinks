@@ -603,7 +603,7 @@ export default async function AnalyticsWidgets({
           <div className="text-xs text-white/60">Active shares</div>
           <div className="mt-1 text-3xl font-semibold text-white">{fmtInt(activeShares)}</div>
           <div className="mt-1 text-xs text-white/65">Expiring soon: {fmtInt(expiringShares)}</div>
-          <Link href="/admin/upload" className="mt-3 inline-flex rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white hover:bg-white/15">
+          <Link href="/admin/dashboard?createLink=1" className="mt-3 inline-flex rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white hover:bg-white/15">
             Create new protected link
           </Link>
         </div>

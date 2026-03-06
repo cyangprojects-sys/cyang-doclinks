@@ -136,7 +136,7 @@ export default async function AdminDashboardPage() {
                 <Link href="/admin/uploads?openPicker=1" className="btn-base btn-secondary rounded-lg px-2.5 py-1.5 text-xs">
                   Upload document
                 </Link>
-                <Link href="/admin/dashboard?createLink=1" className="btn-base btn-secondary rounded-lg px-2.5 py-1.5 text-xs">
+                <Link href="/admin/uploads?openPicker=1&fromCreateLink=1" className="btn-base btn-secondary rounded-lg px-2.5 py-1.5 text-xs">
                   Create protected link
                 </Link>
               </div>

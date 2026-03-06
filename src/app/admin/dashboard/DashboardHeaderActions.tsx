@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { createAndEmailShareToken } from "@/app/d/[alias]/actions";
 import { isPackAvailableForPlan, type PackId } from "@/lib/packs";
-import { getDocumentUiStatus, getShareEligibility } from "@/lib/documentStatus";
+import { getDocumentUiStatus, getShareEligibility, normalizeDocState, normalizeScanState } from "@/lib/documentStatus";
 
 type DocOption = {
   docId: string;
@@ -130,6 +130,15 @@ export default function DashboardHeaderActions(props: { docs: DocOption[]; planI
       return { ...d, ui, eligibility };
     });
   }, [props.docs]);
+  const hasAnyDocs = docsWithStatus.length > 0;
+  const hasReadyCleanDoc = useMemo(() => {
+    return docsWithStatus.some((d) => {
+      const docState = normalizeDocState(d.docState);
+      const scanState = normalizeScanState(d.scanState, d.moderationStatus);
+      return d.eligibility.canCreateLink && docState === "READY" && scanState === "CLEAN";
+    });
+  }, [docsWithStatus]);
+  const createLinkUploadHref = "/admin/uploads?openPicker=1&fromCreateLink=1";
 
   useEffect(() => {
     if (!docsWithStatus.length) {
@@ -149,21 +158,36 @@ export default function DashboardHeaderActions(props: { docs: DocOption[]; planI
 
   useEffect(() => {
     const requestedOpen = sp.get("createLink") === "1";
-    if (requestedOpen) setOpen(true);
-
     const requestedDocId = String(sp.get("docId") || "").trim();
+    if (requestedOpen) {
+      if (!requestedDocId && !hasReadyCleanDoc) {
+        setOpen(false);
+        router.replace(createLinkUploadHref, { scroll: false });
+        return;
+      }
+      setOpen(true);
+    }
     if (!requestedDocId) return;
     const doc = docsWithStatus.find((d) => d.docId === requestedDocId);
     if (!doc) return;
     setSelectedDocId(doc.docId);
     setShareWarning(doc.eligibility.warning ?? null);
-  }, [sp, docsWithStatus]);
+  }, [sp, docsWithStatus, hasReadyCleanDoc, createLinkUploadHref, router]);
 
   const filteredDocs = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return docsWithStatus;
     return docsWithStatus.filter((d) => `${d.title} ${d.docId}`.toLowerCase().includes(q));
   }, [docsWithStatus, query]);
+
+  function onPrimaryCreateClick() {
+    if (!hasReadyCleanDoc) {
+      router.push(createLinkUploadHref);
+      return;
+    }
+    resetFlow();
+    setOpen(true);
+  }
 
   function resetFlow() {
     setErr(null);
@@ -275,10 +299,13 @@ export default function DashboardHeaderActions(props: { docs: DocOption[]; planI
       <div className="flex items-center gap-2">
         <button
           type="button"
-          onClick={() => setOpen(true)}
+          onClick={onPrimaryCreateClick}
           className="btn-base rounded-lg border border-cyan-300/45 bg-cyan-400 px-4 py-2 text-sm font-semibold text-[#04111e] shadow-[0_6px_20px_rgba(34,211,238,0.28)] hover:bg-cyan-300"
         >
-          Create protected link
+          <span className="flex flex-col items-start leading-tight">
+            <span>{hasAnyDocs ? "Create protected link" : "Upload a document"}</span>
+            {!hasAnyDocs ? <span className="text-[11px] font-medium text-[#0f2a3a]/80">then create a link</span> : null}
+          </span>
         </button>
         <button
           type="button"
