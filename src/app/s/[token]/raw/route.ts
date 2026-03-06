@@ -217,6 +217,7 @@ export async function GET(
     id: ipKey,
     limit: Number(process.env.RATE_LIMIT_SHARE_IP_PER_MIN || 60),
     windowSeconds: 60,
+    failClosed: true,
   });
   if (!ipRl.ok) {
     await logSecurityEvent({
@@ -242,6 +243,7 @@ export async function GET(
     id: tokenKey,
     limit: Number(process.env.RATE_LIMIT_SHARE_TOKEN_PER_MIN || 240),
     windowSeconds: 60,
+    failClosed: true,
   });
   if (!tokenRl.ok) {
     await logSecurityEvent({

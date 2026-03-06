@@ -331,4 +331,28 @@ test.describe("api route guardrails", () => {
     const code = src("src/lib/securityTelemetry.ts");
     expect(code.includes("failClosed: strict !== false")).toBeTruthy();
   });
+
+  test("share raw per-IP and per-token rate limits fail closed", () => {
+    const code = src("src/app/s/[token]/raw/route.ts");
+    expect(code.includes('scope: "ip:share_preview"')).toBeTruthy();
+    expect(code.includes('scope: "token:share_preview"')).toBeTruthy();
+    expect(code.includes("failClosed: true")).toBeTruthy();
+  });
+
+  test("monetization soft-cap rate-limit gates fail closed", () => {
+    const code = src("src/lib/monetization.ts");
+    const scopes = [
+      'scope: "pro:share_create:user:min"',
+      'scope: "pro:share_create:user:burst"',
+      'scope: "pro:view_overage:user:min"',
+      'scope: "pro:view_soft_cap_alert:user:day"',
+      'scope: "pro:egress_probe:user:15m"',
+      'scope: "pro:egress_alert:user:day"',
+    ];
+    for (const scope of scopes) {
+      expect(code.includes(scope)).toBeTruthy();
+    }
+    const failClosedCount = (code.match(/failClosed:\s*true/g) || []).length;
+    expect(failClosedCount).toBeGreaterThanOrEqual(scopes.length);
+  });
 });

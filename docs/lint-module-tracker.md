@@ -312,3 +312,7 @@ Remaining strict rate-limit modules pending: 0
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\tests\api-route-guardrails.spec.ts` (resweep: asserts strict fail-closed throttling for auth+share-download routes)
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\securityTelemetry.ts` (resweep: enforceGlobalApiRateLimit fail-closed by default unless strict=false)
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\tests\api-route-guardrails.spec.ts` (resweep: asserts global rate limiter fail-closed default behavior)
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\s\[token]\raw\route.ts` (resweep: explicit failClosed=true for direct per-IP/per-token rateLimit gates)
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\tests\api-route-guardrails.spec.ts` (resweep: asserts share-raw direct rate limits are fail-closed)
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\monetization.ts` (resweep: all direct pro soft-cap/overage rateLimit gates fail-closed)
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\tests\api-route-guardrails.spec.ts` (resweep: asserts monetization soft-cap rate-limit gates are fail-closed)

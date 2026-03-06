@@ -379,6 +379,7 @@ export async function assertCanCreateShare(ownerId: string): Promise<LimitResult
       id: uid,
       limit: envInt("PRO_SHARE_CREATE_PER_MIN", 90),
       windowSeconds: 60,
+      failClosed: true,
     });
     if (!perMinute.ok) {
       return { ok: false, error: "LIMIT_REACHED", message: "Too many share creates. Please retry shortly." };
@@ -389,6 +390,7 @@ export async function assertCanCreateShare(ownerId: string): Promise<LimitResult
       id: uid,
       limit: envInt("PRO_SHARE_CREATE_BURST_LIMIT", 300),
       windowSeconds: envInt("PRO_SHARE_CREATE_BURST_WINDOW_SECONDS", 300),
+      failClosed: true,
     });
     if (!burst.ok) {
       return { ok: false, error: "LIMIT_REACHED", message: "Share creation burst limit reached. Please retry shortly." };
@@ -423,6 +425,7 @@ export async function assertCanServeView(ownerId: string): Promise<LimitResult> 
         id: uid,
         limit: envInt("PRO_VIEW_OVERAGE_PER_MIN", 120),
         windowSeconds: 60,
+        failClosed: true,
       });
       if (!throttle.ok) {
         return { ok: false, error: "LIMIT_REACHED", message: "Traffic temporarily throttled. Please retry shortly." };
@@ -433,6 +436,7 @@ export async function assertCanServeView(ownerId: string): Promise<LimitResult> 
         id: uid,
         limit: 1,
         windowSeconds: 86400,
+        failClosed: true,
       });
       if (alertGate.ok && alertGate.count === 1) {
         void logSecurityEvent({
@@ -485,6 +489,7 @@ async function maybeFlagHeavyProEgress(ownerId: string): Promise<void> {
     id: uid,
     limit: 1,
     windowSeconds: 900,
+    failClosed: true,
   });
   if (!(probeGate.ok && probeGate.count === 1)) return;
 
@@ -497,6 +502,7 @@ async function maybeFlagHeavyProEgress(ownerId: string): Promise<void> {
     id: uid,
     limit: 1,
     windowSeconds: 86400,
+    failClosed: true,
   });
   if (!(alertGate.ok && alertGate.count === 1)) return;
 
