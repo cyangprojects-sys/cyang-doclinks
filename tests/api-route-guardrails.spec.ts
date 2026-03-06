@@ -326,4 +326,9 @@ test.describe("api route guardrails", () => {
       expect(code.includes("strict: true")).toBeTruthy();
     }
   });
+
+  test("global api rate limiter defaults to fail-closed when strict is omitted", () => {
+    const code = src("src/lib/securityTelemetry.ts");
+    expect(code.includes("failClosed: strict !== false")).toBeTruthy();
+  });
 });

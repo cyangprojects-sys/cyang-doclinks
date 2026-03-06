@@ -310,3 +310,5 @@ Remaining strict rate-limit modules pending: 0
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\org\[slug]\auth\[provider]\route.ts` (resweep: enforceGlobalApiRateLimit strict fail-closed)
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\s\[token]\download\route.ts` (resweep: enforceGlobalApiRateLimit strict fail-closed)
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\tests\api-route-guardrails.spec.ts` (resweep: asserts strict fail-closed throttling for auth+share-download routes)
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\securityTelemetry.ts` (resweep: enforceGlobalApiRateLimit fail-closed by default unless strict=false)
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\tests\api-route-guardrails.spec.ts` (resweep: asserts global rate limiter fail-closed default behavior)

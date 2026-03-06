@@ -312,7 +312,8 @@ export async function enforceGlobalApiRateLimit(args: {
     id: ipHash,
     limit,
     windowSeconds,
-    failClosed: Boolean(strict),
+    // Fail closed by default; callers can explicitly opt out with strict: false.
+    failClosed: strict !== false,
   });
 
   const retryAfterSeconds = Math.max(1, rl.resetSeconds);
