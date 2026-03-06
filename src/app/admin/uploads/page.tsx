@@ -5,6 +5,7 @@ import DashboardHeaderActions from "@/app/admin/dashboard/DashboardHeaderActions
 import UploadPanel from "@/app/admin/dashboard/UploadPanel";
 import { getDashboardDocumentsData } from "@/app/admin/dashboard/data";
 import { normalizeScanState } from "@/lib/documentStatus";
+import { sql } from "@/lib/db";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,7 +14,7 @@ export const revalidate = 0;
 export default async function AdminUploadsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ openPicker?: string; fromCreateLink?: string; show?: string }>;
+  searchParams: Promise<{ openPicker?: string; fromCreateLink?: string; show?: string; count?: string }>;
 }) {
   let u;
   try {
@@ -28,6 +29,9 @@ export default async function AdminUploadsPage({
   const fromCreateLink = String(params?.fromCreateLink || "") === "1";
   const show = String(params?.show || "").trim().toLowerCase();
   const showFailed = show === "failed";
+  const reportedFailureCountRaw = Number(params?.count || "0");
+  const reportedFailureCount = Number.isFinite(reportedFailureCountRaw) && reportedFailureCountRaw > 0 ? Math.floor(reportedFailureCountRaw) : 0;
+  const canSeeAllFailures = ["owner", "admin"].includes(String(u.role || "").trim().toLowerCase());
   const headerDocs = data.unifiedRows.map((r) => ({
     docId: r.doc_id,
     title: r.doc_title || "Untitled document",
@@ -40,6 +44,24 @@ export default async function AdminUploadsPage({
     const scanState = normalizeScanState(r.scan_status, r.moderation_status);
     return docState === "error" || scanState === "NEEDS_REVIEW";
   });
+  let failedStartEvents: Array<{ created_at: string | null; message: string | null }> = [];
+  if (showFailed) {
+    try {
+      failedStartEvents = (await sql`
+        select
+          se.created_at::text as created_at,
+          nullif(trim(coalesce(se.message::text, se.meta->>'reason', se.meta->>'error', '')), '') as message
+        from public.security_events se
+        where se.type = 'upload_presign_error'
+          and se.created_at > now() - interval '24 hours'
+          ${canSeeAllFailures ? sql`` : sql`and se.actor_user_id = ${u.id}::uuid`}
+        order by se.created_at desc
+        limit 10
+      `) as unknown as Array<{ created_at: string | null; message: string | null }>;
+    } catch {
+      failedStartEvents = [];
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -70,6 +92,20 @@ export default async function AdminUploadsPage({
                   </li>
                 ))}
               </ul>
+            ) : failedStartEvents.length ? (
+              <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-rose-100/90">
+                {failedStartEvents.map((e, idx) => (
+                  <li key={`${e.created_at || "unknown"}-${idx}`}>
+                    {e.created_at ? `${new Date(e.created_at).toLocaleString()}: ` : ""}
+                    {e.message || "Upload failed to initialize before a document record was created."}
+                  </li>
+                ))}
+              </ul>
+            ) : reportedFailureCount > 0 ? (
+              <div className="mt-1 text-xs text-rose-100/85">
+                Detected {reportedFailureCount} failed upload start event{reportedFailureCount === 1 ? "" : "s"} in the last 24h.
+                These can fail before a document record is created.
+              </div>
             ) : (
               <div className="mt-1 text-xs text-rose-100/85">No recent failed uploads found.</div>
             )}

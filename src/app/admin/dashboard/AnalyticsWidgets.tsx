@@ -93,6 +93,7 @@ export default async function AnalyticsWidgets({
   let usageMaxStorageBytes: number | null = 104857600;
   let usageMaxViewsPerMonth: number | null = 100;
   let usageMaxUploadsPerDay: number | null = 10;
+  let usageMaxFileSizeBytes: number | null = 26214400;
   let usageActiveShares = 0;
   let usageStorage = 0;
   let usageMonthlyViews: number | null = null;
@@ -106,6 +107,7 @@ export default async function AnalyticsWidgets({
     usageMaxStorageBytes = usagePlan.maxStorageBytes;
     usageMaxViewsPerMonth = usagePlan.maxViewsPerMonth;
     usageMaxUploadsPerDay = usagePlan.maxUploadsPerDay;
+    usageMaxFileSizeBytes = usagePlan.maxFileSizeBytes;
   } catch {
     // keep defaults
   }
@@ -557,8 +559,13 @@ export default async function AnalyticsWidgets({
   const scanDelayThresholdRaw = Number(process.env.SCAN_PENDING_DELAY_THRESHOLD || 25);
   const scanDelayThreshold = Number.isFinite(scanDelayThresholdRaw) && scanDelayThresholdRaw > 0 ? Math.floor(scanDelayThresholdRaw) : 25;
   const scanSystemDelayed = pendingScanDocs > scanDelayThreshold;
-  const failedUploadsHref = "/admin/uploads?show=failed";
+  const failedUploadsHref = `/admin/uploads?show=failed&count=${encodeURIComponent(String(presignErrors24h))}`;
   const planDisplayLabel = isOwnerRole ? "Pro" : usagePlanId === "pro" ? "Pro" : "Free";
+  const effectiveMaxFileSizeBytes = isOwnerRole ? 104857600 : usageMaxFileSizeBytes;
+  const fileSizeLimitLabel =
+    effectiveMaxFileSizeBytes == null
+      ? "Unlimited"
+      : `${Math.max(1, Math.floor(effectiveMaxFileSizeBytes / (1024 * 1024)))}MB`;
 
   return (
     <section className="mb-6">
@@ -573,7 +580,7 @@ export default async function AnalyticsWidgets({
               {usageMaxActiveShares == null ? "unlimited" : fmtInt(usageMaxActiveShares)} active
             </li>
             <li>
-              File size limit: {usagePlanId === "pro" ? "100MB" : "25MB"} ({planDisplayLabel})
+              File size limit: {fileSizeLimitLabel} ({planDisplayLabel})
             </li>
             <li>
               Storage used: {fmtStorageUsedForHome(usageStorage)}

@@ -47,7 +47,8 @@ export async function GET(req: NextRequest) {
     return await withRouteTimeout(
       (async () => {
         const maxJobs = Math.max(1, Math.min(100, Number(process.env.SCAN_CRON_BATCH || 25)));
-        const absMaxBytes = Math.max(1024 * 1024, Number(process.env.SCAN_ABS_MAX_BYTES || 25_000_000)); // default 25MB
+        const defaultScanMaxBytes = Number(process.env.UPLOAD_ABSOLUTE_MAX_BYTES || 100 * 1024 * 1024); // default 100MB
+        const absMaxBytes = Math.max(1024 * 1024, Number(process.env.SCAN_ABS_MAX_BYTES || defaultScanMaxBytes));
         const maxAttempts = Math.max(1, Number(process.env.SCAN_MAX_ATTEMPTS || 5));
         const retryBase = Math.max(1, Number(process.env.SCAN_RETRY_BASE_MINUTES || 5));
         const retryMax = Math.max(retryBase, Number(process.env.SCAN_RETRY_MAX_MINUTES || 720));
