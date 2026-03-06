@@ -66,7 +66,7 @@ async function getCtx(u: AuthedUser): Promise<DashboardCtx> {
   const canSeeAll = roleAtLeast(u.role, "admin");
   const canCheckEncryptionStatus = roleAtLeast(u.role, "owner");
   const userPlan = await getPlanForUser(u.id);
-  const planId = String(userPlan.id || "free").toLowerCase() === "free" ? "free" : "pro";
+  const planId = String(userPlan.id || "free").toLowerCase() === "pro" ? "pro" : "free";
   const nowTs = Date.now();
 
   const hasDocs = await tableExists("public.docs");

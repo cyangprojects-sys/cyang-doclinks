@@ -296,7 +296,7 @@ export default function DashboardHeaderActions(props: { docs: DocOption[]; planI
 
   return (
     <>
-      <div className="flex items-center gap-2">
+      <div className="flex w-full items-center justify-center gap-2">
         <button
           type="button"
           onClick={onPrimaryCreateClick}
@@ -355,10 +355,11 @@ export default function DashboardHeaderActions(props: { docs: DocOption[]; planI
                       const doc = docsWithStatus.find((d) => d.docId === nextId);
                       setShareWarning(doc?.eligibility.warning ?? null);
                     }}
-                    className="mt-2 w-full rounded-lg border border-white/20 bg-black/25 px-3 py-2 text-sm text-white"
+                    className="mt-2 w-full rounded-lg border border-white/20 bg-white px-3 py-2 text-sm text-black"
+                    style={{ colorScheme: "light" }}
                   >
                     {filteredDocs.map((d) => (
-                      <option key={d.docId} value={d.docId} disabled={!d.eligibility.canCreateLink} title={d.ui.subtext}>
+                      <option key={d.docId} value={d.docId} disabled={!d.eligibility.canCreateLink} title={d.ui.subtext} className="bg-white text-black">
                         {`${d.title} - ${d.ui.label}${d.eligibility.canCreateLink ? "" : " (Unavailable)"}`}
                       </option>
                     ))}
