@@ -303,4 +303,11 @@ test.describe("api route guardrails", () => {
     const missing = keys.filter((k) => !new RegExp(`^${k}=`, "m").test(envExample));
     expect(missing).toEqual([]);
   });
+
+  test("auth email start route enforces form body bounds before parsing", () => {
+    const code = src("src/app/auth/email/start/route.ts");
+    expect(code.includes("MAX_AUTH_EMAIL_START_FORM_BYTES")).toBeTruthy();
+    expect(code.includes("parseFormBodyLength(")).toBeTruthy();
+    expect(code.includes('status: 413')).toBeTruthy();
+  });
 });

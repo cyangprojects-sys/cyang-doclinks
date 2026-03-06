@@ -6,6 +6,13 @@ import { enforceGlobalApiRateLimit } from "@/lib/securityTelemetry";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const ALIAS_RE = /^[a-z0-9][a-z0-9_-]{1,127}$/i;
+const MAX_AUTH_EMAIL_START_FORM_BYTES = 8 * 1024;
+
+function parseFormBodyLength(req: NextRequest): number {
+  const raw = String(req.headers.get("content-length") || "").trim();
+  const size = Number(raw);
+  return Number.isFinite(size) && size > 0 ? size : 0;
+}
 
 function requireAppUrl(): string {
   const appUrl = (process.env.APP_URL || "").trim();
@@ -34,6 +41,9 @@ export async function POST(req: NextRequest) {
       status: rl.status,
       headers: { "Retry-After": String(rl.retryAfterSeconds) },
     });
+  }
+  if (parseFormBodyLength(req) > MAX_AUTH_EMAIL_START_FORM_BYTES) {
+    return new Response("Request body too large.", { status: 413 });
   }
 
   const form = await req.formData();

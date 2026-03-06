@@ -291,3 +291,10 @@ Remaining rate-limit env parity modules pending: 0
 
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\.env.example` (resweep: added missing RATE_LIMIT_PER_MIN and RATE_LIMIT_PER_10MIN keys for share password gate)
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\tests\api-route-guardrails.spec.ts` (resweep: asserts .env.example contains all process.env RATE_LIMIT_* and ABUSE_BLOCK_* keys)
+
+## FormData bounds sweep
+
+Remaining form-data bounds modules pending: 0
+
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\auth\email\start\route.ts` (resweep: added explicit form body byte bound before formData parsing)
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\tests\api-route-guardrails.spec.ts` (resweep: asserts auth email start route enforces form payload bounds)
