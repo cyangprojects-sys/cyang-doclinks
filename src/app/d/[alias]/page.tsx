@@ -4,6 +4,7 @@ import { unstable_noStore as noStore } from "next/cache";
 import ShareForm from "./ShareForm";
 import AliasPasswordGate from "./AliasPasswordGate";
 import BackButton from "./BackButton";
+import ScanAutoRefresh from "./ScanAutoRefresh";
 import { resolveDoc } from "@/lib/resolveDoc";
 
 import { getServerSession } from "next-auth";
@@ -15,7 +16,7 @@ import { getPlanForUser } from "@/lib/monetization";
 import { allowUnencryptedServing } from "@/lib/securityPolicy";
 import SecurePdfCanvasViewer from "@/app/components/SecurePdfCanvasViewer";
 import { detectFileFamily, fileFamilyLabel, isMicrosoftOfficeDocument } from "@/lib/fileFamily";
-import { getDocumentUiStatus, getShareEligibility } from "@/lib/documentStatus";
+import { getDocumentUiStatus, getShareEligibility, normalizeScanState } from "@/lib/documentStatus";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -126,7 +127,7 @@ async function userOwnsDoc(userId: string, docId: string): Promise<boolean> {
   }
 }
 
-async function getDocAvailabilityHint(docId: string): Promise<string | null> {
+async function getDocAvailabilityHint(docId: string): Promise<{ hint: string | null; shouldAutoRefresh: boolean }> {
   async function fromRows(rows: Array<{
     encryption_enabled: boolean;
     moderation_status: string;
@@ -137,25 +138,32 @@ async function getDocAvailabilityHint(docId: string): Promise<string | null> {
     org_active?: boolean;
   }>) {
     const r = rows?.[0];
-    if (!r) return null;
+    if (!r) return { hint: null, shouldAutoRefresh: false };
 
     if ((r.status || "").toLowerCase() === "deleted") {
-      return "This document is deleted and unavailable.";
+      return { hint: "This document is deleted and unavailable.", shouldAutoRefresh: false };
     }
     if (r.org_disabled === true || r.org_active === false) {
-      return "This organization is disabled, so document serving is unavailable.";
+      return { hint: "This organization is disabled, so document serving is unavailable.", shouldAutoRefresh: false };
     }
     if (!r.r2_key) {
-      return "Document storage pointer is missing. Re-upload this document.";
+      return { hint: "Document storage pointer is missing. Re-upload this document.", shouldAutoRefresh: false };
     }
 
     if (!r.encryption_enabled && !allowUnencryptedServing()) {
-      return "This is a legacy unencrypted upload. Serving is blocked by policy. Re-upload or migrate this document to encrypted storage.";
+      return {
+        hint: "This is a legacy unencrypted upload. Serving is blocked by policy. Re-upload or migrate this document to encrypted storage.",
+        shouldAutoRefresh: false,
+      };
     }
 
     const moderation = String(r.moderation_status || "active").toLowerCase();
-    if (moderation === "quarantined") return "This document is quarantined and cannot be served.";
-    if (moderation === "disabled" || moderation === "deleted") return `This document is ${moderation} and unavailable.`;
+    if (moderation === "quarantined") {
+      return { hint: "This document is quarantined and cannot be served.", shouldAutoRefresh: false };
+    }
+    if (moderation === "disabled" || moderation === "deleted") {
+      return { hint: `This document is ${moderation} and unavailable.`, shouldAutoRefresh: false };
+    }
 
     const eligibility = getShareEligibility({
       docStateRaw: r.status || "ready",
@@ -163,17 +171,26 @@ async function getDocAvailabilityHint(docId: string): Promise<string | null> {
       moderationStatusRaw: r.moderation_status || "active",
     });
     if (!eligibility.canCreateLink) {
-      return eligibility.blockedReason || "This document cannot be shared right now.";
+      return {
+        hint: eligibility.blockedReason || "This document cannot be shared right now.",
+        shouldAutoRefresh: false,
+      };
     }
+    const scanState = normalizeScanState(r.scan_status || "unscanned", r.moderation_status || "active");
+    const shouldAutoRefresh = scanState === "PENDING" || scanState === "RUNNING" || scanState === "NOT_SCHEDULED";
+
     if (eligibility.warning) {
       const ui = getDocumentUiStatus({
         docStateRaw: r.status || "ready",
         scanStateRaw: r.scan_status || "unscanned",
         moderationStatusRaw: r.moderation_status || "active",
       });
-      return `${ui.label}: ${ui.subtext}.`;
+      return {
+        hint: `${ui.label}: ${ui.subtext}.`,
+        shouldAutoRefresh,
+      };
     }
-    return null;
+    return { hint: null, shouldAutoRefresh: false };
   }
 
   try {
@@ -221,11 +238,11 @@ async function getDocAvailabilityHint(docId: string): Promise<string | null> {
         r2_key: string | null;
       }>;
       return await fromRows(rows);
-    } catch {
+  } catch {
       // ignore
     }
   }
-  return null;
+  return { hint: null, shouldAutoRefresh: false };
 }
 
 async function getDocViewMeta(docId: string): Promise<{ contentType: string | null; filename: string | null }> {
@@ -383,7 +400,7 @@ export default async function SharePage({
   if (isPrivileged) {
     const planId = u ? (await getPlanForUser(u.id)).id : "pro";
     const canEditTitle = ownerEmail || planId !== "free";
-    const availabilityHint = await getDocAvailabilityHint(bypass.docId);
+    const availability = await getDocAvailabilityHint(bypass.docId);
     const viewMeta = await getDocViewMeta(bypass.docId);
     return (
       <main className="mx-auto w-full max-w-[2200px] px-3 py-8 sm:px-4 lg:px-6 2xl:px-8">
@@ -396,7 +413,13 @@ export default async function SharePage({
           </section>
           <aside className="lg:sticky lg:top-4 lg:self-start">
             <div className="mb-2 text-xs font-medium uppercase tracking-wide text-neutral-400">Live preview</div>
-            <DocumentViewer alias={alias} contentType={viewMeta.contentType} filename={viewMeta.filename} availabilityHint={availabilityHint} />
+            <DocumentViewer
+              alias={alias}
+              contentType={viewMeta.contentType}
+              filename={viewMeta.filename}
+              availabilityHint={availability.hint}
+              shouldAutoRefresh={availability.shouldAutoRefresh}
+            />
           </aside>
         </div>
       </main>
@@ -448,11 +471,13 @@ function DocumentViewer({
   contentType,
   filename,
   availabilityHint,
+  shouldAutoRefresh = false,
 }: {
   alias: string;
   contentType?: string | null;
   filename?: string | null;
   availabilityHint?: string | null;
+  shouldAutoRefresh?: boolean;
 }) {
   const viewerUrl = `/d/${encodeURIComponent(alias)}/raw`;
   const downloadUrl = `/d/${encodeURIComponent(alias)}/raw?disposition=attachment`;
@@ -464,6 +489,7 @@ function DocumentViewer({
 
   return (
     <div className="mt-3 lg:mt-0">
+      {shouldAutoRefresh ? <ScanAutoRefresh /> : null}
       <div className="mb-3 flex flex-wrap items-center gap-2 text-xs text-white/80">
         <span className="rounded-full border border-white/20 bg-white/10 px-2.5 py-1 font-semibold tracking-wide">
           {typeLabel}
