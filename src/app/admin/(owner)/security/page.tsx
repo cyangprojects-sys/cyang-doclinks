@@ -25,6 +25,8 @@ export default async function SecurityTelemetryPage(props: {
   const error = (Array.isArray(sp.error) ? sp.error[0] : sp.error) || "";
   const requeuedRaw = (Array.isArray(sp.requeued) ? sp.requeued[0] : sp.requeued) || "0";
   const requeuedCount = Number.isFinite(Number(requeuedRaw)) ? Number(requeuedRaw) : 0;
+  const requeueScopeRaw = (Array.isArray(sp.scope) ? sp.scope[0] : sp.scope) || "all";
+  const requeueScope: "all" | "quarantined" = requeueScopeRaw === "quarantined" ? "quarantined" : "all";
   const inviteUrl = (Array.isArray(sp.invite_url) ? sp.invite_url[0] : sp.invite_url) || "";
   const currentUser = await requireRole("owner");
   const freezeSettingsRes = await getSecurityFreezeSettings();
@@ -145,6 +147,14 @@ export default async function SecurityTelemetryPage(props: {
     last_error: string | null;
     r2_key: string | null;
   }> = [];
+  let quarantinedDocs: Array<{
+    id: string;
+    title: string;
+    scan_status: string;
+    moderation_status: string;
+    risk_level: string;
+    created_at: string;
+  }> = [];
 
   const roles: Role[] = ["viewer", "admin", "owner"];
   const membershipTableReady = await orgMembershipTablesReady();
@@ -195,6 +205,31 @@ export default async function SecurityTelemetryPage(props: {
       attempts: number;
       last_error: string | null;
       r2_key: string | null;
+    }>;
+
+    quarantinedDocs = (await sql`
+      select
+        d.id::text as id,
+        coalesce(nullif(trim(d.title::text), ''), nullif(trim(d.original_filename::text), ''), 'Untitled document') as title,
+        coalesce(d.scan_status::text, 'unscanned') as scan_status,
+        coalesce(d.moderation_status::text, 'active') as moderation_status,
+        coalesce(d.risk_level::text, 'unknown') as risk_level,
+        d.created_at::text as created_at
+      from public.docs d
+      where coalesce(d.status::text, 'ready') <> 'deleted'
+        and (
+          lower(coalesce(d.scan_status::text, 'unscanned')) = 'quarantined'
+          or lower(coalesce(d.moderation_status::text, 'active')) = 'quarantined'
+        )
+      order by d.created_at desc
+      limit 100
+    `) as unknown as Array<{
+      id: string;
+      title: string;
+      scan_status: string;
+      moderation_status: string;
+      risk_level: string;
+      created_at: string;
     }>;
   } catch {
     // optional table in some environments
@@ -262,7 +297,9 @@ export default async function SecurityTelemetryPage(props: {
       ) : null}
       {saved === "scan_requeued" ? (
         <div className="mt-4 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-200">
-          Rescan requested for {fmt(requeuedCount)} document(s).
+          {requeueScope === "quarantined"
+            ? `Rescan requested for ${fmt(requeuedCount)} quarantined document(s).`
+            : `Rescan requested for ${fmt(requeuedCount)} document(s).`}
         </div>
       ) : null}
 
@@ -462,6 +499,62 @@ export default async function SecurityTelemetryPage(props: {
               )}
             </tbody>
           </table>
+          </div>
+        </div>
+      </div>
+
+      <div className="glass-card-strong mt-4 rounded-2xl p-4">
+        <div className="flex items-start justify-between gap-3">
+          <h2 className="text-sm font-semibold">Quarantined docs</h2>
+          <form action="/api/admin/security/requeue-scans" method="post">
+            <input type="hidden" name="scope" value="quarantined" />
+            <button
+              type="submit"
+              className="rounded border border-amber-400/40 bg-amber-500/20 px-3 py-1.5 text-xs text-amber-100 hover:bg-amber-500/30"
+            >
+              Rescan quarantined
+            </button>
+          </form>
+        </div>
+        <p className="mt-1 text-xs text-white/50">
+          Documents listed here are blocked from sharing until a clean scan verdict is recorded.
+        </p>
+
+        <div className="mt-3 overflow-hidden rounded-2xl border border-white/10">
+          <div className="max-h-[520px] overflow-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="sticky top-0 bg-[#10192b]/95 text-xs text-white/60 backdrop-blur">
+                <tr>
+                  <th className="px-3 py-2">Document</th>
+                  <th className="px-3 py-2">Scan</th>
+                  <th className="px-3 py-2">Moderation</th>
+                  <th className="px-3 py-2">Risk</th>
+                  <th className="px-3 py-2">Created</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/10">
+                {quarantinedDocs.length ? (
+                  quarantinedDocs.map((d) => (
+                    <tr key={d.id} className="bg-black/10">
+                      <td className="px-3 py-2">
+                        <div className="text-xs text-white/85">{d.title}</div>
+                        <div className="mt-0.5 font-mono text-[11px] text-white/45">{d.id}</div>
+                      </td>
+                      <td className="px-3 py-2 text-xs text-amber-200">{d.scan_status}</td>
+                      <td className="px-3 py-2 text-xs text-amber-200">{d.moderation_status}</td>
+                      <td className="px-3 py-2 text-xs text-white/70">{d.risk_level}</td>
+                      <td className="px-3 py-2 whitespace-nowrap text-xs text-white/60">{d.created_at}</td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr className="bg-black/10">
+                    <td className="px-3 py-3 text-xs text-white/60" colSpan={5}>
+                      No quarantined docs.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
       </div>

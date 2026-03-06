@@ -41,6 +41,25 @@ export async function POST(req: Request) {
         if (parseBodyLength(req) > MAX_REQUEUE_SCANS_BODY_BYTES) {
           return NextResponse.redirect(new URL("/admin/security?error=PAYLOAD_TOO_LARGE", appBaseUrl), { status: 303 });
         }
+        const form = await req.formData().catch(() => null);
+        const scopeRaw = String(form?.get("scope") || "all")
+          .trim()
+          .toLowerCase();
+        const scope: "all" | "quarantined" = scopeRaw === "quarantined" ? "quarantined" : "all";
+        const candidateScopeClause =
+          scope === "quarantined"
+            ? sql`
+              and (
+                lower(coalesce(d.scan_status::text, 'unscanned')) = 'quarantined'
+                or lower(coalesce(d.moderation_status::text, 'active')) = 'quarantined'
+              )
+            `
+            : sql`
+              and (
+                lower(coalesce(d.scan_status::text, 'unscanned')) in ('pending', 'unscanned', 'queued', 'running', 'error', 'quarantined')
+                or lower(coalesce(d.moderation_status::text, 'active')) = 'quarantined'
+              )
+            `;
 
         const rows = (await sql`
           with candidates as (
@@ -49,10 +68,7 @@ export async function POST(req: Request) {
             where coalesce(d.status::text, 'ready') <> 'deleted'
               and d.r2_bucket is not null
               and d.r2_key is not null
-              and (
-                lower(coalesce(d.scan_status::text, 'unscanned')) in ('pending', 'unscanned', 'queued', 'running', 'error', 'quarantined')
-                or lower(coalesce(d.moderation_status::text, 'active')) = 'quarantined'
-              )
+              ${candidateScopeClause}
           ),
           upserted as (
             insert into public.malware_scan_jobs (doc_id, r2_bucket, r2_key, status, attempts, next_retry_at, started_at, finished_at, last_error)
@@ -119,10 +135,7 @@ export async function POST(req: Request) {
           where coalesce(d.status::text, 'ready') <> 'deleted'
             and d.r2_bucket is not null
             and d.r2_key is not null
-            and (
-              lower(coalesce(d.scan_status::text, 'unscanned')) in ('pending', 'unscanned', 'queued', 'running', 'error', 'quarantined')
-              or lower(coalesce(d.moderation_status::text, 'active')) = 'quarantined'
-            )
+            ${candidateScopeClause}
         `;
 
         void logSecurityEvent({
@@ -131,11 +144,17 @@ export async function POST(req: Request) {
           actorUserId: u.id,
           orgId: u.orgId ?? null,
           scope: "scanner",
-          message: "Owner requested rescan for pending and quarantined docs",
-          meta: { requeued },
+          message:
+            scope === "quarantined"
+              ? "Owner requested rescan for quarantined docs"
+              : "Owner requested rescan for pending and quarantined docs",
+          meta: { requeued, scope },
         });
 
-        return NextResponse.redirect(new URL(`/admin/security?saved=scan_requeued&requeued=${requeued}`, appBaseUrl), { status: 303 });
+        return NextResponse.redirect(
+          new URL(`/admin/security?saved=scan_requeued&requeued=${requeued}&scope=${scope}`, appBaseUrl),
+          { status: 303 }
+        );
       })(),
       timeoutMs
     );
