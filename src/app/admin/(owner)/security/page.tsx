@@ -5,6 +5,7 @@ import type { Role } from "@/lib/authz";
 import { requireRole } from "@/lib/authz";
 import { listOrgMemberships, listPendingOrgInvites, orgMembershipTablesReady } from "@/lib/orgMembership";
 import { getSecurityFreezeSettings } from "@/lib/settings";
+import SecurityTablesAutoRefresh from "./SecurityTablesAutoRefresh";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -217,6 +218,7 @@ export default async function SecurityTelemetryPage(props: {
         d.created_at::text as created_at
       from public.docs d
       where coalesce(d.status::text, 'ready') <> 'deleted'
+        and lower(coalesce(d.scan_status::text, 'unscanned')) <> 'clean'
         and (
           lower(coalesce(d.scan_status::text, 'unscanned')) = 'quarantined'
           or lower(coalesce(d.moderation_status::text, 'active')) = 'quarantined'
@@ -237,6 +239,7 @@ export default async function SecurityTelemetryPage(props: {
 
   return (
     <div>
+      <SecurityTablesAutoRefresh />
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Security</h1>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 type MasterKeyRow = { id: string; active: boolean; revoked: boolean };
 type MasterKeyChange = {
@@ -39,6 +39,21 @@ type KeysOk = {
 };
 type KeysErr = { ok: false; error: string; message?: string };
 type KeysResponse = KeysOk | KeysErr;
+const KEY_PANEL_POLL_MS = 10000;
+
+function keysSignature(payload: KeysResponse | null): string {
+  if (!payload || !payload.ok) return "";
+  const keys = payload.keys
+    .map((k) => `${k.id}:${k.active ? "1" : "0"}:${k.revoked ? "1" : "0"}`)
+    .join("|");
+  const changes = payload.changes
+    .map((c) => `${c.id}:${c.previous_key_id || ""}:${c.new_key_id}:${c.created_at}`)
+    .join("|");
+  const jobs = payload.jobs
+    .map((j) => `${j.id}:${j.status}:${j.scanned_count}:${j.rotated_count}:${j.failed_count}:${j.finished_at || ""}`)
+    .join("|");
+  return [payload.active_key_id || "", payload.db_active_key_id || "", keys, changes, jobs].join("::");
+}
 
 function pillClass(active: boolean, revoked: boolean): string {
   if (revoked) return "border-red-400/20 bg-red-400/10 text-red-200";
@@ -64,6 +79,7 @@ export default function KeyManagementPanel() {
   const [data, setData] = useState<KeysResponse | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const signatureRef = useRef<string>("");
 
   const keys = useMemo(() => (data && data.ok ? data.keys : []), [data]);
   const activeId = data && data.ok ? data.active_key_id : null;
@@ -77,21 +93,34 @@ export default function KeyManagementPanel() {
   const [toKey, setToKey] = useState<string>("");
   const [limit, setLimit] = useState<number>(250);
 
-  async function refresh() {
-    setError(null);
+  const refresh = useCallback(async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setError(null);
     const r = await fetch("/api/admin/security/keys", { method: "GET" });
     const j = (await r.json().catch(() => null)) as KeysResponse | null;
     if (!j) {
-      setError("Failed to load keys.");
+      if (!opts?.silent) setError("Failed to load keys.");
       return;
     }
-    setData(j);
-    if (!r.ok || !j.ok) setError(j.ok ? "Failed to load keys." : (j.error || "Failed to load keys."));
-  }
+    const nextSignature = keysSignature(j);
+    if (nextSignature && nextSignature !== signatureRef.current) {
+      signatureRef.current = nextSignature;
+      setData(j);
+    } else if (!data) {
+      setData(j);
+    }
+    if ((!r.ok || !j.ok) && !opts?.silent) {
+      setError(j.ok ? "Failed to load keys." : (j.error || "Failed to load keys."));
+    }
+  }, [data]);
 
   useEffect(() => {
     void refresh();
-  }, []);
+    const timer = window.setInterval(() => {
+      if (busy) return;
+      void refresh({ silent: true });
+    }, KEY_PANEL_POLL_MS);
+    return () => window.clearInterval(timer);
+  }, [busy, refresh]);
 
   async function onActivate() {
     if (!activateKey) {
