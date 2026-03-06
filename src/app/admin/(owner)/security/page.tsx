@@ -262,7 +262,7 @@ export default async function SecurityTelemetryPage(props: {
       ) : null}
       {saved === "scan_requeued" ? (
         <div className="mt-4 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-200">
-          Requeued {fmt(requeuedCount)} pending scan job(s).
+          Rescan requested for {fmt(requeuedCount)} document(s).
         </div>
       ) : null}
 
@@ -422,7 +422,7 @@ export default async function SecurityTelemetryPage(props: {
               type="submit"
               className="rounded border border-amber-400/40 bg-amber-500/20 px-3 py-1.5 text-xs text-amber-100 hover:bg-amber-500/30"
             >
-              Requeue pending scans
+              Rescan
             </button>
           </form>
         </div>
