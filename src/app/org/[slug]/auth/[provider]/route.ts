@@ -29,7 +29,13 @@ export async function GET(req: NextRequest, ctx: RouteCtx) {
   if (!rl.ok) {
     return NextResponse.json(
       { ok: false, error: "RATE_LIMIT", message: "Too many requests. Try again shortly." },
-      { status: rl.status, headers: { "Retry-After": String(rl.retryAfterSeconds) } }
+      {
+        status: rl.status,
+        headers: {
+          "Retry-After": String(rl.retryAfterSeconds),
+          "Cache-Control": "no-store",
+        },
+      }
     );
   }
 
@@ -41,20 +47,29 @@ export async function GET(req: NextRequest, ctx: RouteCtx) {
   try {
     appBaseUrl = resolvePublicAppBaseUrl(req.url);
   } catch {
-    return NextResponse.json({ ok: false, error: "ENV_MISCONFIGURED" }, { status: 500 });
+    return NextResponse.json(
+      { ok: false, error: "ENV_MISCONFIGURED" },
+      { status: 500, headers: { "Cache-Control": "no-store" } }
+    );
   }
 
   if (!slug || !SLUG_RE.test(slug)) {
-    return NextResponse.redirect(new URL("/login", appBaseUrl));
+    const res = NextResponse.redirect(new URL("/login", appBaseUrl));
+    res.headers.set("Cache-Control", "no-store");
+    return res;
   }
 
   const org = await getOrgBySlug(slug);
   if (!org) {
-    return NextResponse.redirect(new URL("/login", appBaseUrl));
+    const res = NextResponse.redirect(new URL("/login", appBaseUrl));
+    res.headers.set("Cache-Control", "no-store");
+    return res;
   }
 
   if (!ALLOWED.has(provider)) {
-    return NextResponse.redirect(new URL(`/org/${encodeURIComponent(slug)}/login`, appBaseUrl));
+    const res = NextResponse.redirect(new URL(`/org/${encodeURIComponent(slug)}/login`, appBaseUrl));
+    res.headers.set("Cache-Control", "no-store");
+    return res;
   }
 
   const inviteTokenRaw = String(new URL(req.url).searchParams.get("invite") || "").trim().slice(0, INVITE_TOKEN_MAX);
@@ -67,6 +82,7 @@ export async function GET(req: NextRequest, ctx: RouteCtx) {
       appBaseUrl
     )
   );
+  res.headers.set("Cache-Control", "no-store");
 
   res.cookies.set(ORG_COOKIE_NAME, slug, {
     httpOnly: true,

@@ -40,11 +40,17 @@ export async function POST(req: NextRequest) {
   if (!rl.ok) {
     return new Response("Too many requests. Please try again shortly.", {
       status: rl.status,
-      headers: { "Retry-After": String(rl.retryAfterSeconds) },
+      headers: {
+        "Retry-After": String(rl.retryAfterSeconds),
+        "Cache-Control": "no-store",
+      },
     });
   }
   if (parseFormBodyLength(req) > MAX_AUTH_EMAIL_START_FORM_BYTES) {
-    return new Response("Request body too large.", { status: 413 });
+    return new Response("Request body too large.", {
+      status: 413,
+      headers: { "Cache-Control": "no-store" },
+    });
   }
 
   const form = await req.formData();
@@ -52,7 +58,10 @@ export async function POST(req: NextRequest) {
   const alias = String(form.get("alias") || "").trim();
 
   if (!email || !alias || !EMAIL_RE.test(email) || !ALIAS_RE.test(alias)) {
-    return new Response("Missing or invalid email/alias", { status: 400 });
+    return new Response("Missing or invalid email/alias", {
+      status: 400,
+      headers: { "Cache-Control": "no-store" },
+    });
   }
 
   // Confirm alias exists/active (respond generically either way)
@@ -64,7 +73,10 @@ const ok = (await sql`
 `) as { alias: string; is_active: boolean }[];
 
   if (ok.length === 0 || !ok[0].is_active) {
-    return new Response("If the document exists, you will receive an email shortly.", { status: 200 });
+    return new Response("If the document exists, you will receive an email shortly.", {
+      status: 200,
+      headers: { "Cache-Control": "no-store" },
+    });
   }
 
   const token = randomToken(32);
@@ -87,6 +99,11 @@ const ok = (await sql`
       <p>If <b>${escHtml(email)}</b> can receive mail, you’ll get a sign-in link shortly.</p>
       <p><a href="/d/${encodeURIComponent(alias)}">Back to document</a></p>
     </body></html>`,
-    { headers: { "Content-Type": "text/html; charset=utf-8" } }
+    {
+      headers: {
+        "Content-Type": "text/html; charset=utf-8",
+        "Cache-Control": "no-store",
+      },
+    }
   );
 }

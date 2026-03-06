@@ -30,7 +30,10 @@ export async function GET(req: NextRequest) {
   if (!rl.ok) {
     return new Response("Too many requests. Please try again shortly.", {
       status: rl.status,
-      headers: { "Retry-After": String(rl.retryAfterSeconds) },
+      headers: {
+        "Retry-After": String(rl.retryAfterSeconds),
+        "Cache-Control": "no-store",
+      },
     });
   }
 
@@ -40,6 +43,7 @@ export async function GET(req: NextRequest) {
   const expectedNonce = (getCookie(req, "cy_oauth_nonce") || "").trim();
 
   const headers = new Headers();
+  headers.set("Cache-Control", "no-store");
   // Clear oauth cookies no matter what
   clearCookie(headers, "cy_oauth_alias");
   clearCookie(headers, "cy_oauth_cv");

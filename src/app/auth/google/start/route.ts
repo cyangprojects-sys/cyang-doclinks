@@ -30,18 +30,27 @@ export async function GET(req: NextRequest, _ctx: { params: Promise<Record<strin
   if (!rl.ok) {
     return new Response("Too many requests. Please try again shortly.", {
       status: rl.status,
-      headers: { "Retry-After": String(rl.retryAfterSeconds) },
+      headers: {
+        "Retry-After": String(rl.retryAfterSeconds),
+        "Cache-Control": "no-store",
+      },
     });
   }
 
   const url = new URL(req.url);
   const alias = (url.searchParams.get("alias") || "").trim();
 
-  if (!alias || !ALIAS_RE.test(alias)) return new Response("Missing or invalid alias", { status: 400 });
+  if (!alias || !ALIAS_RE.test(alias)) {
+    return new Response("Missing or invalid alias", {
+      status: 400,
+      headers: { "Cache-Control": "no-store" },
+    });
+  }
 
   const { authorizationUrl, codeVerifier, state, nonce } = await createGoogleAuthRequest(alias);
 
   const headers = new Headers();
+  headers.set("Cache-Control", "no-store");
   setCookie(headers, "cy_oauth_alias", alias, 10 * 60);
   setCookie(headers, "cy_oauth_cv", codeVerifier, 10 * 60);
   setCookie(headers, "cy_oauth_state", state, 10 * 60);

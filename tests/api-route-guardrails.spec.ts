@@ -355,4 +355,19 @@ test.describe("api route guardrails", () => {
     const failClosedCount = (code.match(/failClosed:\s*true/g) || []).length;
     expect(failClosedCount).toBeGreaterThanOrEqual(scopes.length);
   });
+
+  test("auth entry routes set no-store cache headers", () => {
+    const routes = [
+      "src/app/auth/email/start/route.ts",
+      "src/app/auth/email/consume/route.ts",
+      "src/app/auth/google/start/route.ts",
+      "src/app/auth/google/callback/route.ts",
+      "src/app/org/[slug]/auth/[provider]/route.ts",
+    ];
+    for (const route of routes) {
+      const code = src(route);
+      expect(code.toLowerCase().includes("cache-control")).toBeTruthy();
+      expect(code.toLowerCase().includes("no-store")).toBeTruthy();
+    }
+  });
 });

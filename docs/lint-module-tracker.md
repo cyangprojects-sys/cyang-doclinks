@@ -316,3 +316,14 @@ Remaining strict rate-limit modules pending: 0
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\tests\api-route-guardrails.spec.ts` (resweep: asserts share-raw direct rate limits are fail-closed)
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\monetization.ts` (resweep: all direct pro soft-cap/overage rateLimit gates fail-closed)
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\tests\api-route-guardrails.spec.ts` (resweep: asserts monetization soft-cap rate-limit gates are fail-closed)
+
+## Auth cache-control sweep
+
+Remaining auth cache-control modules pending: 0
+
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\auth\email\start\route.ts` (resweep: add Cache-Control no-store on auth entry responses)
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\auth\email\consume\route.ts` (resweep: add Cache-Control no-store on token consume and redirect responses)
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\auth\google\start\route.ts` (resweep: add Cache-Control no-store on OAuth start responses)
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\auth\google\callback\route.ts` (resweep: add Cache-Control no-store on OAuth callback responses)
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\org\[slug]\auth\[provider]\route.ts` (resweep: add Cache-Control no-store on org auth redirects/json)
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\tests\api-route-guardrails.spec.ts` (resweep: asserts auth entry routes include no-store cache headers)

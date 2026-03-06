@@ -20,6 +20,12 @@ type LoginTokenRow = {
 type DocAliasRow = { doc_id: string; is_active: boolean };
 type GrantRow = { id: number };
 
+function noStoreHeaders(init?: HeadersInit): Headers {
+  const headers = new Headers(init);
+  headers.set("Cache-Control", "no-store");
+  return headers;
+}
+
 export async function GET(req: NextRequest) {
   const rl = await enforceGlobalApiRateLimit({
     req,
@@ -31,7 +37,7 @@ export async function GET(req: NextRequest) {
   if (!rl.ok) {
     return new Response("Too many requests. Please try again shortly.", {
       status: rl.status,
-      headers: { "Retry-After": String(rl.retryAfterSeconds) },
+      headers: noStoreHeaders({ "Retry-After": String(rl.retryAfterSeconds) }),
     });
   }
 
@@ -40,7 +46,7 @@ export async function GET(req: NextRequest) {
   const alias = (url.searchParams.get("alias") || "").trim();
 
   if (!token || !alias || !TOKEN_RE.test(token) || !ALIAS_RE.test(alias)) {
-    return new Response("Bad request", { status: 400 });
+    return new Response("Bad request", { status: 400, headers: noStoreHeaders() });
   }
 
   const tokenHash = hmacSha256Hex(token);
@@ -52,13 +58,13 @@ export async function GET(req: NextRequest) {
     limit 1
   `) as LoginTokenRow[];
 
-  if (rows.length === 0) return new Response("This sign-in link is invalid or expired.", { status: 400 });
+  if (rows.length === 0) return new Response("This sign-in link is invalid or expired.", { status: 400, headers: noStoreHeaders() });
 
   const t = rows[0];
-  if (t.revoked_at) return new Response("This sign-in link is no longer valid.", { status: 400 });
-  if (t.alias !== alias) return new Response("This sign-in link does not match the document.", { status: 400 });
-  if (new Date(t.expires_at).getTime() <= Date.now()) return new Response("This sign-in link has expired.", { status: 400 });
-  if (t.use_count >= t.max_uses) return new Response("This sign-in link has already been used.", { status: 400 });
+  if (t.revoked_at) return new Response("This sign-in link is no longer valid.", { status: 400, headers: noStoreHeaders() });
+  if (t.alias !== alias) return new Response("This sign-in link does not match the document.", { status: 400, headers: noStoreHeaders() });
+  if (new Date(t.expires_at).getTime() <= Date.now()) return new Response("This sign-in link has expired.", { status: 400, headers: noStoreHeaders() });
+  if (t.use_count >= t.max_uses) return new Response("This sign-in link has already been used.", { status: 400, headers: noStoreHeaders() });
 
   // Mark token used
   await sql`
@@ -75,7 +81,7 @@ export async function GET(req: NextRequest) {
     limit 1
   `) as DocAliasRow[];
 
-  if (docs.length === 0 || !docs[0].is_active) return new Response("Document not found.", { status: 404 });
+  if (docs.length === 0 || !docs[0].is_active) return new Response("Document not found.", { status: 404, headers: noStoreHeaders() });
 
   const docId = docs[0].doc_id;
 
@@ -94,6 +100,7 @@ export async function GET(req: NextRequest) {
   const signed = signPayload({ grant_id: grantId, exp: expUnix });
 
   const headers = new Headers();
+  headers.set("Cache-Control", "no-store");
   headers.append("Set-Cookie", cookieHeader("cy_doc_session", signed, { maxAgeSeconds: 8 * 60 * 60 }));
   headers.set("Location", `/d/${encodeURIComponent(alias)}`);
 
