@@ -674,7 +674,6 @@ export default async function AnalyticsWidgets({
                 {presignErrors24h > 0 ? (
                   <Link
                     href={failedUploadsHref}
-                    onClick={(e) => e.stopPropagation()}
                     className="mt-1 inline-flex rounded-md border border-rose-400/35 bg-rose-500/15 px-2 py-1 text-xs text-rose-100 hover:bg-rose-500/25"
                   >
                     View failed uploads
