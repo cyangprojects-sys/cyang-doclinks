@@ -277,3 +277,10 @@ Remaining timeout-guard modules pending: 0
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\v1\shares\route.ts` (resweep: bounded route timeout guard for share creation endpoint)
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\v1\takedown\route.ts` (resweep: bounded route timeout guard for takedown notice intake)
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\v1\webhooks\test\route.ts` (resweep: bounded route timeout guard for API-key webhook test endpoint)
+
+## Timeout env parity sweep
+
+Remaining timeout env parity modules pending: 0
+
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\.env.example` (resweep: added complete route-timeout env key set used by guardrails)
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\tests\api-route-guardrails.spec.ts` (resweep: asserts .env.example contains all timeout env keys referenced by route guards)

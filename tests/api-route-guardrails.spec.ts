@@ -10,8 +10,28 @@ function routeFiles(): string[] {
     .filter(Boolean);
 }
 
+function sourceFiles(): string[] {
+  const raw = execSync("rg --files src", { encoding: "utf8" });
+  return raw
+    .split(/\r?\n/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
 function src(file: string): string {
   return readFileSync(file, "utf8");
+}
+
+function timeoutEnvKeysFromSource(): string[] {
+  const keys = new Set<string>();
+  for (const file of sourceFiles()) {
+    const code = src(file);
+    const matches = code.matchAll(/getRouteTimeoutMs\("([A-Z0-9_]+)"/g);
+    for (const m of matches) {
+      if (m[1]) keys.add(m[1]);
+    }
+  }
+  return Array.from(keys).sort();
 }
 
 test.describe("api route guardrails", () => {
@@ -249,5 +269,12 @@ test.describe("api route guardrails", () => {
     expect(code.includes("getRouteTimeoutMs(")).toBeTruthy();
     expect(code.includes("withRouteTimeout(")).toBeTruthy();
     expect(code.includes("isRouteTimeoutError(")).toBeTruthy();
+  });
+
+  test(".env.example includes timeout env keys used by route guards", () => {
+    const keys = timeoutEnvKeysFromSource();
+    const envExample = src(".env.example");
+    const missing = keys.filter((k) => !new RegExp(`^${k}=`, "m").test(envExample));
+    expect(missing).toEqual([]);
   });
 });
