@@ -25,6 +25,7 @@ export async function GET(req: NextRequest, _ctx: { params: Promise<Record<strin
     scope: "ip:auth_google_start",
     limit: Number(process.env.RATE_LIMIT_AUTH_GOOGLE_START_IP_PER_MIN || 30),
     windowSeconds: 60,
+    strict: true,
   });
   if (!rl.ok) {
     return new Response("Too many requests. Please try again shortly.", {

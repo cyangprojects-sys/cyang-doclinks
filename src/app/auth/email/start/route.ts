@@ -35,6 +35,7 @@ export async function POST(req: NextRequest) {
     scope: "ip:auth_email_start",
     limit: Number(process.env.RATE_LIMIT_AUTH_EMAIL_START_IP_PER_MIN || 8),
     windowSeconds: 60,
+    strict: true,
   });
   if (!rl.ok) {
     return new Response("Too many requests. Please try again shortly.", {

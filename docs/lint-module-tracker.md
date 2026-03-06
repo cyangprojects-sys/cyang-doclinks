@@ -298,3 +298,15 @@ Remaining form-data bounds modules pending: 0
 
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\auth\email\start\route.ts` (resweep: added explicit form body byte bound before formData parsing)
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\tests\api-route-guardrails.spec.ts` (resweep: asserts auth email start route enforces form payload bounds)
+
+## Strict rate-limit sweep
+
+Remaining strict rate-limit modules pending: 0
+
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\auth\email\start\route.ts` (resweep: enforceGlobalApiRateLimit strict fail-closed)
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\auth\email\consume\route.ts` (resweep: enforceGlobalApiRateLimit strict fail-closed)
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\auth\google\start\route.ts` (resweep: enforceGlobalApiRateLimit strict fail-closed)
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\auth\google\callback\route.ts` (resweep: enforceGlobalApiRateLimit strict fail-closed)
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\org\[slug]\auth\[provider]\route.ts` (resweep: enforceGlobalApiRateLimit strict fail-closed)
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\s\[token]\download\route.ts` (resweep: enforceGlobalApiRateLimit strict fail-closed)
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\tests\api-route-guardrails.spec.ts` (resweep: asserts strict fail-closed throttling for auth+share-download routes)

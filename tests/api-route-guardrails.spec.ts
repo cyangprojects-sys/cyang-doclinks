@@ -310,4 +310,20 @@ test.describe("api route guardrails", () => {
     expect(code.includes("parseFormBodyLength(")).toBeTruthy();
     expect(code.includes('status: 413')).toBeTruthy();
   });
+
+  test("auth and share-download throttles are strict fail-closed", () => {
+    const routes = [
+      "src/app/auth/email/start/route.ts",
+      "src/app/auth/email/consume/route.ts",
+      "src/app/auth/google/start/route.ts",
+      "src/app/auth/google/callback/route.ts",
+      "src/app/org/[slug]/auth/[provider]/route.ts",
+      "src/app/s/[token]/download/route.ts",
+    ];
+    for (const route of routes) {
+      const code = src(route);
+      expect(code.includes("enforceGlobalApiRateLimit(")).toBeTruthy();
+      expect(code.includes("strict: true")).toBeTruthy();
+    }
+  });
 });

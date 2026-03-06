@@ -25,6 +25,7 @@ export async function GET(req: NextRequest) {
     scope: "ip:auth_google_callback",
     limit: Number(process.env.RATE_LIMIT_AUTH_GOOGLE_CALLBACK_IP_PER_MIN || 40),
     windowSeconds: 60,
+    strict: true,
   });
   if (!rl.ok) {
     return new Response("Too many requests. Please try again shortly.", {

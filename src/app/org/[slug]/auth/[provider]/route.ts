@@ -24,6 +24,7 @@ export async function GET(req: NextRequest, ctx: RouteCtx) {
     scope: "ip:org_auth_start",
     limit: Number(process.env.RATE_LIMIT_ORG_AUTH_START_IP_PER_MIN || 30),
     windowSeconds: 60,
+    strict: true,
   });
   if (!rl.ok) {
     return NextResponse.json(

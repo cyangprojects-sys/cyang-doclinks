@@ -26,6 +26,7 @@ export async function GET(req: NextRequest) {
     scope: "ip:auth_email_consume",
     limit: Number(process.env.RATE_LIMIT_AUTH_EMAIL_CONSUME_IP_PER_MIN || 20),
     windowSeconds: 60,
+    strict: true,
   });
   if (!rl.ok) {
     return new Response("Too many requests. Please try again shortly.", {

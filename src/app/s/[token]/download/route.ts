@@ -24,6 +24,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ token: stri
     scope: "ip:share_download",
     limit: Number(process.env.RATE_LIMIT_SHARE_DOWNLOAD_IP_PER_MIN || 120),
     windowSeconds: 60,
+    strict: true,
   });
   if (!rl.ok) {
     return new NextResponse("Too Many Requests", {
