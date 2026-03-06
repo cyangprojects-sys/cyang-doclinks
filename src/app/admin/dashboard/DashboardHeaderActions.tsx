@@ -310,9 +310,12 @@ export default function DashboardHeaderActions(props: { docs: DocOption[]; planI
         <button
           type="button"
           onClick={() => router.push("/admin/uploads?openPicker=1")}
-          className="btn-base rounded-lg border border-white/25 bg-transparent px-3 py-2 text-sm text-white/90 hover:bg-white/10"
+          className="btn-base rounded-lg border border-amber-200/70 bg-gradient-to-br from-amber-300 via-yellow-300 to-orange-300 px-3.5 py-2 text-sm font-semibold text-[#2b1700] shadow-[0_8px_22px_rgba(251,191,36,0.38)] hover:brightness-105"
         >
-          Upload document
+          <span className="inline-flex items-center gap-1.5">
+            <span className="h-2 w-2 rounded-full bg-[#2b1700]/75" />
+            Upload document
+          </span>
         </button>
       </div>
 
