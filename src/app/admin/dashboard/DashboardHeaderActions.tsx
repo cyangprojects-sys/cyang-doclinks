@@ -296,21 +296,21 @@ export default function DashboardHeaderActions(props: { docs: DocOption[]; planI
 
   return (
     <>
-      <div className="flex w-full items-center justify-center gap-2">
+      <div className="flex w-full flex-wrap items-center justify-center gap-2">
         <button
           type="button"
           onClick={onPrimaryCreateClick}
-          className="btn-base rounded-lg border border-cyan-300/45 bg-cyan-400 px-4 py-2 text-sm font-semibold text-[#04111e] shadow-[0_6px_20px_rgba(34,211,238,0.28)] hover:bg-cyan-300"
+          className="btn-base h-[56px] w-[220px] rounded-lg border border-cyan-300/45 bg-cyan-400 px-4 py-2 text-sm font-semibold text-[#04111e] shadow-[0_6px_20px_rgba(34,211,238,0.28)] hover:bg-cyan-300"
         >
           <span className="flex flex-col items-start leading-tight">
             <span>{hasAnyDocs ? "Create protected link" : "Upload a document"}</span>
-            {!hasAnyDocs ? <span className="text-[11px] font-medium text-[#0f2a3a]/80">then create a link</span> : null}
+            <span className={`text-[11px] font-medium text-[#0f2a3a]/80 ${hasAnyDocs ? "invisible" : ""}`}>then create a link</span>
           </span>
         </button>
         <button
           type="button"
           onClick={() => router.push("/admin/uploads?openPicker=1")}
-          className="btn-base rounded-lg border border-amber-300/45 bg-amber-300/18 px-3.5 py-2 text-sm font-medium text-amber-50 shadow-[0_5px_14px_rgba(251,191,36,0.18)] hover:bg-amber-300/24"
+          className="btn-base h-[56px] w-[220px] rounded-lg border border-amber-300/45 bg-amber-300/18 px-3.5 py-2 text-sm font-medium text-amber-50 shadow-[0_5px_14px_rgba(251,191,36,0.18)] hover:bg-amber-300/24"
         >
           Upload document
         </button>
