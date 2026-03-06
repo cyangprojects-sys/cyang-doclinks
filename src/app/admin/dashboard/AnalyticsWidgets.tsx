@@ -66,10 +66,12 @@ export default async function AnalyticsWidgets({
   ownerId,
   userId,
   showHealth = false,
+  isOwnerRole = false,
 }: {
   ownerId?: string;
   userId: string;
   showHealth?: boolean;
+  isOwnerRole?: boolean;
 }) {
   const isViewerScoped = Boolean(ownerId);
   const hasDocViews = await tableExists("public.doc_views");
@@ -555,20 +557,23 @@ export default async function AnalyticsWidgets({
   const scanDelayThresholdRaw = Number(process.env.SCAN_PENDING_DELAY_THRESHOLD || 25);
   const scanDelayThreshold = Number.isFinite(scanDelayThresholdRaw) && scanDelayThresholdRaw > 0 ? Math.floor(scanDelayThresholdRaw) : 25;
   const scanSystemDelayed = pendingScanDocs > scanDelayThreshold;
+  const failedUploadsHref = "/admin/uploads?show=failed";
+  const planDisplayLabel = isOwnerRole ? "Pro" : usagePlanId === "pro" ? "Pro" : "Free";
 
   return (
     <section className="mb-6">
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 2xl:grid-cols-4">
         <div className="glass-card-strong rounded-2xl p-4">
           <div className="text-xs text-white/60">Usage snapshot</div>
-          <div className="mt-2 text-xl font-semibold text-white">Your plan: {usagePlanName}</div>
+          <div className="mt-2 text-xl font-semibold text-white">Plan: {planDisplayLabel}</div>
           <ul className="mt-2 space-y-1 text-xs text-white/70">
+            {isOwnerRole ? <li>Role: Owner</li> : null}
             <li>
               Links: {fmtInt(usageActiveShares)} of{" "}
               {usageMaxActiveShares == null ? "unlimited" : fmtInt(usageMaxActiveShares)} active
             </li>
             <li>
-              File size limit: {usagePlanId === "pro" ? "100MB" : "25MB"} ({usagePlanName})
+              File size limit: {usagePlanId === "pro" ? "100MB" : "25MB"} ({planDisplayLabel})
             </li>
             <li>
               Storage used: {fmtStorageUsedForHome(usageStorage)}
@@ -583,17 +588,17 @@ export default async function AnalyticsWidgets({
             Uploads today: {usageDailyUploads == null ? "-" : fmtInt(usageDailyUploads)}
             {usageMaxUploadsPerDay == null ? " / unlimited" : ` / ${fmtInt(usageMaxUploadsPerDay)}`}
           </div>
-          {usagePlanId !== "pro" ? (
+          {!isOwnerRole && usagePlanId !== "pro" ? (
             <div className="mt-2 text-xs text-white/60">Upgrade to Pro for 100MB uploads + Pro presets.</div>
           ) : null}
           <div className="mt-3">
-            {usagePlanId !== "pro" ? (
+            {!isOwnerRole && usagePlanId !== "pro" ? (
               <Link href="/admin/upgrade" className="inline-flex rounded-lg border border-cyan-400/35 bg-cyan-400/20 px-3 py-1.5 text-xs text-cyan-50 hover:bg-cyan-400/30">
                 Upgrade to Pro
               </Link>
             ) : (
               <span className="inline-flex rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-xs text-white/70">
-                Pro enabled
+                {isOwnerRole ? "Owner access" : "Pro enabled"}
               </span>
             )}
           </div>
@@ -622,8 +627,13 @@ export default async function AnalyticsWidgets({
         <div className="glass-card-strong rounded-2xl p-4">
           <div className="text-xs text-white/60">Protection status</div>
           <div className="mt-2 text-xl font-semibold text-white">
-            {unencryptedDocs === 0 && blockedDocs === 0 && needsReviewDocs === 0 ? "Protected" : "Needs attention"}
+            {pendingScanDocs > 0
+              ? `Scanning: ${fmtInt(pendingScanDocs)} ${pendingScanDocs === 1 ? "document" : "documents"}`
+              : unencryptedDocs === 0 && blockedDocs === 0 && needsReviewDocs === 0
+                ? "Protected"
+                : "Needs attention"}
           </div>
+          {pendingScanDocs > 0 ? <div className="mt-1 text-xs text-amber-100/90">Sharing unlocks after scan completes.</div> : null}
           <ul className="mt-2 space-y-1 text-xs text-white/70">
             <li>{unencryptedDocs === 0 ? "All documents encrypted" : `${fmtInt(unencryptedDocs)} documents need encryption review`}</li>
             <li>{unencryptedDocs === 0 ? "0 unencrypted docs" : `${fmtInt(unencryptedDocs)} unencrypted docs`}</li>
@@ -637,8 +647,11 @@ export default async function AnalyticsWidgets({
             </div>
           ) : null}
           <div className="mt-3">
-            <Link href="/admin/activity" className="inline-flex rounded-lg border border-white/20 bg-white/10 px-3 py-1.5 text-xs text-white hover:bg-white/15">
-              {pendingScanDocs > 0 ? `View scanning (${fmtInt(pendingScanDocs)})` : "View activity"}
+            <Link
+              href={pendingScanDocs > 0 ? "/admin/documents?docSort=status&docDir=asc" : "/admin/activity"}
+              className="inline-flex rounded-lg border border-white/20 bg-white/10 px-3 py-1.5 text-xs text-white hover:bg-white/15"
+            >
+              {pendingScanDocs > 0 ? "View scanning" : "View activity"}
             </Link>
           </div>
         </div>
@@ -657,16 +670,23 @@ export default async function AnalyticsWidgets({
             </div>
             <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
               <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-white/80">
-                {presignErrors24h === 0 ? "Uploads working" : "Some uploads failed to start"}
+                <div>{presignErrors24h === 0 ? "Uploads working" : "Some uploads failed to start"}</div>
+                {presignErrors24h > 0 ? (
+                  <Link
+                    href={failedUploadsHref}
+                    onClick={(e) => e.stopPropagation()}
+                    className="mt-1 inline-flex rounded-md border border-rose-400/35 bg-rose-500/15 px-2 py-1 text-xs text-rose-100 hover:bg-rose-500/25"
+                  >
+                    View failed uploads
+                  </Link>
+                ) : null}
               </div>
               <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-white/80">
-                {cronFailures24h === 0 ? "Links working" : "Some link checks failed"}
-              </div>
-                <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-white/80">
-                  {unencryptedDocs === 0 ? "Encryption OK" : "Encryption needs attention"}
-                </div>
-              <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-white/80">
-                {scanSystemDelayed ? `Scan system delayed (${fmtInt(pendingScanDocs)} pending)` : "Scans running"}
+                {scanSystemDelayed
+                  ? `Scan system delayed (${fmtInt(pendingScanDocs)} pending)`
+                  : pendingScanDocs > 0
+                    ? `Scans running (${fmtInt(pendingScanDocs)})`
+                    : "Scans healthy"}
               </div>
             </div>
           </summary>

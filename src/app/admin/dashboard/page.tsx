@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/authz";
-import { getDocumentUiStatus, getShareEligibility } from "@/lib/documentStatus";
+import { getDocumentUiStatus, getShareEligibility, normalizeScanState } from "@/lib/documentStatus";
 
 import AnalyticsWidgets from "./AnalyticsWidgets";
 import ViewerHelpfulTiles from "./ViewerHelpfulTiles";
@@ -36,6 +36,7 @@ export default async function AdminDashboardPage() {
   }
 
   const data = await getDashboardHomeData(u);
+  const isOwnerDashboard = u.role === "owner";
 
   return (
     <div className="space-y-8">
@@ -47,7 +48,12 @@ export default async function AdminDashboardPage() {
         <DashboardHeaderActions docs={data.headerDocs} planId={data.planId} />
       </div>
 
-      <AnalyticsWidgets ownerId={data.canSeeAll ? undefined : u.id} userId={u.id} showHealth={u.role === "owner"} />
+      <AnalyticsWidgets
+        ownerId={data.canSeeAll ? undefined : u.id}
+        userId={u.id}
+        showHealth={u.role === "owner"}
+        isOwnerRole={isOwnerDashboard}
+      />
 
       {data.missingCoreTables ? (
         <div className="rounded-lg border border-neutral-800 bg-neutral-950 p-4 text-sm text-neutral-300">
@@ -91,11 +97,14 @@ export default async function AdminDashboardPage() {
                   scanStateRaw: doc.scan_status,
                   moderationStatusRaw: doc.moderation_status,
                 });
+                const scanState = normalizeScanState(doc.scan_status, doc.moderation_status);
+                const isScanning = scanState === "PENDING" || scanState === "RUNNING" || scanState === "NOT_SCHEDULED";
                 const share = getShareEligibility({
                   docStateRaw: doc.doc_state,
                   scanStateRaw: doc.scan_status,
                   moderationStatusRaw: doc.moderation_status,
                 });
+                const canShareNow = share.canCreateLink && scanState === "CLEAN";
                 const shareHref = `/admin/dashboard?createLink=1&docId=${encodeURIComponent(doc.doc_id)}`;
                 return (
                   <li key={doc.doc_id} className="flex flex-wrap items-center justify-between gap-3 p-4">
@@ -103,11 +112,11 @@ export default async function AdminDashboardPage() {
                       <div className="truncate text-sm font-medium text-white">{doc.doc_title || "Untitled document"}</div>
                       <div className="mt-1 text-xs text-white/60">Added {fmtDate(doc.created_at)}</div>
                     </div>
-                    <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs ${toneClass(ui.tone)}`}>
-                      {ui.label}
+                    <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs ${toneClass(isScanning ? "warning" : ui.tone)}`}>
+                      {isScanning ? "Scanning..." : ui.label}
                     </span>
                     <div className="flex items-center gap-2">
-                      {share.canCreateLink ? (
+                      {canShareNow ? (
                         <Link href={shareHref} className="rounded-lg border border-cyan-400/35 bg-cyan-400/20 px-3 py-1.5 text-xs text-cyan-50 hover:bg-cyan-400/30">
                           Share
                         </Link>
@@ -115,7 +124,7 @@ export default async function AdminDashboardPage() {
                         <button
                           type="button"
                           disabled
-                          title={share.blockedReason || "Sharing unavailable"}
+                          title={isScanning ? "Available after scan completes." : share.blockedReason || "Sharing unavailable"}
                           className="cursor-not-allowed rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white/45"
                         >
                           Share
@@ -136,25 +145,29 @@ export default async function AdminDashboardPage() {
                 <Link href="/admin/uploads?openPicker=1" className="btn-base btn-secondary rounded-lg px-2.5 py-1.5 text-xs">
                   Upload document
                 </Link>
-                <Link href="/admin/uploads?openPicker=1&fromCreateLink=1" className="btn-base btn-secondary rounded-lg px-2.5 py-1.5 text-xs">
-                  Create protected link
-                </Link>
+                {isOwnerDashboard ? null : (
+                  <Link href="/admin/uploads?openPicker=1&fromCreateLink=1" className="btn-base btn-secondary rounded-lg px-2.5 py-1.5 text-xs">
+                    Create protected link
+                  </Link>
+                )}
               </div>
             </div>
           )}
         </div>
       </section>
 
-      <section id="settings" className="space-y-2">
-        <h2 className="text-lg font-semibold">Pro</h2>
-        <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4 text-sm text-white/75">
-          <div className="font-medium text-white">Upgrade to unlock stricter controls</div>
-          <div className="mt-1">Get one-time access, legal/confidential presets, and ID verification mode.</div>
-          <Link href="/admin/upgrade" className="mt-3 inline-flex rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white hover:bg-white/15">
-            See Pro features
-          </Link>
-        </div>
-      </section>
+      {isOwnerDashboard ? null : (
+        <section id="settings" className="space-y-2">
+          <h2 className="text-lg font-semibold">Pro</h2>
+          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4 text-sm text-white/75">
+            <div className="font-medium text-white">Upgrade to unlock stricter controls</div>
+            <div className="mt-1">Get one-time access, legal/confidential presets, and ID verification mode.</div>
+            <Link href="/admin/upgrade" className="mt-3 inline-flex rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white hover:bg-white/15">
+              See Pro features
+            </Link>
+          </div>
+        </section>
+      )}
     </div>
   );
 }

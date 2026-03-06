@@ -127,7 +127,13 @@ export default function DashboardHeaderActions(props: { docs: DocOption[]; planI
         scanStateRaw: d.scanState,
         moderationStatusRaw: d.moderationStatus,
       });
-      return { ...d, ui, eligibility };
+      const scanStateNormalized = normalizeScanState(d.scanState, d.moderationStatus);
+      const canCreateNow = eligibility.canCreateLink && scanStateNormalized === "CLEAN";
+      const shareBlockedReason =
+        scanStateNormalized !== "CLEAN"
+          ? "Available after scan completes."
+          : eligibility.blockedReason || "This file cannot be shared yet.";
+      return { ...d, ui, eligibility, scanStateNormalized, canCreateNow, shareBlockedReason };
     });
   }, [props.docs]);
   const hasAnyDocs = docsWithStatus.length > 0;
@@ -148,12 +154,12 @@ export default function DashboardHeaderActions(props: { docs: DocOption[]; planI
     }
     if (selectedDocId && docsWithStatus.some((d) => d.docId === selectedDocId)) {
       const current = docsWithStatus.find((d) => d.docId === selectedDocId);
-      setShareWarning(current?.eligibility.warning ?? null);
+      setShareWarning(current ? (current.canCreateNow ? current.eligibility.warning ?? null : current.shareBlockedReason) : null);
       return;
     }
-    const firstEligible = docsWithStatus.find((d) => d.eligibility.canCreateLink);
+    const firstEligible = docsWithStatus.find((d) => d.canCreateNow);
     setSelectedDocId(firstEligible?.docId || docsWithStatus[0].docId);
-    setShareWarning(firstEligible?.eligibility.warning ?? null);
+    setShareWarning(firstEligible?.eligibility.warning ?? "Available after scan completes.");
   }, [docsWithStatus, selectedDocId]);
 
   useEffect(() => {
@@ -171,7 +177,7 @@ export default function DashboardHeaderActions(props: { docs: DocOption[]; planI
     const doc = docsWithStatus.find((d) => d.docId === requestedDocId);
     if (!doc) return;
     setSelectedDocId(doc.docId);
-    setShareWarning(doc.eligibility.warning ?? null);
+    setShareWarning(doc.canCreateNow ? doc.eligibility.warning ?? null : doc.shareBlockedReason);
   }, [sp, docsWithStatus, hasReadyCleanDoc, createLinkUploadHref, router]);
 
   const filteredDocs = useMemo(() => {
@@ -224,8 +230,8 @@ export default function DashboardHeaderActions(props: { docs: DocOption[]; planI
       setErr("Document not found.");
       return;
     }
-    if (!selectedDoc.eligibility.canCreateLink) {
-      setErr(selectedDoc.eligibility.blockedReason || "This file cannot be shared yet.");
+    if (!selectedDoc.canCreateNow) {
+      setErr(selectedDoc.shareBlockedReason);
       return;
     }
     const selectedPreset = PRESET_OPTIONS.find((p) => p.id === preset);
@@ -353,14 +359,18 @@ export default function DashboardHeaderActions(props: { docs: DocOption[]; planI
                       const nextId = e.target.value;
                       setSelectedDocId(nextId);
                       const doc = docsWithStatus.find((d) => d.docId === nextId);
-                      setShareWarning(doc?.eligibility.warning ?? null);
+                      setShareWarning(doc ? (doc.canCreateNow ? doc.eligibility.warning ?? null : doc.shareBlockedReason) : null);
                     }}
                     className="mt-2 w-full rounded-lg border border-white/20 bg-white px-3 py-2 text-sm text-black"
                     style={{ colorScheme: "light" }}
                   >
                     {filteredDocs.map((d) => (
-                      <option key={d.docId} value={d.docId} disabled={!d.eligibility.canCreateLink} title={d.ui.subtext} className="bg-white text-black">
-                        {`${d.title} - ${d.ui.label}${d.eligibility.canCreateLink ? "" : " (Unavailable)"}`}
+                      <option key={d.docId} value={d.docId} disabled={!d.canCreateNow} title={d.canCreateNow ? d.ui.subtext : d.shareBlockedReason} className="bg-white text-black">
+                        {`${d.title} - ${
+                          d.scanStateNormalized === "PENDING" || d.scanStateNormalized === "RUNNING" || d.scanStateNormalized === "NOT_SCHEDULED"
+                            ? "Scanning..."
+                            : d.ui.label
+                        }${d.canCreateNow ? "" : " (Unavailable)"}`}
                       </option>
                     ))}
                   </select>
