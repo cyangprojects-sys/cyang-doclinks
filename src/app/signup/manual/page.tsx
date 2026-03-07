@@ -5,7 +5,7 @@ import { useState } from "react";
 
 type State = "idle" | "submitting" | "sent";
 const signupEnabled =
-  typeof process !== "undefined" && process.env.NEXT_PUBLIC_SIGNUP_ENABLED === "true";
+  typeof process !== "undefined" && String(process.env.NEXT_PUBLIC_SIGNUP_ENABLED || "").trim().toLowerCase() !== "false";
 
 export default function ManualSignupPage() {
   const [state, setState] = useState<State>("idle");

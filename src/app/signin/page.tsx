@@ -10,7 +10,7 @@ const googleConfigured =
 const enterpriseConfigured =
   typeof process !== "undefined" && process.env.NEXT_PUBLIC_ENTERPRISE_SSO_ENABLED === "true";
 const signupEnabled =
-  typeof process !== "undefined" && process.env.NEXT_PUBLIC_SIGNUP_ENABLED === "true";
+  typeof process !== "undefined" && String(process.env.NEXT_PUBLIC_SIGNUP_ENABLED || "").trim().toLowerCase() !== "false";
 
 const AFTER_SIGN_IN = "/admin/dashboard";
 

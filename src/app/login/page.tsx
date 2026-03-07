@@ -5,7 +5,7 @@ import { signIn } from "next-auth/react";
 import Link from "next/link";
 
 const signupEnabled =
-    typeof process !== "undefined" && process.env.NEXT_PUBLIC_SIGNUP_ENABLED === "true";
+    typeof process !== "undefined" && String(process.env.NEXT_PUBLIC_SIGNUP_ENABLED || "").trim().toLowerCase() !== "false";
 
 export default function LoginPage() {
     return (

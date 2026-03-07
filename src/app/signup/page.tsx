@@ -10,7 +10,7 @@ const googleConfigured =
 const enterpriseConfigured =
   typeof process !== "undefined" && process.env.NEXT_PUBLIC_ENTERPRISE_SSO_ENABLED === "true";
 const signupEnabled =
-  typeof process !== "undefined" && process.env.NEXT_PUBLIC_SIGNUP_ENABLED === "true";
+  typeof process !== "undefined" && String(process.env.NEXT_PUBLIC_SIGNUP_ENABLED || "").trim().toLowerCase() !== "false";
 
 async function prepareSignupConsent(acceptTerms: boolean) {
   const resp = await fetch("/api/auth/signup-consent", {

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getUploadUiStatus, type StatusTone } from "@/lib/documentStatus";
+import { getUploadUiStatus, normalizeDocState, normalizeScanState, type StatusTone } from "@/lib/documentStatus";
 
 type PresignResponse =
   | {
@@ -31,6 +31,18 @@ type CompleteResponse =
 
 type KeyStatusResponse =
   | { ok: true; configured: boolean; active_key_id: string | null; revoked_active: boolean }
+  | { ok: false; error: string; message?: string };
+
+type UploadStatusResponse =
+  | {
+      ok: true;
+      docs: Array<{
+        doc_id: string;
+        doc_state: string;
+        scan_state: string;
+        moderation_status: string;
+      }>;
+    }
   | { ok: false; error: string; message?: string };
 
 type UploadItem = {
@@ -177,6 +189,7 @@ export default function UploadPanel({
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const didAutoOpenRef = useRef(false);
+  const statusPollInFlightRef = useRef(false);
 
   const [items, setItems] = useState<UploadItem[]>([]);
   const [busy, setBusy] = useState(false);
@@ -190,6 +203,22 @@ export default function UploadPanel({
   const queuedCount = useMemo(() => items.filter((i) => i.status === "queued").length, [items]);
   const doneCount = useMemo(() => items.filter((i) => i.status === "done").length, [items]);
   const errorCount = useMemo(() => items.filter((i) => i.status === "error").length, [items]);
+  const pendingDocIds = useMemo(
+    () =>
+      items
+        .filter((item) => {
+          if (item.status !== "done") return false;
+          if (!item.docId) return false;
+          const docState = normalizeDocState(item.docState);
+          const scanState = normalizeScanState(item.scanState, item.moderationStatus);
+          if (docState === "UPLOADING" || docState === "PROCESSING") return true;
+          return scanState === "PENDING" || scanState === "RUNNING" || scanState === "NOT_SCHEDULED" || scanState === "SKIPPED";
+        })
+        .map((item) => String(item.docId || "").trim())
+        .filter(Boolean),
+    [items]
+  );
+  const pendingDocIdsKey = useMemo(() => pendingDocIds.slice().sort().join(","), [pendingDocIds]);
   const allowedTypeSummary =
     "Documents: .pdf, .doc, .docx, .txt, .rtf, .odt | Spreadsheets: .xls, .xlsx, .csv | Presentations: .ppt, .pptx | Images: .jpg, .jpeg, .png, .gif, .bmp, .heic | Archives: .zip, .rar | Audio/Video: .mp3, .wav, .mp4, .mov, .avi";
 
@@ -244,6 +273,71 @@ export default function UploadPanel({
       cancelled = true;
     };
   }, [canCheckEncryptionStatus]);
+
+  useEffect(() => {
+    if (!pendingDocIds.length) return;
+    let cancelled = false;
+
+    async function pollStatus() {
+      if (statusPollInFlightRef.current) return;
+      statusPollInFlightRef.current = true;
+      try {
+        const res = await fetch("/api/admin/upload/status", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ docIds: pendingDocIds }),
+          cache: "no-store",
+        });
+        const payload = (await res.json().catch(() => null)) as UploadStatusResponse | null;
+        if (!res.ok || !payload || payload.ok !== true || cancelled) return;
+
+        const byDocId = new Map(
+          payload.docs.map((d) => [
+            String(d.doc_id || "").trim(),
+            { docState: d.doc_state, scanState: d.scan_state, moderationStatus: d.moderation_status },
+          ])
+        );
+        let changed = false;
+        setItems((prev) =>
+          prev.map((item) => {
+            const docId = String(item.docId || "").trim();
+            if (!docId) return item;
+            const next = byDocId.get(docId);
+            if (!next) return item;
+            if (
+              String(item.docState || "") === String(next.docState || "") &&
+              String(item.scanState || "") === String(next.scanState || "") &&
+              String(item.moderationStatus || "") === String(next.moderationStatus || "")
+            ) {
+              return item;
+            }
+            changed = true;
+            return {
+              ...item,
+              docState: next.docState,
+              scanState: next.scanState,
+              moderationStatus: next.moderationStatus,
+            };
+          })
+        );
+        if (changed) router.refresh();
+      } catch {
+        // Best-effort status polling.
+      } finally {
+        statusPollInFlightRef.current = false;
+      }
+    }
+
+    void pollStatus();
+    const timer = window.setInterval(() => {
+      void pollStatus();
+    }, 5000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [pendingDocIds, pendingDocIdsKey, router]);
 
   function addFiles(files: FileList | File[]) {
     const arr = Array.from(files || []);

@@ -35,7 +35,7 @@ function parseBooleanEnv(raw: string | undefined | null, fallback: boolean): boo
 }
 
 export function isSignupEnabled(): boolean {
-  return parseBooleanEnv(process.env.SIGNUP_ENABLED ?? process.env.NEXT_PUBLIC_SIGNUP_ENABLED, false);
+  return parseBooleanEnv(process.env.SIGNUP_ENABLED ?? process.env.NEXT_PUBLIC_SIGNUP_ENABLED, true);
 }
 
 function normalizeEmail(emailRaw: string): string {
