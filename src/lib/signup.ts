@@ -26,6 +26,18 @@ const MAX_ACCEPTANCE_SOURCE_LEN = 80;
 const MAX_ACTIVATION_TOKEN_LEN = 512;
 const BASIC_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+function parseBooleanEnv(raw: string | undefined | null, fallback: boolean): boolean {
+  const value = String(raw || "").trim().toLowerCase();
+  if (!value) return fallback;
+  if (["1", "true", "yes", "on"].includes(value)) return true;
+  if (["0", "false", "no", "off"].includes(value)) return false;
+  return fallback;
+}
+
+export function isSignupEnabled(): boolean {
+  return parseBooleanEnv(process.env.SIGNUP_ENABLED ?? process.env.NEXT_PUBLIC_SIGNUP_ENABLED, false);
+}
+
 function normalizeEmail(emailRaw: string): string {
   const email = String(emailRaw || "").trim().toLowerCase();
   if (!email || email.length > MAX_EMAIL_LEN) return "";

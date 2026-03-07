@@ -4,10 +4,31 @@ import Link from "next/link";
 import { useState } from "react";
 
 type State = "idle" | "submitting" | "sent";
+const signupEnabled =
+  typeof process !== "undefined" && process.env.NEXT_PUBLIC_SIGNUP_ENABLED === "true";
 
 export default function ManualSignupPage() {
   const [state, setState] = useState<State>("idle");
   const [error, setError] = useState<string | null>(null);
+
+  if (!signupEnabled) {
+    return (
+      <main className="mx-auto w-full max-w-[1000px] px-4 py-12 sm:px-6">
+        <div className="glass-card-strong rounded-2xl p-6 md:p-8">
+          <h1 className="text-2xl font-semibold text-white">Sign ups are temporarily paused</h1>
+          <p className="mt-2 text-sm text-white/70">Manual account registration is currently disabled.</p>
+          <div className="mt-6 flex gap-3">
+            <Link href="/signin/manual" className="rounded-xl border border-white/15 bg-white/10 px-4 py-2 text-sm text-white hover:bg-white/15">
+              Go to manual sign in
+            </Link>
+            <Link href="/signin" className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm text-white/85 hover:bg-white/10">
+              Other sign in options
+            </Link>
+          </div>
+        </div>
+      </main>
+    );
+  }
 
   async function onSubmit(formData: FormData) {
     setState("submitting");

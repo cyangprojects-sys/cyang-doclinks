@@ -4,6 +4,9 @@
 import { signIn } from "next-auth/react";
 import Link from "next/link";
 
+const signupEnabled =
+    typeof process !== "undefined" && process.env.NEXT_PUBLIC_SIGNUP_ENABLED === "true";
+
 export default function LoginPage() {
     return (
         <main className="min-h-screen bg-black text-white">
@@ -30,12 +33,14 @@ export default function LoginPage() {
     Sign in with Enterprise SSO
 </button>
 
-                    <Link
-                        href="/signup"
-                        className="mt-3 inline-flex w-full items-center justify-center rounded-2xl bg-white/5 px-5 py-3 text-sm font-medium text-white hover:bg-white/10"
-                    >
-                        Create account
-                    </Link>
+                    {signupEnabled ? (
+                        <Link
+                            href="/signup"
+                            className="mt-3 inline-flex w-full items-center justify-center rounded-2xl bg-white/5 px-5 py-3 text-sm font-medium text-white hover:bg-white/10"
+                        >
+                            Create account
+                        </Link>
+                    ) : null}
 
                     <div className="mt-6 text-xs text-white/50">
                         <p>

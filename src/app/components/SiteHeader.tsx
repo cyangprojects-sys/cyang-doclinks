@@ -1,10 +1,12 @@
 // app/components/SiteHeader.tsx
 import Link from "next/link";
 import { getBillingFlags } from "@/lib/settings";
+import { isSignupEnabled } from "@/lib/signup";
 
 export async function SiteHeader() {
   const flagsRes = await getBillingFlags();
   const showPricingUi = flagsRes.flags.pricingUiEnabled;
+  const signupEnabled = isSignupEnabled();
 
   return (
     <header className="glass-card-strong ui-sheen sticky top-2 z-40 rounded-2xl px-4 py-3 sm:px-6">
@@ -43,9 +45,11 @@ export async function SiteHeader() {
           >
             Sign in
           </Link>
-          <Link href="/signup" className="btn-base btn-primary rounded-xl px-4 py-2.5 text-sm font-semibold">
-            Sign up
-          </Link>
+          {signupEnabled ? (
+            <Link href="/signup" className="btn-base btn-primary rounded-xl px-4 py-2.5 text-sm font-semibold">
+              Sign up
+            </Link>
+          ) : null}
         </div>
       </div>
     </header>

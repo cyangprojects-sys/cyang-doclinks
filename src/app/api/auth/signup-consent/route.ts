@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { enforceGlobalApiRateLimit } from "@/lib/securityTelemetry";
-import { isTermsAccepted, setSignupConsentCookie } from "@/lib/signup";
+import { isSignupEnabled, isTermsAccepted, setSignupConsentCookie } from "@/lib/signup";
 
 export const runtime = "nodejs";
 const MAX_CONSENT_BODY_BYTES = 8 * 1024;
@@ -12,6 +12,13 @@ function parseJsonBodyLength(req: NextRequest): number {
 }
 
 export async function POST(req: NextRequest) {
+  if (!isSignupEnabled()) {
+    return NextResponse.json(
+      { ok: false, error: "SIGNUP_DISABLED", message: "Sign up is temporarily disabled." },
+      { status: 403 }
+    );
+  }
+
   const rl = await enforceGlobalApiRateLimit({
     req,
     scope: "ip:signup_consent",

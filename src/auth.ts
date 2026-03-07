@@ -2,7 +2,7 @@ import type { NextAuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 import Credentials from "next-auth/providers/credentials";
 import { sql } from "@/lib/db";
-import { hasSignupConsentCookie, recordTermsAcceptance, verifyManualCredentials } from "@/lib/signup";
+import { hasSignupConsentCookie, isSignupEnabled, recordTermsAcceptance, verifyManualCredentials } from "@/lib/signup";
 
 /**
  * Auth (NextAuth v4)
@@ -263,6 +263,9 @@ export const authOptions: NextAuthOptions = {
         }
 
         if (!userExists) {
+          if (!isSignupEnabled()) {
+            return "/signin?error=signup_disabled";
+          }
           const hasConsent = await hasSignupConsentCookie();
           if (!hasConsent) {
             return "/signup?error=terms_required";

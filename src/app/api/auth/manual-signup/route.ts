@@ -3,6 +3,7 @@ import { sendAccountActivationEmail } from "@/lib/email";
 import { enforceGlobalApiRateLimit } from "@/lib/securityTelemetry";
 import {
   createOrRefreshManualSignup,
+  isSignupEnabled,
   isTermsAccepted,
   recordTermsAcceptance,
   SIGNUP_TERMS_VERSION,
@@ -54,6 +55,13 @@ function cleanOptionalText(valueRaw: unknown, maxLen: number): string {
 }
 
 export async function POST(req: NextRequest) {
+  if (!isSignupEnabled()) {
+    return NextResponse.json(
+      { ok: false, error: "SIGNUP_DISABLED", message: "Sign up is temporarily disabled." },
+      { status: 403 }
+    );
+  }
+
   const rl = await enforceGlobalApiRateLimit({
     req,
     scope: "ip:manual_signup",

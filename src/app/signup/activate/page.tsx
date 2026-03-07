@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { activateManualSignup } from "@/lib/signup";
+import { activateManualSignup, isSignupEnabled } from "@/lib/signup";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,7 +15,9 @@ export default async function SignupActivatePage(props: {
   let detail = "Your activation link is invalid or expired.";
   let ok = false;
 
-  if (token && email) {
+  if (!isSignupEnabled()) {
+    detail = "Sign up is temporarily disabled.";
+  } else if (token && email) {
     try {
       await activateManualSignup(email, token);
       ok = true;

@@ -9,6 +9,8 @@ const googleConfigured =
 
 const enterpriseConfigured =
   typeof process !== "undefined" && process.env.NEXT_PUBLIC_ENTERPRISE_SSO_ENABLED === "true";
+const signupEnabled =
+  typeof process !== "undefined" && process.env.NEXT_PUBLIC_SIGNUP_ENABLED === "true";
 
 async function prepareSignupConsent(acceptTerms: boolean) {
   const resp = await fetch("/api/auth/signup-consent", {
@@ -23,6 +25,26 @@ export default function SignupPage() {
   const [acceptTerms, setAcceptTerms] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  if (!signupEnabled) {
+    return (
+      <main className="mx-auto w-full max-w-[1200px] px-4 py-12 sm:px-6">
+        <div className="glass-card-strong rounded-2xl p-6 md:p-8">
+          <div className="text-xs uppercase tracking-[0.16em] text-cyan-200/80">Sign up</div>
+          <h1 className="mt-2 text-3xl font-semibold text-white">Sign ups are temporarily paused</h1>
+          <p className="mt-2 text-sm text-white/70">New account creation is disabled while maintenance is in progress.</p>
+          <div className="mt-6 flex flex-wrap gap-3">
+            <Link href="/signin" className="rounded-xl border border-white/15 bg-white/10 px-4 py-2 text-sm text-white hover:bg-white/15">
+              Sign in
+            </Link>
+            <Link href="/" className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm text-white/85 hover:bg-white/10">
+              Home
+            </Link>
+          </div>
+        </div>
+      </main>
+    );
+  }
 
   async function startProviderSignup(provider: "google" | "enterprise-sso") {
     if (!acceptTerms || busy) return;

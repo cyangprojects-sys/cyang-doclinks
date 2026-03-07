@@ -9,6 +9,8 @@ const googleConfigured =
 
 const enterpriseConfigured =
   typeof process !== "undefined" && process.env.NEXT_PUBLIC_ENTERPRISE_SSO_ENABLED === "true";
+const signupEnabled =
+  typeof process !== "undefined" && process.env.NEXT_PUBLIC_SIGNUP_ENABLED === "true";
 
 const AFTER_SIGN_IN = "/admin/dashboard";
 
@@ -50,11 +52,15 @@ export default function SignInPage() {
         </div>
 
         <div className="mt-6 rounded-xl border border-white/15 bg-white/5 p-3">
-          <div className="text-xs text-white/60">Need Account, sign up here</div>
+          <div className="text-xs text-white/60">
+            {signupEnabled ? "Need Account, sign up here" : "Sign up is temporarily disabled"}
+          </div>
           <div className="mt-2 flex flex-wrap gap-2">
-            <Link href="/signup" className="rounded-lg border border-white/20 bg-white/10 px-3 py-1.5 text-xs text-white hover:bg-white/15">
-              Sign up
-            </Link>
+            {signupEnabled ? (
+              <Link href="/signup" className="rounded-lg border border-white/20 bg-white/10 px-3 py-1.5 text-xs text-white hover:bg-white/15">
+                Sign up
+              </Link>
+            ) : null}
             <Link href="/signin/manual" className="rounded-lg border border-white/20 bg-white/10 px-3 py-1.5 text-xs text-white hover:bg-white/15">
               Sign in with email
             </Link>
