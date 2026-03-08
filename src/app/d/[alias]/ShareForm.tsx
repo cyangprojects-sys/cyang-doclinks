@@ -22,7 +22,7 @@ type Mode = "simple" | "advanced";
 type WatermarkStrength = "light" | "strong";
 type WatermarkPlacement = "diagonal" | "center";
 type SimpleExpiryChoice = "pack" | "none" | "24h" | "72h" | "7d" | "14d" | "30d" | "custom";
-type QuickPresetId = "general_secure" | "email_safe" | "client_share";
+type QuickPresetId = "general_secure" | "email_safe" | "client_share" | "one_time_share";
 type QuickPreset = {
   id: QuickPresetId;
   label: string;
@@ -89,6 +89,19 @@ const QUICK_PRESETS: readonly QuickPreset[] = [
     watermarkStrength: "light",
     watermarkPlacement: "center",
   },
+  {
+    id: "one_time_share",
+    label: "One-Time Share",
+    description: "Auto-closes after first access.",
+    badge: "Strict",
+    packId: "one_time_share",
+    watermarkEnabled: true,
+    allowDownload: false,
+    maxViews: 1,
+    expiryChoice: "24h",
+    watermarkStrength: "strong",
+    watermarkPlacement: "diagonal",
+  },
 ];
 
 const PRO_TEASER_PRESETS: readonly ProTeaserPreset[] = [
@@ -129,11 +142,6 @@ const MORE_PRESETS: readonly MorePreset[] = [
     id: "job_search",
     label: "Resume / Portfolio",
     description: "Longer window for resume and portfolio sharing.",
-  },
-  {
-    id: "one_time_share",
-    label: "One-Time Share",
-    description: "Auto-closes after first access.",
   },
   {
     id: "legal_confidential",
@@ -677,7 +685,7 @@ export default function ShareForm({
             Pick a preset. Everything is secure by default.
           </p>
           <div className="mt-2 flex items-center justify-between gap-2">
-            <div className="text-xs text-neutral-400">Most common (Free)</div>
+            <div className="text-xs text-neutral-400">Most common</div>
             <button
               type="button"
               onClick={onSaveDefaultPack}
