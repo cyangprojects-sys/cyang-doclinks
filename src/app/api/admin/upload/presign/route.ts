@@ -76,6 +76,9 @@ export async function POST(req: Request) {
             { status: 403, headers: { "Retry-After": String(abuseBlock.retryAfterSeconds) } }
           );
         }
+        const user = await requireUser();
+        const plan = await getPlanForUser(user.id);
+
         // Global API throttle (best-effort)
         const globalRl = await enforceGlobalApiRateLimit({
           req,
@@ -91,8 +94,6 @@ export async function POST(req: Request) {
           );
         }
         const r2Bucket = getR2Bucket();
-        const user = await requireUser();
-        const plan = await getPlanForUser(user.id);
 
         // Upload presign throttle per-IP (stronger)
         const basePresignLimit = Number(process.env.RATE_LIMIT_UPLOAD_PRESIGN_IP_PER_MIN || 30);
