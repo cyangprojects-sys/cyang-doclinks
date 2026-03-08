@@ -15,8 +15,8 @@ const RATE_LIMIT_PER_10MIN = 25;
 const MAX_TOKEN_LEN = 128;
 const MAX_PASSWORD_LEN = 256;
 const MAX_EMAIL_LEN = 320;
-const SHARE_TOKEN_RE =
-  /^(?:[a-f0-9]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i;
+// Accept current generated tokens (hex/uuid) and older/manual safe tokens used in fixtures.
+const SHARE_TOKEN_RE = /^(?:[a-f0-9]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|[A-Za-z0-9][A-Za-z0-9_-]{7,127})$/;
 
 function cleanText(raw: unknown, maxLen: number): string {
     const value = String(raw || "");

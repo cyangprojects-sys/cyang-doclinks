@@ -13,6 +13,7 @@ import { generateApiKey, hashApiKey } from "@/lib/apiKeys";
 import { emitWebhook } from "@/lib/webhooks";
 import { appendImmutableAudit } from "@/lib/immutableAudit";
 import { resolveConfiguredPublicAppBaseUrl } from "@/lib/publicBaseUrl";
+import { getDemoShareToken } from "@/lib/demo";
 
 function getBaseUrl() {
   return resolveConfiguredPublicAppBaseUrl();
@@ -101,6 +102,23 @@ async function tableExists(name: string): Promise<boolean> {
     return Boolean(rows?.[0]?.reg);
   } catch {
     return false;
+  }
+}
+
+async function assertNotDemoDocument(docId: string): Promise<void> {
+  const demoToken = getDemoShareToken();
+  if (!demoToken) return;
+  const shareTokensExists = await tableExists("public.share_tokens");
+  if (!shareTokensExists) return;
+  const rows = (await sql`
+    select 1
+    from public.share_tokens
+    where token = ${demoToken}
+      and doc_id = ${docId}::uuid
+    limit 1
+  `) as unknown as Array<{ "?column?": number }>;
+  if (rows.length) {
+    throw new Error("This document is protected as the configured demo document. Update DEMO_DOC_URL first.");
   }
 }
 
@@ -434,6 +452,7 @@ export async function deleteDocAction(formData: FormData): Promise<void> {
   if (!docId) throw new Error("Missing docId.");
 
   await requireDocWrite(docId);
+  await assertNotDemoDocument(docId);
 
   const drows = (await sql`
     select title::text as title
@@ -850,6 +869,7 @@ export async function bulkDeleteDocsAction(formData: FormData): Promise<void> {
 
     try {
       await requireDocWrite(id);
+      await assertNotDemoDocument(id);
 
       const drows = (await sql`
         select title::text as title

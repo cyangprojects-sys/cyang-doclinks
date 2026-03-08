@@ -43,6 +43,10 @@ export type RevokeShareResult =
   | { ok: true; token: string }
   | { ok: false; error: string; message?: string };
 
+export type SendShareEmailResult =
+  | { ok: true }
+  | { ok: false; error: string; message?: string };
+
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const SHARE_TOKEN_RE =
   /^(?:[a-f0-9]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i;
@@ -55,6 +59,7 @@ const MAX_PACK_ID_LEN = 64;
 const MAX_DATE_OVERRIDE_LEN = 64;
 const MAX_COUNTRY_FIELD_LEN = 2048;
 const MAX_SHARE_TITLE_LEN = 240;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function readFormText(formData: FormData, key: string, maxLen: number): string {
   const raw = String(formData.get(key) || "");
@@ -74,6 +79,19 @@ function isUuid(value: string): boolean {
 
 function isShareToken(value: string): boolean {
   return SHARE_TOKEN_RE.test(String(value || "").trim());
+}
+
+function isValidEmail(value: string): boolean {
+  return EMAIL_RE.test(String(value || "").trim().toLowerCase());
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
 }
 
 function baseUrlFromEnv(): string {
@@ -121,6 +139,113 @@ async function trySendResendEmail(opts: {
     return { ok: true };
   } catch (e: unknown) {
     return { ok: false, message: "Failed to send email" };
+  }
+}
+
+export async function sendShareLinkEmail(form: FormData): Promise<SendShareEmailResult> {
+  try {
+    const token = readFormText(form, "token", MAX_TOKEN_LEN).toLowerCase();
+    const toEmail = readFormText(form, "toEmail", MAX_EMAIL_LEN).toLowerCase();
+    if (!isShareToken(token)) {
+      return { ok: false, error: "invalid_token", message: "Invalid share token." };
+    }
+    if (!isValidEmail(toEmail)) {
+      return { ok: false, error: "invalid_email", message: "Enter a valid recipient email." };
+    }
+
+    let rows: Array<{
+      doc_id: string;
+      title: string | null;
+      restricted_email: string | null;
+      password_hash: string | null;
+      expires_at: string | null;
+      revoked_at: string | null;
+    }> = [];
+
+    try {
+      rows = (await sql`
+        select
+          st.doc_id::text as doc_id,
+          d.title::text as title,
+          st.to_email::text as restricted_email,
+          st.password_hash::text as password_hash,
+          st.expires_at::text as expires_at,
+          st.revoked_at::text as revoked_at
+        from public.share_tokens st
+        left join public.docs d on d.id = st.doc_id
+        where st.token = ${token}
+        limit 1
+      `) as unknown as typeof rows;
+    } catch {
+      rows = (await sql`
+        select
+          st.doc_id::text as doc_id,
+          d.title::text as title,
+          st.to_email::text as restricted_email,
+          null::text as password_hash,
+          st.expires_at::text as expires_at,
+          st.revoked_at::text as revoked_at
+        from public.share_tokens st
+        left join public.docs d on d.id = st.doc_id
+        where st.token = ${token}
+        limit 1
+      `) as unknown as typeof rows;
+    }
+
+    const row = rows[0];
+    if (!row?.doc_id) {
+      return { ok: false, error: "not_found", message: "Share link not found." };
+    }
+
+    await requireDocWrite(row.doc_id);
+
+    if (row.revoked_at) {
+      return { ok: false, error: "revoked", message: "This link is revoked." };
+    }
+    if (row.expires_at) {
+      const expiresAtMs = Date.parse(row.expires_at);
+      if (Number.isFinite(expiresAtMs) && expiresAtMs <= Date.now()) {
+        return { ok: false, error: "expired", message: "This link is already expired." };
+      }
+    }
+
+    const url = buildShareUrl(token);
+    const title = row.title?.trim() || "Document";
+    const gates: string[] = [];
+    if (row.restricted_email) {
+      gates.push(`Recipient restriction: <b>${escapeHtml(row.restricted_email)}</b>`);
+    }
+    if (row.password_hash) {
+      gates.push("Password required");
+    }
+
+    const html = `
+      <div style="font-family: ui-sans-serif, system-ui; line-height:1.45;">
+        <h2 style="margin:0 0 10px 0;">${escapeHtml(title)}</h2>
+        <p style="margin:0 0 10px 0;">A protected document link has been shared with you.</p>
+        <p style="margin:0 0 10px 0;">${gates.length ? `Access rules: ${gates.join(" · ")}` : "Access rules: standard protected link"}</p>
+        <p style="margin:12px 0;">
+          <a href="${url}" style="display:inline-block;padding:10px 14px;border-radius:10px;text-decoration:none;border:1px solid #ddd;">
+            Open document
+          </a>
+        </p>
+        <p style="color:#666;font-size:12px;margin:12px 0 0 0;">If you did not expect this link, you can ignore this email.</p>
+      </div>
+    `;
+
+    const sent = await trySendResendEmail({
+      to: toEmail,
+      subject: `Cyang Docs: ${title}`,
+      html,
+    });
+
+    if (!sent.ok) {
+      return { ok: false, error: "email_failed", message: sent.message };
+    }
+
+    return { ok: true };
+  } catch {
+    return { ok: false, error: "exception", message: "Unable to send email." };
   }
 }
 

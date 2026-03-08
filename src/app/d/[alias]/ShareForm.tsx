@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { createAndEmailShareToken } from "./actions";
+import { createAndEmailShareToken, sendShareLinkEmail } from "./actions";
 import type { CreateShareResult } from "./actions";
 import {
   DEFAULT_PACK_ID,
@@ -130,6 +130,31 @@ const MORE_PRESETS: readonly MorePreset[] = [
     label: "Resume / Portfolio",
     description: "Longer window for resume and portfolio sharing.",
   },
+  {
+    id: "one_time_share",
+    label: "One-Time Share",
+    description: "Auto-closes after first access.",
+  },
+  {
+    id: "legal_confidential",
+    label: "Legal / Confidential",
+    description: "Stricter sharing and stronger watermark defaults.",
+  },
+  {
+    id: "id_verification",
+    label: "ID / Verification",
+    description: "Best for paystubs, IDs, and onboarding.",
+  },
+  {
+    id: "client_delivery",
+    label: "Client Delivery",
+    description: "Longer-lived links for final deliverables clients keep.",
+  },
+  {
+    id: "executive_brief",
+    label: "Executive Brief",
+    description: "Tight-window sharing for executive and board docs.",
+  },
 ];
 
 const EXPIRY_SECONDS_BY_CHOICE: Readonly<Record<"24h" | "72h" | "7d" | "14d" | "30d", number>> = {
@@ -223,6 +248,8 @@ export default function ShareForm({
     expiresAt: string | null;
     allowDownload: boolean;
     watermarkEnabled: boolean;
+    restrictedToEmail: string | null;
+    passwordRequired: boolean;
   } | null>(null);
   const [overrideAllowDownload, setOverrideAllowDownload] = useState<boolean | null>(null);
   const [overrideWatermarkEnabled, setOverrideWatermarkEnabled] = useState<boolean | null>(null);
@@ -241,6 +268,12 @@ export default function ShareForm({
   const [activeProTeaserId, setActiveProTeaserId] = useState<ProTeaserPresetId | null>(null);
   const isFreePlan = String(planId || "").trim().toLowerCase() === "free";
   const [showMorePresets, setShowMorePresets] = useState(false);
+  const [shareToken, setShareToken] = useState<string | null>(null);
+  const [emailModalOpen, setEmailModalOpen] = useState(false);
+  const [emailRecipient, setEmailRecipient] = useState("");
+  const [emailBusy, setEmailBusy] = useState(false);
+  const [emailErr, setEmailErr] = useState<string | null>(null);
+  const [ackInsecureEmailSend, setAckInsecureEmailSend] = useState(false);
 
   useEffect(() => {
     const canUsePack = (packId: string) => isPackAvailableForPlan(packId, planId);
@@ -328,9 +361,16 @@ export default function ShareForm({
   const createdExpiresLabel = fmtIso(createdShareSummary?.expiresAt ?? preview.expiresAt);
   const createdDownloadLabel = (createdShareSummary?.allowDownload ?? preview.allowDownload) ? "allowed" : "view-only";
   const createdWatermarkLabel = (createdShareSummary?.watermarkEnabled ?? preview.watermarkEnabled) ? "on" : "off";
+  const createdRestrictionEmail = createdShareSummary?.restrictedToEmail ?? null;
+  const createdPasswordRequired = createdShareSummary?.passwordRequired ?? false;
+  const hasOptionalSecurity = Boolean(createdRestrictionEmail) || createdPasswordRequired;
   const qrCodeSrc = shareUrl
     ? `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(shareUrl)}`
     : "";
+
+  function isValidEmail(value: string): boolean {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+  }
 
   function buildSuggestedPassword(length: number = 14): string {
     const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$%*_-";
@@ -486,10 +526,17 @@ export default function ShareForm({
         (typeof res.url === "string" && res.url.trim()) ||
         `${window.location.origin}/s/${encodeURIComponent(String(res.token || ""))}`;
       setShareUrl(resolvedUrl);
+      setShareToken(String(res.token || "").trim() || null);
+      setEmailModalOpen(false);
+      setEmailErr(null);
+      setAckInsecureEmailSend(false);
+      setEmailRecipient(nextToEmail || "");
       setCreatedShareSummary({
         expiresAt: preview.expiresAt,
         allowDownload: preview.allowDownload,
         watermarkEnabled: preview.watermarkEnabled,
+        restrictedToEmail: nextToEmail || null,
+        passwordRequired: Boolean(nextPassword.trim()),
       });
       setUiMessage("Protected link created.");
     } catch (e: unknown) {
@@ -510,10 +557,51 @@ export default function ShareForm({
   }
 
   function onEmailShare() {
-    if (!shareUrl) return;
-    const subject = encodeURIComponent("Protected document link");
-    const body = encodeURIComponent(`Here is the protected link:\n\n${shareUrl}`);
-    window.location.href = `mailto:?subject=${subject}&body=${body}`;
+    if (!shareUrl || !shareToken) return;
+    setEmailErr(null);
+    setAckInsecureEmailSend(false);
+    if (!emailRecipient.trim()) {
+      if (createdRestrictionEmail) {
+        setEmailRecipient(createdRestrictionEmail);
+      } else if (toEmail.trim()) {
+        setEmailRecipient(toEmail.trim().toLowerCase());
+      }
+    }
+    setEmailModalOpen(true);
+  }
+
+  async function onSendShareEmail() {
+    if (!shareToken) {
+      setEmailErr("Create a protected link first.");
+      return;
+    }
+    const to = emailRecipient.trim().toLowerCase();
+    if (!isValidEmail(to)) {
+      setEmailErr("Enter a valid recipient email.");
+      return;
+    }
+    if (!hasOptionalSecurity && !ackInsecureEmailSend) {
+      setEmailErr("Confirm sending without optional security, or add recipient/password protection first.");
+      return;
+    }
+    setEmailBusy(true);
+    setEmailErr(null);
+    try {
+      const fd = new FormData();
+      fd.set("token", shareToken);
+      fd.set("toEmail", to);
+      const result = await sendShareLinkEmail(fd);
+      if (!result.ok) {
+        setEmailErr(result.message || result.error || "Unable to send email.");
+        return;
+      }
+      setEmailModalOpen(false);
+      setUiMessage(`Email sent to ${to}.`);
+    } catch {
+      setEmailErr("Unable to send email.");
+    } finally {
+      setEmailBusy(false);
+    }
   }
 
   function onGeneratePassword() {
@@ -566,6 +654,11 @@ export default function ShareForm({
     setRestrictRecipientEmail(false);
     setRequirePasswordProtection(false);
     setShowQrCode(false);
+    setShareToken(null);
+    setEmailModalOpen(false);
+    setEmailRecipient("");
+    setEmailErr(null);
+    setAckInsecureEmailSend(false);
     if (canEditTitle) setShareTitle("");
   }
 
@@ -1078,7 +1171,8 @@ export default function ShareForm({
               <button
                 type="button"
                 onClick={onEmailShare}
-                className="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-200 hover:bg-neutral-800"
+                disabled={!shareToken}
+                className="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-200 hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Email link
               </button>
@@ -1096,7 +1190,7 @@ export default function ShareForm({
               className="mt-2 w-full rounded-lg border border-neutral-800 bg-neutral-900 px-3 py-2 text-sm text-neutral-100"
             />
             <div className="mt-2 text-xs text-neutral-300">
-              Link expires: {createdExpiresLabel} • Download: {createdDownloadLabel} • Watermark: {createdWatermarkLabel}
+              Link expires: {createdExpiresLabel} • Download: {createdDownloadLabel} • Watermark: {createdWatermarkLabel} • Optional security: {hasOptionalSecurity ? "set" : "not set"}
             </div>
 
             {showQrCode && qrCodeSrc ? (
@@ -1179,6 +1273,80 @@ export default function ShareForm({
                 Created with: <span className="text-neutral-200">{createdWithPack}</span>
               </div>
             ) : null}
+          </div>
+        ) : null}
+
+        {emailModalOpen ? (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+            <div className="w-full max-w-md rounded-xl border border-neutral-700 bg-neutral-950 p-4 shadow-2xl">
+              <div className="text-base font-semibold text-neutral-100">Email protected link</div>
+              <div className="mt-1 text-xs text-neutral-400">
+                Confirm the optional security settings before sending.
+              </div>
+
+              <div className="mt-3 rounded-lg border border-neutral-800 bg-neutral-900 p-3 text-xs text-neutral-300">
+                <div>Recipient restriction: {createdRestrictionEmail ? createdRestrictionEmail : "Not set"}</div>
+                <div className="mt-1">Password protection: {createdPasswordRequired ? "Enabled" : "Not set"}</div>
+              </div>
+
+              {!hasOptionalSecurity ? (
+                <div className="mt-3 rounded-lg border border-amber-700/40 bg-amber-950/30 p-3 text-xs text-amber-100">
+                  This link has no optional security yet. You can add recipient restriction or password, then click
+                  {" "}
+                  <span className="font-semibold">Generate updated link</span>
+                  {" "}
+                  before sending.
+                </div>
+              ) : null}
+
+              <label className="mt-3 block text-xs font-medium text-neutral-300">Recipient email</label>
+              <input
+                value={emailRecipient}
+                onChange={(e) => setEmailRecipient(e.target.value)}
+                type="email"
+                placeholder="recipient@example.com"
+                className="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 placeholder:text-neutral-500 focus:border-neutral-600 focus:outline-none focus:ring-2 focus:ring-neutral-700 transition"
+              />
+
+              {!hasOptionalSecurity ? (
+                <label className="mt-3 flex items-start gap-2 text-xs text-neutral-300">
+                  <input
+                    type="checkbox"
+                    checked={ackInsecureEmailSend}
+                    onChange={(e) => setAckInsecureEmailSend(e.target.checked)}
+                    className="mt-0.5 h-4 w-4 rounded border-neutral-700 bg-neutral-950 text-cyan-400 focus:ring-cyan-500"
+                  />
+                  <span>I understand and still want to send without optional security.</span>
+                </label>
+              ) : null}
+
+              {emailErr ? (
+                <div className="mt-3 rounded-lg border border-red-900/40 bg-red-950/30 p-2 text-xs text-red-200">
+                  {emailErr}
+                </div>
+              ) : null}
+
+              <div className="mt-4 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEmailModalOpen(false);
+                    setEmailErr(null);
+                  }}
+                  className="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-200 hover:bg-neutral-800"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={onSendShareEmail}
+                  disabled={emailBusy || !shareToken || (!hasOptionalSecurity && !ackInsecureEmailSend)}
+                  className="rounded-lg bg-neutral-100 px-3 py-2 text-sm font-medium text-neutral-950 hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {emailBusy ? "Sending..." : "Send email"}
+                </button>
+              </div>
+            </div>
           </div>
         ) : null}
 
