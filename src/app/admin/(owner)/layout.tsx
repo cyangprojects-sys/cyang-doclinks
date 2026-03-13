@@ -15,17 +15,17 @@ export default async function OwnerAdminLayout({
   const session = await getServerSession(authOptions);
   if (!session?.user) redirect("/signin");
 
-  // Hard gate all (owner) routes.
-  const role = (session.user as { role?: string })?.role;
-  const isOwner = role === "owner";
-  if (!isOwner) redirect("/admin/dashboard");
   const email = String(session.user.email || "").trim().toLowerCase();
+  if (!email) redirect("/signin");
   const orgId = (session.user as { orgId?: string | null } | undefined)?.orgId ?? null;
   const orgSlug = (session.user as { orgSlug?: string | null } | undefined)?.orgSlug ?? null;
-  if (email && roleRequiresMfa("owner")) {
-    const user = await ensureUserByEmail(email, { orgId, orgSlug });
+  const user = await ensureUserByEmail(email, { orgId, orgSlug });
+
+  // Hard gate all (owner) routes.
+  if (user.role !== "owner") redirect("/admin");
+  if (roleRequiresMfa("owner")) {
     const ok = await hasValidMfaCookie({ userId: user.id, email: user.email, role: user.role });
-    if (!ok) redirect("/mfa?next=/admin/dashboard");
+    if (!ok) redirect("/mfa?next=/admin");
   }
 
   // IMPORTANT: Do NOT render AdminTopNav here.

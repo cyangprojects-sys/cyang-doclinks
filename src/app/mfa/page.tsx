@@ -31,19 +31,17 @@ export default async function MfaPage({ searchParams }: { searchParams: SearchPa
   const email = String(session?.user?.email || "").trim().toLowerCase();
   if (!email) redirect("/signin");
 
-  const role = String((session?.user as { role?: string } | undefined)?.role || "viewer");
-  if (role !== "admin" && role !== "owner") redirect("/admin/dashboard");
-
   const orgId = (session?.user as { orgId?: string | null } | undefined)?.orgId ?? null;
   const orgSlug = (session?.user as { orgSlug?: string | null } | undefined)?.orgSlug ?? null;
   const user = await ensureUserByEmail(email, { orgId, orgSlug });
+  if (user.role !== "admin" && user.role !== "owner") redirect("/projects/doclinks");
 
   if (!roleRequiresMfa(user.role) && !mfaEnforcementEnabled()) {
-    redirect("/admin/dashboard");
+    redirect("/admin");
   }
 
   const params = await searchParams;
-  const next = sanitizeInternalRedirectPath(String(params?.next || "/admin/dashboard"));
+  const next = sanitizeInternalRedirectPath(String(params?.next || "/admin"));
   const error = String(params?.error || "").trim();
   const setupRequested = String(params?.setup || "").trim() === "1";
   const recoveryRequested = String(params?.recovery || "").trim() === "1";

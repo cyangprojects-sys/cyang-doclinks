@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 
 type AdminRole = "admin" | "owner";
 
-function isAdminRole(role: string | undefined): role is AdminRole {
+function isAdminRole(role: string): role is AdminRole {
   return role === "admin" || role === "owner";
 }
 
@@ -26,27 +26,19 @@ export default async function AdminLayout({
   // Require login for all /admin routes
   if (!session?.user) redirect("/signin");
 
-  const rawRole = (session.user as { role?: string })?.role;
-  if (!isAdminRole(rawRole)) redirect("/");
-  const role = rawRole;
-  const isOwner = role === "owner";
   const email = String(session.user.email || "").trim().toLowerCase();
+  if (!email) redirect("/signin");
   const orgId = (session.user as { orgId?: string | null } | undefined)?.orgId ?? null;
   const orgSlug = (session.user as { orgSlug?: string | null } | undefined)?.orgSlug ?? null;
-  let ensuredUserId = String((session.user as { id?: string } | undefined)?.id || "").trim();
-  if ((role === "admin" || role === "owner") && email && roleRequiresMfa(role)) {
-    const user = await ensureUserByEmail(email, { orgId, orgSlug });
-    ensuredUserId = ensuredUserId || user.id;
+  const user = await ensureUserByEmail(email, { orgId, orgSlug });
+  if (!isAdminRole(user.role)) redirect("/projects/doclinks");
+
+  const role = user.role;
+  const isOwner = role === "owner";
+  const ensuredUserId = user.id;
+  if (roleRequiresMfa(role)) {
     const ok = await hasValidMfaCookie({ userId: user.id, email: user.email, role: user.role });
-    if (!ok) redirect("/mfa?next=/admin/dashboard");
-  }
-  if (!ensuredUserId && email) {
-    try {
-      const user = await ensureUserByEmail(email, { orgId, orgSlug });
-      ensuredUserId = user.id;
-    } catch {
-      ensuredUserId = "";
-    }
+    if (!ok) redirect("/mfa?next=/admin");
   }
   const billingFlags = await getBillingFlags();
   const shellContext = await getAdminShellContext({

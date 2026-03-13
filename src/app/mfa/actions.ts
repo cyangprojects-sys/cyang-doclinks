@@ -31,20 +31,20 @@ function readFormText(formData: FormData, key: string, maxLen: number): string {
 async function getAuthedUser() {
   const session = await getServerSession(authOptions);
   const email = String(session?.user?.email || "").trim().toLowerCase();
-  const role = String((session?.user as { role?: string } | undefined)?.role || "viewer");
-  if (!email || (role !== "admin" && role !== "owner")) {
+  if (!email) {
     throw new Error("FORBIDDEN");
   }
   const orgId = (session?.user as { orgId?: string | null } | undefined)?.orgId ?? null;
   const orgSlug = (session?.user as { orgSlug?: string | null } | undefined)?.orgSlug ?? null;
   const user = await ensureUserByEmail(email, { orgId, orgSlug });
+  if (user.role !== "admin" && user.role !== "owner") throw new Error("FORBIDDEN");
   if (!roleRequiresMfa(user.role)) throw new Error("FORBIDDEN");
   return user;
 }
 
 export async function beginMfaSetupAction(formData: FormData): Promise<void> {
   const nextRaw = readFormText(formData, "next", MAX_NEXT_PATH_LEN);
-  const next = sanitizeInternalRedirectPath(nextRaw || "/admin/dashboard");
+  const next = sanitizeInternalRedirectPath(nextRaw || "/admin");
   const user = await getAuthedUser();
   if (!(await mfaTableExists())) {
     redirect(`/mfa?error=table_missing&next=${encodeURIComponent(next)}`);
@@ -55,7 +55,7 @@ export async function beginMfaSetupAction(formData: FormData): Promise<void> {
 
 export async function enableMfaAction(formData: FormData): Promise<void> {
   const nextRaw = readFormText(formData, "next", MAX_NEXT_PATH_LEN);
-  const next = sanitizeInternalRedirectPath(nextRaw || "/admin/dashboard");
+  const next = sanitizeInternalRedirectPath(nextRaw || "/admin");
   const code = readFormText(formData, "code", MAX_MFA_CODE_LEN);
   const user = await getAuthedUser();
   const ok = await enableMfa({ userId: user.id, code });
@@ -73,7 +73,7 @@ export async function enableMfaAction(formData: FormData): Promise<void> {
 
 export async function verifyMfaAction(formData: FormData): Promise<void> {
   const nextRaw = readFormText(formData, "next", MAX_NEXT_PATH_LEN);
-  const next = sanitizeInternalRedirectPath(nextRaw || "/admin/dashboard");
+  const next = sanitizeInternalRedirectPath(nextRaw || "/admin");
   const code = readFormText(formData, "code", MAX_MFA_CODE_LEN);
   const user = await getAuthedUser();
   const ok = await verifyMfaCode({ userId: user.id, code });
@@ -91,7 +91,7 @@ export async function clearMfaSessionAction(): Promise<void> {
 
 export async function regenerateRecoveryCodesAction(formData: FormData): Promise<void> {
   const nextRaw = readFormText(formData, "next", MAX_NEXT_PATH_LEN);
-  const next = sanitizeInternalRedirectPath(nextRaw || "/admin/dashboard");
+  const next = sanitizeInternalRedirectPath(nextRaw || "/admin");
   const user = await getAuthedUser();
   const codes = await regenerateRecoveryCodes(user.id);
   if (!codes?.length) {
