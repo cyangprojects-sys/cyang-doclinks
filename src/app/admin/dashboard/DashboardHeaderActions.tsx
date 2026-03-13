@@ -151,8 +151,8 @@ export default function DashboardHeaderActions(props: {
       return d.eligibility.canCreateLink && docState === "READY" && scanState === "CLEAN";
     });
   }, [docsWithStatus]);
-  const uploadPickerHref = props.uploadPickerHref ?? "/admin/dashboard?openPicker=1";
-  const createLinkUploadHref = props.createLinkFallbackHref ?? "/admin/dashboard?openPicker=1&fromCreateLink=1";
+  const uploadPickerHref = props.uploadPickerHref ?? "/admin?openPicker=1";
+  const createLinkUploadHref = props.createLinkFallbackHref ?? "/admin?openPicker=1&fromCreateLink=1";
 
   useEffect(() => {
     if (!docsWithStatus.length) {

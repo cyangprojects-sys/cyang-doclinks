@@ -15,13 +15,6 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-function fmtDate(s: string | null): string {
-  if (!s) return "No activity yet";
-  const d = new Date(s);
-  if (Number.isNaN(d.getTime())) return s;
-  return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
-}
-
 function fmtDateTime(s: string | null): string {
   if (!s) return "No activity yet";
   const d = new Date(s);
@@ -97,18 +90,18 @@ export default async function AdminDashboardPage({
         docs={headerDocs}
         planId={homeData.planId}
         mode="modal-only"
-        uploadPickerHref="/admin/dashboard?openPicker=1"
-        createLinkFallbackHref="/admin/dashboard?openPicker=1&fromCreateLink=1"
+        uploadPickerHref="/admin?openPicker=1"
+        createLinkFallbackHref="/admin?openPicker=1&fromCreateLink=1"
       />
 
       <section className="glass-card-strong ui-sheen overflow-hidden rounded-[32px] p-6 sm:p-7">
         <div className="grid gap-6 xl:grid-cols-[1.25fr_minmax(0,0.85fr)]">
           <div className="space-y-5">
             <div>
-              <div className="text-xs uppercase tracking-[0.18em] text-cyan-200/70">Home</div>
-              <h1 className="mt-3 max-w-3xl text-3xl font-semibold tracking-tight text-white sm:text-4xl">
+              <div className="text-xs uppercase tracking-[0.18em] text-cyan-200/70">Overview</div>
+              <h2 className="mt-3 max-w-3xl text-3xl font-semibold tracking-tight text-white sm:text-4xl">
                 Secure sharing that feels obvious from the first file.
-              </h1>
+              </h2>
               <p className="mt-3 max-w-2xl text-sm leading-6 text-white/68 sm:text-base">
                 Upload a file, wait for the scan, create a protected link, and come back here to see what is ready, active, or viewed.
               </p>
@@ -116,16 +109,16 @@ export default async function AdminDashboardPage({
 
             <div className="flex flex-wrap items-center gap-3">
               <Link
-                href="/admin/dashboard?openPicker=1"
+                href="/admin?openPicker=1"
                 className="btn-base rounded-2xl border border-cyan-300/45 bg-cyan-300 px-5 py-3 text-sm font-semibold text-[#07131f] shadow-[0_14px_32px_rgba(34,211,238,0.18)] hover:bg-cyan-200"
               >
-                Upload file
+                Upload documents
               </Link>
               <Link href="/admin/documents" className="btn-base btn-secondary rounded-2xl px-4 py-3 text-sm">
-                Open files
+                Open documents
               </Link>
               <Link href="/admin/links" className="btn-base btn-secondary rounded-2xl px-4 py-3 text-sm">
-                Manage shared links
+                Manage links
               </Link>
             </div>
 
@@ -152,7 +145,7 @@ export default async function AdminDashboardPage({
             <div className="text-xs uppercase tracking-[0.16em] text-white/45">At a glance</div>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-                <div className="text-xs text-white/45">Files</div>
+                <div className="text-xs text-white/45">Documents</div>
                 <div className="mt-2 text-2xl font-semibold text-white">{fmtInt(docsData.unifiedRows.length)}</div>
                 <div className="mt-1 text-sm text-white/60">in your secure library</div>
               </div>
@@ -169,20 +162,20 @@ export default async function AdminDashboardPage({
               <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
                 <div className="text-xs text-white/45">Views</div>
                 <div className="mt-2 text-2xl font-semibold text-white">{fmtInt(totalViews)}</div>
-                <div className="mt-1 text-sm text-white/60">across {fmtInt(activeFilesWithViews)} files</div>
+                <div className="mt-1 text-sm text-white/60">across {fmtInt(activeFilesWithViews)} documents</div>
               </div>
             </div>
 
             <div className="mt-4 rounded-2xl border border-cyan-300/18 bg-cyan-400/[0.08] p-4">
-              <div className="text-sm font-medium text-white">Your plan: {planLabel}</div>
+              <div className="text-sm font-medium text-white">Workspace plan: {planLabel}</div>
               <div className="mt-1 text-sm text-white/65">
                 {homeData.planId === "pro"
                   ? "You have access to higher limits and stronger sharing controls."
                   : "Upgrade when you want more room, stricter presets, and richer insight."}
               </div>
               {homeData.planId !== "pro" ? (
-                <Link href="/admin/upgrade" className="btn-base btn-secondary mt-3 inline-flex rounded-xl px-3 py-2 text-sm">
-                  See upgrade options
+                <Link href="/admin/billing?tab=plan" className="btn-base btn-secondary mt-3 inline-flex rounded-xl px-3 py-2 text-sm">
+                  Review plan
                 </Link>
               ) : null}
             </div>
@@ -194,14 +187,14 @@ export default async function AdminDashboardPage({
         <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
           <div>
             <div className="text-xs uppercase tracking-[0.16em] text-white/45">Start here</div>
-            <h2 className="mt-2 text-xl font-semibold text-white">Upload a file</h2>
+            <h2 className="mt-2 text-xl font-semibold text-white">Upload a document</h2>
             <p className="mt-2 max-w-2xl text-sm text-white/65">
-              Upload is the first step. The scan runs automatically, and the files page will guide you when a link is ready to create.
+              Upload is the first step. The scan runs automatically, and the documents page will guide you when a link is ready to create.
             </p>
           </div>
           {fromCreateLink ? (
             <div className="rounded-2xl border border-cyan-400/25 bg-cyan-400/10 px-4 py-3 text-sm text-cyan-100">
-              Upload a file first, then create its protected link from Files.
+              Upload a document first, then create its protected link from Documents.
             </div>
           ) : null}
         </div>
@@ -213,18 +206,18 @@ export default async function AdminDashboardPage({
           <div className="flex items-center justify-between gap-3">
             <div>
               <div className="text-xs uppercase tracking-[0.16em] text-white/45">Next best action</div>
-              <h2 className="mt-2 text-xl font-semibold text-white">Files that are ready to share</h2>
+              <h2 className="mt-2 text-xl font-semibold text-white">Documents that are ready to share</h2>
             </div>
             <Link href="/admin/documents" className="btn-base btn-secondary rounded-xl px-3 py-2 text-sm">
-              Open files
+              Open documents
             </Link>
           </div>
 
           {docsData.unifiedRows.length === 0 ? (
             <div className="mt-4 rounded-2xl border border-dashed border-white/16 bg-white/[0.03] p-6 text-center">
-              <div className="text-lg font-semibold text-white">Your workspace is ready for the first file.</div>
+              <div className="text-lg font-semibold text-white">Your workspace is ready for the first document.</div>
               <div className="mt-2 text-sm text-white/65">
-                Upload one file and DocLinks will guide you from scan to protected sharing.
+                Upload one document and DocLinks will guide you from scan to protected sharing.
               </div>
             </div>
           ) : readyWithoutLinks.length > 0 ? (
@@ -233,7 +226,7 @@ export default async function AdminDashboardPage({
                 <div key={row.doc_id} className="rounded-2xl border border-emerald-400/20 bg-emerald-400/[0.07] p-4">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
-                      <div className="text-sm font-medium text-white">{row.doc_title || "Untitled file"}</div>
+                      <div className="text-sm font-medium text-white">{row.doc_title || "Untitled document"}</div>
                       <div className="mt-1 text-sm text-emerald-100/80">Scan complete. Ready for its first protected link.</div>
                     </div>
                     <Link
@@ -248,11 +241,11 @@ export default async function AdminDashboardPage({
             </div>
           ) : (
             <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.04] p-4">
-              <div className="text-sm font-medium text-white">No files are waiting on link creation right now.</div>
+              <div className="text-sm font-medium text-white">No documents are waiting on link creation right now.</div>
               <div className="mt-1 text-sm text-white/65">
                 {waitingDocs.length > 0
-                  ? `${fmtInt(waitingDocs.length)} file${waitingDocs.length === 1 ? "" : "s"} are still waiting for the scan to finish.`
-                  : "Your ready files already have links, or you can upload another file to share."}
+                  ? `${fmtInt(waitingDocs.length)} document${waitingDocs.length === 1 ? "" : "s"} are still waiting for the scan to finish.`
+                  : "Your ready documents already have links, or you can upload another document to share."}
               </div>
             </div>
           )}
@@ -264,7 +257,7 @@ export default async function AdminDashboardPage({
           <div className="mt-4 space-y-3">
             <div className="rounded-2xl border border-emerald-400/20 bg-emerald-400/[0.07] p-4">
               <div className="text-sm font-medium text-white">Ready to share</div>
-              <div className="mt-1 text-sm text-emerald-100/80">Files marked Ready have completed their scan.</div>
+              <div className="mt-1 text-sm text-emerald-100/80">Documents marked Ready have completed their scan.</div>
             </div>
             <div className="rounded-2xl border border-amber-400/20 bg-amber-400/[0.07] p-4">
               <div className="text-sm font-medium text-white">Waiting for scan</div>
@@ -272,7 +265,7 @@ export default async function AdminDashboardPage({
             </div>
             <div className="rounded-2xl border border-rose-400/20 bg-rose-400/[0.07] p-4">
               <div className="text-sm font-medium text-white">Blocked for safety</div>
-              <div className="mt-1 text-sm text-rose-100/80">Flagged files remain blocked so they cannot be shared accidentally.</div>
+              <div className="mt-1 text-sm text-rose-100/80">Flagged documents remain blocked so they cannot be shared accidentally.</div>
             </div>
           </div>
         </div>
@@ -282,11 +275,11 @@ export default async function AdminDashboardPage({
         <div className="glass-card-strong rounded-[28px] p-5">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <div className="text-xs uppercase tracking-[0.16em] text-white/45">Latest shared links</div>
+              <div className="text-xs uppercase tracking-[0.16em] text-white/45">Latest protected links</div>
               <h2 className="mt-2 text-xl font-semibold text-white">Links you can manage right away</h2>
             </div>
             <Link href="/admin/links" className="btn-base btn-secondary rounded-xl px-3 py-2 text-sm">
-              Open shared links
+              Open links
             </Link>
           </div>
 
@@ -296,12 +289,12 @@ export default async function AdminDashboardPage({
                 <div key={share.token} className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
-                      <div className="text-sm font-medium text-white">{share.doc_title || "Untitled file"}</div>
+                      <div className="text-sm font-medium text-white">{share.doc_title || "Untitled document"}</div>
                       <div className="mt-1 text-sm text-white/65">
                         {share.to_email ? `Shared with ${share.to_email}` : "Protected link ready to copy"} · Created {fmtDateTime(share.created_at)}
                       </div>
                     </div>
-                    <Link href={`/admin/links?shareQ=${encodeURIComponent(share.token)}`} className="btn-base btn-secondary rounded-xl px-3 py-2 text-sm">
+                    <Link href={`/admin/links/${encodeURIComponent(share.token)}`} className="btn-base btn-secondary rounded-xl px-3 py-2 text-sm">
                       Manage
                     </Link>
                   </div>
@@ -310,7 +303,7 @@ export default async function AdminDashboardPage({
             </div>
           ) : (
             <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.04] p-4 text-sm text-white/65">
-              No shared links yet. Upload a file, then create its first protected link from Files.
+              No protected links yet. Upload a document, then create its first protected link from Documents.
             </div>
           )}
         </div>
@@ -322,7 +315,7 @@ export default async function AdminDashboardPage({
               <h2 className="mt-2 text-xl font-semibold text-white">Where people are engaging</h2>
             </div>
             <Link href="/admin/activity" className="btn-base btn-secondary rounded-xl px-3 py-2 text-sm">
-              Open insights
+              Open activity
             </Link>
           </div>
 
@@ -332,7 +325,7 @@ export default async function AdminDashboardPage({
                 <div key={row.doc_id} className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
-                      <div className="text-sm font-medium text-white">{row.doc_title || "Untitled file"}</div>
+                      <div className="text-sm font-medium text-white">{row.doc_title || "Untitled document"}</div>
                       <div className="mt-1 text-sm text-white/65">
                         {fmtInt(row.views)} views · {fmtInt(row.unique_ips)} unique visitors · Last opened {fmtDateTime(row.last_view)}
                       </div>
@@ -346,7 +339,7 @@ export default async function AdminDashboardPage({
             </div>
           ) : (
             <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.04] p-4 text-sm text-white/65">
-              No one has opened a shared file yet. Once someone views a link, you will see it here.
+              No one has opened a shared document yet. Once someone views a link, you will see it here.
             </div>
           )}
         </div>

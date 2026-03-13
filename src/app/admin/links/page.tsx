@@ -50,7 +50,7 @@ export default async function AdminLinksPage() {
               <Link href="/admin/documents" className="btn-base btn-secondary rounded-2xl px-4 py-3 text-sm">
                 Open files
               </Link>
-              <Link href="/admin/dashboard?openPicker=1" className="btn-base btn-secondary rounded-2xl px-4 py-3 text-sm">
+              <Link href="/admin?openPicker=1" className="btn-base btn-secondary rounded-2xl px-4 py-3 text-sm">
                 Upload file
               </Link>
             </div>

@@ -453,7 +453,7 @@ export default function UnifiedDocsTableClient(props: {
                             </button>
                           ) : null}
                           <Link
-                            href={`/admin/links?shareQ=${encodeURIComponent(row.doc_title || row.doc_id)}`}
+                            href={row.latest_share_token ? `/admin/links/${encodeURIComponent(row.latest_share_token)}` : `/admin/links?shareQ=${encodeURIComponent(row.doc_title || row.doc_id)}`}
                             className="btn-base btn-secondary rounded-xl px-3 py-2 text-sm"
                           >
                             Manage links
@@ -696,7 +696,7 @@ export default function UnifiedDocsTableClient(props: {
                       ? "Blocked"
                       : "Needs review";
               const manageHref = row.latest_share_token
-                ? `/admin/links?shareQ=${encodeURIComponent(row.latest_share_token)}`
+                ? `/admin/links/${encodeURIComponent(row.latest_share_token)}`
                 : `/admin/links?shareQ=${encodeURIComponent(row.doc_title || row.doc_id)}`;
 
               return (
@@ -723,7 +723,7 @@ export default function UnifiedDocsTableClient(props: {
 
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-2">
-                            <Link href={`/admin/docs/${row.doc_id}`} className="truncate text-lg font-semibold text-white hover:text-cyan-100">
+                            <Link href={`/admin/documents/${row.doc_id}`} className="truncate text-lg font-semibold text-white hover:text-cyan-100">
                               {row.doc_title || "Untitled document"}
                             </Link>
                             <span className={`rounded-full border px-2.5 py-1 text-[11px] ${toneClass(docStatus.tone)}`}>
@@ -836,7 +836,7 @@ export default function UnifiedDocsTableClient(props: {
                       <Link href={manageHref} className="btn-base btn-secondary rounded-2xl px-4 py-3 text-center text-sm">
                         Manage links
                       </Link>
-                      <Link href={`/admin/docs/${row.doc_id}`} className="btn-base btn-secondary rounded-2xl px-4 py-3 text-center text-sm">
+                      <Link href={`/admin/documents/${row.doc_id}`} className="btn-base btn-secondary rounded-2xl px-4 py-3 text-center text-sm">
                         View details
                       </Link>
 

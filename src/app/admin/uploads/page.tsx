@@ -96,7 +96,7 @@ export default async function AdminUploadsPage({
               <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-rose-100/90">
                 {failedRows.slice(0, 8).map((r) => (
                   <li key={r.doc_id}>
-                    <Link href={`/admin/docs/${encodeURIComponent(r.doc_id)}`} className="underline hover:text-white">
+                    <Link href={`/admin/documents/${encodeURIComponent(r.doc_id)}`} className="underline hover:text-white">
                       {r.doc_title || "Untitled file"}
                     </Link>
                   </li>

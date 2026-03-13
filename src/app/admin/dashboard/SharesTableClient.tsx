@@ -284,7 +284,7 @@ export default function SharesTableClient(props: { shares: ShareRow[]; nowTs: nu
                 <Link href="/admin/documents" className="btn-base rounded-xl border border-cyan-300/40 bg-cyan-300 px-4 py-2 text-sm font-semibold text-[#07131f] hover:bg-cyan-200">
                   Open files
                 </Link>
-                <Link href="/admin/dashboard?openPicker=1" className="btn-base btn-secondary rounded-xl px-4 py-2 text-sm">
+                <Link href="/admin?openPicker=1" className="btn-base btn-secondary rounded-xl px-4 py-2 text-sm">
                   Upload file
                 </Link>
               </div>
@@ -413,8 +413,8 @@ export default function SharesTableClient(props: { shares: ShareRow[]; nowTs: nu
                       >
                         Open link
                       </Link>
-                      <Link href={`/admin/documents`} className="btn-base btn-secondary rounded-2xl px-4 py-3 text-center text-sm">
-                        Open file
+                      <Link href={`/admin/links/${encodeURIComponent(share.token)}`} className="btn-base btn-secondary rounded-2xl px-4 py-3 text-center text-sm">
+                        Link detail
                       </Link>
                       <RevokeShareForm
                         token={share.token}

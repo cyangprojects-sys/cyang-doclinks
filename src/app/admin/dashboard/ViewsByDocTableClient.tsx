@@ -183,7 +183,7 @@ export default function ViewsByDocTableClient(props: { rows: ViewsByDocRow[]; ca
   const quietCount = counts.quiet;
 
   async function copyLink(row: ViewsByDocRow) {
-    const href = row.alias ? `${window.location.origin}/d/${encodeURIComponent(row.alias)}` : `${window.location.origin}/admin/docs/${encodeURIComponent(row.doc_id)}`;
+    const href = row.alias ? `${window.location.origin}/d/${encodeURIComponent(row.alias)}` : `${window.location.origin}/admin/documents/${encodeURIComponent(row.doc_id)}`;
     await navigator.clipboard.writeText(href);
     setCopiedId(row.doc_id);
   }
@@ -326,7 +326,7 @@ export default function ViewsByDocTableClient(props: { rows: ViewsByDocRow[]; ca
             </p>
             <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
               <Link
-                href="/admin/dashboard?openPicker=1"
+                href="/admin?openPicker=1"
                 className="btn-base rounded-2xl border border-cyan-300/45 bg-cyan-300 px-5 py-3 text-sm font-semibold text-[#07131f] shadow-[0_14px_32px_rgba(34,211,238,0.18)] hover:bg-cyan-200"
               >
                 Upload file
@@ -405,7 +405,7 @@ export default function ViewsByDocTableClient(props: { rows: ViewsByDocRow[]; ca
 
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
-                          <Link href={`/admin/docs/${row.doc_id}`} className="truncate text-lg font-semibold text-white hover:text-cyan-100">
+                          <Link href={`/admin/documents/${row.doc_id}`} className="truncate text-lg font-semibold text-white hover:text-cyan-100">
                             {row.doc_title || "Untitled file"}
                           </Link>
                           <span className={`rounded-full border px-2.5 py-1 text-[11px] ${statusToneClass}`}>{statusLabel}</span>

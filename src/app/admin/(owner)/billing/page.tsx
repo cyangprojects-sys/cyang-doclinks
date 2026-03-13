@@ -12,6 +12,8 @@ import {
 } from "@/lib/monetization";
 import { getActiveViewLimitOverride } from "@/lib/viewLimitOverride";
 import { classifyBillingEntitlement, getBillingSnapshotForUser } from "@/lib/billingSubscription";
+import StripeBillingPage from "./stripe/page";
+import { AdminPageIntro, AdminTabs } from "../../_components/AdminPagePrimitives";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -66,7 +68,7 @@ function fmtBytes(value: number): string {
 export default async function BillingSettingsPage({
   searchParams,
 }: {
-  searchParams?: { saved?: string; error?: string; checkout?: string };
+  searchParams?: { saved?: string; error?: string; checkout?: string; tab?: string };
 }) {
   noStore();
 
@@ -94,16 +96,37 @@ export default async function BillingSettingsPage({
 
   const saved = searchParams?.saved === "1";
   const error = searchParams?.error ? decodeURIComponent(searchParams.error) : null;
+  const currentTab = String(searchParams?.tab || "plan");
+
+  const tabs = [
+    { key: "plan", label: "Plan", href: "/admin/billing?tab=plan" },
+    { key: "usage", label: "Usage", href: "/admin/billing?tab=usage" },
+    { key: "invoices", label: "Invoices", href: "/admin/billing?tab=invoices" },
+    { key: "billing-ops", label: "Billing Ops", href: "/admin/billing?tab=billing-ops" },
+  ];
+
+  if (currentTab === "billing-ops") {
+    return (
+      <div className="space-y-6">
+        <AdminPageIntro
+          eyebrow="Billing & Plan"
+          title="Review subscription health, usage pressure, and billing operations."
+          description="Keep the commercial side of the workspace in one place: plan posture, usage guardrails, invoice health, and the Stripe diagnostics owners use when billing needs intervention."
+        />
+        <AdminTabs tabs={tabs} current={currentTab} />
+        <StripeBillingPage />
+      </div>
+    );
+  }
 
   return (
-    <div className="w-full space-y-4 text-white">
-      <div className="mb-6">
-        <h1 className="text-3xl font-semibold tracking-tight">Billing & Monetization</h1>
-        <p className="mt-2 text-sm text-white/65">
-          Owner-only runtime flags backed by <span className="font-mono text-xs">public.app_settings</span>.
-          These toggle enforcement and UI visibility without a redeploy.
-        </p>
-      </div>
+    <div className="w-full space-y-6 text-white">
+      <AdminPageIntro
+        eyebrow="Billing & Plan"
+        title="Review subscription health, usage pressure, and billing operations."
+        description="Keep the commercial side of the workspace in one place: plan posture, usage guardrails, invoice health, and the Stripe diagnostics owners use when billing needs intervention."
+      />
+      <AdminTabs tabs={tabs} current={tabs.some((tab) => tab.key === currentTab) ? currentTab : "plan"} />
 
       {(saved || error) && (
         <div
