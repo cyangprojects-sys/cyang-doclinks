@@ -166,52 +166,116 @@ export async function getDashboardDocumentsData(u: AuthedUser) {
 
   if (ctx.hasDocs) {
     try {
+      const aliasJoin = ctx.hasDocAliases
+        ? sql`
+            left join lateral (
+              select
+                da.alias,
+                da.expires_at,
+                da.is_active,
+                da.revoked_at
+              from public.doc_aliases da
+              where da.doc_id = d.id
+              order by da.created_at desc nulls last
+              limit 1
+            ) a on true
+          `
+        : sql`
+            left join lateral (
+              select
+                null::text as alias,
+                null::timestamptz as expires_at,
+                null::boolean as is_active,
+                null::timestamptz as revoked_at
+            ) a on true
+          `;
+      const viewsJoin = ctx.hasDocViews
+        ? sql`
+            left join lateral (
+              select
+                count(*)::int as total_views,
+                max(vv.created_at) as last_view
+              from public.doc_views vv
+              where vv.doc_id = d.id
+            ) v on true
+          `
+        : sql`
+            left join lateral (
+              select
+                0::int as total_views,
+                null::timestamptz as last_view
+            ) v on true
+          `;
+      const shareCountJoin = ctx.hasShareTokens
+        ? sql`
+            left join lateral (
+              select
+                count(*)::int as active_shares
+              from public.share_tokens st
+              where st.doc_id = d.id
+                and st.revoked_at is null
+                and (st.expires_at is null or st.expires_at > now())
+                and (
+                  st.max_views is null
+                  or st.max_views = 0
+                  or coalesce(st.views_count, 0) < st.max_views
+                )
+            ) s on true
+          `
+        : sql`
+            left join lateral (
+              select 0::int as active_shares
+            ) s on true
+          `;
+      const latestShareJoin = ctx.hasShareTokens
+        ? sql`
+            left join lateral (
+              select
+                st.token,
+                st.created_at
+              from public.share_tokens st
+              where st.doc_id = d.id
+                and st.revoked_at is null
+                and (st.expires_at is null or st.expires_at > now())
+                and (
+                  st.max_views is null
+                  or st.max_views = 0
+                  or coalesce(st.views_count, 0) < st.max_views
+                )
+              order by st.created_at desc nulls last
+              limit 1
+            ) ls on true
+          `
+        : sql`
+            left join lateral (
+              select
+                null::text as token,
+                null::timestamptz as created_at
+            ) ls on true
+          `;
+
       unifiedRows = (await sql`
         select
           d.id::text as doc_id,
           d.title::text as doc_title,
           coalesce(d.status::text, 'ready') as doc_state,
+          d.created_at::text as created_at,
           a.alias::text as alias,
           coalesce(d.scan_status::text, 'unscanned') as scan_status,
           coalesce(d.moderation_status::text, 'active') as moderation_status,
           coalesce(v.total_views, 0)::int as total_views,
           v.last_view::text as last_view,
           coalesce(s.active_shares, 0)::int as active_shares,
+          ls.token::text as latest_share_token,
+          ls.created_at::text as latest_share_created_at,
           a.expires_at::text as alias_expires_at,
           a.is_active as alias_is_active,
           a.revoked_at::text as alias_revoked_at
         from public.docs d
-        left join lateral (
-          select
-            da.alias,
-            da.expires_at,
-            da.is_active,
-            da.revoked_at
-          from public.doc_aliases da
-          where da.doc_id = d.id
-          order by da.created_at desc nulls last
-          limit 1
-        ) a on true
-        left join lateral (
-          select
-            count(*)::int as total_views,
-            max(vv.created_at) as last_view
-          from public.doc_views vv
-          where vv.doc_id = d.id
-        ) v on true
-        left join lateral (
-          select
-            count(*)::int as active_shares
-          from public.share_tokens st
-          where st.doc_id = d.id
-            and st.revoked_at is null
-            and (st.expires_at is null or st.expires_at > now())
-            and (
-              st.max_views is null
-              or st.max_views = 0
-              or coalesce(st.views_count, 0) < st.max_views
-            )
-        ) s on true
+        ${aliasJoin}
+        ${viewsJoin}
+        ${shareCountJoin}
+        ${latestShareJoin}
         where 1=1
           and lower(coalesce(d.status::text, 'ready')) <> 'deleted'
           ${ctx.docFilter}

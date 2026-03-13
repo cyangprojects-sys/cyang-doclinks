@@ -8,13 +8,21 @@ export default function DeleteDocForm({
   docId,
   title,
   action,
+  label = "Delete",
+  variant = "danger",
 }: {
   docId: string;
   title: string;
   action: (formData: FormData) => Promise<void>;
+  label?: string;
+  variant?: "danger" | "subtle";
 }) {
   const [pending, setPending] = useState(false);
   const router = useRouter();
+  const buttonClass =
+    variant === "subtle"
+      ? "rounded-lg border border-white/10 bg-transparent px-3 py-1.5 text-xs text-white/55 hover:border-white/20 hover:bg-white/5 hover:text-white"
+      : "btn-base btn-danger rounded-lg px-3 py-1.5 text-xs";
 
   return (
     <form
@@ -38,10 +46,10 @@ export default function DeleteDocForm({
         type="submit"
         aria-label={`Delete document ${title}`}
         disabled={pending}
-        className="btn-base btn-danger rounded-lg px-3 py-1.5 text-xs disabled:cursor-not-allowed disabled:opacity-60"
+        className={`${buttonClass} disabled:cursor-not-allowed disabled:opacity-60`}
         title="Delete document"
       >
-        {pending ? "Deleting..." : "Delete"}
+        {pending ? "Deleting..." : label}
       </button>
     </form>
   );

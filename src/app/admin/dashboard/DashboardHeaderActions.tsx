@@ -91,7 +91,13 @@ const PRESET_OPTIONS: readonly ModalPreset[] = [
   },
 ];
 
-export default function DashboardHeaderActions(props: { docs: DocOption[]; planId: string }) {
+export default function DashboardHeaderActions(props: {
+  docs: DocOption[];
+  planId: string;
+  mode?: "default" | "modal-only";
+  uploadPickerHref?: string;
+  createLinkFallbackHref?: string;
+}) {
   const router = useRouter();
   const pathname = usePathname();
   const sp = useSearchParams();
@@ -106,6 +112,7 @@ export default function DashboardHeaderActions(props: { docs: DocOption[]; planI
   const [createdUrl, setCreatedUrl] = useState<string | null>(null);
   const [shareWarning, setShareWarning] = useState<string | null>(null);
   const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
+  const mode = props.mode ?? "default";
 
   function clearCreateParams() {
     const params = new URLSearchParams(sp.toString());
@@ -144,7 +151,8 @@ export default function DashboardHeaderActions(props: { docs: DocOption[]; planI
       return d.eligibility.canCreateLink && docState === "READY" && scanState === "CLEAN";
     });
   }, [docsWithStatus]);
-  const createLinkUploadHref = "/admin/uploads?openPicker=1&fromCreateLink=1";
+  const uploadPickerHref = props.uploadPickerHref ?? "/admin/uploads?openPicker=1";
+  const createLinkUploadHref = props.createLinkFallbackHref ?? "/admin/uploads?openPicker=1&fromCreateLink=1";
 
   useEffect(() => {
     if (!docsWithStatus.length) {
@@ -302,25 +310,27 @@ export default function DashboardHeaderActions(props: { docs: DocOption[]; planI
 
   return (
     <>
-      <div className="flex w-full flex-wrap items-center justify-center gap-2">
-        <button
-          type="button"
-          onClick={onPrimaryCreateClick}
-          className="btn-base h-[56px] w-[220px] rounded-lg border border-cyan-300/45 bg-cyan-400 px-4 py-2 text-sm font-semibold text-[#04111e] shadow-[0_6px_20px_rgba(34,211,238,0.28)] hover:bg-cyan-300"
-        >
-          <span className="flex flex-col items-start leading-tight">
-            <span>{hasAnyDocs ? "Create protected link" : "Upload a document"}</span>
-            <span className={`text-[11px] font-medium text-[#0f2a3a]/80 ${hasAnyDocs ? "invisible" : ""}`}>then create a link</span>
-          </span>
-        </button>
-        <button
-          type="button"
-          onClick={() => router.push("/admin/uploads?openPicker=1")}
-          className="btn-base h-[56px] w-[220px] rounded-lg border border-amber-300/45 bg-amber-300/18 px-3.5 py-2 text-sm font-medium text-amber-50 shadow-[0_5px_14px_rgba(251,191,36,0.18)] hover:bg-amber-300/24"
-        >
-          Upload document
-        </button>
-      </div>
+      {mode === "default" ? (
+        <div className="flex w-full flex-wrap items-center justify-center gap-2">
+          <button
+            type="button"
+            onClick={onPrimaryCreateClick}
+            className="btn-base h-[56px] w-[220px] rounded-lg border border-cyan-300/45 bg-cyan-400 px-4 py-2 text-sm font-semibold text-[#04111e] shadow-[0_6px_20px_rgba(34,211,238,0.28)] hover:bg-cyan-300"
+          >
+            <span className="flex flex-col items-start leading-tight">
+              <span>{hasAnyDocs ? "Create protected link" : "Upload a document"}</span>
+              <span className={`text-[11px] font-medium text-[#0f2a3a]/80 ${hasAnyDocs ? "invisible" : ""}`}>then create a link</span>
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => router.push(uploadPickerHref)}
+            className="btn-base h-[56px] w-[220px] rounded-lg border border-amber-300/45 bg-amber-300/18 px-3.5 py-2 text-sm font-medium text-amber-50 shadow-[0_5px_14px_rgba(251,191,36,0.18)] hover:bg-amber-300/24"
+          >
+            Upload document
+          </button>
+        </div>
+      ) : null}
 
       {open ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
