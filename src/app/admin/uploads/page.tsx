@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { requireUser } from "@/lib/authz";
+import { requireRole } from "@/lib/authz";
 import DashboardHeaderActions from "@/app/admin/dashboard/DashboardHeaderActions";
 import UploadPanel from "@/app/admin/dashboard/UploadPanel";
 import { getDashboardDocumentsData } from "@/app/admin/dashboard/data";
@@ -18,19 +18,9 @@ export default async function AdminUploadsPage({
 }) {
   let u;
   try {
-    u = await requireUser();
+    u = await requireRole("admin");
   } catch {
-    redirect("/api/auth/signin");
-  }
-
-  const role = String(u.role || "").trim().toLowerCase();
-  if (!["owner", "admin"].includes(role)) {
-    const params = await searchParams;
-    const next = new URLSearchParams();
-    if (String(params?.openPicker || "") === "1") next.set("openPicker", "1");
-    if (String(params?.fromCreateLink || "") === "1") next.set("fromCreateLink", "1");
-    const qs = next.toString();
-    redirect(`/admin/dashboard${qs ? `?${qs}` : ""}`);
+    redirect("/");
   }
 
   const data = await getDashboardDocumentsData(u);
@@ -41,7 +31,7 @@ export default async function AdminUploadsPage({
   const showFailed = show === "failed";
   const reportedFailureCountRaw = Number(params?.count || "0");
   const reportedFailureCount = Number.isFinite(reportedFailureCountRaw) && reportedFailureCountRaw > 0 ? Math.floor(reportedFailureCountRaw) : 0;
-  const canSeeAllFailures = ["owner", "admin"].includes(String(u.role || "").trim().toLowerCase());
+  const canSeeAllFailures = true;
   const headerDocs = data.unifiedRows.map((r) => ({
     docId: r.doc_id,
     title: r.doc_title || "Untitled file",

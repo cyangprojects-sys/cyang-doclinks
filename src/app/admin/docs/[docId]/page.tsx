@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
 import { sql } from "@/lib/db";
-import { requireUser, roleAtLeast } from "@/lib/authz";
+import { requireRole, roleAtLeast } from "@/lib/authz";
 import Sparkline from "@/components/Sparkline";
 import {
   createOrAssignAliasAction,
@@ -71,9 +71,9 @@ export default async function AdminDocDetailPage({
 }) {
   let u;
   try {
-    u = await requireUser();
+    u = await requireRole("admin");
   } catch {
-    redirect("/api/auth/signin");
+    redirect("/");
   }
 
   const resolvedParams = await Promise.resolve(params);

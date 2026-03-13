@@ -10,10 +10,10 @@ import { getAdminShellContext } from "./_components/adminShellData";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-type AdminRole = "viewer" | "admin" | "owner";
+type AdminRole = "admin" | "owner";
 
 function isAdminRole(role: string | undefined): role is AdminRole {
-  return role === "viewer" || role === "admin" || role === "owner";
+  return role === "admin" || role === "owner";
 }
 
 export default async function AdminLayout({
@@ -27,7 +27,7 @@ export default async function AdminLayout({
   if (!session?.user) redirect("/signin");
 
   const rawRole = (session.user as { role?: string })?.role;
-  if (!isAdminRole(rawRole)) redirect("/signin");
+  if (!isAdminRole(rawRole)) redirect("/");
   const role = rawRole;
   const isOwner = role === "owner";
   const email = String(session.user.email || "").trim().toLowerCase();

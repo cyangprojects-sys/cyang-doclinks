@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { requireUser } from "@/lib/authz";
+import { requireRole } from "@/lib/authz";
 import DashboardHeaderActions from "@/app/admin/dashboard/DashboardHeaderActions";
 import ViewsByDocTableClient from "@/app/admin/dashboard/ViewsByDocTableClient";
 import { getDashboardActivityData, getDashboardHomeData } from "@/app/admin/dashboard/data";
@@ -20,9 +20,9 @@ function fmtInt(n: number) {
 export default async function AdminActivityPage() {
   let user;
   try {
-    user = await requireUser();
+    user = await requireRole("admin");
   } catch {
-    redirect("/api/auth/signin");
+    redirect("/");
   }
 
   const [activityData, homeData] = await Promise.all([getDashboardActivityData(user), getDashboardHomeData(user)]);

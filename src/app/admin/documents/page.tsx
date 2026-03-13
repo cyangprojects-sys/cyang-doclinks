@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { requireUser } from "@/lib/authz";
+import { requireRole } from "@/lib/authz";
 import DashboardHeaderActions from "@/app/admin/dashboard/DashboardHeaderActions";
 import UploadPanel from "@/app/admin/dashboard/UploadPanel";
 import UnifiedDocsTableClient from "@/app/admin/dashboard/UnifiedDocsTableClient";
@@ -18,9 +18,9 @@ export default async function AdminDocumentsPage({
 }) {
   let u;
   try {
-    u = await requireUser();
+    u = await requireRole("admin");
   } catch {
-    redirect("/api/auth/signin");
+    redirect("/");
   }
 
   const data = await getDashboardDocumentsData(u);

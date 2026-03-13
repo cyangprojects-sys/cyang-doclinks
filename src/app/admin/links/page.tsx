@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { requireUser } from "@/lib/authz";
+import { requireRole } from "@/lib/authz";
 import DashboardHeaderActions from "@/app/admin/dashboard/DashboardHeaderActions";
 import SharesTableClient from "@/app/admin/dashboard/SharesTableClient";
 import { getDashboardLinksData, getDashboardHomeData } from "@/app/admin/dashboard/data";
@@ -12,9 +12,9 @@ export const revalidate = 0;
 export default async function AdminLinksPage() {
   let user;
   try {
-    user = await requireUser();
+    user = await requireRole("admin");
   } catch {
-    redirect("/api/auth/signin");
+    redirect("/");
   }
 
   const [linksData, homeData] = await Promise.all([getDashboardLinksData(user), getDashboardHomeData(user)]);

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { requireUser } from "@/lib/authz";
+import { requireRole } from "@/lib/authz";
 import DashboardHeaderActions from "./DashboardHeaderActions";
 import UploadPanel from "./UploadPanel";
 import {
@@ -49,9 +49,9 @@ export default async function AdminDashboardPage({
 }) {
   let user;
   try {
-    user = await requireUser();
+    user = await requireRole("admin");
   } catch {
-    redirect("/api/auth/signin");
+    redirect("/");
   }
 
   const [params, homeData, docsData, linksData, activityData] = await Promise.all([
