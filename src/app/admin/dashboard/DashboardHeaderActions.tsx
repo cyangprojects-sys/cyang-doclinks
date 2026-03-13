@@ -151,8 +151,8 @@ export default function DashboardHeaderActions(props: {
       return d.eligibility.canCreateLink && docState === "READY" && scanState === "CLEAN";
     });
   }, [docsWithStatus]);
-  const uploadPickerHref = props.uploadPickerHref ?? "/admin/uploads?openPicker=1";
-  const createLinkUploadHref = props.createLinkFallbackHref ?? "/admin/uploads?openPicker=1&fromCreateLink=1";
+  const uploadPickerHref = props.uploadPickerHref ?? "/admin/dashboard?openPicker=1";
+  const createLinkUploadHref = props.createLinkFallbackHref ?? "/admin/dashboard?openPicker=1&fromCreateLink=1";
 
   useEffect(() => {
     if (!docsWithStatus.length) {
@@ -230,12 +230,12 @@ export default function DashboardHeaderActions(props: {
   async function onCreateLink() {
     setErr(null);
     if (!selectedDocId) {
-      setErr("Pick a document first.");
+      setErr("Pick a file first.");
       return;
     }
     const selectedDoc = docsWithStatus.find((d) => d.docId === selectedDocId);
     if (!selectedDoc) {
-      setErr("Document not found.");
+      setErr("File not found.");
       return;
     }
     if (!selectedDoc.canCreateNow) {
@@ -303,7 +303,7 @@ export default function DashboardHeaderActions(props: {
   function onSendEmail() {
     if (!createdUrl) return;
     const to = encodeURIComponent(sendToEmail.trim());
-    const subject = encodeURIComponent("Protected document link");
+    const subject = encodeURIComponent("Protected file link");
     const body = encodeURIComponent(`Here is your protected link:\n\n${createdUrl}`);
     window.location.href = `mailto:${to}?subject=${subject}&body=${body}`;
   }
@@ -318,7 +318,7 @@ export default function DashboardHeaderActions(props: {
             className="btn-base h-[56px] w-[220px] rounded-lg border border-cyan-300/45 bg-cyan-400 px-4 py-2 text-sm font-semibold text-[#04111e] shadow-[0_6px_20px_rgba(34,211,238,0.28)] hover:bg-cyan-300"
           >
             <span className="flex flex-col items-start leading-tight">
-              <span>{hasAnyDocs ? "Create protected link" : "Upload a document"}</span>
+              <span>{hasAnyDocs ? "Create protected link" : "Upload a file"}</span>
               <span className={`text-[11px] font-medium text-[#0f2a3a]/80 ${hasAnyDocs ? "invisible" : ""}`}>then create a link</span>
             </span>
           </button>
@@ -327,7 +327,7 @@ export default function DashboardHeaderActions(props: {
             onClick={() => router.push(uploadPickerHref)}
             className="btn-base h-[56px] w-[220px] rounded-lg border border-amber-300/45 bg-amber-300/18 px-3.5 py-2 text-sm font-medium text-amber-50 shadow-[0_5px_14px_rgba(251,191,36,0.18)] hover:bg-amber-300/24"
           >
-            Upload document
+            Upload file
           </button>
         </div>
       ) : null}
@@ -338,7 +338,7 @@ export default function DashboardHeaderActions(props: {
             <div className="flex items-center justify-between gap-3">
               <div>
                 <h3 className="text-lg font-semibold text-white">Create protected link</h3>
-                <p className="mt-1 text-xs text-white/60">Choose document, choose preset, create and share.</p>
+                <p className="mt-1 text-xs text-white/60">Choose a file, choose a preset, create the link, then share it.</p>
               </div>
               <button
                 type="button"
@@ -356,11 +356,11 @@ export default function DashboardHeaderActions(props: {
               <div className="mt-4 space-y-4">
                 <div>
                   <div className="text-xs font-semibold uppercase tracking-[0.12em] text-white/60">Step 1</div>
-                  <label className="mt-2 block text-sm text-white/80">Choose document</label>
+                  <label className="mt-2 block text-sm text-white/80">Choose file</label>
                   <input
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
-                    placeholder="Search by name..."
+                    placeholder="Search by file name..."
                     className="mt-1 w-full rounded-lg border border-white/20 bg-black/25 px-3 py-2 text-sm text-white placeholder:text-white/45"
                   />
                   <select

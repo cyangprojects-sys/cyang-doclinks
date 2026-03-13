@@ -29,7 +29,7 @@ export default async function AdminDocumentsPage({
   const fromCreateLink = String(params?.fromCreateLink || "") === "1";
   const headerDocs = data.unifiedRows.map((r) => ({
     docId: r.doc_id,
-    title: r.doc_title || "Untitled document",
+    title: r.doc_title || "Untitled file",
     docState: r.doc_state,
     scanState: r.scan_status,
     moderationStatus: r.moderation_status,
@@ -55,9 +55,9 @@ export default async function AdminDocumentsPage({
         <div className="grid gap-6 xl:grid-cols-[1.3fr_minmax(0,0.9fr)]">
           <div className="space-y-5">
             <div>
-              <div className="text-xs uppercase tracking-[0.2em] text-cyan-200/70">Secure document sharing</div>
+              <div className="text-xs uppercase tracking-[0.2em] text-cyan-200/70">Secure file sharing</div>
               <h1 className="mt-3 max-w-3xl text-3xl font-semibold tracking-tight text-white sm:text-4xl">
-                Upload a document, create its protected link, and share it with confidence.
+                Upload a file, create its protected link, and share it with confidence.
               </h1>
               <p className="mt-3 max-w-2xl text-sm leading-6 text-white/68 sm:text-base">
                 DocLinks keeps the flow obvious for everyday customers: upload first, wait for the security scan, then copy a protected link when the file is ready.
@@ -67,7 +67,7 @@ export default async function AdminDocumentsPage({
             <div className="grid gap-3 md:grid-cols-3">
               <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
                 <div className="text-xs uppercase tracking-[0.16em] text-white/45">Step 1</div>
-                <div className="mt-2 text-base font-semibold text-white">Upload document</div>
+                <div className="mt-2 text-base font-semibold text-white">Upload file</div>
                 <div className="mt-1 text-sm text-white/60">Add a file from your device.</div>
               </div>
               <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
@@ -87,7 +87,7 @@ export default async function AdminDocumentsPage({
                 href="/admin/documents?openPicker=1"
                 className="btn-base rounded-2xl border border-cyan-300/45 bg-cyan-300 px-5 py-3 text-sm font-semibold text-[#07131f] shadow-[0_14px_32px_rgba(34,211,238,0.18)] hover:bg-cyan-200"
               >
-                Upload document
+                Upload file
               </Link>
               <Link href="/admin/links" className="btn-base btn-secondary rounded-2xl px-4 py-3 text-sm">
                 Manage active links
@@ -118,7 +118,7 @@ export default async function AdminDocumentsPage({
 
       {data.missingCoreTables ? (
         <div className="rounded-lg border border-neutral-800 bg-neutral-950 p-4 text-sm text-neutral-300">
-          <div className="font-medium text-neutral-100">Documents unavailable</div>
+          <div className="font-medium text-neutral-100">Files unavailable</div>
           <div className="mt-1 text-neutral-400">The `public.docs` table is missing.</div>
         </div>
       ) : (
@@ -127,14 +127,14 @@ export default async function AdminDocumentsPage({
             <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
               <div>
                 <div className="text-xs uppercase tracking-[0.18em] text-white/45">Step 1</div>
-                <h2 className="mt-2 text-xl font-semibold text-white">Upload document</h2>
+                <h2 className="mt-2 text-xl font-semibold text-white">Upload file</h2>
                 <p className="mt-2 max-w-2xl text-sm text-white/65">
-                  Start here. When a file is clean, the document list below will guide you to create its protected link.
+                  Start here. When a file is clean, the library below will guide you to create its protected link.
                 </p>
               </div>
               {fromCreateLink ? (
                 <div className="rounded-2xl border border-cyan-400/25 bg-cyan-400/10 px-4 py-3 text-sm text-cyan-100">
-                  Upload a file first, then create its protected link from the document list.
+                  Upload a file first, then create its protected link from the file list.
                 </div>
               ) : null}
             </div>

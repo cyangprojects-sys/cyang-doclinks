@@ -499,9 +499,9 @@ export default function UploadPanel({
     <div className="rounded-xl border border-white/10 bg-white/5 p-5">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold">Upload Documents</h2>
+          <h2 className="text-lg font-semibold">Upload files</h2>
           <p className="mt-1 text-sm text-white/60">
-            Drag and drop one or more supported files. Document title is set from filename by default.
+            Drag and drop one or more supported files. File names are used as titles by default.
           </p>
           <p className="mt-2 text-xs leading-relaxed text-white/60">
             Allowed types: {allowedTypeSummary}

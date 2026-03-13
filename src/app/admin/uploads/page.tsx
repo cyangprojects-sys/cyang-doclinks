@@ -23,6 +23,16 @@ export default async function AdminUploadsPage({
     redirect("/api/auth/signin");
   }
 
+  const role = String(u.role || "").trim().toLowerCase();
+  if (!["owner", "admin"].includes(role)) {
+    const params = await searchParams;
+    const next = new URLSearchParams();
+    if (String(params?.openPicker || "") === "1") next.set("openPicker", "1");
+    if (String(params?.fromCreateLink || "") === "1") next.set("fromCreateLink", "1");
+    const qs = next.toString();
+    redirect(`/admin/dashboard${qs ? `?${qs}` : ""}`);
+  }
+
   const data = await getDashboardDocumentsData(u);
   const params = await searchParams;
   const autoOpenPicker = String(params?.openPicker || "") === "1";
@@ -34,7 +44,7 @@ export default async function AdminUploadsPage({
   const canSeeAllFailures = ["owner", "admin"].includes(String(u.role || "").trim().toLowerCase());
   const headerDocs = data.unifiedRows.map((r) => ({
     docId: r.doc_id,
-    title: r.doc_title || "Untitled document",
+    title: r.doc_title || "Untitled file",
     docState: r.doc_state,
     scanState: r.scan_status,
     moderationStatus: r.moderation_status,
@@ -68,7 +78,7 @@ export default async function AdminUploadsPage({
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold">Uploads</h1>
-          <div className="mt-1 text-sm text-white/65">Upload documents, then share with a protected link.</div>
+          <div className="mt-1 text-sm text-white/65">Upload files, then move them into protected sharing.</div>
         </div>
         <DashboardHeaderActions docs={headerDocs} planId={data.planId} />
       </div>
@@ -76,7 +86,7 @@ export default async function AdminUploadsPage({
       <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
         {fromCreateLink ? (
           <div className="mb-3 rounded-lg border border-cyan-400/30 bg-cyan-500/10 px-3 py-2 text-sm text-cyan-100">
-            Upload a document to create your first protected link.
+            Upload a file to create your first protected link.
           </div>
         ) : null}
         {showFailed ? (
@@ -87,7 +97,7 @@ export default async function AdminUploadsPage({
                 {failedRows.slice(0, 8).map((r) => (
                   <li key={r.doc_id}>
                     <Link href={`/admin/docs/${encodeURIComponent(r.doc_id)}`} className="underline hover:text-white">
-                      {r.doc_title || "Untitled document"}
+                      {r.doc_title || "Untitled file"}
                     </Link>
                   </li>
                 ))}
@@ -111,7 +121,7 @@ export default async function AdminUploadsPage({
             )}
           </div>
         ) : null}
-        <div className="mb-3 text-sm text-white/75">Upload a document, then create a protected link in one flow.</div>
+        <div className="mb-3 text-sm text-white/75">Upload a file, then create a protected link in one flow.</div>
         <UploadPanel canCheckEncryptionStatus={data.canCheckEncryptionStatus} autoOpenPicker={autoOpenPicker} />
       </div>
     </div>

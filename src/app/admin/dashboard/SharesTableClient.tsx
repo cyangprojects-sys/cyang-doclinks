@@ -1,8 +1,7 @@
-// src/app/admin/dashboard/SharesTableClient.tsx
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import RevokeShareForm from "./RevokeShareForm";
 import SharePasswordForm from "./SharePasswordForm";
@@ -32,40 +31,60 @@ export type ShareRow = {
   has_password: boolean;
 };
 
-function fmtDate(s: string | null) {
-  if (!s) return "-";
-  const d = new Date(s);
-  if (Number.isNaN(d.getTime())) return s;
-  return d.toLocaleString();
-}
-
-function maxLabel(n: number | null) {
-  if (n === null) return "-";
-  if (n === 0) return "inf";
-  return String(n);
-}
-
 type Status = "all" | "active" | "expired" | "maxed" | "revoked";
 type StatusFilter = Status | "expiring";
 
-function computeStatus(s: ShareRow, nowTs: number): Exclude<Status, "all"> {
-  if (s.revoked_at) return "revoked";
-  if (s.expires_at && new Date(s.expires_at).getTime() <= nowTs) return "expired";
-  if (s.max_views != null && s.max_views !== 0 && s.view_count >= s.max_views) return "maxed";
+function formatDate(value: string | null) {
+  if (!value) return "No date";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString(undefined, { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
+}
+
+function formatShortDate(value: string | null) {
+  if (!value) return "No date";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+}
+
+function formatViews(maxViews: number | null, viewCount: number) {
+  if (maxViews == null) return `${viewCount} views`;
+  if (maxViews === 0) return `${viewCount} views`;
+  return `${viewCount} of ${maxViews} views`;
+}
+
+function computeStatus(share: ShareRow, nowTs: number): Exclude<Status, "all"> {
+  if (share.revoked_at) return "revoked";
+  if (share.expires_at && new Date(share.expires_at).getTime() <= nowTs) return "expired";
+  if (share.max_views != null && share.max_views !== 0 && share.view_count >= share.max_views) return "maxed";
   return "active";
 }
 
-function statusBadge(status: Exclude<Status, "all">) {
-  switch (status) {
-    case "revoked":
-      return { label: "Revoked", cls: "border-amber-500/25 bg-amber-500/10 text-amber-100" };
-    case "expired":
-      return { label: "Expired", cls: "border-rose-500/25 bg-rose-500/10 text-rose-100" };
-    case "maxed":
-      return { label: "Maxed", cls: "border-rose-500/25 bg-rose-500/10 text-rose-100" };
-    default:
-      return { label: "Active", cls: "border-emerald-500/25 bg-emerald-500/10 text-emerald-100" };
+function isExpiringSoon(share: ShareRow, nowTs: number) {
+  if (share.revoked_at || !share.expires_at) return false;
+  const exp = new Date(share.expires_at).getTime();
+  if (Number.isNaN(exp) || exp <= nowTs) return false;
+  return exp <= nowTs + 7 * 24 * 60 * 60 * 1000;
+}
+
+function statusBadge(status: Exclude<Status, "all">, expiringSoon: boolean) {
+  if (status === "active" && expiringSoon) {
+    return { label: "Expiring soon", cls: "border-amber-500/25 bg-amber-500/10 text-amber-100" };
   }
+  if (status === "revoked") return { label: "Access removed", cls: "border-white/15 bg-white/[0.05] text-white/70" };
+  if (status === "expired") return { label: "Expired", cls: "border-rose-500/25 bg-rose-500/10 text-rose-100" };
+  if (status === "maxed") return { label: "View limit reached", cls: "border-rose-500/25 bg-rose-500/10 text-rose-100" };
+  return { label: "Secure link active", cls: "border-emerald-500/25 bg-emerald-500/10 text-emerald-100" };
+}
+
+function buildFilterLabel(filter: StatusFilter, count: number) {
+  if (filter === "active") return `Active (${count})`;
+  if (filter === "expiring") return `Expiring soon (${count})`;
+  if (filter === "expired") return `Expired (${count})`;
+  if (filter === "maxed") return `View limit reached (${count})`;
+  if (filter === "revoked") return `Removed (${count})`;
+  return `All (${count})`;
 }
 
 export default function SharesTableClient(props: { shares: ShareRow[]; nowTs: number; canManageBulk?: boolean }) {
@@ -75,99 +94,76 @@ export default function SharesTableClient(props: { shares: ShareRow[]; nowTs: nu
   const canManageBulk = Boolean(props.canManageBulk);
 
   const [selected, setSelected] = useState<Record<string, boolean>>({});
+  const [copiedToken, setCopiedToken] = useState<string | null>(null);
 
   const q = (sp.get("shareQ") || "").trim();
   const status = (sp.get("shareStatus") || "all") as StatusFilter;
-  const nowTs = props.nowTs;
+  const normalizedQ = q.toLowerCase();
 
-  const normalizedQ = q.trim().toLowerCase();
-
-  const filtered = useMemo(() => {
-    return props.shares.filter((s) => {
-      const st = computeStatus(s, nowTs);
-      if (status !== "all") {
-        if (status === "expiring") {
-          if (st !== "active") return false;
-          if (!s.expires_at) return false;
-          const exp = new Date(s.expires_at).getTime();
-          const sevenDays = 7 * 24 * 60 * 60 * 1000;
-          if (Number.isNaN(exp)) return false;
-          if (exp <= nowTs) return false;
-          if (exp > nowTs + sevenDays) return false;
-        } else if (st !== status) {
-          return false;
-        }
-      }
-      if (!normalizedQ) return true;
-      const hay = [s.to_email ?? "", s.token, s.doc_title ?? "", s.alias ?? "", s.doc_id, s.has_password ? "password protected" : "no password"].join(" ").toLowerCase();
-      return hay.includes(normalizedQ);
-    });
-  }, [props.shares, normalizedQ, status, nowTs]);
+  useEffect(() => {
+    if (!copiedToken) return;
+    const id = window.setTimeout(() => setCopiedToken(null), 1800);
+    return () => window.clearTimeout(id);
+  }, [copiedToken]);
 
   const counts = useMemo(() => {
-    const c = { all: props.shares.length, active: 0, expired: 0, maxed: 0, revoked: 0 };
-    for (const s of props.shares) c[computeStatus(s, nowTs)] += 1;
-    return c;
-  }, [props.shares, nowTs]);
-
-  const expiringCount = useMemo(() => {
-    const sevenDays = 7 * 24 * 60 * 60 * 1000;
-    let n = 0;
-    for (const s of props.shares) {
-      if (computeStatus(s, nowTs) !== "active") continue;
-      if (!s.expires_at) continue;
-      const exp = new Date(s.expires_at).getTime();
-      if (Number.isNaN(exp)) continue;
-      if (exp > nowTs && exp <= nowTs + sevenDays) n += 1;
+    const next: Record<StatusFilter, number> = {
+      all: props.shares.length,
+      active: 0,
+      expiring: 0,
+      expired: 0,
+      maxed: 0,
+      revoked: 0,
+    };
+    for (const share of props.shares) {
+      const state = computeStatus(share, props.nowTs);
+      next[state] += 1;
+      if (state === "active" && isExpiringSoon(share, props.nowTs)) next.expiring += 1;
     }
-    return n;
-  }, [props.shares, nowTs]);
+    return next;
+  }, [props.nowTs, props.shares]);
+
+  const filtered = useMemo(() => {
+    return props.shares.filter((share) => {
+      const state = computeStatus(share, props.nowTs);
+      const expiring = isExpiringSoon(share, props.nowTs);
+      const matchesFilter =
+        status === "all" ? true : status === "expiring" ? state === "active" && expiring : state === status;
+      if (!matchesFilter) return false;
+      if (!normalizedQ) return true;
+      const haystack = [
+        share.doc_title ?? "",
+        share.to_email ?? "",
+        share.alias ?? "",
+        share.token,
+        state,
+        expiring ? "expiring" : "",
+        share.has_password ? "password protected" : "no password",
+      ]
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(normalizedQ);
+    });
+  }, [normalizedQ, props.nowTs, props.shares, status]);
+
+  const selectedTokens = useMemo(() => Object.keys(selected).filter((key) => selected[key]), [selected]);
+  const anySelected = selectedTokens.length > 0;
+  const activeCount = counts.active;
+  const passwordCount = props.shares.filter((share) => share.has_password).length;
 
   function syncUrl(next: { shareQ?: string; shareStatus?: StatusFilter }) {
     const params = new URLSearchParams(sp.toString());
     if (next.shareQ !== undefined) {
-      const v = next.shareQ.trim();
-      if (v) params.set("shareQ", v);
+      const value = next.shareQ.trim();
+      if (value) params.set("shareQ", value);
       else params.delete("shareQ");
     }
     if (next.shareStatus !== undefined) {
-      if (next.shareStatus && next.shareStatus !== "all") params.set("shareStatus", next.shareStatus);
-      else params.delete("shareStatus");
+      if (next.shareStatus === "all") params.delete("shareStatus");
+      else params.set("shareStatus", next.shareStatus);
     }
-    const hash = typeof window !== "undefined" ? window.location.hash : "";
     const qs = params.toString();
-    router.replace(`${pathname}${qs ? `?${qs}` : ""}${hash}`, { scroll: false });
-  }
-
-  const filteredTokens = useMemo(() => filtered.map((s) => s.token), [filtered]);
-  const selectedTokens = useMemo(() => Object.keys(selected).filter((k) => selected[k]), [selected]);
-  const anySelected = selectedTokens.length > 0;
-  const allVisibleSelected = useMemo(() => filteredTokens.length > 0 && filteredTokens.every((t) => selected[t]), [filteredTokens, selected]);
-
-  function toggleAllVisible(next: boolean) {
-    setSelected((prev) => {
-      const out = { ...prev };
-      for (const t of filteredTokens) out[t] = next;
-      return out;
-    });
-  }
-
-  function downloadCsvForSelected() {
-    const rows = props.shares.filter((s) => selected[s.token]);
-    const header = ["token", "doc_id", "alias", "doc_title", "to_email", "created_at", "expires_at", "max_views", "view_count", "revoked_at", "has_password"].join(",");
-    const lines = rows.map((s) =>
-      [s.token, s.doc_id, JSON.stringify(s.alias || ""), JSON.stringify(s.doc_title || ""), JSON.stringify(s.to_email || ""), JSON.stringify(s.created_at || ""), JSON.stringify(s.expires_at || ""), s.max_views == null ? "" : String(s.max_views), String(s.view_count ?? 0), JSON.stringify(s.revoked_at || ""), s.has_password ? "true" : "false"].join(",")
-    );
-    const csv = [header, ...lines].join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `shares_export_${new Date().toISOString().slice(0, 10)}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
+    router.replace(`${pathname}${qs ? `?${qs}` : ""}`, { scroll: false });
   }
 
   async function runActionAndRefresh(fn: (fd: FormData) => Promise<void>, fd: FormData) {
@@ -175,216 +171,313 @@ export default function SharesTableClient(props: { shares: ShareRow[]; nowTs: nu
     router.refresh();
   }
 
+  function downloadCsvForSelected() {
+    const rows = props.shares.filter((share) => selected[share.token]);
+    const header = ["token", "doc_id", "doc_title", "recipient", "created_at", "expires_at", "max_views", "view_count", "has_password"].join(",");
+    const lines = rows.map((share) =>
+      [
+        share.token,
+        share.doc_id,
+        JSON.stringify(share.doc_title || ""),
+        JSON.stringify(share.to_email || ""),
+        JSON.stringify(share.created_at || ""),
+        JSON.stringify(share.expires_at || ""),
+        share.max_views == null ? "" : String(share.max_views),
+        String(share.view_count ?? 0),
+        share.has_password ? "true" : "false",
+      ].join(",")
+    );
+    const csv = [header, ...lines].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `shared_links_${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  async function copyLink(token: string) {
+    await navigator.clipboard.writeText(`${window.location.origin}/s/${encodeURIComponent(token)}`);
+    setCopiedToken(token);
+  }
+
   return (
-    <div className="glass-card-strong mt-4 rounded-2xl p-4">
-      <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-        <div className="flex flex-col gap-2 md:flex-row md:items-center">
-          <div>
-            <label htmlFor="share-search" className="block text-xs text-white/60">Search</label>
+    <div className="space-y-5">
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="glass-card-strong rounded-[24px] p-4">
+          <div className="text-xs uppercase tracking-[0.16em] text-white/45">All links</div>
+          <div className="mt-2 text-2xl font-semibold text-white">{counts.all}</div>
+          <div className="mt-1 text-sm text-white/60">Every protected link you have created.</div>
+        </div>
+        <div className="glass-card-strong rounded-[24px] p-4">
+          <div className="text-xs uppercase tracking-[0.16em] text-white/45">Active</div>
+          <div className="mt-2 text-2xl font-semibold text-white">{activeCount}</div>
+          <div className="mt-1 text-sm text-white/60">Links people can still open now.</div>
+        </div>
+        <div className="glass-card-strong rounded-[24px] p-4">
+          <div className="text-xs uppercase tracking-[0.16em] text-white/45">Expiring soon</div>
+          <div className="mt-2 text-2xl font-semibold text-white">{counts.expiring}</div>
+          <div className="mt-1 text-sm text-white/60">Good candidates for a quick extension.</div>
+        </div>
+        <div className="glass-card-strong rounded-[24px] p-4">
+          <div className="text-xs uppercase tracking-[0.16em] text-white/45">Password protected</div>
+          <div className="mt-2 text-2xl font-semibold text-white">{passwordCount}</div>
+          <div className="mt-1 text-sm text-white/60">Links with an extra password step.</div>
+        </div>
+      </section>
+
+      <section className="glass-card-strong rounded-[30px]">
+        <div className="flex flex-col gap-4 border-b border-white/10 p-5 lg:flex-row lg:items-end lg:justify-between">
+          <div className="space-y-3">
+            <div>
+              <div className="text-xs uppercase tracking-[0.16em] text-white/45">Find a link fast</div>
+              <h2 className="mt-2 text-xl font-semibold text-white">Protected links</h2>
+              <p className="mt-2 max-w-2xl text-sm text-white/65">
+                Search by file name or recipient, filter by state, then copy or adjust the link without digging through a table.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {(["all", "active", "expiring", "expired", "maxed", "revoked"] as StatusFilter[]).map((item) => (
+                <button
+                  key={item}
+                  type="button"
+                  onClick={() => syncUrl({ shareStatus: item })}
+                  className={[
+                    "btn-base rounded-full border px-3 py-1.5 text-sm",
+                    status === item
+                      ? "border-cyan-300/35 bg-cyan-400/14 text-cyan-50"
+                      : "border-white/10 bg-white/[0.04] text-white/70 hover:border-white/20 hover:bg-white/[0.08] hover:text-white",
+                  ].join(" ")}
+                >
+                  {buildFilterLabel(item, counts[item])}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex w-full flex-col gap-3 lg:w-auto lg:min-w-[360px]">
+            <label htmlFor="share-search" className="text-xs text-white/55">
+              Search
+            </label>
             <input
               id="share-search"
-              aria-label="Search shares"
+              aria-label="Search shared links"
               value={q}
-              onChange={(e) => {
-                const v = e.target.value;
-                syncUrl({ shareQ: v });
-              }}
-              placeholder="email, alias, title, token..."
-              className="mt-1 w-full rounded-xl border border-white/20 bg-black/20 px-3 py-2 text-sm text-white placeholder:text-white/45 focus:border-cyan-300/55 focus:outline-none md:w-[360px]"
+              onChange={(event) => syncUrl({ shareQ: event.target.value })}
+              placeholder="Search by file name, recipient, or link"
+              className="w-full rounded-2xl border border-white/14 bg-black/20 px-4 py-3 text-sm text-white placeholder:text-white/40 focus:border-cyan-300/45 focus:outline-none"
             />
           </div>
-          <div>
-            <label htmlFor="share-status" className="block text-xs text-white/60">Status</label>
-            <select
-              id="share-status"
-              aria-label="Filter share status"
-              value={status}
-              onChange={(e) => {
-                const v = e.target.value as StatusFilter;
-                syncUrl({ shareStatus: v });
-              }}
-              className="mt-1 w-full rounded-xl border border-white/20 bg-black/20 px-3 py-2 text-sm text-white focus:border-cyan-300/55 focus:outline-none md:w-[190px]"
-            >
-              <option value="all">All ({counts.all})</option>
-              <option value="active">Active ({counts.active})</option>
-              <option value="expiring">Expiring (7d) ({expiringCount})</option>
-              <option value="expired">Expired ({counts.expired})</option>
-              <option value="maxed">Maxed ({counts.maxed})</option>
-              <option value="revoked">Revoked ({counts.revoked})</option>
-            </select>
+        </div>
+
+        {filtered.length === 0 ? (
+          <div className="p-6">
+            <div className="rounded-[28px] border border-dashed border-white/16 bg-white/[0.03] p-8 text-center">
+              <div className="text-lg font-semibold text-white">No protected links yet</div>
+              <div className="mt-2 text-sm text-white/65">
+                Create a protected link from Files once a file is ready to share.
+              </div>
+              <div className="mt-5 flex justify-center gap-3">
+                <Link href="/admin/documents" className="btn-base rounded-xl border border-cyan-300/40 bg-cyan-300 px-4 py-2 text-sm font-semibold text-[#07131f] hover:bg-cyan-200">
+                  Open files
+                </Link>
+                <Link href="/admin/dashboard?openPicker=1" className="btn-base btn-secondary rounded-xl px-4 py-2 text-sm">
+                  Upload file
+                </Link>
+              </div>
+            </div>
           </div>
-          <button
-            onClick={() => {
-              syncUrl({ shareQ: "", shareStatus: "all" });
-            }}
-            className="btn-base btn-secondary rounded-xl px-3 py-2 text-sm md:mb-[2px]"
-          >
-            Reset filters
-          </button>
-        </div>
+        ) : (
+          <div className="space-y-3 p-5">
+            {filtered.map((share) => {
+              const state = computeStatus(share, props.nowTs);
+              const expiringSoon = isExpiringSoon(share, props.nowTs);
+              const badge = statusBadge(state, expiringSoon);
 
-        <div className="text-xs text-white/60">
-          Showing <span className="text-white">{filtered.length}</span> of <span className="text-white">{props.shares.length}</span>
-        </div>
-      </div>
+              return (
+                <article
+                  key={share.token}
+                  className="rounded-[28px] border border-white/12 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-5"
+                >
+                  <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <div className="text-lg font-semibold text-white">{share.doc_title || "Untitled file"}</div>
+                        <span className={`rounded-full border px-2.5 py-1 text-[11px] ${badge.cls}`}>{badge.label}</span>
+                        {share.has_password ? (
+                          <span className="rounded-full border border-white/12 bg-white/[0.04] px-2.5 py-1 text-[11px] text-white/70">
+                            Password protected
+                          </span>
+                        ) : null}
+                      </div>
 
-      <div className="mt-3 overflow-hidden rounded-xl border border-white/10">
-        <div className="max-h-[560px] overflow-auto">
-          <table className="w-full text-sm">
-            <thead className="sticky top-0 bg-[#10192b]/95 text-white/75 backdrop-blur">
-              <tr>
-                <th className="w-[44px] px-4 py-3 text-left">
-                  <input type="checkbox" checked={allVisibleSelected} onChange={(e) => toggleAllVisible(e.target.checked)} aria-label="Select all visible shares" />
-                </th>
-                <th className="px-4 py-3 text-left">Recipient</th>
-                <th className="px-4 py-3 text-left">Token</th>
-                <th className="px-4 py-3 text-left">Doc</th>
-                <th className="px-4 py-3 text-left">Status</th>
-                <th className="px-4 py-3 text-left">Expires</th>
-                <th className="px-4 py-3 text-right">Max</th>
-                <th className="px-4 py-3 text-right">Views</th>
-                <th className="px-4 py-3 text-right">Password</th>
-                <th className="px-4 py-3 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.length === 0 ? (
-                <tr><td colSpan={10} className="px-4 py-6 text-white/60">No protected links yet. Create your first link.</td></tr>
-              ) : (
-                filtered.map((s) => {
-                  const st = computeStatus(s, nowTs);
-                  const badge = statusBadge(st);
-                  const tokenShort = s.token.length > 16 ? `${s.token.slice(0, 8)}...${s.token.slice(-4)}` : s.token;
-                  return (
-                    <tr key={s.token} className="border-t border-white/10 hover:bg-white/[0.03]">
-                      <td className="px-4 py-3 align-top">
-                        <input type="checkbox" checked={!!selected[s.token]} onChange={(e) => setSelected((prev) => ({ ...prev, [s.token]: e.target.checked }))} aria-label={`Select ${s.token}`} />
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="text-white">{s.to_email || <span className="text-white/55">(public)</span>}</div>
-                        <div className="text-xs text-white/55">{fmtDate(s.created_at)}</div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="font-mono text-xs text-white/90">{tokenShort}</div>
-                        <div className="mt-1 text-xs text-white/50">Tokenized access path</div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="text-white">{s.doc_title || "Untitled"}</div>
-                        <div className="mt-1 text-xs text-white/55">
-                          {s.alias ? (
-                            <Link
-                              href={`/d/${s.alias}`}
-                              className="inline-flex rounded-md border border-cyan-500/35 bg-cyan-500/15 px-2 py-0.5 text-[11px] text-cyan-100 hover:bg-cyan-500/25"
+                      <p className="mt-3 text-sm text-white/68">
+                        {share.to_email
+                          ? `Shared directly with ${share.to_email}.`
+                          : "Ready to copy and share with the right person when you need it."}
+                      </p>
+
+                      <div className="mt-4 flex flex-wrap gap-2 text-xs text-white/55">
+                        <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5">
+                          Created {formatShortDate(share.created_at)}
+                        </span>
+                        <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5">
+                          {share.expires_at ? `Expires ${formatShortDate(share.expires_at)}` : "No expiry set"}
+                        </span>
+                        <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5">
+                          {formatViews(share.max_views, share.view_count)}
+                        </span>
+                        {share.alias ? (
+                          <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5">
+                            Based on {share.alias}
+                          </span>
+                        ) : null}
+                      </div>
+
+                      <details className="mt-4 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                        <summary className="cursor-pointer list-none text-sm font-medium text-white">Adjust protection</summary>
+                        <div className="mt-4 space-y-4">
+                          <SharePasswordForm
+                            token={share.token}
+                            hasPassword={Boolean(share.has_password)}
+                            setAction={async (fd) => runActionAndRefresh(setSharePasswordAction, fd)}
+                            clearAction={async (fd) => runActionAndRefresh(clearSharePasswordAction, fd)}
+                          />
+
+                          <div className="flex flex-wrap gap-2">
+                            <form action={async (fd) => runActionAndRefresh(extendShareExpirationAction, fd)}>
+                              <input type="hidden" name="token" value={share.token} />
+                              <input type="hidden" name="days" value="7" />
+                              <button type="submit" disabled={Boolean(share.revoked_at)} className="btn-base btn-secondary rounded-xl px-3 py-2 text-sm disabled:opacity-40">
+                                Extend 7 days
+                              </button>
+                            </form>
+                            <form action={async (fd) => runActionAndRefresh(extendShareExpirationAction, fd)}>
+                              <input type="hidden" name="token" value={share.token} />
+                              <input type="hidden" name="days" value="30" />
+                              <button type="submit" disabled={Boolean(share.revoked_at)} className="btn-base btn-secondary rounded-xl px-3 py-2 text-sm disabled:opacity-40">
+                                Extend 30 days
+                              </button>
+                            </form>
+                            <form
+                              action={async (fd) => runActionAndRefresh(setShareMaxViewsAction, fd)}
+                              onSubmit={(event) => {
+                                const input = event.currentTarget.querySelector('input[name="maxViews"]') as HTMLInputElement | null;
+                                const value = window.prompt("Set a total view limit. Use 0 for no cap.", share.max_views == null ? "" : String(share.max_views));
+                                if (value === null) {
+                                  event.preventDefault();
+                                  return;
+                                }
+                                if (input) input.value = value.trim();
+                              }}
                             >
-                              Share
-                            </Link>
-                          ) : (
-                            <span className="font-mono">{s.doc_id}</span>
-                          )}
+                              <input type="hidden" name="token" value={share.token} />
+                              <input type="hidden" name="maxViews" defaultValue="" />
+                              <button type="submit" disabled={Boolean(share.revoked_at)} className="btn-base btn-secondary rounded-xl px-3 py-2 text-sm disabled:opacity-40">
+                                Set view limit
+                              </button>
+                            </form>
+                            <form action={async (fd) => runActionAndRefresh(resetShareViewsCountAction, fd)}>
+                              <input type="hidden" name="token" value={share.token} />
+                              <button type="submit" disabled={Boolean(share.revoked_at)} className="btn-base btn-secondary rounded-xl px-3 py-2 text-sm disabled:opacity-40">
+                                Reset views
+                              </button>
+                            </form>
+                            <form action={async (fd) => runActionAndRefresh(forceSharePasswordResetAction, fd)}>
+                              <input type="hidden" name="token" value={share.token} />
+                              <button type="submit" disabled={Boolean(share.revoked_at)} className="btn-base btn-secondary rounded-xl px-3 py-2 text-sm disabled:opacity-40">
+                                Clear saved password
+                              </button>
+                            </form>
+                          </div>
                         </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs ${badge.cls}`}>{badge.label}</span>
-                      </td>
-                      <td className="px-4 py-3 text-white/65">{fmtDate(s.expires_at)}</td>
-                      <td className="px-4 py-3 text-right text-white/90">{maxLabel(s.max_views)}</td>
-                      <td className="px-4 py-3 text-right text-white/90">{s.view_count ?? 0}</td>
-                      <td className="px-4 py-3 text-right">
-                        <SharePasswordForm
-                          token={s.token}
-                          hasPassword={Boolean(s.has_password)}
-                          setAction={async (fd) => runActionAndRefresh(setSharePasswordAction, fd)}
-                          clearAction={async (fd) => runActionAndRefresh(clearSharePasswordAction, fd)}
-                        />
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-right">
-                        <div className="flex flex-wrap items-center justify-end gap-2">
-                          <form action={async (fd) => runActionAndRefresh(extendShareExpirationAction, fd)}>
-                            <input type="hidden" name="token" value={s.token} />
-                            <input type="hidden" name="days" value="7" />
-                            <button type="submit" disabled={!!s.revoked_at} className="btn-base btn-secondary rounded-lg px-2.5 py-1.5 text-xs disabled:opacity-40">Extend 7d</button>
-                          </form>
-                          <form action={async (fd) => runActionAndRefresh(extendShareExpirationAction, fd)}>
-                            <input type="hidden" name="token" value={s.token} />
-                            <input type="hidden" name="days" value="30" />
-                            <button type="submit" disabled={!!s.revoked_at} className="btn-base btn-secondary rounded-lg px-2.5 py-1.5 text-xs disabled:opacity-40">Extend 30d</button>
-                          </form>
-                          <form action={async (fd) => runActionAndRefresh(resetShareViewsCountAction, fd)}>
-                            <input type="hidden" name="token" value={s.token} />
-                            <button type="submit" disabled={!!s.revoked_at} className="btn-base btn-secondary rounded-lg px-2.5 py-1.5 text-xs disabled:opacity-40">Reset views</button>
-                          </form>
-                          <form action={async (fd) => runActionAndRefresh(forceSharePasswordResetAction, fd)}>
-                            <input type="hidden" name="token" value={s.token} />
-                            <button type="submit" disabled={!!s.revoked_at} className="btn-base btn-secondary rounded-lg px-2.5 py-1.5 text-xs disabled:opacity-40">Clear password</button>
-                          </form>
-                          <form
-                            action={async (fd) => runActionAndRefresh(setShareMaxViewsAction, fd)}
-                            onSubmit={(e) => {
-                              const input = (e.currentTarget.querySelector('input[name="maxViews"]') as HTMLInputElement) || null;
-                              if (!input) return;
-                              const v = window.prompt("Set max views. Use 0 for no cap. Leave blank to clear.", s.max_views == null ? "" : String(s.max_views));
-                              if (v === null) {
-                                e.preventDefault();
-                                return;
-                              }
-                              input.value = v.trim();
-                            }}
-                          >
-                            <input type="hidden" name="token" value={s.token} />
-                            <input type="hidden" name="maxViews" defaultValue="" />
-                            <button type="submit" disabled={!!s.revoked_at} className="btn-base btn-secondary rounded-lg px-2.5 py-1.5 text-xs disabled:opacity-40">Set max views</button>
-                          </form>
-                          <RevokeShareForm token={s.token} revoked={Boolean(s.revoked_at)} action={async (fd) => runActionAndRefresh(revokeDocShareAction, fd)} />
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+                      </details>
+                    </div>
 
-      <div className="mt-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-        <div className="text-xs text-white/60">Selected: <span className="text-white">{selectedTokens.length}</span></div>
-        <div className="flex flex-wrap gap-2">
-          {canManageBulk ? (
-            <>
-              <form action={async (fd) => runActionAndRefresh(bulkRevokeSharesAction, fd)} onSubmit={(e) => { if (!anySelected) e.preventDefault(); }}>
-                <input type="hidden" name="tokens" value={JSON.stringify(selectedTokens)} />
-                <button type="submit" disabled={!anySelected} className="btn-base btn-danger rounded-xl px-3 py-2 text-sm disabled:opacity-40">Revoke selected</button>
-              </form>
-              <form
-                action={async (fd) => runActionAndRefresh(bulkExtendSharesAction, fd)}
-                onSubmit={(e) => {
-                  if (!anySelected) {
-                    e.preventDefault();
-                    return;
-                  }
-                  const days = window.prompt("Extend expiration by how many days?", "7");
-                  if (days === null) {
-                    e.preventDefault();
-                    return;
-                  }
-                  const d = (e.currentTarget.querySelector('input[name="days"]') as HTMLInputElement) || null;
-                  if (d) d.value = days.trim();
-                }}
-              >
-                <input type="hidden" name="tokens" value={JSON.stringify(selectedTokens)} />
-                <input type="hidden" name="days" defaultValue="7" />
-                <button type="submit" disabled={!anySelected} className="btn-base btn-secondary rounded-xl px-3 py-2 text-sm disabled:opacity-40">Extend selected</button>
-              </form>
-            </>
-          ) : null}
-          <button type="button" disabled={!anySelected} onClick={() => { if (anySelected) downloadCsvForSelected(); }} className="btn-base btn-secondary rounded-xl px-3 py-2 text-sm disabled:opacity-40">
-            Export CSV
-          </button>
-          <button type="button" onClick={() => setSelected({})} className="btn-base btn-secondary rounded-xl px-3 py-2 text-sm">
-            Clear selected
-          </button>
+                    <div className="flex w-full flex-col gap-2 xl:w-[260px]">
+                      <button
+                        type="button"
+                        onClick={() => copyLink(share.token)}
+                        className="btn-base rounded-2xl border border-cyan-300/35 bg-cyan-400/14 px-4 py-3 text-sm font-medium text-cyan-100 hover:bg-cyan-400/22"
+                      >
+                        {copiedToken === share.token ? "Link copied" : "Copy protected link"}
+                      </button>
+                      <Link
+                        href={`/s/${encodeURIComponent(share.token)}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="btn-base btn-secondary rounded-2xl px-4 py-3 text-center text-sm"
+                      >
+                        Open link
+                      </Link>
+                      <Link href={`/admin/documents`} className="btn-base btn-secondary rounded-2xl px-4 py-3 text-center text-sm">
+                        Open file
+                      </Link>
+                      <RevokeShareForm
+                        token={share.token}
+                        revoked={Boolean(share.revoked_at)}
+                        action={async (fd) => runActionAndRefresh(revokeDocShareAction, fd)}
+                      />
+                      <div className="pt-1 text-[11px] text-white/40">
+                        Link ID: <span className="font-mono">{share.token.slice(0, 8)}…{share.token.slice(-4)}</span>
+                      </div>
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        )}
+
+        <div className="flex flex-col gap-3 border-t border-white/10 px-5 py-4 text-sm text-white/60 md:flex-row md:items-center md:justify-between">
+          <div>
+            Showing <span className="text-white">{filtered.length}</span> of <span className="text-white">{props.shares.length}</span> links
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {canManageBulk ? (
+              <>
+                <form action={async (fd) => runActionAndRefresh(bulkRevokeSharesAction, fd)} onSubmit={(e) => { if (!anySelected) e.preventDefault(); }}>
+                  <input type="hidden" name="tokens" value={JSON.stringify(selectedTokens)} />
+                  <button type="submit" disabled={!anySelected} className="btn-base btn-danger rounded-xl px-3 py-2 text-sm disabled:opacity-40">
+                    Remove selected access
+                  </button>
+                </form>
+                <form
+                  action={async (fd) => runActionAndRefresh(bulkExtendSharesAction, fd)}
+                  onSubmit={(event) => {
+                    if (!anySelected) {
+                      event.preventDefault();
+                      return;
+                    }
+                    const days = window.prompt("Extend selected links by how many days?", "7");
+                    if (days === null) {
+                      event.preventDefault();
+                      return;
+                    }
+                    const input = event.currentTarget.querySelector('input[name="days"]') as HTMLInputElement | null;
+                    if (input) input.value = days.trim();
+                  }}
+                >
+                  <input type="hidden" name="tokens" value={JSON.stringify(selectedTokens)} />
+                  <input type="hidden" name="days" defaultValue="7" />
+                  <button type="submit" disabled={!anySelected} className="btn-base btn-secondary rounded-xl px-3 py-2 text-sm disabled:opacity-40">
+                    Extend selected
+                  </button>
+                </form>
+              </>
+            ) : null}
+            <button type="button" onClick={() => downloadCsvForSelected()} disabled={!anySelected} className="btn-base btn-secondary rounded-xl px-3 py-2 text-sm disabled:opacity-40">
+              Export selected
+            </button>
+            <button type="button" onClick={() => setSelected({})} className="btn-base btn-secondary rounded-xl px-3 py-2 text-sm">
+              Clear selection
+            </button>
+          </div>
         </div>
-      </div>
+      </section>
     </div>
   );
 }

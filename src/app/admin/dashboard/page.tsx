@@ -1,173 +1,356 @@
-// src/app/admin/dashboard/page.tsx
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/authz";
-import { getDocumentUiStatus, getShareEligibility, normalizeScanState } from "@/lib/documentStatus";
-
-import AnalyticsWidgets from "./AnalyticsWidgets";
-import ViewerHelpfulTiles from "./ViewerHelpfulTiles";
 import DashboardHeaderActions from "./DashboardHeaderActions";
-import { getDashboardHomeData } from "./data";
+import UploadPanel from "./UploadPanel";
+import {
+  getDashboardActivityData,
+  getDashboardDocumentsData,
+  getDashboardHomeData,
+  getDashboardLinksData,
+} from "./data";
+import { getShareEligibility, normalizeScanState } from "@/lib/documentStatus";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-function toneClass(tone: "positive" | "warning" | "danger" | "neutral") {
-  if (tone === "danger") return "border-rose-500/35 bg-rose-500/15 text-rose-100";
-  if (tone === "warning") return "border-amber-500/35 bg-amber-500/15 text-amber-100";
-  if (tone === "positive") return "border-emerald-500/35 bg-emerald-500/15 text-emerald-100";
-  return "border-white/20 bg-white/10 text-white/85";
-}
-
 function fmtDate(s: string | null): string {
-  if (!s) return "-";
+  if (!s) return "No activity yet";
   const d = new Date(s);
-  if (Number.isNaN(d.getTime())) return "-";
-  return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "2-digit" });
+  if (Number.isNaN(d.getTime())) return s;
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 }
 
-export default async function AdminDashboardPage() {
-  let u;
+function fmtDateTime(s: string | null): string {
+  if (!s) return "No activity yet";
+  const d = new Date(s);
+  if (Number.isNaN(d.getTime())) return s;
+  return d.toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+}
+
+function fmtInt(n: number): string {
   try {
-    u = await requireUser();
+    return new Intl.NumberFormat().format(n);
+  } catch {
+    return String(n);
+  }
+}
+
+function countActiveShares(
+  shares: Array<{ expires_at: string | null; revoked_at: string | null; max_views: number | null; view_count: number }>
+) {
+  const now = Date.now();
+  return shares.filter((share) => {
+    if (share.revoked_at) return false;
+    if (share.expires_at && new Date(share.expires_at).getTime() <= now) return false;
+    if (share.max_views != null && share.max_views !== 0 && share.view_count >= share.max_views) return false;
+    return true;
+  }).length;
+}
+
+export default async function AdminDashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ openPicker?: string; fromCreateLink?: string }>;
+}) {
+  let user;
+  try {
+    user = await requireUser();
   } catch {
     redirect("/api/auth/signin");
   }
 
-  const data = await getDashboardHomeData(u);
-  const isOwnerDashboard = u.role === "owner";
+  const [params, homeData, docsData, linksData, activityData] = await Promise.all([
+    searchParams,
+    getDashboardHomeData(user),
+    getDashboardDocumentsData(user),
+    getDashboardLinksData(user),
+    getDashboardActivityData(user),
+  ]);
+
+  const headerDocs = homeData.headerDocs;
+  const autoOpenPicker = String(params?.openPicker || "") === "1";
+  const fromCreateLink = String(params?.fromCreateLink || "") === "1";
+  const readyDocs = docsData.unifiedRows.filter((row) => {
+    const share = getShareEligibility({
+      docStateRaw: row.doc_state,
+      scanStateRaw: row.scan_status,
+      moderationStatusRaw: row.moderation_status,
+    });
+    return share.canCreateLink && normalizeScanState(row.scan_status, row.moderation_status) === "CLEAN";
+  });
+  const readyWithoutLinks = readyDocs.filter((row) => row.active_shares === 0).slice(0, 3);
+  const waitingDocs = docsData.unifiedRows.filter((row) => {
+    const scan = normalizeScanState(row.scan_status, row.moderation_status);
+    return scan === "PENDING" || scan === "RUNNING" || scan === "NOT_SCHEDULED";
+  });
+  const latestLinks = linksData.shares.slice(0, 3);
+  const activeLinkCount = countActiveShares(linksData.shares);
+  const totalViews = activityData.viewsRows.reduce((sum, row) => sum + (row.views || 0), 0);
+  const activeFilesWithViews = activityData.viewsRows.filter((row) => row.views > 0).length;
+  const planLabel = homeData.planId === "pro" ? "Pro" : "Free";
 
   return (
-    <div className="space-y-8">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold">Overview</h1>
-          <div className="mt-1 text-sm text-white/65">Your protected documents and links</div>
-        </div>
-        <DashboardHeaderActions docs={data.headerDocs} planId={data.planId} />
-      </div>
-
-      <AnalyticsWidgets
-        ownerId={data.canSeeAll ? undefined : u.id}
-        userId={u.id}
-        showHealth={u.role === "owner"}
-        isOwnerRole={isOwnerDashboard}
+    <div className="space-y-6">
+      <DashboardHeaderActions
+        docs={headerDocs}
+        planId={homeData.planId}
+        mode="modal-only"
+        uploadPickerHref="/admin/dashboard?openPicker=1"
+        createLinkFallbackHref="/admin/dashboard?openPicker=1&fromCreateLink=1"
       />
 
-      {data.missingCoreTables ? (
-        <div className="rounded-lg border border-neutral-800 bg-neutral-950 p-4 text-sm text-neutral-300">
-          <div className="font-medium text-neutral-100">Setup incomplete</div>
-          <div className="mt-1 text-neutral-400">
-            Your database is missing one or more tables required for dashboard analytics.
-          </div>
-          <ul className="mt-3 list-disc space-y-1 pl-5 text-neutral-400">
-            <li>public.docs: {data.hasDocs ? "ok" : "missing"}</li>
-            <li>public.doc_views: {data.hasDocViews ? "ok" : "missing"}</li>
-            <li>public.share_tokens: {data.hasShareTokens ? "ok" : "missing"}</li>
-            <li>public.doc_aliases: {data.hasDocAliases ? "ok" : "missing"}</li>
-          </ul>
-        </div>
-      ) : null}
+      <section className="glass-card-strong ui-sheen overflow-hidden rounded-[32px] p-6 sm:p-7">
+        <div className="grid gap-6 xl:grid-cols-[1.25fr_minmax(0,0.85fr)]">
+          <div className="space-y-5">
+            <div>
+              <div className="text-xs uppercase tracking-[0.18em] text-cyan-200/70">Home</div>
+              <h1 className="mt-3 max-w-3xl text-3xl font-semibold tracking-tight text-white sm:text-4xl">
+                Secure sharing that feels obvious from the first file.
+              </h1>
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-white/68 sm:text-base">
+                Upload a file, wait for the scan, create a protected link, and come back here to see what is ready, active, or viewed.
+              </p>
+            </div>
 
-      <section id="activity" className="space-y-3">
-        <div className="flex items-center justify-between gap-4">
-          <h2 className="text-lg font-semibold">Shortcuts</h2>
-          <Link className="text-xs text-neutral-500 hover:underline" href="/admin/activity">
-            View activity →
-          </Link>
+            <div className="flex flex-wrap items-center gap-3">
+              <Link
+                href="/admin/dashboard?openPicker=1"
+                className="btn-base rounded-2xl border border-cyan-300/45 bg-cyan-300 px-5 py-3 text-sm font-semibold text-[#07131f] shadow-[0_14px_32px_rgba(34,211,238,0.18)] hover:bg-cyan-200"
+              >
+                Upload file
+              </Link>
+              <Link href="/admin/documents" className="btn-base btn-secondary rounded-2xl px-4 py-3 text-sm">
+                Open files
+              </Link>
+              <Link href="/admin/links" className="btn-base btn-secondary rounded-2xl px-4 py-3 text-sm">
+                Manage shared links
+              </Link>
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-3">
+              <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+                <div className="text-xs uppercase tracking-[0.16em] text-white/45">Step 1</div>
+                <div className="mt-2 text-base font-semibold text-white">Upload</div>
+                <div className="mt-1 text-sm text-white/60">Start with the file you want to share.</div>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+                <div className="text-xs uppercase tracking-[0.16em] text-white/45">Step 2</div>
+                <div className="mt-2 text-base font-semibold text-white">Protect</div>
+                <div className="mt-1 text-sm text-white/60">Sharing unlocks after the scan is complete.</div>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+                <div className="text-xs uppercase tracking-[0.16em] text-white/45">Step 3</div>
+                <div className="mt-2 text-base font-semibold text-white">Share and track</div>
+                <div className="mt-1 text-sm text-white/60">Copy the link and check views later.</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-[28px] border border-white/10 bg-white/[0.04] p-5">
+            <div className="text-xs uppercase tracking-[0.16em] text-white/45">At a glance</div>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                <div className="text-xs text-white/45">Files</div>
+                <div className="mt-2 text-2xl font-semibold text-white">{fmtInt(docsData.unifiedRows.length)}</div>
+                <div className="mt-1 text-sm text-white/60">in your secure library</div>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                <div className="text-xs text-white/45">Ready to share</div>
+                <div className="mt-2 text-2xl font-semibold text-white">{fmtInt(readyDocs.length)}</div>
+                <div className="mt-1 text-sm text-white/60">scan complete</div>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                <div className="text-xs text-white/45">Active links</div>
+                <div className="mt-2 text-2xl font-semibold text-white">{fmtInt(activeLinkCount)}</div>
+                <div className="mt-1 text-sm text-white/60">currently available to recipients</div>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                <div className="text-xs text-white/45">Views</div>
+                <div className="mt-2 text-2xl font-semibold text-white">{fmtInt(totalViews)}</div>
+                <div className="mt-1 text-sm text-white/60">across {fmtInt(activeFilesWithViews)} files</div>
+              </div>
+            </div>
+
+            <div className="mt-4 rounded-2xl border border-cyan-300/18 bg-cyan-400/[0.08] p-4">
+              <div className="text-sm font-medium text-white">Your plan: {planLabel}</div>
+              <div className="mt-1 text-sm text-white/65">
+                {homeData.planId === "pro"
+                  ? "You have access to higher limits and stronger sharing controls."
+                  : "Upgrade when you want more room, stricter presets, and richer insight."}
+              </div>
+              {homeData.planId !== "pro" ? (
+                <Link href="/admin/upgrade" className="btn-base btn-secondary mt-3 inline-flex rounded-xl px-3 py-2 text-sm">
+                  See upgrade options
+                </Link>
+              ) : null}
+            </div>
+          </div>
         </div>
-        <ViewerHelpfulTiles userId={u.id} orgId={u.orgId} hasOrgId={data.hasOrgId} />
       </section>
 
-      <section id="recent-docs" className="space-y-3">
-        <div className="flex items-center justify-between gap-4">
-          <h2 className="text-lg font-semibold">Recent documents</h2>
-          <Link className="text-xs text-neutral-500 hover:underline" href="/admin/documents">
-            View all documents →
-          </Link>
+      <section className="rounded-[30px] border border-white/10 bg-white/[0.03] p-4 sm:p-5">
+        <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <div className="text-xs uppercase tracking-[0.16em] text-white/45">Start here</div>
+            <h2 className="mt-2 text-xl font-semibold text-white">Upload a file</h2>
+            <p className="mt-2 max-w-2xl text-sm text-white/65">
+              Upload is the first step. The scan runs automatically, and the files page will guide you when a link is ready to create.
+            </p>
+          </div>
+          {fromCreateLink ? (
+            <div className="rounded-2xl border border-cyan-400/25 bg-cyan-400/10 px-4 py-3 text-sm text-cyan-100">
+              Upload a file first, then create its protected link from Files.
+            </div>
+          ) : null}
         </div>
+        <UploadPanel canCheckEncryptionStatus={homeData.canCheckEncryptionStatus} autoOpenPicker={autoOpenPicker} />
+      </section>
 
-        <div className="glass-card-strong overflow-hidden rounded-2xl">
-          {data.recentDocs.length ? (
-            <ul className="divide-y divide-white/10">
-              {data.recentDocs.map((doc) => {
-                const ui = getDocumentUiStatus({
-                  docStateRaw: doc.doc_state,
-                  scanStateRaw: doc.scan_status,
-                  moderationStatusRaw: doc.moderation_status,
-                });
-                const scanState = normalizeScanState(doc.scan_status, doc.moderation_status);
-                const isScanning = scanState === "PENDING" || scanState === "RUNNING" || scanState === "NOT_SCHEDULED";
-                const share = getShareEligibility({
-                  docStateRaw: doc.doc_state,
-                  scanStateRaw: doc.scan_status,
-                  moderationStatusRaw: doc.moderation_status,
-                });
-                const canShareNow = share.canCreateLink && scanState === "CLEAN";
-                const shareHref = `/admin/dashboard?createLink=1&docId=${encodeURIComponent(doc.doc_id)}`;
-                return (
-                  <li key={doc.doc_id} className="flex flex-wrap items-center justify-between gap-3 p-4">
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm font-medium text-white">{doc.doc_title || "Untitled document"}</div>
-                      <div className="mt-1 text-xs text-white/60">Added {fmtDate(doc.created_at)}</div>
+      <section className="grid gap-4 xl:grid-cols-[1.2fr_minmax(0,0.8fr)]">
+        <div className="glass-card-strong rounded-[28px] p-5">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <div className="text-xs uppercase tracking-[0.16em] text-white/45">Next best action</div>
+              <h2 className="mt-2 text-xl font-semibold text-white">Files that are ready to share</h2>
+            </div>
+            <Link href="/admin/documents" className="btn-base btn-secondary rounded-xl px-3 py-2 text-sm">
+              Open files
+            </Link>
+          </div>
+
+          {docsData.unifiedRows.length === 0 ? (
+            <div className="mt-4 rounded-2xl border border-dashed border-white/16 bg-white/[0.03] p-6 text-center">
+              <div className="text-lg font-semibold text-white">Your workspace is ready for the first file.</div>
+              <div className="mt-2 text-sm text-white/65">
+                Upload one file and DocLinks will guide you from scan to protected sharing.
+              </div>
+            </div>
+          ) : readyWithoutLinks.length > 0 ? (
+            <div className="mt-4 space-y-3">
+              {readyWithoutLinks.map((row) => (
+                <div key={row.doc_id} className="rounded-2xl border border-emerald-400/20 bg-emerald-400/[0.07] p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-medium text-white">{row.doc_title || "Untitled file"}</div>
+                      <div className="mt-1 text-sm text-emerald-100/80">Scan complete. Ready for its first protected link.</div>
                     </div>
-                    <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs ${toneClass(isScanning ? "warning" : ui.tone)}`}>
-                      {isScanning ? "Scanning..." : ui.label}
-                    </span>
-                    <div className="flex items-center gap-2">
-                      {canShareNow ? (
-                        <Link href={shareHref} className="rounded-lg border border-cyan-400/35 bg-cyan-400/20 px-3 py-1.5 text-xs text-cyan-50 hover:bg-cyan-400/30">
-                          Share
-                        </Link>
-                      ) : (
-                        <button
-                          type="button"
-                          disabled
-                          title={isScanning ? "Available after scan completes." : share.blockedReason || "Sharing unavailable"}
-                          className="cursor-not-allowed rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white/45"
-                        >
-                          Share
-                        </button>
-                      )}
-                      <Link href={`/admin/docs/${encodeURIComponent(doc.doc_id)}`} className="rounded-md border border-white/15 bg-transparent px-2 py-1 text-[11px] text-white/65 hover:bg-white/10 hover:text-white">
-                        Details
-                      </Link>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
+                    <Link
+                      href={`/admin/documents?createLink=1&docId=${encodeURIComponent(row.doc_id)}`}
+                      className="btn-base rounded-xl border border-emerald-300/45 bg-emerald-300 px-4 py-2 text-sm font-semibold text-[#082012] hover:bg-emerald-200"
+                    >
+                      Create protected link
+                    </Link>
+                  </div>
+                </div>
+              ))}
+            </div>
           ) : (
-            <div className="p-4 text-sm text-white/70">
-              No documents yet.
-              <div className="mt-2 flex flex-wrap gap-2">
-                <Link href="/admin/uploads?openPicker=1" className="btn-base btn-secondary rounded-lg px-2.5 py-1.5 text-xs">
-                  Upload document
-                </Link>
-                {isOwnerDashboard ? null : (
-                  <Link href="/admin/uploads?openPicker=1&fromCreateLink=1" className="btn-base btn-secondary rounded-lg px-2.5 py-1.5 text-xs">
-                    Create protected link
-                  </Link>
-                )}
+            <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+              <div className="text-sm font-medium text-white">No files are waiting on link creation right now.</div>
+              <div className="mt-1 text-sm text-white/65">
+                {waitingDocs.length > 0
+                  ? `${fmtInt(waitingDocs.length)} file${waitingDocs.length === 1 ? "" : "s"} are still waiting for the scan to finish.`
+                  : "Your ready files already have links, or you can upload another file to share."}
               </div>
             </div>
           )}
         </div>
+
+        <div className="glass-card-strong rounded-[28px] p-5">
+          <div className="text-xs uppercase tracking-[0.16em] text-white/45">Protection status</div>
+          <h2 className="mt-2 text-xl font-semibold text-white">What is safe to share</h2>
+          <div className="mt-4 space-y-3">
+            <div className="rounded-2xl border border-emerald-400/20 bg-emerald-400/[0.07] p-4">
+              <div className="text-sm font-medium text-white">Ready to share</div>
+              <div className="mt-1 text-sm text-emerald-100/80">Files marked Ready have completed their scan.</div>
+            </div>
+            <div className="rounded-2xl border border-amber-400/20 bg-amber-400/[0.07] p-4">
+              <div className="text-sm font-medium text-white">Waiting for scan</div>
+              <div className="mt-1 text-sm text-amber-100/80">Sharing stays unavailable until the scan finishes.</div>
+            </div>
+            <div className="rounded-2xl border border-rose-400/20 bg-rose-400/[0.07] p-4">
+              <div className="text-sm font-medium text-white">Blocked for safety</div>
+              <div className="mt-1 text-sm text-rose-100/80">Flagged files remain blocked so they cannot be shared accidentally.</div>
+            </div>
+          </div>
+        </div>
       </section>
 
-      {isOwnerDashboard ? null : (
-        <section id="settings" className="space-y-2">
-          <h2 className="text-lg font-semibold">Pro</h2>
-          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4 text-sm text-white/75">
-            <div className="font-medium text-white">Upgrade to unlock stricter controls</div>
-            <div className="mt-1">Get one-time access, legal/confidential presets, and ID verification mode.</div>
-            <Link href="/admin/upgrade" className="mt-3 inline-flex rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white hover:bg-white/15">
-              See Pro features
+      <section className="grid gap-4 xl:grid-cols-[1fr_minmax(0,1fr)]">
+        <div className="glass-card-strong rounded-[28px] p-5">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <div className="text-xs uppercase tracking-[0.16em] text-white/45">Latest shared links</div>
+              <h2 className="mt-2 text-xl font-semibold text-white">Links you can manage right away</h2>
+            </div>
+            <Link href="/admin/links" className="btn-base btn-secondary rounded-xl px-3 py-2 text-sm">
+              Open shared links
             </Link>
           </div>
-        </section>
-      )}
+
+          {latestLinks.length > 0 ? (
+            <div className="mt-4 space-y-3">
+              {latestLinks.map((share) => (
+                <div key={share.token} className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-medium text-white">{share.doc_title || "Untitled file"}</div>
+                      <div className="mt-1 text-sm text-white/65">
+                        {share.to_email ? `Shared with ${share.to_email}` : "Protected link ready to copy"} · Created {fmtDateTime(share.created_at)}
+                      </div>
+                    </div>
+                    <Link href={`/admin/links?shareQ=${encodeURIComponent(share.token)}`} className="btn-base btn-secondary rounded-xl px-3 py-2 text-sm">
+                      Manage
+                    </Link>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.04] p-4 text-sm text-white/65">
+              No shared links yet. Upload a file, then create its first protected link from Files.
+            </div>
+          )}
+        </div>
+
+        <div className="glass-card-strong rounded-[28px] p-5">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <div className="text-xs uppercase tracking-[0.16em] text-white/45">Recent views</div>
+              <h2 className="mt-2 text-xl font-semibold text-white">Where people are engaging</h2>
+            </div>
+            <Link href="/admin/activity" className="btn-base btn-secondary rounded-xl px-3 py-2 text-sm">
+              Open insights
+            </Link>
+          </div>
+
+          {activityData.viewsRows.slice(0, 3).length > 0 ? (
+            <div className="mt-4 space-y-3">
+              {activityData.viewsRows.slice(0, 3).map((row) => (
+                <div key={row.doc_id} className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-medium text-white">{row.doc_title || "Untitled file"}</div>
+                      <div className="mt-1 text-sm text-white/65">
+                        {fmtInt(row.views)} views · {fmtInt(row.unique_ips)} unique visitors · Last opened {fmtDateTime(row.last_view)}
+                      </div>
+                    </div>
+                    <Link href={`/admin/activity?viewQ=${encodeURIComponent(row.doc_title || row.doc_id)}`} className="btn-base btn-secondary rounded-xl px-3 py-2 text-sm">
+                      View details
+                    </Link>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.04] p-4 text-sm text-white/65">
+              No one has opened a shared file yet. Once someone views a link, you will see it here.
+            </div>
+          )}
+        </div>
+      </section>
     </div>
   );
 }
