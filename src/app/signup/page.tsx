@@ -52,7 +52,7 @@ export default function SignupPage() {
     setError(null);
     try {
       await prepareSignupConsent(true);
-      await signIn(provider, { callbackUrl: "/auth/continue" });
+      await signIn(provider, { callbackUrl: "/auth/continue-viewer" });
     } catch {
       setError("Unable to start sign up.");
       setBusy(false);

@@ -77,7 +77,7 @@ export default function AuthModal({
         <h2 id="auth-modal-title" className="text-xl font-semibold text-white">Sign In</h2>
 
         <button
-          onClick={() => signIn("google")}
+          onClick={() => signIn("google", { callbackUrl: "/auth/continue-viewer" })}
           className="mt-6 w-full rounded-2xl bg-white px-5 py-3 text-sm font-medium text-black hover:bg-white/90"
         >
           Continue with Google

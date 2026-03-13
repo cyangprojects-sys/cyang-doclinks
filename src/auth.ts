@@ -12,9 +12,9 @@ import { hasSignupConsentCookie, isSignupEnabled, recordTermsAcceptance, verifyM
  * - Enterprise SSO (BYO OIDC) (organizational logins)
  *
  * Landing behavior:
- * - Successful sign-in goes through a role-aware continuation route
- * - Admin/owner land in /admin
- * - Viewer accounts land on the public Doclinks product surface
+ * - Successful sign-in goes through an intent-aware continuation route
+ * - Admin/owner sign-in lands in /admin
+ * - Viewer sign-in lands on the public Doclinks product surface
  * - Sign-out lands on /
  *
  * Owner role:
@@ -40,7 +40,7 @@ import { hasSignupConsentCookie, isSignupEnabled, recordTermsAcceptance, verifyM
  * - OWNER_EMAIL="a@x.com"
  */
 
-const POST_SIGN_IN_PATH = "/auth/continue";
+const POST_SIGN_IN_PATH = "/auth/continue-viewer";
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const EMAIL_MAX_LEN = 254;
 const MANUAL_PASSWORD_MAX_LEN = 4096;
@@ -302,11 +302,6 @@ export const authOptions: NextAuthOptions = {
       try {
         const u = new URL(url, baseUrl);
 
-        // Allow explicit home redirects (used by sign-out).
-        if (u.origin === baseUrl && (u.pathname === "/" || u.pathname === "")) {
-          return baseUrl;
-        }
-
         // Keep NextAuth system routes functioning.
         if (u.origin === baseUrl && u.pathname.startsWith("/api/auth")) {
           return `${baseUrl}${u.pathname}${u.search}`;
@@ -320,7 +315,7 @@ export const authOptions: NextAuthOptions = {
         // ignore parsing issues; fall through to the role-aware continuation route
       }
 
-      // Default: send signed-in users through a role-aware continuation route.
+      // Default: send signed-in users through the viewer/general continuation route.
       return `${baseUrl}${POST_SIGN_IN_PATH}`;
     },
   },
