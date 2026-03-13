@@ -12,7 +12,7 @@ const enterpriseConfigured =
 const signupEnabled =
   typeof process !== "undefined" && String(process.env.NEXT_PUBLIC_SIGNUP_ENABLED || "").trim().toLowerCase() !== "false";
 
-const AFTER_SIGN_IN = "/admin/dashboard";
+const AFTER_SIGN_IN = "/auth/continue";
 
 export default function SignInPage() {
   return (

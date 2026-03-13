@@ -20,14 +20,14 @@ export default function LoginPage() {
                     </p>
 
                     <button
-                        onClick={() => signIn("google", { callbackUrl: "/admin" })}
+                        onClick={() => signIn("google", { callbackUrl: "/auth/continue" })}
                         className="mt-6 w-full rounded-2xl bg-white px-5 py-3 text-sm font-medium text-black hover:bg-white/90"
                     >
                         Sign in with Google
                     </button>
 
 <button
-    onClick={() => signIn("enterprise-sso", { callbackUrl: "/admin" })}
+    onClick={() => signIn("enterprise-sso", { callbackUrl: "/auth/continue" })}
     className="mt-3 w-full rounded-2xl bg-white/10 px-5 py-3 text-sm font-medium text-white hover:bg-white/15"
 >
     Sign in with Enterprise SSO

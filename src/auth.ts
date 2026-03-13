@@ -12,8 +12,10 @@ import { hasSignupConsentCookie, isSignupEnabled, recordTermsAcceptance, verifyM
  * - Enterprise SSO (BYO OIDC) (organizational logins)
  *
  * Landing behavior:
- * - ALWAYS land on /admin/dashboard after a successful sign-in
- * - Sign-out should land on /
+ * - Successful sign-in goes through a role-aware continuation route
+ * - Admin/owner land in /admin
+ * - Viewer accounts land on the public Doclinks product surface
+ * - Sign-out lands on /
  *
  * Owner role:
  * - We compute `user.role` into the session so server layouts can hide/show owner-only nav.
@@ -38,7 +40,7 @@ import { hasSignupConsentCookie, isSignupEnabled, recordTermsAcceptance, verifyM
  * - OWNER_EMAIL="a@x.com"
  */
 
-const POST_SIGN_IN_PATH = "/admin/dashboard";
+const POST_SIGN_IN_PATH = "/auth/continue";
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const EMAIL_MAX_LEN = 254;
 const MANUAL_PASSWORD_MAX_LEN = 4096;
@@ -310,15 +312,15 @@ export const authOptions: NextAuthOptions = {
           return `${baseUrl}${u.pathname}${u.search}`;
         }
 
-        // If caller explicitly redirects into /admin, honor it.
-        if (u.origin === baseUrl && u.pathname.startsWith("/admin")) {
+        // Honor any explicit same-origin in-app redirect.
+        if (u.origin === baseUrl && u.pathname.startsWith("/")) {
           return `${baseUrl}${u.pathname}${u.search}`;
         }
       } catch {
-        // ignore parsing issues; fall through to forcing admin
+        // ignore parsing issues; fall through to the role-aware continuation route
       }
 
-      // Default: always send signed-in users to the admin dashboard
+      // Default: send signed-in users through a role-aware continuation route.
       return `${baseUrl}${POST_SIGN_IN_PATH}`;
     },
   },

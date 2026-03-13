@@ -78,7 +78,7 @@ export async function GET(req: NextRequest, ctx: RouteCtx) {
   // Bind org to this browser (httpOnly so JS can't tamper with it).
   const res = NextResponse.redirect(
     new URL(
-      `/api/auth/signin/${encodeURIComponent(provider)}?callbackUrl=${encodeURIComponent("/admin/dashboard")}`,
+      `/api/auth/signin/${encodeURIComponent(provider)}?callbackUrl=${encodeURIComponent("/auth/continue")}`,
       appBaseUrl
     )
   );

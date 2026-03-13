@@ -19,7 +19,7 @@ export default function ManualSignInPage() {
       email,
       password,
       redirect: false,
-      callbackUrl: "/admin/dashboard",
+      callbackUrl: "/auth/continue",
     });
 
     if (!res || res.error) {
@@ -28,7 +28,7 @@ export default function ManualSignInPage() {
       return;
     }
 
-    window.location.href = res.url || "/admin/dashboard";
+    window.location.href = res.url || "/auth/continue";
   }
 
   return (
