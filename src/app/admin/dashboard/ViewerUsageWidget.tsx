@@ -34,7 +34,12 @@ async function tableExists(fqTable: string): Promise<boolean> {
   }
 }
 
-export default async function ViewerUsageWidget(props: { userId: string }) {
+export default async function ViewerUsageWidget(props: {
+  userId: string;
+  upgradeHref?: string | null;
+  sharesHref?: string;
+  showUpgradeCta?: boolean;
+}) {
   const userId = String(props.userId || "").trim();
   if (!userId) return null;
 
@@ -106,7 +111,12 @@ export default async function ViewerUsageWidget(props: { userId: string }) {
   const uploadsLeft =
     maxUploadsPerDay == null || dailyUploads == null ? null : Math.max(0, maxUploadsPerDay - dailyUploads);
   const billingFlags = await getBillingFlags();
-  const showUpgrade = billingFlags.flags.pricingUiEnabled && planId !== "pro";
+  const showUpgrade =
+    (props.showUpgradeCta ?? true) &&
+    billingFlags.flags.pricingUiEnabled &&
+    planId !== "pro" &&
+    !!props.upgradeHref;
+  const sharesHref = props.sharesHref || "#shares";
 
   return (
     <section className="glass-card-strong rounded-2xl p-4">
@@ -117,11 +127,11 @@ export default async function ViewerUsageWidget(props: { userId: string }) {
         </div>
         <div className="flex items-center gap-2">
           {showUpgrade ? (
-            <a href="/admin/upgrade" className="btn-base rounded-lg border border-cyan-400/35 bg-cyan-400/20 px-3 py-1.5 text-xs text-cyan-50 hover:bg-cyan-400/30">
+            <a href={props.upgradeHref!} className="btn-base rounded-lg border border-cyan-400/35 bg-cyan-400/20 px-3 py-1.5 text-xs text-cyan-50 hover:bg-cyan-400/30">
               Upgrade to Pro
             </a>
           ) : null}
-          <a href="#shares" className="btn-base btn-secondary rounded-lg px-3 py-1.5 text-xs">
+          <a href={sharesHref} className="btn-base btn-secondary rounded-lg px-3 py-1.5 text-xs">
             Open shares
           </a>
         </div>

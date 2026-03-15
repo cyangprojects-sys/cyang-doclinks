@@ -1,19 +1,43 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/auth";
+import { ensureUserByEmail } from "@/lib/authz";
+import ViewerHelpfulTiles from "@/app/admin/dashboard/ViewerHelpfulTiles";
+import ViewerUsageWidget from "@/app/admin/dashboard/ViewerUsageWidget";
 import ViewerLinkLauncher from "./ViewerLinkLauncher";
 
 export const metadata: Metadata = {
-  title: "Viewer Workspace",
-  description: "Open and review shared DocLinks content in your authenticated viewer workspace.",
+  title: "Member Workspace",
+  description: "Open and review shared DocLinks content in your authenticated member workspace.",
 };
 
-export default function ViewerDashboardPage() {
+export default async function ViewerDashboardPage() {
+  const session = await getServerSession(authOptions);
+  const email = String(session?.user?.email || "").trim().toLowerCase();
+  if (!email) redirect("/signin");
+
+  const orgId = (session?.user as { orgId?: string | null } | undefined)?.orgId ?? null;
+  const orgSlug = (session?.user as { orgSlug?: string | null } | undefined)?.orgSlug ?? null;
+
+  let user: Awaited<ReturnType<typeof ensureUserByEmail>>;
+  try {
+    user = await ensureUserByEmail(email, { orgId, orgSlug });
+  } catch {
+    redirect("/signin?error=AccessDenied");
+  }
+
+  if (user.role === "admin" || user.role === "owner") {
+    redirect("/admin");
+  }
+
   return (
     <div className="space-y-4">
       <section className="glass-card-strong ui-sheen rounded-[30px] border-white/14 p-6 sm:p-7">
         <p className="text-xs uppercase tracking-[0.16em] text-cyan-200/86">Secure access</p>
         <h2 className="mt-2 text-3xl font-semibold tracking-tight text-white sm:text-4xl">
-          Open shared files with a dedicated viewer experience.
+          Open shared files with a dedicated member experience.
         </h2>
         <p className="mt-3 max-w-3xl text-sm leading-7 text-white/70 sm:text-base">
           This workspace is intentionally focused on recipients. It keeps document viewing flows clear while
@@ -26,7 +50,14 @@ export default function ViewerDashboardPage() {
         </div>
       </section>
 
-      <section className="grid gap-4 lg:grid-cols-[1.15fr_minmax(0,0.85fr)]">
+      <section className="grid gap-4 lg:grid-cols-[1.05fr_minmax(0,0.95fr)]">
+        <ViewerUsageWidget
+          userId={user.id}
+          sharesHref="#viewer-shares"
+          showUpgradeCta={false}
+          upgradeHref={null}
+        />
+
         <div className="glass-card-strong rounded-[26px] border-white/12 p-5 sm:p-6">
           <div className="text-xs uppercase tracking-[0.16em] text-white/54">Open shared content</div>
           <h3 className="mt-2 text-xl font-semibold text-white">Paste a secure link or token</h3>
@@ -38,7 +69,17 @@ export default function ViewerDashboardPage() {
           </div>
         </div>
 
-        <div className="glass-card-strong rounded-[26px] border-white/12 p-5 sm:p-6">
+      </section>
+
+      <section id="viewer-shares">
+        <ViewerHelpfulTiles
+          userId={user.id}
+          orgId={user.orgId}
+          hasOrgId={Boolean(user.orgId)}
+        />
+      </section>
+
+      <section className="glass-card-strong rounded-[26px] border-white/12 p-5 sm:p-6">
           <div className="text-xs uppercase tracking-[0.16em] text-white/54">Need workspace management?</div>
           <h3 className="mt-2 text-xl font-semibold text-white">Owner and admin controls are separate</h3>
           <p className="mt-2 text-sm text-white/65">
@@ -58,7 +99,6 @@ export default function ViewerDashboardPage() {
               Product overview
             </Link>
           </div>
-        </div>
       </section>
 
       <section className="glass-card-strong rounded-[26px] border-white/12 p-5 sm:p-6">

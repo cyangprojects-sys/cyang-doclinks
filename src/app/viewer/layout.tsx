@@ -41,9 +41,9 @@ export default async function ViewerLayout({
             <div>
               <div className="text-xs uppercase tracking-[0.16em] text-white/52">DocLinks</div>
               <div className="mt-1 flex items-center gap-2">
-                <h1 className="text-xl font-semibold text-white sm:text-2xl">Viewer workspace</h1>
+                <h1 className="text-xl font-semibold text-white sm:text-2xl">Member workspace</h1>
                 <span className="rounded-full border border-white/14 bg-white/[0.05] px-2.5 py-1 text-[11px] uppercase tracking-[0.13em] text-cyan-100">
-                  Viewer
+                  Member
                 </span>
               </div>
             </div>

@@ -35,12 +35,12 @@ const ACCESS_CARDS: AccessCard[] = [
   },
   {
     key: "viewer",
-    label: "For viewers and recipients",
+    label: "For members and recipients",
     title: "Open shared content",
     description:
       "Access protected files, continue reviewing documents, and return to links shared with you.",
     secondary: "Best for recipients, guest access, and shared document viewing.",
-    cta: "Continue as viewer",
+    cta: "Continue as member",
   },
 ];
 
@@ -120,11 +120,11 @@ export default function SignInClient(props: SignInClientProps) {
     };
   }, []);
 
-  const intentTitle = intent === "admin" ? "Admin / Owner workspace access" : "Viewer / Recipient access";
+  const intentTitle = intent === "admin" ? "Admin / Owner workspace access" : "Member / Recipient access";
   const intentSubtext =
     intent === "admin"
       ? "Sign in to run secure sharing operations and workspace controls."
-      : "Sign in to open shared files and continue reviewing protected content.";
+      : "Sign in to open shared files and continue working in the member workspace.";
   const emailHref = `/signin/manual?intent=${intent}`;
 
   const onProviderSignIn = async (provider: "google" | "enterprise-sso") => {
@@ -343,7 +343,7 @@ export default function SignInClient(props: SignInClientProps) {
               <div className="mt-6 rounded-xl border border-white/12 bg-black/20 p-4">
                 <div className="text-sm font-medium text-white">New to DocLinks?</div>
                 <p className="mt-1 text-sm text-white/62">
-                  Create an account to share documents securely, manage protected links, and control viewer access.
+                  Create an account to share documents securely, manage protected links, and control member access.
                 </p>
                 <div className="mt-3 flex flex-wrap gap-2">
                   {props.signupEnabled ? (

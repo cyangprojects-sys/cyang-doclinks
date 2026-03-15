@@ -39,7 +39,7 @@ export default function ManualSignInClient({ intent }: { intent: "admin" | "view
         <p className="mt-2 text-sm text-white/70">
           Use email and password. Account must be activated from your email link first.
           <span className="ml-1 text-white/50">
-            Destination: {intent === "admin" ? "Admin / Owner workspace" : "Viewer workspace"}
+            Destination: {intent === "admin" ? "Admin / Owner workspace" : "Member workspace"}
           </span>
         </p>
 
