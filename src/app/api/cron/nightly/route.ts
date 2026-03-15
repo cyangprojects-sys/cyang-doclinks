@@ -24,6 +24,7 @@ import {
 } from "@/lib/securityTelemetry";
 import { logCronRun } from "@/lib/cronTelemetry";
 import { runBillingMaintenance } from "@/lib/billingSubscription";
+import { runStatusDailyDigest } from "@/lib/statusSubscriptions";
 
 import { cronUnauthorizedResponse, isCronAuthorized } from "@/lib/cronAuth";
 
@@ -103,6 +104,9 @@ export async function GET(req: NextRequest) {
     maxUsers: Math.max(1, Math.min(5000, Number(process.env.BILLING_MAINTENANCE_MAX_USERS || 500))),
   });
 
+  // 9.5) Daily status digest delivery (first cron run in configured 6 AM window)
+  const status_digest = await runStatusDailyDigest();
+
   // 10) Spike alerting rollups (best-effort)
   await detectScanFailureSpike();
   await detectUploadCompletionSpike();
@@ -141,6 +145,11 @@ export async function GET(req: NextRequest) {
       backupStatus: backupRecoveryObj.backupStatus ?? null,
       billingSyncOk: billingSyncObj.ok ?? null,
       billingUsersScanned: billingSyncObj.usersScanned ?? null,
+      statusDigestOk: status_digest.ok,
+      statusDigestSent: status_digest.sent ?? 0,
+      statusDigestFailed: status_digest.failed ?? 0,
+      statusDigestSkipped: status_digest.skipped ?? false,
+      statusDigestReason: status_digest.reason ?? null,
     },
   });
   return NextResponse.json({
@@ -158,6 +167,7 @@ export async function GET(req: NextRequest) {
     usage_maintenance,
     backup_recovery,
     billing_sync,
+    status_digest,
   });
   } catch (e: unknown) {
     const duration = Date.now() - startedAt;

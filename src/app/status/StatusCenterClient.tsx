@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 
 type PlatformState =
   | "operational"
@@ -61,6 +61,13 @@ export type StatusPreview =
   | "loading";
 
 const AUTO_REFRESH_MS = 45_000;
+const STATUS_SUBSCRIBE_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const STATUS_SUBSCRIBE_STORAGE_KEY = "cyang_status_subscription_email";
+
+type StatusSubscribeApiResponse = {
+  ok?: boolean;
+  message?: string;
+};
 
 const SERVICE_CATALOG: Array<{
   key: string;
@@ -417,6 +424,9 @@ export default function StatusCenterClient({ preview }: { preview: StatusPreview
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [snapshot, setSnapshot] = useState<StatusSnapshot | null>(null);
   const [lastRefreshAt, setLastRefreshAt] = useState<number | null>(null);
+  const [subscriptionEmail, setSubscriptionEmail] = useState("");
+  const [subscriptionBusy, setSubscriptionBusy] = useState(false);
+  const [subscriptionFeedback, setSubscriptionFeedback] = useState<{ tone: "success" | "error"; message: string } | null>(null);
 
   const refreshSnapshot = useCallback(async (silent = false) => {
     if (preview === "loading") return;
@@ -459,6 +469,56 @@ export default function StatusCenterClient({ preview }: { preview: StatusPreview
     }, AUTO_REFRESH_MS);
     return () => window.clearInterval(id);
   }, [preview, refreshSnapshot]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const stored = String(window.localStorage.getItem(STATUS_SUBSCRIBE_STORAGE_KEY) || "").trim().toLowerCase();
+    if (stored && STATUS_SUBSCRIBE_EMAIL_RE.test(stored)) {
+      setSubscriptionEmail(stored);
+    }
+  }, []);
+
+  const submitSubscription = useCallback(async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const email = subscriptionEmail.trim().toLowerCase();
+    if (!STATUS_SUBSCRIBE_EMAIL_RE.test(email)) {
+      setSubscriptionFeedback({ tone: "error", message: "Enter a valid email address." });
+      return;
+    }
+
+    setSubscriptionBusy(true);
+    setSubscriptionFeedback(null);
+    try {
+      const res = await fetch("/api/status/subscribe", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({ email }),
+      });
+      const payload = (await res.json().catch(() => ({}))) as StatusSubscribeApiResponse;
+      if (!res.ok || !payload.ok) {
+        setSubscriptionFeedback({
+          tone: "error",
+          message: payload.message || "Unable to subscribe right now. Please try again shortly.",
+        });
+        return;
+      }
+      window.localStorage.setItem(STATUS_SUBSCRIBE_STORAGE_KEY, email);
+      setSubscriptionFeedback({
+        tone: "success",
+        message: payload.message || "You are subscribed to daily status updates.",
+      });
+    } catch {
+      setSubscriptionFeedback({
+        tone: "error",
+        message: "Network error while subscribing. Please try again.",
+      });
+    } finally {
+      setSubscriptionBusy(false);
+    }
+  }, [subscriptionEmail]);
 
   const scenario = useMemo<PlatformState>(() => {
     if (preview !== "live" && preview !== "loading") return preview;
@@ -671,14 +731,47 @@ export default function StatusCenterClient({ preview }: { preview: StatusPreview
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-base font-semibold text-white">Need help or updates?</h2>
-            <p className="mt-1 text-sm text-white/62">Contact support for account-specific questions, or use trust documentation for security guidance.</p>
+            <p className="mt-1 text-sm text-white/62">Contact support for account-specific questions, or subscribe for daily platform updates delivered at 6:00 AM UTC.</p>
           </div>
           <div className="flex flex-wrap items-center gap-2 text-sm">
             <a href="mailto:support@cyang.io" className="btn-base btn-secondary rounded-xl px-3 py-2">Contact support</a>
             <Link href="/security-disclosure" className="btn-base btn-secondary rounded-xl px-3 py-2">Security docs</Link>
-            <a href="mailto:support@cyang.io?subject=Status%20Updates%20Subscription" className="btn-base btn-secondary rounded-xl px-3 py-2">Subscribe to updates</a>
           </div>
         </div>
+        <form onSubmit={submitSubscription} className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center" noValidate>
+          <label className="sr-only" htmlFor="status-subscribe-email">Email address</label>
+          <input
+            id="status-subscribe-email"
+            type="email"
+            inputMode="email"
+            autoComplete="email"
+            placeholder="you@company.com"
+            value={subscriptionEmail}
+            onChange={(event) => setSubscriptionEmail(event.target.value)}
+            className="h-11 w-full rounded-xl border border-white/14 bg-white/[0.04] px-3.5 text-sm text-white placeholder:text-white/42 outline-none transition focus:border-cyan-300/60 focus:ring-2 focus:ring-cyan-300/20 sm:max-w-sm"
+            required
+          />
+          <button
+            type="submit"
+            disabled={subscriptionBusy}
+            className="btn-base rounded-xl border border-cyan-300/30 bg-cyan-300/18 px-4 py-2.5 text-sm font-medium text-cyan-100 hover:border-cyan-200/40 hover:bg-cyan-300/25 disabled:opacity-60"
+          >
+            {subscriptionBusy ? "Subscribing..." : "Subscribe to updates"}
+          </button>
+        </form>
+        {subscriptionFeedback ? (
+          <div
+            className={`mt-3 rounded-xl border px-3 py-2 text-sm ${
+              subscriptionFeedback.tone === "success"
+                ? "border-emerald-400/30 bg-emerald-400/12 text-emerald-100"
+                : "border-amber-400/30 bg-amber-400/12 text-amber-100"
+            }`}
+            role="status"
+            aria-live="polite"
+          >
+            {subscriptionFeedback.message}
+          </div>
+        ) : null}
       </section>
     </div>
   );
