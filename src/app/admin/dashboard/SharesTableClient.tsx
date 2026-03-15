@@ -31,7 +31,7 @@ export type ShareRow = {
   has_password: boolean;
 };
 
-type Status = "all" | "active" | "expired" | "maxed" | "revoked";
+type Status = "all" | "active" | "maxed";
 type StatusFilter = Status | "expiring";
 
 function formatDate(value: string | null) {
@@ -54,15 +54,13 @@ function formatViews(maxViews: number | null, viewCount: number) {
   return `${viewCount} of ${maxViews} views`;
 }
 
-function computeStatus(share: ShareRow, nowTs: number): Exclude<Status, "all"> {
-  if (share.revoked_at) return "revoked";
-  if (share.expires_at && new Date(share.expires_at).getTime() <= nowTs) return "expired";
+function computeStatus(share: ShareRow): Exclude<Status, "all"> {
   if (share.max_views != null && share.max_views !== 0 && share.view_count >= share.max_views) return "maxed";
   return "active";
 }
 
 function isExpiringSoon(share: ShareRow, nowTs: number) {
-  if (share.revoked_at || !share.expires_at) return false;
+  if (!share.expires_at) return false;
   const exp = new Date(share.expires_at).getTime();
   if (Number.isNaN(exp) || exp <= nowTs) return false;
   return exp <= nowTs + 7 * 24 * 60 * 60 * 1000;
@@ -72,8 +70,6 @@ function statusBadge(status: Exclude<Status, "all">, expiringSoon: boolean) {
   if (status === "active" && expiringSoon) {
     return { label: "Expiring soon", cls: "border-amber-500/25 bg-amber-500/10 text-amber-100" };
   }
-  if (status === "revoked") return { label: "Access removed", cls: "border-white/15 bg-white/[0.05] text-white/70" };
-  if (status === "expired") return { label: "Expired", cls: "border-rose-500/25 bg-rose-500/10 text-rose-100" };
   if (status === "maxed") return { label: "View limit reached", cls: "border-rose-500/25 bg-rose-500/10 text-rose-100" };
   return { label: "Secure link active", cls: "border-emerald-500/25 bg-emerald-500/10 text-emerald-100" };
 }
@@ -81,9 +77,7 @@ function statusBadge(status: Exclude<Status, "all">, expiringSoon: boolean) {
 function buildFilterLabel(filter: StatusFilter, count: number) {
   if (filter === "active") return `Active (${count})`;
   if (filter === "expiring") return `Expiring soon (${count})`;
-  if (filter === "expired") return `Expired (${count})`;
   if (filter === "maxed") return `View limit reached (${count})`;
-  if (filter === "revoked") return `Removed (${count})`;
   return `All (${count})`;
 }
 
@@ -106,7 +100,11 @@ export default function SharesTableClient(props: {
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
 
   const q = (sp.get("shareQ") || "").trim();
-  const status = (sp.get("shareStatus") || "all") as StatusFilter;
+  const statusRaw = (sp.get("shareStatus") || "all").trim().toLowerCase();
+  const status: StatusFilter =
+    statusRaw === "active" || statusRaw === "expiring" || statusRaw === "maxed" || statusRaw === "all"
+      ? statusRaw
+      : "all";
   const normalizedQ = q.toLowerCase();
 
   useEffect(() => {
@@ -115,26 +113,34 @@ export default function SharesTableClient(props: {
     return () => window.clearTimeout(id);
   }, [copiedToken]);
 
+  const reusableShares = useMemo(() => {
+    return props.shares.filter((share) => {
+      if (share.revoked_at) return false;
+      if (!share.expires_at) return true;
+      const expTs = new Date(share.expires_at).getTime();
+      if (Number.isNaN(expTs)) return true;
+      return expTs > props.nowTs;
+    });
+  }, [props.nowTs, props.shares]);
+
   const counts = useMemo(() => {
     const next: Record<StatusFilter, number> = {
-      all: props.shares.length,
+      all: reusableShares.length,
       active: 0,
       expiring: 0,
-      expired: 0,
       maxed: 0,
-      revoked: 0,
     };
-    for (const share of props.shares) {
-      const state = computeStatus(share, props.nowTs);
+    for (const share of reusableShares) {
+      const state = computeStatus(share);
       next[state] += 1;
       if (state === "active" && isExpiringSoon(share, props.nowTs)) next.expiring += 1;
     }
     return next;
-  }, [props.nowTs, props.shares]);
+  }, [props.nowTs, reusableShares]);
 
   const filtered = useMemo(() => {
-    return props.shares.filter((share) => {
-      const state = computeStatus(share, props.nowTs);
+    return reusableShares.filter((share) => {
+      const state = computeStatus(share);
       const expiring = isExpiringSoon(share, props.nowTs);
       const matchesFilter =
         status === "all" ? true : status === "expiring" ? state === "active" && expiring : state === status;
@@ -153,12 +159,12 @@ export default function SharesTableClient(props: {
         .toLowerCase();
       return haystack.includes(normalizedQ);
     });
-  }, [normalizedQ, props.nowTs, props.shares, status]);
+  }, [normalizedQ, props.nowTs, reusableShares, status]);
 
   const selectedTokens = useMemo(() => Object.keys(selected).filter((key) => selected[key]), [selected]);
   const anySelected = selectedTokens.length > 0;
   const activeCount = counts.active;
-  const passwordCount = props.shares.filter((share) => share.has_password).length;
+  const passwordCount = reusableShares.filter((share) => share.has_password).length;
 
   function syncUrl(next: { shareQ?: string; shareStatus?: StatusFilter }) {
     const params = new URLSearchParams(sp.toString());
@@ -181,7 +187,7 @@ export default function SharesTableClient(props: {
   }
 
   function downloadCsvForSelected() {
-    const rows = props.shares.filter((share) => selected[share.token]);
+    const rows = reusableShares.filter((share) => selected[share.token]);
     const header = ["token", "doc_id", "doc_title", "recipient", "created_at", "expires_at", "max_views", "view_count", "has_password"].join(",");
     const lines = rows.map((share) =>
       [
@@ -219,7 +225,7 @@ export default function SharesTableClient(props: {
         <div className="glass-card-strong rounded-[24px] p-4">
           <div className="text-xs uppercase tracking-[0.16em] text-white/45">All links</div>
           <div className="mt-2 text-2xl font-semibold text-white">{counts.all}</div>
-          <div className="mt-1 text-sm text-white/60">Every protected link you have created.</div>
+          <div className="mt-1 text-sm text-white/60">Reusable links currently available to manage.</div>
         </div>
         <div className="glass-card-strong rounded-[24px] p-4">
           <div className="text-xs uppercase tracking-[0.16em] text-white/45">Active</div>
@@ -249,7 +255,7 @@ export default function SharesTableClient(props: {
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
-              {(["all", "active", "expiring", "expired", "maxed", "revoked"] as StatusFilter[]).map((item) => (
+              {(["all", "active", "expiring", "maxed"] as StatusFilter[]).map((item) => (
                 <button
                   key={item}
                   type="button"
@@ -302,7 +308,7 @@ export default function SharesTableClient(props: {
         ) : (
           <div className="space-y-3 p-5">
             {filtered.map((share) => {
-              const state = computeStatus(share, props.nowTs);
+              const state = computeStatus(share);
               const expiringSoon = isExpiringSoon(share, props.nowTs);
               const badge = statusBadge(state, expiringSoon);
 
@@ -443,7 +449,7 @@ export default function SharesTableClient(props: {
 
         <div className="flex flex-col gap-3 border-t border-white/10 px-5 py-4 text-sm text-white/60 md:flex-row md:items-center md:justify-between">
           <div>
-            Showing <span className="text-white">{filtered.length}</span> of <span className="text-white">{props.shares.length}</span> links
+            Showing <span className="text-white">{filtered.length}</span> of <span className="text-white">{reusableShares.length}</span> links
           </div>
           <div className="flex flex-wrap gap-2">
             {canManageBulk ? (

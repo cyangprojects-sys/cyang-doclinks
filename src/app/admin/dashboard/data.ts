@@ -323,6 +323,8 @@ export async function getDashboardLinksData(u: AuthedUser) {
           limit 1
         ) a on true
         where 1=1
+          and st.revoked_at is null
+          and (st.expires_at is null or st.expires_at > now())
           ${ctx.docFilter}
         order by st.created_at desc
         limit 2000
