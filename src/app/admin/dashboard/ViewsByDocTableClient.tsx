@@ -94,11 +94,19 @@ function getShareHref(alias: string | null) {
   return `/d/${encodeURIComponent(alias)}`;
 }
 
-export default function ViewsByDocTableClient(props: { rows: ViewsByDocRow[]; canManageShares?: boolean }) {
+export default function ViewsByDocTableClient(props: {
+  rows: ViewsByDocRow[];
+  canManageShares?: boolean;
+  basePath?: string;
+}) {
   const sp = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
   const canManageShares = Boolean(props.canManageShares);
+  const basePath = props.basePath ?? "/admin";
+  const documentsPath = `${basePath}/documents`;
+  const linksPath = `${basePath}/links`;
+  const overviewUploadPath = `${basePath}?openPicker=1`;
   const [isPending, startTransition] = useTransition();
 
   const qFromUrl = (sp.get("viewQ") || "").trim();
@@ -183,7 +191,9 @@ export default function ViewsByDocTableClient(props: { rows: ViewsByDocRow[]; ca
   const quietCount = counts.quiet;
 
   async function copyLink(row: ViewsByDocRow) {
-    const href = row.alias ? `${window.location.origin}/d/${encodeURIComponent(row.alias)}` : `${window.location.origin}/admin/documents/${encodeURIComponent(row.doc_id)}`;
+    const href = row.alias
+      ? `${window.location.origin}/d/${encodeURIComponent(row.alias)}`
+      : `${window.location.origin}${documentsPath}/${encodeURIComponent(row.doc_id)}`;
     await navigator.clipboard.writeText(href);
     setCopiedId(row.doc_id);
   }
@@ -326,12 +336,12 @@ export default function ViewsByDocTableClient(props: { rows: ViewsByDocRow[]; ca
             </p>
             <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
               <Link
-                href="/admin?openPicker=1"
+                href={overviewUploadPath}
                 className="btn-base rounded-2xl border border-cyan-300/45 bg-cyan-300 px-5 py-3 text-sm font-semibold text-[#07131f] shadow-[0_14px_32px_rgba(34,211,238,0.18)] hover:bg-cyan-200"
               >
                 Upload file
               </Link>
-              <Link href="/admin/links" className="btn-base btn-secondary rounded-2xl px-4 py-3 text-sm">
+              <Link href={linksPath} className="btn-base btn-secondary rounded-2xl px-4 py-3 text-sm">
                 Open shared links
               </Link>
             </div>
@@ -405,7 +415,7 @@ export default function ViewsByDocTableClient(props: { rows: ViewsByDocRow[]; ca
 
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
-                          <Link href={`/admin/documents/${row.doc_id}`} className="truncate text-lg font-semibold text-white hover:text-cyan-100">
+                          <Link href={`${documentsPath}/${row.doc_id}`} className="truncate text-lg font-semibold text-white hover:text-cyan-100">
                             {row.doc_title || "Untitled file"}
                           </Link>
                           <span className={`rounded-full border px-2.5 py-1 text-[11px] ${statusToneClass}`}>{statusLabel}</span>
@@ -476,7 +486,7 @@ export default function ViewsByDocTableClient(props: { rows: ViewsByDocRow[]; ca
                       </>
                     ) : scanState === "CLEAN" ? (
                       <Link
-                        href={`/admin/documents?createLink=1&docId=${encodeURIComponent(row.doc_id)}`}
+                        href={`${documentsPath}?createLink=1&docId=${encodeURIComponent(row.doc_id)}`}
                         className="btn-base rounded-2xl border border-cyan-300/40 bg-cyan-300 px-4 py-3 text-center text-sm font-semibold text-[#07131f] shadow-[0_14px_36px_rgba(34,211,238,0.18)] hover:bg-cyan-200"
                       >
                         Create protected link
@@ -492,13 +502,13 @@ export default function ViewsByDocTableClient(props: { rows: ViewsByDocRow[]; ca
                     )}
 
                     <Link
-                      href={`/admin/documents?docQ=${encodeURIComponent(row.doc_title || row.doc_id)}`}
+                      href={`${documentsPath}?docQ=${encodeURIComponent(row.doc_title || row.doc_id)}`}
                       className="btn-base btn-secondary rounded-2xl px-4 py-3 text-center text-sm"
                     >
                       Open file
                     </Link>
                     <Link
-                      href={`/admin/links?shareQ=${encodeURIComponent(row.alias || row.doc_title || row.doc_id)}`}
+                      href={`${linksPath}?shareQ=${encodeURIComponent(row.alias || row.doc_title || row.doc_id)}`}
                       className="btn-base btn-secondary rounded-2xl px-4 py-3 text-center text-sm"
                     >
                       Manage links

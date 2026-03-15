@@ -1,9 +1,11 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import { ensureUserByEmail } from "@/lib/authz";
-import ViewerSignOutButton from "./ViewerSignOutButton";
+import { getBillingFlags } from "@/lib/settings";
+import AdminShell from "@/app/admin/_components/AdminShell";
+import { ADMIN_NAV_ITEMS, type AdminNavItem } from "@/app/admin/_components/adminNavigation";
+import { getAdminShellContext } from "@/app/admin/_components/adminShellData";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -33,34 +35,41 @@ export default async function ViewerLayout({
     redirect("/admin");
   }
 
-  return (
-    <main className="app-shell min-h-screen px-4 py-6 text-white sm:px-6 sm:py-8">
-      <div className="mx-auto w-full max-w-[1280px]">
-        <header className="glass-card-strong ui-sheen sticky top-2 z-40 rounded-[28px] border-white/14 px-4 py-4 sm:px-6">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <div className="text-xs uppercase tracking-[0.16em] text-white/52">DocLinks</div>
-              <div className="mt-1 flex items-center gap-2">
-                <h1 className="text-xl font-semibold text-white sm:text-2xl">Member workspace</h1>
-                <span className="rounded-full border border-white/14 bg-white/[0.05] px-2.5 py-1 text-[11px] uppercase tracking-[0.13em] text-cyan-100">
-                  Member
-                </span>
-              </div>
-            </div>
-            <div className="flex flex-wrap items-center gap-2.5">
-              <Link
-                href="/signin?intent=admin"
-                className="btn-base rounded-xl border border-white/12 bg-white/[0.04] px-3.5 py-2 text-sm text-white/78 hover:border-white/22 hover:bg-white/[0.08]"
-              >
-                Workspace owner sign-in
-              </Link>
-              <ViewerSignOutButton />
-            </div>
-          </div>
-        </header>
+  const billingFlags = await getBillingFlags();
+  const shellContext = await getAdminShellContext({
+    userId: user.id,
+    email: session.user.email,
+    orgId,
+    orgSlug,
+    isOwner: false,
+  });
+  const viewerNavItems: AdminNavItem[] = ADMIN_NAV_ITEMS.filter((item) =>
+    item.key === "overview" ||
+    item.key === "documents" ||
+    item.key === "links" ||
+    item.key === "activity"
+  ).map((item) => ({
+    ...item,
+    href: item.href.replace(/^\/admin\b/, "/viewer"),
+  }));
+  const viewerContext = {
+    ...shellContext,
+    workspaceLabel: "Member workspace",
+    roleLabel: "Member",
+  };
 
-        <div className="mt-5">{children}</div>
-      </div>
-    </main>
+  return (
+    <AdminShell
+      email={session.user.email}
+      isOwner={false}
+      showPricingUi={billingFlags.flags.pricingUiEnabled}
+      context={viewerContext}
+      routeBase="/viewer"
+      navItems={viewerNavItems}
+      profileHref="/viewer"
+      signOutCallbackUrl="/signin"
+    >
+      {children}
+    </AdminShell>
   );
 }

@@ -97,6 +97,7 @@ export default function DashboardHeaderActions(props: {
   mode?: "default" | "modal-only";
   uploadPickerHref?: string;
   createLinkFallbackHref?: string;
+  upgradeHref?: string;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -153,6 +154,7 @@ export default function DashboardHeaderActions(props: {
   }, [docsWithStatus]);
   const uploadPickerHref = props.uploadPickerHref ?? "/admin?openPicker=1";
   const createLinkUploadHref = props.createLinkFallbackHref ?? "/admin?openPicker=1&fromCreateLink=1";
+  const upgradeHref = props.upgradeHref ?? "/admin/upgrade";
 
   useEffect(() => {
     if (!docsWithStatus.length) {
@@ -438,7 +440,7 @@ export default function DashboardHeaderActions(props: {
                   {proUpsellPreset ? (
                     <div className="mt-2 flex items-center gap-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-2 text-xs text-amber-100">
                       <span>Pro preset - upgrade to enable.</span>
-                      <a href="/admin/upgrade" className="rounded-md border border-amber-400/40 bg-amber-400/15 px-2 py-1 text-amber-50 hover:bg-amber-400/25">
+                      <a href={upgradeHref} className="rounded-md border border-amber-400/40 bg-amber-400/15 px-2 py-1 text-amber-50 hover:bg-amber-400/25">
                         Upgrade to Pro
                       </a>
                     </div>
@@ -458,7 +460,7 @@ export default function DashboardHeaderActions(props: {
                   {showUpgradePrompt ? (
                     <div className="mt-2 flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-2 py-2 text-xs text-amber-100">
                       <span>Need stricter controls or higher limits?</span>
-                      <a href="/admin/upgrade" className="rounded-md border border-amber-400/40 bg-amber-400/15 px-2 py-1 text-amber-50 hover:bg-amber-400/25">
+                      <a href={upgradeHref} className="rounded-md border border-amber-400/40 bg-amber-400/15 px-2 py-1 text-amber-50 hover:bg-amber-400/25">
                         Upgrade to Pro
                       </a>
                     </div>

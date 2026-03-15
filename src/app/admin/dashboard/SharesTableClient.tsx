@@ -87,11 +87,20 @@ function buildFilterLabel(filter: StatusFilter, count: number) {
   return `All (${count})`;
 }
 
-export default function SharesTableClient(props: { shares: ShareRow[]; nowTs: number; canManageBulk?: boolean }) {
+export default function SharesTableClient(props: {
+  shares: ShareRow[];
+  nowTs: number;
+  canManageBulk?: boolean;
+  basePath?: string;
+}) {
   const sp = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
   const canManageBulk = Boolean(props.canManageBulk);
+  const basePath = props.basePath ?? "/admin";
+  const documentsPath = `${basePath}/documents`;
+  const overviewUploadPath = `${basePath}?openPicker=1`;
+  const linksPath = `${basePath}/links`;
 
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
@@ -281,10 +290,10 @@ export default function SharesTableClient(props: { shares: ShareRow[]; nowTs: nu
                 Create a protected link from Files once a file is ready to share.
               </div>
               <div className="mt-5 flex justify-center gap-3">
-                <Link href="/admin/documents" className="btn-base rounded-xl border border-cyan-300/40 bg-cyan-300 px-4 py-2 text-sm font-semibold text-[#07131f] hover:bg-cyan-200">
+                <Link href={documentsPath} className="btn-base rounded-xl border border-cyan-300/40 bg-cyan-300 px-4 py-2 text-sm font-semibold text-[#07131f] hover:bg-cyan-200">
                   Open files
                 </Link>
-                <Link href="/admin?openPicker=1" className="btn-base btn-secondary rounded-xl px-4 py-2 text-sm">
+                <Link href={overviewUploadPath} className="btn-base btn-secondary rounded-xl px-4 py-2 text-sm">
                   Upload file
                 </Link>
               </div>
@@ -413,7 +422,7 @@ export default function SharesTableClient(props: { shares: ShareRow[]; nowTs: nu
                       >
                         Open link
                       </Link>
-                      <Link href={`/admin/links/${encodeURIComponent(share.token)}`} className="btn-base btn-secondary rounded-2xl px-4 py-3 text-center text-sm">
+                      <Link href={`${linksPath}/${encodeURIComponent(share.token)}`} className="btn-base btn-secondary rounded-2xl px-4 py-3 text-center text-sm">
                         Link detail
                       </Link>
                       <RevokeShareForm

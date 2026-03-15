@@ -7,7 +7,6 @@ import { signOut } from "next-auth/react";
 import {
   ADMIN_NAV_GROUPS,
   getAdminNavItems,
-  matchAdminNavItem,
   type AdminIconName,
   type AdminNavItem,
 } from "./adminNavigation";
@@ -18,6 +17,11 @@ type AdminShellProps = {
   isOwner: boolean;
   showPricingUi: boolean;
   context: AdminShellContext;
+  routeBase?: string;
+  navItems?: AdminNavItem[];
+  profileHref?: string;
+  helpHref?: string;
+  signOutCallbackUrl?: string;
   children: React.ReactNode;
 };
 
@@ -205,14 +209,44 @@ function CommandPalette({
   );
 }
 
-export default function AdminShell({ email, isOwner, context, children }: AdminShellProps) {
+export default function AdminShell(props: AdminShellProps) {
+  const {
+    email,
+    isOwner,
+    context,
+    children,
+    routeBase = "/admin",
+    navItems,
+    profileHref: profileHrefProp,
+    helpHref: helpHrefProp,
+    signOutCallbackUrl: signOutCallbackUrlProp,
+  } = props;
   const pathname = usePathname();
   const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
-  const items = useMemo(() => getAdminNavItems(isOwner), [isOwner]);
-  const currentItem = useMemo(() => matchAdminNavItem(pathname, isOwner), [isOwner, pathname]);
+  const items = useMemo(() => {
+    if (navItems?.length) {
+      return navItems;
+    }
+    const baseItems = getAdminNavItems(isOwner);
+    if (routeBase === "/admin") return baseItems;
+    return baseItems.map((item) => ({
+      ...item,
+      href: item.href.startsWith("/admin") ? item.href.replace(/^\/admin\b/, routeBase) : item.href,
+    }));
+  }, [isOwner, navItems, routeBase]);
+  const currentItem = useMemo(
+    () => items.find((item) => isActive(pathname, item.href)) ?? items[0] ?? null,
+    [items, pathname]
+  );
+  const uploadHref = `${routeBase}/documents?openPicker=1`;
+  const createLinkHref = `${routeBase}/documents?createLink=1`;
+  const profileHref = profileHrefProp || `${routeBase}/team`;
+  const helpHref = helpHrefProp || "/security-disclosure";
+  const signOutCallbackUrl = signOutCallbackUrlProp || "/";
+  const siteHref = routeBase === "/viewer" ? "/projects/doclinks" : "/";
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -241,17 +275,17 @@ export default function AdminShell({ email, isOwner, context, children }: AdminS
         label: "Upload documents",
         hint: "Open the upload flow on Documents.",
         icon: "documents" as const,
-        onSelect: () => router.push("/admin/documents?openPicker=1"),
+        onSelect: () => router.push(uploadHref),
       },
       {
         key: "create-link",
         label: "Create protected link",
         hint: "Open the protected-link modal from Documents.",
         icon: "links" as const,
-        onSelect: () => router.push("/admin/documents?createLink=1"),
+        onSelect: () => router.push(createLinkHref),
       },
     ],
-    [items, router]
+    [createLinkHref, items, router, uploadHref]
   );
 
   const navByGroup = useMemo(() => {
@@ -290,14 +324,14 @@ export default function AdminShell({ email, isOwner, context, children }: AdminS
             <div className="mt-2 text-sm font-medium text-white">Upload, scan, protect, and monitor from one place.</div>
             <div className="mt-3 flex gap-2">
               <Link
-                href="/admin/documents?openPicker=1"
+                href={uploadHref}
                 onClick={onNavigate}
                 className="btn-base inline-flex rounded-xl border border-cyan-300/35 bg-cyan-300 px-3 py-2 text-xs font-semibold text-[#07131f] hover:bg-cyan-200"
               >
                 Upload
               </Link>
               <Link
-                href="/admin/documents?createLink=1"
+                href={createLinkHref}
                 onClick={onNavigate}
                 className="btn-base inline-flex rounded-xl border border-white/12 bg-white/[0.08] px-3 py-2 text-xs text-white/82 hover:bg-white/[0.12]"
               >
@@ -370,13 +404,13 @@ export default function AdminShell({ email, isOwner, context, children }: AdminS
               <span className="flex-1">Search and jump</span>
               <span className="rounded-lg border border-white/12 bg-white/[0.04] px-2 py-1 text-[11px] text-white/45">Ctrl K</span>
             </button>
-            <Link href="/admin/team" onClick={onNavigate} className="flex items-center gap-3 rounded-2xl border border-transparent px-3 py-2 text-sm text-white/64 hover:border-white/10 hover:bg-white/[0.04] hover:text-white">
+            <Link href={profileHref} onClick={onNavigate} className="flex items-center gap-3 rounded-2xl border border-transparent px-3 py-2 text-sm text-white/64 hover:border-white/10 hover:bg-white/[0.04] hover:text-white">
               <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04]">
                 <AdminIcon name="profile" />
               </span>
               <span className="flex-1">My Profile</span>
             </Link>
-            <Link href="/security-disclosure" onClick={onNavigate} className="flex items-center gap-3 rounded-2xl border border-transparent px-3 py-2 text-sm text-white/64 hover:border-white/10 hover:bg-white/[0.04] hover:text-white">
+            <Link href={helpHref} onClick={onNavigate} className="flex items-center gap-3 rounded-2xl border border-transparent px-3 py-2 text-sm text-white/64 hover:border-white/10 hover:bg-white/[0.04] hover:text-white">
               <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04]">
                 <AdminIcon name="help" />
               </span>
@@ -388,7 +422,7 @@ export default function AdminShell({ email, isOwner, context, children }: AdminS
             <button type="button" onClick={() => setPaletteOpen(true)} className="flex w-full justify-center rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2.5 text-white/72 hover:bg-white/[0.08]">
               <AdminIcon name="search" />
             </button>
-            <Link href="/admin/team" onClick={onNavigate} className="flex justify-center rounded-2xl border border-transparent px-3 py-2.5 text-white/68 hover:border-white/10 hover:bg-white/[0.04] hover:text-white">
+            <Link href={profileHref} onClick={onNavigate} className="flex justify-center rounded-2xl border border-transparent px-3 py-2.5 text-white/68 hover:border-white/10 hover:bg-white/[0.04] hover:text-white">
               <AdminIcon name="profile" />
             </Link>
           </div>
@@ -401,19 +435,19 @@ export default function AdminShell({ email, isOwner, context, children }: AdminS
               <div className="mt-2 truncate text-sm font-medium text-white/84">{email || "unknown"}</div>
               <div className="mt-3 flex gap-2">
                 <button
-                  onClick={() => signOut({ callbackUrl: "/" })}
+                  onClick={() => signOut({ callbackUrl: signOutCallbackUrl })}
                   className="btn-base flex-1 rounded-xl border border-white/12 bg-white/[0.06] px-3 py-2 text-xs text-white/84 hover:bg-white/[0.1]"
                 >
                   Sign out
                 </button>
-                <Link href="/" className="btn-base rounded-xl border border-white/12 bg-white/[0.04] px-3 py-2 text-xs text-white/68 hover:bg-white/[0.08]">
+                <Link href={siteHref} className="btn-base rounded-xl border border-white/12 bg-white/[0.04] px-3 py-2 text-xs text-white/68 hover:bg-white/[0.08]">
                   Site
                 </Link>
               </div>
             </>
           ) : (
             <button
-              onClick={() => signOut({ callbackUrl: "/" })}
+              onClick={() => signOut({ callbackUrl: signOutCallbackUrl })}
               className="flex w-full justify-center rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2.5 text-white/76 hover:bg-white/[0.08]"
               aria-label="Sign out"
             >
@@ -492,10 +526,10 @@ export default function AdminShell({ email, isOwner, context, children }: AdminS
                 >
                   Search
                 </button>
-                <Link href="/admin/documents?createLink=1" className="btn-base rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-white/78 hover:bg-white/[0.08]">
+                <Link href={createLinkHref} className="btn-base rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-white/78 hover:bg-white/[0.08]">
                   Create Link
                 </Link>
-                <Link href="/admin/documents?openPicker=1" className="btn-base rounded-xl border border-cyan-300/38 bg-cyan-300 px-3.5 py-2 text-sm font-semibold text-[#07131f] hover:bg-cyan-200">
+                <Link href={uploadHref} className="btn-base rounded-xl border border-cyan-300/38 bg-cyan-300 px-3.5 py-2 text-sm font-semibold text-[#07131f] hover:bg-cyan-200">
                   Upload Documents
                 </Link>
               </div>
