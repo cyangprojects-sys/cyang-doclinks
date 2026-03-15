@@ -21,6 +21,7 @@ export async function SiteFooter() {
             <Link href="/terms" className="transition-colors hover:text-white">Terms</Link>
             <Link href="/acceptable-use" className="transition-colors hover:text-white">Acceptable Use</Link>
             <Link href="/privacy" className="transition-colors hover:text-white">Privacy</Link>
+            <Link href="/status" className="transition-colors hover:text-white">Status</Link>
             <Link href="/data-retention" className="transition-colors hover:text-white">Data Retention</Link>
             <Link href="/security-disclosure" className="transition-colors hover:text-white">Security Disclosure</Link>
             <Link href="/report" className="transition-colors hover:text-white">Report</Link>

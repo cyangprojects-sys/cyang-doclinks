@@ -36,6 +36,9 @@ export async function SiteHeader() {
           <Link href="/about" className="btn-base btn-secondary rounded-lg px-3.5 py-2">
             About
           </Link>
+          <Link href="/status" className="btn-base btn-secondary rounded-lg px-3.5 py-2">
+            Status
+          </Link>
         </nav>
 
         <div className="flex items-center gap-2">

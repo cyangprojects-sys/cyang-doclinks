@@ -374,7 +374,7 @@ export default function SignInClient(props: SignInClientProps) {
               <Link href="/terms" className="hover:text-white/80">
                 Terms
               </Link>
-              <a href="/api/health" target="_blank" rel="noreferrer" className="hover:text-white/80">
+              <a href="/status" className="hover:text-white/80">
                 System status
               </a>
             </div>
