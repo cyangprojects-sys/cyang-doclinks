@@ -14,7 +14,7 @@ import { hasSignupConsentCookie, isSignupEnabled, recordTermsAcceptance, verifyM
  * Landing behavior:
  * - Successful sign-in goes through an intent-aware continuation route
  * - Admin/owner sign-in lands in /admin
- * - Viewer sign-in lands on the public Doclinks product surface
+ * - Viewer sign-in lands in /viewer
  * - Sign-out lands on /
  *
  * Owner role:
@@ -315,7 +315,7 @@ export const authOptions: NextAuthOptions = {
         // ignore parsing issues; fall through to the role-aware continuation route
       }
 
-      // Default: send signed-in users through the viewer/general continuation route.
+      // Default: send signed-in users through the viewer continuation route.
       return `${baseUrl}${POST_SIGN_IN_PATH}`;
     },
   },

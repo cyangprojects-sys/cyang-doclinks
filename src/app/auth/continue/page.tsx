@@ -7,7 +7,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const ADMIN_HOME_PATH = "/admin";
-const VIEWER_HOME_PATH = "/projects/doclinks";
+const VIEWER_HOME_PATH = "/viewer";
 
 export default async function PostSignInContinuePage() {
   const session = await getServerSession(authOptions);
@@ -21,7 +21,7 @@ export default async function PostSignInContinuePage() {
   try {
     user = await ensureUserByEmail(email, { orgId, orgSlug });
   } catch {
-    // Fall through to the public Doclinks product surface for non-admin accounts.
+    // Fall through to the authenticated viewer workspace for non-admin accounts.
   }
 
   if (user && (user.role === "admin" || user.role === "owner")) {

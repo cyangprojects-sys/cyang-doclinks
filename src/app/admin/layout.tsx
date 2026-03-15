@@ -31,7 +31,7 @@ export default async function AdminLayout({
   const orgId = (session.user as { orgId?: string | null } | undefined)?.orgId ?? null;
   const orgSlug = (session.user as { orgSlug?: string | null } | undefined)?.orgSlug ?? null;
   const user = await ensureUserByEmail(email, { orgId, orgSlug });
-  if (!isAdminRole(user.role)) redirect("/projects/doclinks");
+  if (!isAdminRole(user.role)) redirect("/viewer");
 
   const role = user.role;
   const isOwner = role === "owner";

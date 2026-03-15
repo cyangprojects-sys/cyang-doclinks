@@ -25,5 +25,5 @@ export default async function PostSignInAdminContinuePage() {
     redirect("/admin");
   }
 
-  redirect("/projects/doclinks");
+  redirect("/viewer");
 }

@@ -34,7 +34,7 @@ export default async function MfaPage({ searchParams }: { searchParams: SearchPa
   const orgId = (session?.user as { orgId?: string | null } | undefined)?.orgId ?? null;
   const orgSlug = (session?.user as { orgSlug?: string | null } | undefined)?.orgSlug ?? null;
   const user = await ensureUserByEmail(email, { orgId, orgSlug });
-  if (user.role !== "admin" && user.role !== "owner") redirect("/projects/doclinks");
+  if (user.role !== "admin" && user.role !== "owner") redirect("/viewer");
 
   if (!roleRequiresMfa(user.role) && !mfaEnforcementEnabled()) {
     redirect("/admin");
