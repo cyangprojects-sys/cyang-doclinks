@@ -16,14 +16,16 @@ export default async function PostSignInContinuePage() {
 
   const orgId = (session?.user as { orgId?: string | null } | undefined)?.orgId ?? null;
   const orgSlug = (session?.user as { orgSlug?: string | null } | undefined)?.orgSlug ?? null;
+  let user: Awaited<ReturnType<typeof ensureUserByEmail>> | null = null;
 
   try {
-    const user = await ensureUserByEmail(email, { orgId, orgSlug });
-    if (user.role === "admin" || user.role === "owner") {
-      redirect(ADMIN_HOME_PATH);
-    }
+    user = await ensureUserByEmail(email, { orgId, orgSlug });
   } catch {
     // Fall through to the public Doclinks product surface for non-admin accounts.
+  }
+
+  if (user && (user.role === "admin" || user.role === "owner")) {
+    redirect(ADMIN_HOME_PATH);
   }
 
   redirect(VIEWER_HOME_PATH);

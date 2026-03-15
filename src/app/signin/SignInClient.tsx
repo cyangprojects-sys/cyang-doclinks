@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { signIn } from "next-auth/react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 type AccessIntent = "admin" | "viewer";
 
@@ -91,7 +91,9 @@ function TrustChip({ label }: { label: string }) {
 }
 
 export default function SignInClient(props: SignInClientProps) {
-  const [intent, setIntent] = useState<AccessIntent>(props.initialIntent);
+  const initialOwnerReveal = props.initialIntent === "admin";
+  const [ownerRevealOpen, setOwnerRevealOpen] = useState(initialOwnerReveal);
+  const [intent, setIntent] = useState<AccessIntent>(initialOwnerReveal ? "admin" : "viewer");
   const [isGoogleEnabled, setIsGoogleEnabled] = useState(props.googleConfigured);
   const [isEnterpriseEnabled, setIsEnterpriseEnabled] = useState(props.enterpriseConfigured);
   const [busyProvider, setBusyProvider] = useState<"google" | "enterprise-sso" | null>(null);
@@ -135,7 +137,8 @@ export default function SignInClient(props: SignInClientProps) {
     }
   };
 
-  const cards = useMemo(() => ACCESS_CARDS, []);
+  const viewerCard = ACCESS_CARDS.find((card) => card.key === "viewer")!;
+  const adminCard = ACCESS_CARDS.find((card) => card.key === "admin")!;
 
   return (
     <main className="relative min-h-screen overflow-hidden px-4 py-10 sm:px-6 sm:py-14">
@@ -192,53 +195,107 @@ export default function SignInClient(props: SignInClientProps) {
             <div>
               <div className="text-xs uppercase tracking-[0.16em] text-cyan-200/82">Choose how you&apos;re signing in</div>
               <div className="mt-4 grid gap-3">
-                {cards.map((card) => {
-                  const selected = card.key === intent;
-                  return (
-                    <button
-                      key={card.key}
-                      type="button"
-                      onClick={() => setIntent(card.key)}
+                <button
+                  type="button"
+                  onClick={() => setIntent("viewer")}
+                  className={[
+                    "group w-full rounded-2xl border p-4 text-left transition-all duration-200",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 focus-visible:ring-offset-0",
+                    intent === "viewer"
+                      ? "border-cyan-300/35 bg-[linear-gradient(135deg,rgba(79,213,203,0.13),rgba(111,167,255,0.1))] shadow-[0_14px_36px_rgba(36,128,198,0.2)]"
+                      : "border-white/12 bg-white/[0.03] hover:border-white/24 hover:bg-white/[0.06]",
+                  ].join(" ")}
+                  aria-pressed={intent === "viewer"}
+                >
+                  <div className="flex items-start gap-3">
+                    <span
                       className={[
-                        "group w-full rounded-2xl border p-4 text-left transition-all duration-200",
-                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 focus-visible:ring-offset-0",
-                        selected
-                          ? "border-cyan-300/35 bg-[linear-gradient(135deg,rgba(79,213,203,0.13),rgba(111,167,255,0.1))] shadow-[0_14px_36px_rgba(36,128,198,0.2)]"
-                          : "border-white/12 bg-white/[0.03] hover:border-white/24 hover:bg-white/[0.06]",
+                        "mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border",
+                        intent === "viewer"
+                          ? "border-cyan-300/25 bg-cyan-300/15 text-cyan-100"
+                          : "border-white/14 bg-white/[0.05] text-white/74 group-hover:text-white",
                       ].join(" ")}
-                      aria-pressed={selected}
+                    >
+                      <AccessIcon intent="viewer" />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="text-[11px] uppercase tracking-[0.16em] text-white/50">{viewerCard.label}</span>
+                      <span className="mt-1 block text-lg font-semibold text-white">{viewerCard.title}</span>
+                      <span className="mt-1 block text-sm text-white/68">{viewerCard.description}</span>
+                      <span className="mt-2 block text-xs text-white/50">{viewerCard.secondary}</span>
+                      <span className="mt-3 inline-flex items-center rounded-lg border border-cyan-300/35 bg-cyan-300/14 px-3 py-1.5 text-xs font-medium text-cyan-100">
+                        {viewerCard.cta}
+                      </span>
+                    </span>
+                  </div>
+                </button>
+
+                <div className="rounded-2xl border border-white/12 bg-white/[0.03] p-4">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setOwnerRevealOpen((current) => {
+                        const next = !current;
+                        setIntent(next ? "admin" : "viewer");
+                        return next;
+                      })
+                    }
+                    className="group flex w-full items-center justify-between rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2.5 text-left text-sm text-white/82 transition hover:border-white/18 hover:bg-white/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70"
+                    aria-expanded={ownerRevealOpen}
+                  >
+                    <span>
+                      Workspace owner sign-in
+                      <span className="mt-0.5 block text-xs text-white/55">Show admin tools for workspace management and policy controls.</span>
+                    </span>
+                    <svg viewBox="0 0 24 24" fill="none" className={["h-4 w-4 text-white/65 transition-transform", ownerRevealOpen ? "rotate-180" : ""].join(" ")}>
+                      <path d="m6 9 6 6 6-6" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </button>
+
+                  {ownerRevealOpen ? (
+                    <button
+                      type="button"
+                      onClick={() => setIntent("admin")}
+                      className={[
+                        "mt-3 group w-full rounded-xl border p-4 text-left transition-all duration-200",
+                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 focus-visible:ring-offset-0",
+                        intent === "admin"
+                          ? "border-cyan-300/35 bg-[linear-gradient(135deg,rgba(79,213,203,0.13),rgba(111,167,255,0.1))] shadow-[0_14px_36px_rgba(36,128,198,0.2)]"
+                          : "border-white/12 bg-white/[0.02] hover:border-white/22 hover:bg-white/[0.05]",
+                      ].join(" ")}
+                      aria-pressed={intent === "admin"}
                     >
                       <div className="flex items-start gap-3">
                         <span
                           className={[
                             "mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border",
-                            selected
+                            intent === "admin"
                               ? "border-cyan-300/25 bg-cyan-300/15 text-cyan-100"
                               : "border-white/14 bg-white/[0.05] text-white/74 group-hover:text-white",
                           ].join(" ")}
                         >
-                          <AccessIcon intent={card.key} />
+                          <AccessIcon intent="admin" />
                         </span>
                         <span className="min-w-0 flex-1">
-                          <span className="text-[11px] uppercase tracking-[0.16em] text-white/50">{card.label}</span>
-                          <span className="mt-1 block text-lg font-semibold text-white">{card.title}</span>
-                          <span className="mt-1 block text-sm text-white/68">{card.description}</span>
-                          <span className="mt-2 block text-xs text-white/50">{card.secondary}</span>
+                          <span className="text-[11px] uppercase tracking-[0.16em] text-white/50">{adminCard.label}</span>
+                          <span className="mt-1 block text-base font-semibold text-white">{adminCard.title}</span>
+                          <span className="mt-1 block text-sm text-white/68">{adminCard.description}</span>
+                          <span className="mt-2 block text-xs text-white/50">{adminCard.secondary}</span>
                           <span
                             className={[
                               "mt-3 inline-flex items-center rounded-lg border px-3 py-1.5 text-xs font-medium",
-                              selected
+                              intent === "admin"
                                 ? "border-cyan-300/35 bg-cyan-300/14 text-cyan-100"
                                 : "border-white/14 bg-white/[0.05] text-white/74",
                             ].join(" ")}
                           >
-                            {card.cta}
+                            {adminCard.cta}
                           </span>
                         </span>
                       </div>
                     </button>
-                  );
-                })}
+                  ) : null}
+                </div>
               </div>
             </div>
 
