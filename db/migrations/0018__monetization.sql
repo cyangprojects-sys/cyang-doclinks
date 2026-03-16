@@ -1,0 +1,1 @@
+-- source: scripts/sql/monetization.sql

@@ -1,0 +1,1 @@
+-- source: scripts/sql/share_allow_download.sql

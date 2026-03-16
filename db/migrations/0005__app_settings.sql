@@ -1,0 +1,1 @@
+-- source: scripts/sql/app_settings.sql

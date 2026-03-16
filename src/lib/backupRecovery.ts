@@ -43,6 +43,85 @@ export function parseBackupRecoveryConfig(env: NodeJS.ProcessEnv = process.env):
   return { enabled, maxAgeHours, recoveryDrillDays, webhook };
 }
 
+async function tableExists(name: string): Promise<boolean> {
+  try {
+    const rows = (await sql`select to_regclass(${name})::text as reg`) as Array<{ reg: string | null }>;
+    return Boolean(rows[0]?.reg);
+  } catch {
+    return false;
+  }
+}
+
+export async function getBackupRecoveryStatusSummary() {
+  const { enabled, maxAgeHours, recoveryDrillDays } = parseBackupRecoveryConfig();
+  const backupRunsReady = await tableExists("public.backup_runs");
+  const recoveryDrillsReady = await tableExists("public.recovery_drills");
+
+  if (!enabled) {
+    return {
+      enabled: false,
+      tablesReady: backupRunsReady && recoveryDrillsReady,
+      lastStatus: "disabled",
+      maxAgeHours,
+      recoveryDrillDays,
+      hoursSinceLastSuccess: null as number | null,
+      freshnessOk: false,
+      recoveryDrillDue: true,
+    };
+  }
+
+  if (!backupRunsReady || !recoveryDrillsReady) {
+    return {
+      enabled: true,
+      tablesReady: false,
+      lastStatus: "missing",
+      maxAgeHours,
+      recoveryDrillDays,
+      hoursSinceLastSuccess: null as number | null,
+      freshnessOk: false,
+      recoveryDrillDue: true,
+    };
+  }
+
+  const backupRows = (await sql`
+    select
+      (select status::text from public.backup_runs order by created_at desc limit 1) as last_status,
+      (
+        select extract(epoch from (now() - max(created_at))) / 3600.0
+        from public.backup_runs
+        where status in ('ok', 'success')
+      ) as hours_since_last_success
+  `) as Array<{ last_status: string | null; hours_since_last_success: number | string | null }>;
+
+  const recoveryRows = (await sql`
+    select
+      (
+        select extract(epoch from (now() - max(ran_at))) / 86400.0
+        from public.recovery_drills
+        where status = 'success'
+      ) as days_since_last_success
+  `) as Array<{ days_since_last_success: number | string | null }>;
+
+  const hoursSinceLastSuccess =
+    backupRows[0]?.hours_since_last_success == null ? null : Number(backupRows[0]?.hours_since_last_success);
+  const daysSinceRecovery =
+    recoveryRows[0]?.days_since_last_success == null ? Number.POSITIVE_INFINITY : Number(recoveryRows[0]?.days_since_last_success);
+  const freshnessOk =
+    hoursSinceLastSuccess != null && Number.isFinite(hoursSinceLastSuccess) && hoursSinceLastSuccess <= maxAgeHours;
+  const recoveryDrillDue = !Number.isFinite(daysSinceRecovery) || daysSinceRecovery >= recoveryDrillDays;
+
+  return {
+    enabled: true,
+    tablesReady: true,
+    lastStatus: String(backupRows[0]?.last_status || "missing"),
+    maxAgeHours,
+    recoveryDrillDays,
+    hoursSinceLastSuccess,
+    freshnessOk,
+    recoveryDrillDue,
+  };
+}
+
 async function pingBackupWebhook(url: string): Promise<{ ok: boolean; status: number; body?: string }> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 12_000);
@@ -103,36 +182,7 @@ export async function runBackupRecoveryCheck() {
     // best-effort
   }
 
-  let freshnessOk = false;
-  let hoursSinceLast = null as number | null;
-  try {
-    const rows = (await sql`
-      select
-        extract(epoch from (now() - max(created_at))) / 3600.0 as hours_since
-      from public.backup_runs
-      where status in ('ok', 'success')
-    `) as unknown as Array<{ hours_since: number | string | null }>;
-    const h = rows?.[0]?.hours_since;
-    hoursSinceLast = h == null ? null : Number(h);
-    freshnessOk = hoursSinceLast != null && Number.isFinite(hoursSinceLast) && hoursSinceLast <= maxAgeHours;
-  } catch {
-    freshnessOk = false;
-  }
-
-  let recoveryDrillDue = false;
-  try {
-    const rows = (await sql`
-      select
-        extract(epoch from (now() - max(ran_at))) / 86400.0 as days_since
-      from public.recovery_drills
-      where status = 'success'
-    `) as unknown as Array<{ days_since: number | string | null }>;
-    const d = rows?.[0]?.days_since;
-    const daysSince = d == null ? Number.POSITIVE_INFINITY : Number(d);
-    recoveryDrillDue = !Number.isFinite(daysSince) || daysSince >= recoveryDrillDays;
-  } catch {
-    recoveryDrillDue = true;
-  }
+  const status = await getBackupRecoveryStatusSummary();
 
   return {
     enabled: true,
@@ -140,10 +190,10 @@ export async function runBackupRecoveryCheck() {
     backupOk,
     backupStatus,
     maxAgeHours,
-    hoursSinceLastSuccess: hoursSinceLast,
-    freshnessOk,
+    hoursSinceLastSuccess: status.hoursSinceLastSuccess,
+    freshnessOk: status.freshnessOk,
     recoveryDrillDays,
-    recoveryDrillDue,
+    recoveryDrillDue: status.recoveryDrillDue,
     backupMeta,
   };
 }

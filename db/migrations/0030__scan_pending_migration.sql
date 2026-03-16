@@ -1,0 +1,1 @@
+-- source: scripts/sql/scan_pending_migration.sql

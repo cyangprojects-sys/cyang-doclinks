@@ -1,0 +1,1 @@
+-- source: scripts/sql/enterprise_rbac.sql

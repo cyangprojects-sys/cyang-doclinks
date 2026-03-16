@@ -2,11 +2,18 @@ import { expect, test } from "@playwright/test";
 import { readFileSync } from "node:fs";
 
 test.describe("api route access controls (static)", () => {
-  test("health endpoint remains publicly readable", () => {
-    const code = readFileSync("src/app/api/health/route.ts", "utf8");
-    expect(code.includes("export async function GET")).toBeTruthy();
-    expect(code.includes("enforceGlobalApiRateLimit(")).toBeTruthy();
-    expect(code.includes("RATE_LIMIT_HEALTH_IP_PER_MIN")).toBeTruthy();
+  test("health endpoints remain publicly readable but throttled", () => {
+    for (const file of [
+      "src/app/api/health/route.ts",
+      "src/app/api/health/live/route.ts",
+      "src/app/api/health/ready/route.ts",
+      "src/app/api/health/deps/route.ts",
+    ]) {
+      const code = readFileSync(file, "utf8");
+      expect(code.includes("export async function GET")).toBeTruthy();
+      expect(code.includes("enforceGlobalApiRateLimit(")).toBeTruthy();
+      expect(code.includes("RATE_LIMIT_HEALTH_IP_PER_MIN")).toBeTruthy();
+    }
   });
 
   test("debug alias endpoint requires authenticated owner and debug gate", () => {

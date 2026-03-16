@@ -1,0 +1,2 @@
+-- source: scripts/sql/user_ownership_layer.sql
+-- requires-env: OWNER_EMAIL

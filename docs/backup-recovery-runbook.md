@@ -55,7 +55,11 @@ Manual restore test (from a dump file):
 1. Download dump from R2.
 2. Restore into a non-production Neon branch:
    - `pg_restore --clean --if-exists --no-owner --no-privileges --dbname "$TARGET_DATABASE_URL" <dump-file>`
-3. Run smoke checks before any cutover.
+3. Run smoke checks before any cutover:
+   - `npm run restore:verify -- --require-current-migrations`
+4. Record the drill result if desired:
+   - success: `npm run restore:verify -- --record-success --notes "quarterly restore drill"`
+   - failure: `npm run restore:verify -- --record-failure --notes "restore validation issue"`
 
 ## 2) R2 Object Recovery
 1. Confirm bucket retention/versioning configuration in Cloudflare dashboard.
@@ -86,3 +90,5 @@ Manual restore test (from a dump file):
 - Quarantined docs remain blocked unless override exists.
 - Cron endpoints reachable from Cloudflare worker.
 - Security event ingestion and alert spikes operating.
+- `/api/health/ready` returns `200`.
+- `/api/health/deps` shows fresh backups and no critical dependency failures.

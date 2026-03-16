@@ -8,6 +8,8 @@ test.describe("ci workflow guardrails", () => {
     expect(code.includes("security-unit")).toBeTruthy();
     expect(code.includes("npm run lint")).toBeTruthy();
     expect(code.includes("npm run audit:env-example")).toBeTruthy();
+    expect(code.includes("npm run db:migrations:verify")).toBeTruthy();
+    expect(code.includes("npm run release:gate -- --allow-missing-env")).toBeTruthy();
     expect(code.includes("npm run build")).toBeTruthy();
     expect(code.includes("npx tsc --noEmit -p tsconfig.json")).toBeTruthy();
     expect(code.includes("npm run audit:admin-routes")).toBeTruthy();

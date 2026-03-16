@@ -1,11 +1,10 @@
-// app/api/health/route.ts
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-import { NextResponse, type NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { buildLivenessSummary } from "@/lib/health";
 import { enforceGlobalApiRateLimit } from "@/lib/securityTelemetry";
 import { getRouteTimeoutMs, isRouteTimeoutError, withRouteTimeout } from "@/lib/routeTimeout";
-import { buildReadinessSummary, summarizeHealthChecks } from "@/lib/health";
 
 export async function GET(req: NextRequest) {
   const timeoutMs = getRouteTimeoutMs("ROUTE_TIMEOUT_HEALTH_MS", 3_000);
@@ -26,15 +25,12 @@ export async function GET(req: NextRequest) {
           );
         }
 
-        const summary = await buildReadinessSummary();
-        const readiness = summarizeHealthChecks(summary.checks);
-
-        return NextResponse.json(summary, { status: readiness.httpStatus });
+        return NextResponse.json(buildLivenessSummary());
       })(),
       timeoutMs
     );
-  } catch (e: unknown) {
-    if (isRouteTimeoutError(e)) {
+  } catch (error: unknown) {
+    if (isRouteTimeoutError(error)) {
       return NextResponse.json({ ok: false, error: "TIMEOUT" }, { status: 504 });
     }
     return NextResponse.json({ ok: false, error: "SERVER_ERROR" }, { status: 500 });

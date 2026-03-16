@@ -104,6 +104,28 @@ Open `http://localhost:3000`.
 npm run build
 ```
 
+### Production readiness validation
+```bash
+npm run production-readiness
+```
+
+### Release gate with real deploy env
+```bash
+npm run release:gate
+```
+
+### Ordered database migrations
+```bash
+npm run db:migrations:verify
+npm run db:migrate -- status
+npm run db:migrate -- apply
+```
+
+### Staging fire drill
+```bash
+npm run fire-drill:staging
+```
+
 ## Browser Accessibility and Quality Audits
 
 ### Axe (Playwright)
@@ -153,6 +175,7 @@ Recent shipped updates (March 2026):
 - Abuse operations expansion: blocked IP rollups, active blocked IP viewer, and block-hit telemetry.
 - Retention/integrity hardening: weekly orphan sweep route, safer orphan-deletion defaults, and serve-path missing-object checks.
 - Legal center rollout: `/legal` section with Terms, Privacy, AUP, DMCA, DPA, SLA, Security Policy, and Subprocessors sourced from repo docs.
+- Production-readiness hardening: ordered DB migrations with a ledger, release-gate validation, live/ready/dependency health endpoints, and scripted backup/restore fire drills.
 
 ## Stripe Billing
 
@@ -163,6 +186,8 @@ See:
 - `scripts/sql/stripe_event_log.sql`
 - `docs/stripe-billing-runbook.md`
 - `docs/next-steps-rollout.md`
+- `docs/database-migrations.md`
+- `docs/production-readiness.md`
 
 ## Incident Response
 

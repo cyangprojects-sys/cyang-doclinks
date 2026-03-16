@@ -33,8 +33,14 @@ jobs:
       - name: Env Example Audit
         run: npm run audit:env-example
 
+      - name: Migration Manifest Verify
+        run: npm run db:migrations:verify
+
       - name: Admin Route Guard Audit
         run: npm run audit:admin-routes
+
+      - name: Release Gate (Repo)
+        run: npm run release:gate -- --allow-missing-env
 
       - name: Build
         run: npm run build

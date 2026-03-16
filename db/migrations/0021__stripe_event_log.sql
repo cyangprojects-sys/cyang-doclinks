@@ -1,0 +1,1 @@
+-- source: scripts/sql/stripe_event_log.sql

@@ -1,0 +1,1 @@
+-- source: scripts/sql/status_subscriptions.sql

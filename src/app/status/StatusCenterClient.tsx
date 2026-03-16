@@ -433,7 +433,7 @@ export default function StatusCenterClient({ preview }: { preview: StatusPreview
     if (!silent) setLoading(true);
     setRefreshing(silent);
     try {
-      const res = await fetch("/api/health", { cache: "no-store", headers: { Accept: "application/json" } });
+      const res = await fetch("/api/health/ready", { cache: "no-store", headers: { Accept: "application/json" } });
       const payload = (await res.json()) as Partial<StatusSnapshot>;
       if (!res.ok) {
         setSnapshot({ ok: false, service: "cyang.io", ts: Date.now(), error: typeof payload.error === "string" ? payload.error : `HTTP_${res.status}` });
@@ -724,8 +724,9 @@ export default function StatusCenterClient({ preview }: { preview: StatusPreview
 {JSON.stringify(technical, null, 2)}
           </pre>
           <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-white/55">
-            <a href="/api/health" target="_blank" rel="noreferrer" className="underline hover:text-white">View raw JSON endpoint</a>
-            <span>Source: /api/health</span>
+            <a href="/api/health/live" target="_blank" rel="noreferrer" className="underline hover:text-white">Live</a>
+            <a href="/api/health/ready" target="_blank" rel="noreferrer" className="underline hover:text-white">Ready</a>
+            <a href="/api/health/deps" target="_blank" rel="noreferrer" className="underline hover:text-white">Dependencies</a>
           </div>
         </div>
       </details>

@@ -6,17 +6,13 @@ This is the exact rollout sequence for the latest hardening changes (billing ide
 
 ## 1) Database migrations
 
-Run these SQL scripts in order:
+Use the ordered migration runner instead of manually applying loose SQL files:
 
-1. `scripts/sql/monetization.sql`
-2. `scripts/sql/stripe_billing.sql`
-3. `scripts/sql/stripe_billing_event_order.sql`
-4. `scripts/sql/stripe_event_log.sql`
-5. `scripts/sql/data_integrity_constraints.sql`
-6. `scripts/sql/rate_limit_counters.sql`
-7. `scripts/sql/abuse_ip_blocks.sql`
+1. `npm run db:migrations:verify`
+2. `npm run db:migrate -- status`
+3. `npm run db:migrate -- apply`
 
-If you already ran older scripts, rerunning is safe (`if not exists`/idempotent alters).
+See `docs/database-migrations.md` for wrapper format, ledger behavior, and rollback guidance.
 
 ## 2) Environment settings
 
@@ -70,6 +66,12 @@ Example (if your scheduler supports URL + bearer token):
 
 ## 4) Validation checks
 
+Before functional validation, run:
+
+```bash
+npm run production-readiness
+```
+
 ### Billing and Stripe
 
 1. Open owner billing Stripe page: `/admin/billing/stripe`.
@@ -104,7 +106,7 @@ Example (if your scheduler supports URL + bearer token):
 
 These require your deployment/database environment access:
 
-1. Apply SQL migrations to production/staging database.
+1. Apply ordered DB migrations to production/staging database with `npm run db:migrate -- apply`.
 2. Set/update environment variables in hosting provider.
 3. Configure cron schedule in your hosting/orchestrator.
 4. Configure Stripe webhook endpoint in Stripe dashboard to `/api/stripe/webhook`.
@@ -113,9 +115,12 @@ These require your deployment/database environment access:
 ## 6) Cutover sequence (recommended)
 
 1. Deploy code to staging.
-2. Run SQL migrations on staging, then validate `/admin/billing/stripe` and `/admin/abuse`.
-3. Run `GET /api/cron/orphan-sweep?delete=false` once and review counts.
-4. Promote to production.
-5. Run SQL migrations on production.
-6. Verify Stripe webhook deliveries are `2xx` and idempotent.
-7. Enable orphan delete mode (`ORPHAN_SWEEP_DELETE=true`) only after one clean audit-only run.
+2. Run `npm run release:gate`.
+3. Run `npm run db:migrate -- apply` on staging, then validate `/admin/billing/stripe` and `/admin/abuse`.
+4. Run `GET /api/cron/orphan-sweep?delete=false` once and review counts.
+5. Run `npm run fire-drill:staging`.
+6. Promote to production.
+7. Run `npm run release:gate`.
+8. Run `npm run db:migrate -- apply` on production.
+9. Verify Stripe webhook deliveries are `2xx` and idempotent.
+10. Enable orphan delete mode (`ORPHAN_SWEEP_DELETE=true`) only after one clean audit-only run.

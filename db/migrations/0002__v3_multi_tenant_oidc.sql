@@ -1,0 +1,1 @@
+-- source: scripts/sql/v3_multi_tenant_oidc.sql

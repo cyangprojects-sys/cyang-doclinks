@@ -1,0 +1,1 @@
+-- source: scripts/sql/doc_view_daily.sql

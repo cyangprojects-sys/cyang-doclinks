@@ -1,0 +1,1 @@
+-- source: scripts/sql/share_geo_watermark.sql
