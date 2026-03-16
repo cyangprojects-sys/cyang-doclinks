@@ -1,32 +1,7 @@
-import Link from "next/link";
-import { SiteShell } from "@/app/components/SiteShell";
-import { MarkdownLegal } from "@/app/legal/MarkdownLegal";
-import { readLegalDocMarkdown } from "@/lib/legalDocs";
+import { permanentRedirect } from "next/navigation";
 
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
 
-export default async function TermsPage() {
-  const markdown = await readLegalDocMarkdown("TERMS_OF_SERVICE.md");
-
-  return (
-    <SiteShell maxWidth="full">
-      <main className="mx-auto w-full max-w-[1700px] px-3 py-8 sm:px-4 lg:px-6">
-        <div className="mb-6 flex items-center justify-between gap-3">
-          <div>
-            <div className="text-xs text-white/60">cyang.io</div>
-            <h1 className="mt-1 text-2xl font-semibold text-white">Terms of Service</h1>
-            <div className="mt-2 text-sm text-white/60">Source: docs/TERMS_OF_SERVICE.md</div>
-          </div>
-          <Link href="/legal" className="rounded-xl bg-white/10 px-4 py-2 text-sm text-white hover:bg-white/15">
-            Legal Center
-          </Link>
-        </div>
-
-        <article className="rounded-2xl border border-white/10 bg-white/5 p-6">
-          <MarkdownLegal markdown={markdown} />
-        </article>
-      </main>
-    </SiteShell>
-  );
+export default function TermsPage() {
+  permanentRedirect("/legal/terms-of-service");
 }

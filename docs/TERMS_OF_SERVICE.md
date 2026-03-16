@@ -1,148 +1,105 @@
 # Terms of Service
 Effective Date: March 01, 2026
+Last Updated: March 16, 2026
 
-By accessing or using cyang.io / DocLinks ("Service"), you agree to these Terms.
+These Terms of Service govern access to and use of cyang.io and Doclinks (the "Service"). By creating an account, accessing the Service, or using any feature, you agree to these Terms.
 
----
+## 1. Agreement Scope
+These Terms apply to users, administrators, and recipients who access content through share links or other delivery flows.
 
-## 1. Clickwrap Agreement & Acceptance
+## 2. Eligibility and Authority
+You must be legally able to enter into a binding agreement. If you use the Service for a company or organization, you represent that you have authority to bind that entity.
 
-By creating an account, checking the acceptance box, or using the Service,
-you affirmatively agree to be bound by these Terms and all referenced policies.
+## 3. Account Registration and Security
+You are responsible for account activity, credential confidentiality, and reasonable endpoint security.
 
-We maintain electronic records of acceptance including timestamp and IP address.
-Continued use after updates constitutes acceptance of revised Terms.
+- Use accurate account information.
+- Keep authentication credentials secure.
+- Promptly notify us of unauthorized access at security@cyang.io.
 
----
+## 4. Service Access and Permitted Use
+Doclinks is designed for controlled external document delivery, not general consumer cloud storage. You may use the Service only in compliance with these Terms, the Acceptable Use Policy, and applicable law.
 
-## 2. Ownership of Customer Data
+## 5. Customer Data Ownership and Service License
+You retain ownership of documents and data you upload ("Customer Data").
 
-You retain all right, title, and interest in and to documents and data you upload ("Customer Data").
+You grant cyang.io a limited, non-exclusive, worldwide license to host, process, encrypt, transmit, and display Customer Data solely to operate, secure, and improve the Service.
 
-We claim no ownership of Customer Data.
+We do not sell Customer Data and do not use Customer Data to train public machine learning models.
 
-You grant cyang.io a limited, non-exclusive license to store, encrypt,
-process, and transmit Customer Data solely to provide and secure the Service.
+## 6. Security Controls and Enforcement
+The Service uses server-side enforcement for plan limits and sharing policy controls. You acknowledge that security controls may block, quarantine, revoke, or limit delivery when risk states are detected.
 
-We will not:
-- Sell Customer Data
-- Use Customer Data for advertising
-- Use Customer Data to train machine learning models
+## 7. Acceptable Conduct
+You must not use the Service for unlawful, abusive, deceptive, or harmful purposes. Prohibited behavior is described in the Acceptable Use Policy.
 
----
+## 8. Fees, Billing, Taxes, and Renewals
+Paid plans are billed in advance under your selected billing cycle.
 
-## 3. Prohibited Uses
+- Fees are stated before purchase.
+- Unless otherwise required by law, fees are non-refundable.
+- You are responsible for applicable taxes except taxes based on our net income.
+- If payment fails, we may suspend paid features until payment is resolved.
 
-You may not:
-- Upload unlawful or infringing content
-- Distribute malware
-- Attempt to bypass security controls
-- Reverse engineer or clone the Service
+## 9. Free, Trial, Beta, and Experimental Features
+Free, trial, preview, or beta features may have limited functionality, reduced support, or no uptime commitment. These features may change or be removed at any time.
 
----
+## 10. Third-Party Services
+The Service may rely on third-party infrastructure and service providers. Their interruptions may affect availability. Subprocessors are disclosed in the Subprocessors policy.
 
-## 4. Suspension, Removal, and Termination Rights
+## 11. Confidentiality
+If you share non-public business information with us for support, security review, or procurement, we will use reasonable measures to protect that information and use it only for the requested purpose.
 
-We may, at any time and with or without notice, suspend or restrict access to the Service,
-remove or disable content, block access from specific users, accounts, networks, or geographies,
-and terminate accounts when we reasonably determine it is necessary for:
-- Security, abuse prevention, or incident response
-- Suspected fraud, unauthorized access, or platform misuse
-- Legal or regulatory compliance
-- Violations of these Terms or related policies
-- Protection of users, third parties, or Service integrity
+## 12. Intellectual Property Rights
+The Service, software, branding, interface elements, and related content are owned by cyang.io or licensors and are protected by intellectual property laws.
 
-You remain responsible for all activity under your account until termination is complete.
+These Terms do not transfer ownership of our intellectual property to you.
 
----
+## 13. Feedback
+If you submit feedback, suggestions, or feature requests, you grant us a perpetual, irrevocable, worldwide, royalty-free license to use that feedback without restriction and without compensation.
 
-## 5. Subscription & Payments
+## 14. Suspension and Termination
+We may suspend, restrict, or terminate access when reasonably necessary to:
 
-Subscriptions are billed in advance.
-Fees are non-refundable except where required by law.
-Failure to pay may result in suspension.
+- investigate abuse or security incidents,
+- prevent harm to users or third parties,
+- comply with law or legal process,
+- enforce these Terms or the Acceptable Use Policy,
+- protect service integrity and availability.
 
----
+You may stop using the Service at any time.
 
-## 6. Warranty Disclaimer
+## 15. Data Retention and Deletion
+Retention and deletion behavior may depend on plan level, operational controls, legal obligations, and security workflows. See the Privacy Policy and Data Retention page for additional context.
 
-THE SERVICE IS PROVIDED "AS IS" AND "AS AVAILABLE," WITHOUT WARRANTIES OF ANY KIND,
-WHETHER EXPRESS, IMPLIED, STATUTORY, OR OTHERWISE, INCLUDING ANY IMPLIED WARRANTIES OF
-MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE, NON-INFRINGEMENT, OR THAT THE
-SERVICE WILL BE UNINTERRUPTED, ERROR-FREE, SECURE, OR AVAILABLE AT ANY PARTICULAR TIME.
+## 16. Warranties Disclaimer
+THE SERVICE IS PROVIDED "AS IS" AND "AS AVAILABLE." TO THE MAXIMUM EXTENT PERMITTED BY LAW, WE DISCLAIM ALL WARRANTIES, EXPRESS OR IMPLIED, INCLUDING MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT.
 
-TO THE MAXIMUM EXTENT PERMITTED BY LAW, WE DISCLAIM ALL WARRANTIES AND CONDITIONS ARISING
-OUT OF COURSE OF DEALING, USAGE, OR TRADE PRACTICE.
+## 17. Limitation of Liability
+TO THE MAXIMUM EXTENT PERMITTED BY LAW, CYANG.IO WILL NOT BE LIABLE FOR INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, OR LOSS OF PROFITS, REVENUE, DATA, OR GOODWILL.
 
----
+OUR AGGREGATE LIABILITY FOR CLAIMS ARISING OUT OF OR RELATED TO THE SERVICE WILL NOT EXCEED THE TOTAL AMOUNT PAID BY YOU TO CYANG.IO FOR THE SERVICE IN THE 12 MONTHS BEFORE THE EVENT GIVING RISE TO LIABILITY.
 
-## 7. Indemnification
+## 18. Indemnification
+You agree to defend, indemnify, and hold harmless cyang.io and its personnel from claims, liabilities, losses, and expenses arising from:
 
-You agree to defend, indemnify, and hold harmless cyang.io, DocLinks, and their officers,
-directors, employees, and agents from and against any claims, liabilities, damages, losses,
-costs, and expenses (including reasonable attorneys’ fees) arising out of or related to:
-- Content you upload, store, share, or distribute
-- Any allegation that your content infringes or misappropriates third-party intellectual property rights
-- Your illegal, fraudulent, or unauthorized use of the Service
-- Your violation of these Terms, applicable law, or third-party rights
+- Customer Data you upload or share,
+- your use of the Service in violation of these Terms,
+- your violation of applicable law or third-party rights.
 
----
+## 19. Governing Law and Dispute Resolution
+These Terms are governed by the laws of the State of Minnesota, excluding conflict-of-law principles.
 
-## 8. Beta and Experimental Features
+Any dispute will be resolved in state or federal courts located in Minnesota, unless otherwise required by applicable law.
 
-From time to time, we may provide beta, preview, or experimental features ("Beta Features").
-Beta Features may be modified, suspended, or discontinued at any time without notice.
-Beta Features may be unstable, contain errors, or have reduced security and no uptime guarantee.
-Use of Beta Features is at your own risk.
+## 20. Changes to the Service or Terms
+We may modify the Service or these Terms as the platform evolves. Material changes will be reflected by updating the Last Updated date and posting revised terms at /legal.
 
----
+Continued use after updated Terms become effective constitutes acceptance.
 
-## 9. Export Compliance and Sanctions
+## 21. Contact Information
+For legal questions:
 
-You may not use, export, re-export, transfer, or allow access to the Service in violation of
-U.S. export control laws, sanctions laws, or other applicable trade laws and regulations.
-You represent and warrant that you are not located in, organized in, or ordinarily resident in,
-and are not acting on behalf of, any country or region subject to comprehensive U.S. sanctions,
-and are not on any U.S. government denied-party list.
-
----
-
-## 10. Force Majeure
-
-We are not liable for any delay, failure, or interruption in performance caused by events beyond
-our reasonable control, including internet or cloud infrastructure outages, denial-of-service attacks,
-war, terrorism, civil unrest, labor disputes, natural disasters, fire, flood, epidemic, pandemic,
-government actions, legal restrictions, or utility failures.
-
----
-
-## 11. Limitation of Liability
-
-To the maximum extent permitted by law, total liability shall not exceed
-fees paid in the prior 12 months.
-
----
-
-## 12. Arbitration and Class Action Waiver
-
-To the maximum extent permitted by law, any dispute, claim, or controversy arising out of or
-relating to these Terms or the Service will be resolved by final and binding arbitration on an
-individual basis, except that either party may seek injunctive relief in a court of competent
-jurisdiction for intellectual property misuse or unauthorized access claims.
-
-You and cyang.io waive any right to a jury trial and waive any right to participate in a class,
-collective, representative, or consolidated action or proceeding.
-
----
-
-## 13. Assignment
-
-You may not assign or transfer these Terms, by operation of law or otherwise, without our prior
-written consent. We may assign or transfer these Terms, in whole or in part, without restriction,
-including in connection with a merger, acquisition, corporate reorganization, or sale of assets.
-
----
-
-## 14. Governing Law
-
-State of Minnesota, USA.
+- legal@cyang.io
+- privacy@cyang.io
+- security@cyang.io

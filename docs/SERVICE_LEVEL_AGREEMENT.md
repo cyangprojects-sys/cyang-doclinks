@@ -1,50 +1,66 @@
-# Service Level Agreement (SLA)
+# Service Level Agreement
 Effective Date: March 01, 2026
+Last Updated: March 16, 2026
 
-This SLA applies to paid subscription plans only.
+This Service Level Agreement (SLA) applies to paid Doclinks plans.
 
----
+## 1. Covered Service and Plans
+This SLA covers paid subscription plans for the Doclinks service. Free plans are excluded unless explicitly stated.
 
-## 1. Uptime Commitment
+## 2. Service Commitment
+Target monthly uptime commitment: 99.9%.
 
-cyang.io targets 99.9% monthly uptime availability,
-excluding scheduled maintenance and force majeure events.
+## 3. Definitions
+- Uptime: Time when core paid-plan service functionality is available.
+- Downtime: Time when paid-plan service is unavailable due to verified service-side failure.
+- Monthly Uptime Percentage: ((Total Minutes - Downtime Minutes) / Total Minutes) x 100.
 
-Uptime is calculated as:
-(Total Minutes - Downtime) / Total Minutes × 100
+## 4. Exclusions from Downtime
+The following do not count as Downtime:
 
----
+- scheduled maintenance windows,
+- emergency maintenance to mitigate active security risk,
+- customer-side network or configuration issues,
+- misuse, policy violations, or account suspension,
+- force majeure events,
+- third-party dependency outages outside reasonable control.
 
-## 2. Scheduled Maintenance
+## 5. Scheduled Maintenance
+Planned maintenance may occur to preserve security and reliability. Reasonable effort is made to minimize customer impact.
 
-We may perform maintenance with reasonable notice.
-Scheduled maintenance does not count toward downtime.
+## 6. Service Credits
+If Monthly Uptime Percentage falls below 99.9%, eligible paid customers may request credits:
 
----
+| Monthly uptime percentage | Service credit |
+|---|---|
+| 99.0% to 99.89% | 5% of monthly plan fee |
+| 95.0% to 98.99% | 10% of monthly plan fee |
+| Below 95.0% | 20% of monthly plan fee |
 
-## 3. Service Credits
+Credits apply to future invoices only.
 
-If monthly uptime falls below 99.9% for paid plans:
+## 7. How to Request Credits
+Credit requests must be sent to legal@cyang.io within 30 days after the month in which the issue occurred.
 
-- 99.0%–99.89%: 5% service credit
-- 95.0%–98.99%: 10% service credit
-- Below 95.0%: 20% service credit
+Include:
 
-Credits apply to future billing cycles only and must be requested within 30 days.
+- account identifier,
+- incident date and time range,
+- observed impact details,
+- relevant request IDs or logs if available.
 
----
+## 8. Verification and Issuance
+We review requests against internal monitoring and event records. Approved credits are issued on the next practical billing cycle.
 
-## 4. Exclusions
+## 9. Sole and Exclusive Remedy
+Service credits under this SLA are the sole and exclusive remedy for covered downtime under paid plans.
 
-Downtime does not include:
+## 10. Relationship to Other Terms
+This SLA is incorporated into the Terms of Service for paid plans. If there is a conflict specific to uptime credits, this SLA controls.
 
-- Customer-side internet failures
-- Misuse or configuration errors
-- Force majeure events
-- Third-party provider outages beyond reasonable control
+## 11. Changes to This SLA
+We may update this SLA to reflect operational changes or service evolution. Updated terms are posted in the Legal and Trust Center.
 
----
-
-## 5. Sole Remedy
-
-Service credits are the sole and exclusive remedy for SLA breaches.
+## 12. Contact
+- legal@cyang.io
+- status page: /status
