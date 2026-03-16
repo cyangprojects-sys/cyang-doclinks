@@ -368,6 +368,9 @@ export default function SignInClient(props: SignInClientProps) {
               <a href="mailto:support@cyang.io" className="hover:text-white/80">
                 Contact support
               </a>
+              <Link href="/trust" className="hover:text-white/80">
+                Trust Center
+              </Link>
               <Link href="/privacy" className="hover:text-white/80">
                 Privacy
               </Link>

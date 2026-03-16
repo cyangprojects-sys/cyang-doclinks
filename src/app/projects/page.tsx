@@ -1,8 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { SiteShell } from "../components/SiteShell";
-import { DemoDocButton } from "@/components/DemoDocButton";
-import { DEMO_DOC_URL } from "@/lib/demo";
 
 export const metadata: Metadata = {
   title: "Projects - cyang.io",
@@ -53,14 +51,14 @@ const PROJECTS: StudioProject[] = [
     featured: true,
   },
   {
-    name: "Control Plane",
+    name: "Operations reliability layer",
     summary:
-      "Operational interfaces for governance, security posture, abuse handling, and day-to-day product administration.",
-    href: "/admin",
+      "Governance and reliability systems that keep policy behavior, incident handling, and service operation predictable.",
+    href: "/trust",
     status: "Shipping",
     category: "Operations system",
-    tags: ["Admin tools", "Governance", "Usage controls"],
-    cta: "View control surfaces",
+    tags: ["Governance", "Operational clarity", "Service controls"],
+    cta: "View trust architecture",
   },
   {
     name: "Security and Compliance Center",
@@ -110,7 +108,7 @@ const SHIPPING_TRACKS: ShippingTrack[] = [
     body: "Capabilities actively maturing in public product surfaces.",
     items: [
       "Doclinks share lifecycle and policy controls",
-      "Operational governance tooling in admin surfaces",
+      "Operational governance tooling in workspace surfaces",
       "Status and trust-center pathways for customer transparency",
     ],
   },
@@ -150,7 +148,7 @@ export default function ProjectsPage() {
 
         <div className="mt-5 grid gap-6 lg:grid-cols-12 lg:items-end">
           <div className="lg:col-span-8">
-            <h1 className="font-editorial max-w-5xl text-5xl leading-[1.02] tracking-tight text-white sm:text-6xl lg:text-7xl">
+            <h1 className="font-editorial max-w-5xl text-4xl leading-[1.04] tracking-tight text-white sm:text-5xl lg:text-6xl">
               Curated products, maintained systems, and deliberate experimentation.
             </h1>
             <p className="mt-6 max-w-3xl text-base leading-relaxed text-white/72 sm:text-lg">
@@ -158,7 +156,7 @@ export default function ProjectsPage() {
               security-first defaults, and clear user experience under real usage.
             </p>
 
-            <div className="mt-8 flex flex-wrap gap-3">
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
               <Link href="/projects/doclinks" className="btn-base btn-primary rounded-xl px-6 py-3 text-sm font-semibold">
                 Explore flagship
               </Link>
@@ -213,13 +211,18 @@ export default function ProjectsPage() {
               ))}
             </div>
 
-            <div className="mt-7 flex flex-wrap gap-3">
+            <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
               <Link href="/projects/doclinks" className="btn-base btn-primary rounded-xl px-5 py-3 text-sm font-semibold">
                 Open Doclinks
               </Link>
-              <DemoDocButton label="View demo" className="btn-base btn-secondary rounded-xl px-5 py-3 text-sm" />
-              <Link href="/admin" className="btn-base btn-secondary rounded-xl px-5 py-3 text-sm">
-                Upload a file
+              <Link href="/signup" className="btn-base btn-secondary rounded-xl px-5 py-3 text-sm">
+                Create account
+              </Link>
+              <Link href="/pricing" className="btn-base btn-secondary rounded-xl px-5 py-3 text-sm">
+                Compare plans
+              </Link>
+              <Link href="/trust" className="btn-base btn-secondary rounded-xl px-5 py-3 text-sm">
+                Review trust
               </Link>
             </div>
           </div>
@@ -334,12 +337,12 @@ export default function ProjectsPage() {
         <SectionHeader
           eyebrow="Quick actions"
           title="Jump directly into what you need"
-          body="Fast utility actions for product exploration, hands-on experience, and trust verification."
+          body="Fast utility actions for product evaluation, account setup, and trust verification."
         />
 
         <div className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <ActionTile href="/admin" title="Upload a document" body="Create a shareable link through the live admin flow." />
-          <ActionTile href={DEMO_DOC_URL} title="Open a demo" body="View a live shared document in a new tab." external />
+          <ActionTile href="/signup" title="Get started" body="Create an account and begin secure document delivery." />
+          <ActionTile href="/projects/doclinks" title="Explore Doclinks" body="Review the flagship product and control surface." />
           <ActionTile href="/about" title="Read the approach" body="See how cyang.io builds with strict defaults and clarity." />
           <ActionTile href="/status" title="View status" body="Check platform health and operational transparency." />
         </div>
@@ -357,7 +360,7 @@ export default function ProjectsPage() {
             </p>
           </div>
 
-          <div className="mt-7 flex flex-wrap gap-3">
+          <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
             <Link href="/projects/doclinks" className="btn-base btn-primary rounded-xl px-6 py-3 text-sm font-semibold">
               Go to Doclinks
             </Link>

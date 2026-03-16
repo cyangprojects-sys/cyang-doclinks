@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { SiteShell } from "./components/SiteShell";
-import { DemoDocButton } from "@/components/DemoDocButton";
 import { getBillingFlags } from "@/lib/settings";
 
 export const metadata: Metadata = {
@@ -26,20 +25,20 @@ export default async function HomePage() {
           <span className="ui-badge inline-flex rounded-full px-3 py-1 text-xs uppercase tracking-[0.16em]">
             cyang.io - disciplined systems and products
           </span>
-          <h1 className="font-editorial mt-5 max-w-4xl text-5xl leading-[1.02] tracking-tight text-white sm:text-6xl lg:text-7xl">
+          <h1 className="font-editorial mt-5 max-w-4xl text-4xl leading-[1.04] tracking-tight text-white sm:text-5xl lg:text-6xl">
             Built for teams that need software to stay
             <span className="block text-white/72">clear, controlled, and dependable.</span>
           </h1>
           <p className="mt-7 max-w-3xl text-lg leading-relaxed text-white/72">
-            cyang.io is a product studio for practical systems: secure tools, operational software, and disciplined
-            workflows. Doclinks is the current flagship product, purpose-built for controlled document delivery.
+            cyang.io builds practical software for secure workflows, controlled sharing, and operational clarity.
+            Doclinks is the current flagship product, purpose-built for controlled document delivery.
           </p>
           <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-sky-200/25 bg-sky-300/8 px-3 py-1.5 text-xs text-sky-100/85">
             <span className="h-2 w-2 animate-pulse rounded-full bg-sky-300" />
             Featured Product: Doclinks
           </div>
 
-          <div className="mt-9 flex flex-wrap items-center gap-3">
+          <div className="mt-9 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
             <Link href="/projects/doclinks" className="btn-base btn-primary rounded-xl px-6 py-3 text-sm font-semibold">
               Explore Doclinks
             </Link>
@@ -47,13 +46,13 @@ export default async function HomePage() {
               View Projects
             </Link>
             <Link href="/about" className="btn-base btn-secondary rounded-xl px-5 py-3 text-sm">
-              About Chang
+              About cyang.io
             </Link>
             <Link
-              href="/projects/doclinks#security-model"
-              className="text-sm text-white/75 underline-offset-4 hover:text-white hover:underline"
+              href="/trust"
+              className="btn-base btn-secondary rounded-xl px-5 py-3 text-sm"
             >
-              View Security
+              Review trust
             </Link>
           </div>
 
@@ -87,7 +86,9 @@ export default async function HomePage() {
               <Link href="/projects/doclinks" className="btn-base btn-secondary rounded-xl px-4 py-2.5 text-sm">
                 Product overview
               </Link>
-              <DemoDocButton label="Open demo" className="btn-base btn-secondary rounded-xl px-4 py-2.5 text-sm" />
+              <Link href="/signup" className="btn-base btn-secondary rounded-xl px-4 py-2.5 text-sm">
+                Get started
+              </Link>
             </div>
           </div>
 
@@ -106,7 +107,7 @@ export default async function HomePage() {
       <section id="products" className="mt-16 md:mt-20">
         <SectionHeader
           eyebrow="What cyang.io is"
-          title="A focused studio for products, systems, and practical security."
+          title="A focused software brand for products, systems, and practical security."
           body="cyang.io is not a single app. It is a disciplined home for tools that solve real operational problems with clean UX and enforced controls."
         />
         <div className="mt-8 grid gap-4 lg:grid-cols-12">
@@ -114,7 +115,7 @@ export default async function HomePage() {
             className="lg:col-span-5"
             title="Products"
             summary="Customer-ready software with clear jobs-to-be-done, intentional onboarding, and conversion-first flows."
-            points={["Flagship launches with full lifecycle support", "Designed for real usage, not demo traffic"]}
+            points={["Flagship launches with full lifecycle support", "Designed for real usage with long-term reliability"]}
           />
           <ValuePanel
             className="lg:col-span-3"
@@ -177,7 +178,7 @@ export default async function HomePage() {
               <Link href="/projects/doclinks" className="btn-base btn-primary rounded-xl px-5 py-3 text-sm font-semibold">
                 Learn about Doclinks
               </Link>
-              <Link href="/projects/doclinks#security-model" className="btn-base btn-secondary rounded-xl px-5 py-3 text-sm">
+              <Link href="/legal/security-policy" className="btn-base btn-secondary rounded-xl px-5 py-3 text-sm">
                 Review security model
               </Link>
               {showPricingUi ? (
@@ -235,12 +236,12 @@ export default async function HomePage() {
           />
           <EcosystemLane
             className="lg:col-span-4"
-            label="In development"
-            title="Operations and governance tools"
-            description="Internal control surfaces that make products safer and easier to run."
-            items={["Admin workflows for security operations", "Analytics and policy automation layers"]}
-            href="/admin"
-            cta="View control plane"
+            label="Trust systems"
+            title="Operations and governance layer"
+            description="Policy, reliability, and trust surfaces that keep customer workflows consistent."
+            items={["Security and legal trust architecture", "Status and reporting transparency"]}
+            href="/trust"
+            cta="Explore trust center"
           />
           <EcosystemLane
             className="lg:col-span-3"
@@ -293,9 +294,9 @@ export default async function HomePage() {
               <Principle title="Customer clarity" desc="Simple paths, clear expectations, and transparent boundaries." />
             </div>
 
-            <div className="mt-7 flex flex-wrap gap-3">
+            <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
               <Link href="/about" className="btn-base btn-secondary rounded-xl px-5 py-3 text-sm">
-                More about Chang and cyang.io
+                About cyang.io
               </Link>
               <Link href="/projects" className="btn-base btn-secondary rounded-xl px-5 py-3 text-sm">
                 Explore studio work
@@ -344,7 +345,7 @@ export default async function HomePage() {
 
         <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
           <QuickTrustLink href="/status" label="Status Center" detail="Service health and operational updates." />
-          <QuickTrustLink href="/projects/doclinks#security-model" label="Security Model" detail="High-level controls and architecture." />
+          <QuickTrustLink href="/trust" label="Trust Center" detail="Security, policy, reliability, and reporting links." />
           <QuickTrustLink href="/legal" label="Legal Center" detail="Terms, privacy, and policy documents." />
           <QuickTrustLink href="/data-retention" label="Data Retention" detail="Lifecycle and handling expectations." />
           <QuickTrustLink href="/security-disclosure" label="Security Disclosure" detail="How to report and coordinate findings." />

@@ -82,7 +82,7 @@ const SERVICE_CATALOG: Array<{
   { key: "file_uploads", name: "File Uploads", description: "Signed upload flow and transfer handling.", baseLatency: 228, baseUptime: 99.95 },
   { key: "document_processing", name: "Document Processing", description: "Scan queue, sanitization, and processing workers.", baseLatency: 304, baseUptime: 99.93 },
   { key: "authentication", name: "Authentication", description: "Google, SSO, and email sign-in flows.", baseLatency: 136, baseUptime: 99.99 },
-  { key: "admin_dashboard", name: "Admin Dashboard", description: "Workspace operations and controls.", baseLatency: 182, baseUptime: 99.96 },
+  { key: "admin_dashboard", name: "Workspace Dashboard", description: "Workspace operations and controls.", baseLatency: 182, baseUptime: 99.96 },
   { key: "member_access", name: "Member Access", description: "Member workspace access and document workflows.", baseLatency: 176, baseUptime: 99.97 },
   { key: "email_delivery", name: "Email Delivery", description: "Transactional notifications and share emails.", baseLatency: 248, baseUptime: 99.92 },
   { key: "background_jobs", name: "Background Jobs", description: "Scheduled scans, retention, and maintenance tasks.", baseLatency: null, baseUptime: 99.9 },
@@ -715,8 +715,11 @@ export default function StatusCenterClient({ preview }: { preview: StatusPreview
       </section>
 
       <details className="glass-card-strong rounded-[24px] p-4 sm:p-5">
-        <summary className="cursor-pointer list-none text-sm font-semibold text-white">Technical details</summary>
+        <summary className="cursor-pointer list-none text-sm font-semibold text-white">Technical diagnostics (advanced)</summary>
         <div className="mt-3 rounded-2xl border border-white/12 bg-black/20 p-4">
+          <p className="mb-3 text-xs text-white/56">
+            This section is intended for engineering review and integration troubleshooting.
+          </p>
           <pre className="overflow-auto whitespace-pre-wrap text-xs leading-6 text-white/72">
 {JSON.stringify(technical, null, 2)}
           </pre>
@@ -772,6 +775,24 @@ export default function StatusCenterClient({ preview }: { preview: StatusPreview
             {subscriptionFeedback.message}
           </div>
         ) : null}
+      </section>
+
+      <section className="glass-card rounded-[24px] p-4 sm:p-5">
+        <h2 className="text-base font-semibold text-white">Related trust resources</h2>
+        <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+          <Link href="/trust" className="rounded-xl border border-white/12 bg-black/25 px-3 py-2 text-sm text-white/82 transition-colors hover:bg-white/10">
+            Trust Center
+          </Link>
+          <Link href="/legal/security-policy" className="rounded-xl border border-white/12 bg-black/25 px-3 py-2 text-sm text-white/82 transition-colors hover:bg-white/10">
+            Security Policy
+          </Link>
+          <Link href="/legal/service-level-agreement" className="rounded-xl border border-white/12 bg-black/25 px-3 py-2 text-sm text-white/82 transition-colors hover:bg-white/10">
+            SLA
+          </Link>
+          <Link href="/report" className="rounded-xl border border-white/12 bg-black/25 px-3 py-2 text-sm text-white/82 transition-colors hover:bg-white/10">
+            Report abuse
+          </Link>
+        </div>
       </section>
     </div>
   );

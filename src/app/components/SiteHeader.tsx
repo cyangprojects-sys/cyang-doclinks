@@ -16,13 +16,12 @@ export async function SiteHeader() {
           </div>
           <div>
             <div className="text-base font-semibold tracking-tight text-white">cyang.io</div>
-            <div className="text-[11px] uppercase tracking-[0.16em] text-white/50">Product Studio - Systems</div>
+            <div className="text-[11px] uppercase tracking-[0.16em] text-white/50">Secure Workflow Software</div>
           </div>
         </Link>
 
         <nav className="hidden items-center gap-1.5 text-sm lg:flex">
-          <HeaderLink href="/#products">Products</HeaderLink>
-          <HeaderLink href="/projects">Projects</HeaderLink>
+          <HeaderLink href="/projects">Products</HeaderLink>
           <Link href="/projects/doclinks" className="btn-base btn-secondary inline-flex items-center gap-2 rounded-lg px-3.5 py-2">
             <span>Doclinks</span>
             <span className="rounded-full border border-sky-200/30 bg-sky-300/10 px-2 py-0.5 text-[10px] uppercase tracking-[0.1em] text-sky-100/85">
@@ -30,37 +29,34 @@ export async function SiteHeader() {
             </span>
           </Link>
           {showPricingUi ? <HeaderLink href="/pricing">Pricing</HeaderLink> : null}
+          <HeaderLink href="/trust">Trust</HeaderLink>
           <HeaderLink href="/about">About</HeaderLink>
-          <HeaderLink href="/status">Status</HeaderLink>
-          <HeaderLink href="/report">Contact</HeaderLink>
         </nav>
 
         <div className="flex items-center gap-2">
           <Link
             href="/signin"
-            className="btn-base inline-flex rounded-xl border border-sky-200/70 bg-gradient-to-r from-sky-300 to-blue-200 px-4 py-2.5 text-sm font-semibold text-black shadow-[0_8px_24px_rgba(83,177,255,0.32)] hover:brightness-105"
+            className="btn-base btn-secondary inline-flex rounded-xl px-4 py-2.5 text-sm font-semibold"
           >
             Sign in
           </Link>
           {signupEnabled ? (
             <Link href="/signup" className="btn-base btn-primary rounded-xl px-4 py-2.5 text-sm font-semibold">
-              Sign up
+              Get started
             </Link>
           ) : null}
         </div>
       </div>
 
       <nav className="mt-3 flex items-center gap-2 overflow-x-auto pb-1 text-xs lg:hidden">
-        <HeaderLink href="/#products">Products</HeaderLink>
-        <HeaderLink href="/projects">Projects</HeaderLink>
+        <HeaderLink href="/projects">Products</HeaderLink>
         <Link href="/projects/doclinks" className="btn-base btn-secondary inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 whitespace-nowrap">
           <span>Doclinks</span>
           <span className="h-1.5 w-1.5 rounded-full bg-sky-300" />
         </Link>
         {showPricingUi ? <HeaderLink href="/pricing">Pricing</HeaderLink> : null}
+        <HeaderLink href="/trust">Trust</HeaderLink>
         <HeaderLink href="/about">About</HeaderLink>
-        <HeaderLink href="/status">Status</HeaderLink>
-        <HeaderLink href="/report">Contact</HeaderLink>
       </nav>
     </header>
   );

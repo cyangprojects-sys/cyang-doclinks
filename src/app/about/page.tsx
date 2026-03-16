@@ -131,13 +131,13 @@ export default async function AboutPage() {
 
         <div className="lg:col-span-7">
           <span className="ui-badge inline-flex rounded-full px-3 py-1 text-xs uppercase tracking-[0.16em]">About cyang.io</span>
-          <h1 className="font-editorial mt-5 max-w-4xl text-5xl leading-[1.02] tracking-tight text-white sm:text-6xl lg:text-7xl">
+          <h1 className="font-editorial mt-5 max-w-4xl text-4xl leading-[1.04] tracking-tight text-white sm:text-5xl lg:text-6xl">
             Founder-led systems and products
             <span className="block text-white/72">built for trust under real usage.</span>
           </h1>
           <p className="mt-7 max-w-3xl text-base leading-relaxed text-white/72 sm:text-lg">
-            I am Chang Yang. cyang.io is my product studio for security-first software and operational systems.
-            The goal is simple: build useful products with strict defaults, clear control surfaces, and dependable user experience.
+            I am Chang Yang. cyang.io is the software brand I lead for security-first products and operational systems.
+            The goal is simple: build useful software with strict defaults, clear control surfaces, and dependable user experience.
           </p>
 
           <div className="mt-7 flex flex-wrap gap-2">
@@ -148,7 +148,7 @@ export default async function AboutPage() {
             ))}
           </div>
 
-          <div className="mt-9 flex flex-wrap gap-3">
+          <div className="mt-9 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
             <Link href="/projects" className="btn-base btn-primary rounded-xl px-6 py-3 text-sm font-semibold">
               Explore projects
             </Link>
@@ -295,7 +295,7 @@ export default async function AboutPage() {
             <MiniPill label="Audit-minded workflow" />
           </div>
 
-          <div className="mt-7 flex flex-wrap gap-3">
+          <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
             <Link href="/projects/doclinks" className="btn-base btn-primary rounded-xl px-6 py-3 text-sm font-semibold">
               Explore Doclinks
             </Link>

@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { SiteShell } from "../../components/SiteShell";
-import { DemoDocButton } from "@/components/DemoDocButton";
 import { getBillingFlags } from "@/lib/settings";
 
 export const metadata: Metadata = {
@@ -171,7 +170,7 @@ const FAQS: Faq[] = [
 
 const MOMENTUM_ITEMS = [
   "Share lifecycle controls continue to harden with clearer operational states.",
-  "Security and governance flows are being tightened across admin and serve paths.",
+  "Security and governance flows are being tightened across workspace and serve paths.",
   "Audit and trust surfaces are improving for faster customer review and validation.",
   "Performance and UX refinements keep the product fast while preserving guardrails.",
 ];
@@ -192,7 +191,7 @@ export default async function DoclinksPage() {
           <span className="ui-badge inline-flex rounded-full px-3 py-1 text-xs uppercase tracking-[0.16em]">
             Flagship Product - Doclinks
           </span>
-          <h1 className="font-editorial mt-5 max-w-4xl text-5xl leading-[1.02] tracking-tight text-white sm:text-6xl lg:text-7xl">
+          <h1 className="font-editorial mt-5 max-w-4xl text-4xl leading-[1.04] tracking-tight text-white sm:text-5xl lg:text-6xl">
             Secure external document delivery
             <span className="block text-white/72">without losing operational control.</span>
           </h1>
@@ -209,11 +208,15 @@ export default async function DoclinksPage() {
             ))}
           </div>
 
-          <div className="mt-9 flex flex-wrap items-center gap-3">
-            <Link href="/admin" className="btn-base btn-primary rounded-xl px-6 py-3 text-sm font-semibold">
-              Start secure delivery
+          <div className="mt-9 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+            <Link href="/signup" className="btn-base btn-primary rounded-xl px-6 py-3 text-sm font-semibold">
+              Get started
             </Link>
-            <DemoDocButton label="Open demo" className="btn-base btn-secondary rounded-xl px-6 py-3 text-sm" />
+            {showPricingUi ? (
+              <Link href="/pricing" className="btn-base btn-secondary rounded-xl px-6 py-3 text-sm">
+                View pricing
+              </Link>
+            ) : null}
             <Link href="#security-model" className="btn-base btn-secondary rounded-xl px-6 py-3 text-sm">
               View security model
             </Link>
@@ -360,13 +363,13 @@ export default async function DoclinksPage() {
           <SectionIntro
             eyebrow="Live product actions"
             title="Try Doclinks now"
-            body="Start with real workflows: upload, share, review controls, and validate the delivery posture yourself."
+            body="Start with a real account, review plan fit, and evaluate the trust posture end to end."
           />
 
           <div className="mt-7 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <ActionTile href="/admin" title="Open admin upload" body="Upload a file and generate a controlled link." />
-            <ActionTile title="Open live demo" body="View a public demo document flow." demo />
-            <ActionTile href="/signup" title="Sign up" body="Create an account and start delivering securely." />
+            <ActionTile href="/signup" title="Create account" body="Set up Doclinks and start controlled delivery." />
+            <ActionTile href="/signin" title="Sign in" body="Access your workspace and continue active workflows." />
+            <ActionTile href="/trust" title="Explore trust center" body="Review security, policy, and operations resources." />
             {showPricingUi ? (
               <ActionTile href="/pricing" title="View pricing" body="Compare plans and controls." />
             ) : (
@@ -408,8 +411,8 @@ export default async function DoclinksPage() {
                 "Advanced control surface",
                 "Audit export and stronger operations tooling",
               ]}
-              ctaHref="/admin/upgrade"
-              ctaLabel="Upgrade to Pro"
+              ctaHref="/signin?intent=admin"
+              ctaLabel="Upgrade existing workspace"
             />
           </div>
 
@@ -460,11 +463,13 @@ export default async function DoclinksPage() {
           <p className="mt-3 max-w-3xl text-sm leading-relaxed text-white/72">
             Doclinks gives teams a controlled, auditable, security-first way to deliver sensitive files externally.
           </p>
-          <div className="mt-7 flex flex-wrap gap-3">
-            <Link href="/admin" className="btn-base btn-primary rounded-xl px-6 py-3 text-sm font-semibold">
-              Start with Doclinks
+          <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+            <Link href="/signup" className="btn-base btn-primary rounded-xl px-6 py-3 text-sm font-semibold">
+              Create account
             </Link>
-            <DemoDocButton label="Open demo" className="btn-base btn-secondary rounded-xl px-6 py-3 text-sm" />
+            <Link href="/trust" className="btn-base btn-secondary rounded-xl px-6 py-3 text-sm">
+              Review trust
+            </Link>
           </div>
         </div>
       </section>
@@ -561,17 +566,7 @@ function CompareCard(props: { title: string; subtitle: string; points: string[];
   );
 }
 
-function ActionTile(props: { title: string; body: string; href?: string; demo?: boolean }) {
-  if (props.demo) {
-    return (
-      <div className="rounded-2xl border border-white/12 bg-black/25 p-5">
-        <div className="text-sm font-medium text-white/92">{props.title}</div>
-        <p className="mt-1 text-xs leading-relaxed text-white/64">{props.body}</p>
-        <DemoDocButton label="Open demo" className="mt-4 inline-flex text-sm text-white/86 underline underline-offset-4 hover:text-white" />
-      </div>
-    );
-  }
-
+function ActionTile(props: { title: string; body: string; href?: string }) {
   return (
     <Link href={props.href || "/"} className="rounded-2xl border border-white/12 bg-black/25 p-5 transition-colors hover:bg-white/10">
       <div className="text-sm font-medium text-white/92">{props.title}</div>

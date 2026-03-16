@@ -1,9 +1,16 @@
 import { SiteShell } from "@/app/components/SiteShell";
 import StatusCenterClient, { type StatusPreview } from "./StatusCenterClient";
+import type { Metadata } from "next";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
+
+export const metadata: Metadata = {
+  title: "Status - cyang.io",
+  description:
+    "Live service health, availability updates, incident history, and reliability transparency for cyang.io and Doclinks.",
+};
 
 export default async function StatusPage({
   searchParams,
@@ -30,4 +37,3 @@ export default async function StatusPage({
     </SiteShell>
   );
 }
-

@@ -33,7 +33,7 @@ export default function SignupPage() {
           <div className="text-xs uppercase tracking-[0.16em] text-cyan-200/80">Sign up</div>
           <h1 className="mt-2 text-3xl font-semibold text-white">Sign ups are temporarily paused</h1>
           <p className="mt-2 text-sm text-white/70">New account creation is disabled while maintenance is in progress.</p>
-          <div className="mt-6 flex flex-wrap gap-3">
+          <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
             <Link href="/signin" className="rounded-xl border border-white/15 bg-white/10 px-4 py-2 text-sm text-white hover:bg-white/15">
               Sign in
             </Link>
@@ -63,10 +63,17 @@ export default function SignupPage() {
     <main className="mx-auto w-full max-w-[1200px] px-4 py-12 sm:px-6">
       <div className="glass-card-strong rounded-2xl p-6 md:p-8">
         <div className="text-xs uppercase tracking-[0.16em] text-cyan-200/80">Sign up</div>
-        <h1 className="mt-2 text-3xl font-semibold text-white">Create your DocLinks account</h1>
+        <h1 className="mt-2 text-3xl font-semibold text-white">Create your Doclinks account in under two minutes</h1>
         <p className="mt-2 text-sm text-white/70">
-          Choose a signup method. New accounts must accept the Terms of Service before activation.
+          For teams and individuals who need secure document delivery with clear controls. New accounts accept Terms and
+          Privacy during signup, then can start sharing immediately after activation.
         </p>
+
+        <div className="mt-4 flex flex-wrap gap-2">
+          <span className="rounded-full border border-white/14 bg-white/8 px-3 py-1 text-xs text-white/76">Fast setup</span>
+          <span className="rounded-full border border-white/14 bg-white/8 px-3 py-1 text-xs text-white/76">Security-first defaults</span>
+          <span className="rounded-full border border-white/14 bg-white/8 px-3 py-1 text-xs text-white/76">Clear legal and trust references</span>
+        </div>
 
         <label className="mt-6 flex items-start gap-3 rounded-xl border border-white/15 bg-black/20 p-3 text-sm text-white/85">
           <input
@@ -109,18 +116,33 @@ export default function SignupPage() {
         </div>
 
         <div className="mt-6 rounded-xl border border-white/15 bg-white/5 p-4">
-          <div className="text-sm font-medium text-white">Prefer manual entry?</div>
+          <div className="text-sm font-medium text-white">Prefer manual signup?</div>
           <p className="mt-1 text-xs text-white/60">
-            Fill out a full signup form with work details and activate via email verification.
+            Use full form entry with work details and activate by email verification.
           </p>
           <Link href="/signup/manual" className="mt-3 inline-flex rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white hover:bg-white/15">
             Manual sign up
           </Link>
         </div>
 
+        <div className="mt-6 rounded-xl border border-white/15 bg-black/20 p-4">
+          <div className="text-sm font-medium text-white">What happens after signup?</div>
+          <ul className="mt-2 space-y-1 text-xs text-white/62">
+            <li>1. Confirm your account and sign in.</li>
+            <li>2. Upload documents and apply sharing controls.</li>
+            <li>3. Review status, trust, and policy resources as needed.</li>
+          </ul>
+        </div>
+
         <p className="mt-6 text-xs text-white/55">
           Already have an account? <Link href="/signin" className="text-cyan-200 underline">Sign in</Link>.
         </p>
+        <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-xs text-white/60">
+          <Link href="/trust" className="underline hover:text-white">Trust Center</Link>
+          <Link href="/terms" className="underline hover:text-white">Terms</Link>
+          <Link href="/privacy" className="underline hover:text-white">Privacy</Link>
+          <Link href="/legal/security-policy" className="underline hover:text-white">Security Policy</Link>
+        </div>
         <div className="mt-3">
           <Link href="/" className="inline-flex rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-xs text-white/85 hover:bg-white/10">
             Home

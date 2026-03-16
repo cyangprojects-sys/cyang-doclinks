@@ -139,7 +139,7 @@ const SECURITY_BASELINE = [
 const FAQS = [
   {
     q: "Is Free actually usable?",
-    a: "Yes. Free is designed to validate real controlled delivery workflows, not just a demo path.",
+    a: "Yes. Free is designed for real controlled delivery workflows with practical day-to-day utility.",
   },
   {
     q: "Are security features included on Free?",
@@ -175,7 +175,7 @@ export default async function PricingPage() {
 
         <div className="lg:col-span-7">
           <span className="ui-badge inline-flex rounded-full px-3 py-1 text-xs uppercase tracking-[0.16em]">Doclinks pricing</span>
-          <h1 className="font-editorial mt-5 max-w-4xl text-5xl leading-[1.02] tracking-tight text-white sm:text-6xl lg:text-7xl">
+          <h1 className="font-editorial mt-5 max-w-4xl text-4xl leading-[1.04] tracking-tight text-white sm:text-5xl lg:text-6xl">
             Transparent pricing for
             <span className="block text-white/72">controlled document delivery.</span>
           </h1>
@@ -192,12 +192,12 @@ export default async function PricingPage() {
             ))}
           </div>
 
-          <div className="mt-9 flex flex-wrap gap-3">
+          <div className="mt-9 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
             <Link href="/signup" className="btn-base btn-primary rounded-xl px-6 py-3 text-sm font-semibold">
               Get started free
             </Link>
-            <Link href="/admin/upgrade" className="btn-base btn-secondary rounded-xl px-6 py-3 text-sm">
-              Upgrade to Pro
+            <Link href="/signin?intent=admin" className="btn-base btn-secondary rounded-xl px-6 py-3 text-sm">
+              Upgrade existing workspace
             </Link>
             <Link href="/projects/doclinks" className="btn-base btn-secondary rounded-xl px-6 py-3 text-sm">
               View Doclinks
@@ -240,8 +240,8 @@ export default async function PricingPage() {
             price="$12/month"
             bestFor="Best for client delivery, teams, higher volume, and audit visibility"
             highlights={PLAN_HIGHLIGHTS.pro}
-            ctaHref="/admin/upgrade"
-            ctaLabel="Upgrade to Pro"
+            ctaHref="/signup"
+            ctaLabel="Start Pro"
             recommended
           />
         </div>
@@ -347,7 +347,7 @@ export default async function PricingPage() {
 
           <div className="mt-7 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <CtaTile href="/signup" title="Start Free" body="Create an account and validate your workflow." />
-            <CtaTile href="/admin/upgrade" title="Upgrade to Pro" body="Unlock higher throughput and richer controls." />
+            <CtaTile href="/signin?intent=admin" title="Upgrade to Pro" body="Existing workspace owners can upgrade instantly." />
             <CtaTile href="/projects/doclinks" title="Learn about Doclinks" body="Review product capabilities and security model." />
           </div>
         </div>
