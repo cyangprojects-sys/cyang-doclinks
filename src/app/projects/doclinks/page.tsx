@@ -1,16 +1,180 @@
-// app/projects/doclinks/page.tsx
 import type { Metadata } from "next";
 import Link from "next/link";
 import { SiteShell } from "../../components/SiteShell";
 import { DemoDocButton } from "@/components/DemoDocButton";
-import { DEMO_DOC_URL } from "@/lib/demo";
 import { getBillingFlags } from "@/lib/settings";
 
 export const metadata: Metadata = {
-  title: "Doclinks — cyang.io",
+  title: "Doclinks - cyang.io",
   description:
-    "Doclinks is secure document delivery infrastructure with policy-enforced access, scan-gated delivery, and audit visibility.",
+    "Doclinks is secure external document delivery with policy-enforced access, share controls, scan-gated serving, and audit visibility.",
 };
+
+type Feature = {
+  title: string;
+  desc: string;
+};
+
+type Step = {
+  id: string;
+  title: string;
+  body: string;
+};
+
+type UseCase = {
+  title: string;
+  body: string;
+};
+
+type Faq = {
+  q: string;
+  a: string;
+};
+
+const TRUST_CHIPS = [
+  "Encryption default",
+  "Server-side enforcement",
+  "Private object storage",
+  "Audit trail",
+  "Rate limits",
+];
+
+const DIFFERENTIATORS: Feature[] = [
+  {
+    title: "Controlled delivery, not generic storage",
+    desc: "Doclinks is built for sensitive external sharing with policy checks on every request.",
+  },
+  {
+    title: "Server-side enforcement",
+    desc: "Expiration, max views, revocation, and policy states are enforced by architecture.",
+  },
+  {
+    title: "Operational visibility",
+    desc: "Access and delivery behavior are reviewable with audit-friendly event tracking.",
+  },
+  {
+    title: "Secure defaults",
+    desc: "Scan-gated serving, bounded access patterns, and abuse controls are active by default.",
+  },
+];
+
+const FLOW_STEPS: Step[] = [
+  {
+    id: "01",
+    title: "Upload securely",
+    body: "Upload through protected paths with validation and scanning before delivery.",
+  },
+  {
+    id: "02",
+    title: "Set policy",
+    body: "Apply expiration, view limits, and lifecycle controls to each share.",
+  },
+  {
+    id: "03",
+    title: "Share with control",
+    body: "Send links backed by server-side checks instead of relying on secrecy.",
+  },
+  {
+    id: "04",
+    title: "Monitor or revoke",
+    body: "Track activity, review behavior, and revoke access immediately when needed.",
+  },
+];
+
+const USE_CASES: UseCase[] = [
+  {
+    title: "Contracts and agreements",
+    body: "Send legal documents with clear expiration windows and delivery controls.",
+  },
+  {
+    title: "HR and people operations",
+    body: "Share sensitive employee files through auditable, policy-enforced access.",
+  },
+  {
+    title: "Finance and operations",
+    body: "Deliver invoices, tax files, and reports without uncontrolled resharing risk.",
+  },
+  {
+    title: "Vendor and client exchange",
+    body: "Use controlled links for external workflows where document handling matters.",
+  },
+];
+
+const CONTROL_SURFACES: Feature[] = [
+  {
+    title: "Expiration",
+    desc: "Time-box access to reduce lingering exposure after delivery.",
+  },
+  {
+    title: "Max views",
+    desc: "Cap opens to limit uncontrolled reuse and accidental overexposure.",
+  },
+  {
+    title: "Revocation",
+    desc: "Disable a share instantly from the server side.",
+  },
+  {
+    title: "Password gates",
+    desc: "Add another access boundary for higher-sensitivity documents.",
+  },
+  {
+    title: "Audit logs",
+    desc: "Review delivery behavior with traceable access events.",
+  },
+  {
+    title: "Scan-gated blocking",
+    desc: "Files in failed, infected, or quarantined states are blocked from delivery.",
+  },
+];
+
+const ARCHITECTURE_SUMMARY: Feature[] = [
+  {
+    title: "Storage + encryption",
+    desc: "Uploads are encrypted by default and stored behind private object boundaries.",
+  },
+  {
+    title: "Access enforcement",
+    desc: "Every serve request is authorized server-side against policy state.",
+  },
+  {
+    title: "Auditability",
+    desc: "Operational events support review, troubleshooting, and process confidence.",
+  },
+  {
+    title: "Abuse protection",
+    desc: "Rate limiting and guarded request paths reduce misuse and brute-force behavior.",
+  },
+];
+
+const FAQS: Faq[] = [
+  {
+    q: "What makes this different from cloud drive links?",
+    a: "Doclinks is designed for controlled external delivery. Access decisions are enforced server-side with lifecycle controls and audit visibility.",
+  },
+  {
+    q: "What happens if a link is forwarded?",
+    a: "Forwarding is expected. Security relies on policy enforcement such as expiration, max views, revocation, and request controls, not URL secrecy alone.",
+  },
+  {
+    q: "Can we revoke access immediately?",
+    a: "Yes. Revocation is a first-class server-side control.",
+  },
+  {
+    q: "Is this usable for non-technical teams?",
+    a: "Yes. The product is built for operations, compliance, and small teams that need simple, predictable workflows.",
+  },
+  {
+    q: "Do you block risky file states?",
+    a: "Yes. Failed, infected, and quarantined scan states are blocked from delivery.",
+  },
+];
+
+const MOMENTUM_ITEMS = [
+  "Share lifecycle controls continue to harden with clearer operational states.",
+  "Security and governance flows are being tightened across admin and serve paths.",
+  "Audit and trust surfaces are improving for faster customer review and validation.",
+  "Performance and UX refinements keep the product fast while preserving guardrails.",
+];
 
 export default async function DoclinksPage() {
   const flagsRes = await getBillingFlags();
@@ -18,528 +182,439 @@ export default async function DoclinksPage() {
 
   return (
     <SiteShell maxWidth="full">
-      <section className="relative mt-16 grid gap-10 md:grid-cols-12 md:items-end">
+      <section className="relative mt-10 grid gap-6 lg:grid-cols-12 lg:items-end">
         <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
-          <div className="absolute -top-24 left-10 h-64 w-64 rounded-full bg-emerald-500/12 blur-3xl" />
-          <div className="absolute -bottom-32 right-0 h-80 w-80 rounded-full bg-white/10 blur-3xl" />
+          <div className="absolute -left-16 top-0 h-72 w-72 rounded-full bg-sky-400/12 blur-3xl" />
+          <div className="absolute right-0 top-8 h-80 w-80 rounded-full bg-teal-300/12 blur-3xl" />
         </div>
 
-        <div className="md:col-span-7">
-          <p className="inline-flex items-center gap-2 rounded-full bg-white/5 px-4 py-2 text-xs text-white/70 ring-1 ring-white/10">
-            <span className="h-2 w-2 rounded-full bg-emerald-400" />
-            Project: Doclinks
-          </p>
-
-          <h1 className="mt-6 text-4xl font-semibold tracking-tight md:text-5xl">
-            Secure document delivery infrastructure
-            <span className="block text-white/70">for teams that cannot lose control.</span>
+        <div className="lg:col-span-7">
+          <span className="ui-badge inline-flex rounded-full px-3 py-1 text-xs uppercase tracking-[0.16em]">
+            Flagship Product - Doclinks
+          </span>
+          <h1 className="font-editorial mt-5 max-w-4xl text-5xl leading-[1.02] tracking-tight text-white sm:text-6xl lg:text-7xl">
+            Secure external document delivery
+            <span className="block text-white/72">without losing operational control.</span>
           </h1>
-
-          <p className="mt-5 max-w-2xl text-base leading-relaxed text-white/70">
-            Built for operations and compliance managers at small organizations, Doclinks delivers sensitive documents
-            with token-based access, enforced expiration controls, and audit visibility.
+          <p className="mt-7 max-w-3xl text-base leading-relaxed text-white/72 sm:text-lg">
+            Doclinks helps teams share sensitive files through policy-enforced access, auditable delivery behavior, and
+            controls that stay reliable under real usage.
           </p>
 
-          <div className="mt-6 flex flex-wrap gap-2 text-xs text-white/60">
-            <Pill>Encryption default</Pill>
-            <Pill>MIME + signature checks</Pill>
-            <Pill>Executable/macro blocking</Pill>
-            <Pill>Immutable audit log</Pill>
-            <Pill>Quarantine enforcement</Pill>
-            <Pill>Expires shares</Pill>
-            <Pill>Max views</Pill>
-            <Pill>Revocation</Pill>
-            <Pill>Rate limiting</Pill>
+          <div className="mt-7 flex flex-wrap gap-2">
+            {TRUST_CHIPS.map((chip) => (
+              <span key={chip} className="ui-badge rounded-full px-3 py-1.5 text-xs">
+                {chip}
+              </span>
+            ))}
           </div>
 
-          <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-            <Link
-              href="/projects/doclinks#security-model"
-              className="rounded-2xl bg-white/10 px-6 py-3 text-sm font-medium text-white ring-1 ring-white/10 hover:bg-white/15"
-            >
-              View Security
+          <div className="mt-9 flex flex-wrap items-center gap-3">
+            <Link href="/admin" className="btn-base btn-primary rounded-xl px-6 py-3 text-sm font-semibold">
+              Start secure delivery
+            </Link>
+            <DemoDocButton label="Open demo" className="btn-base btn-secondary rounded-xl px-6 py-3 text-sm" />
+            <Link href="#security-model" className="btn-base btn-secondary rounded-xl px-6 py-3 text-sm">
+              View security model
             </Link>
           </div>
 
-          <div className="mt-10 grid gap-4 sm:grid-cols-3">
-            <Stat title="Storage + Crypto" value="R2 + AES-256-GCM" />
-            <Stat title="Enforcement" value="Alias/token + ticket checks" />
-            <Stat title="Observability" value="Immutable + exportable logs" />
+          <div className="mt-8 grid gap-3 sm:grid-cols-3">
+            <HeroStat label="Primary use" value="Controlled external sharing" />
+            <HeroStat label="Risk posture" value="Scan-gated and auditable" />
+            <HeroStat label="Adoption" value="Small teams to ops-heavy orgs" />
           </div>
         </div>
 
-        <div className="md:col-span-5">
-          <div className="rounded-3xl bg-white/5 p-6 ring-1 ring-white/10">
-            <h2 className="text-sm font-medium text-white/90">Request flow</h2>
-
-            <div className="mt-4 space-y-3">
-              <Step
-                n="1"
-                title="Upload securely"
-                desc="Upload business documents through encrypted storage paths."
-              />
-              <Step
-                n="2"
-                title="Set access policy"
-                desc="Apply expiration, view limits, and recipient controls."
-              />
-              <Step
-                n="3"
-                title="Deliver with control"
-                desc="Serve access through tokenized checks and audit every event."
-              />
+        <div className="lg:col-span-5">
+          <div className="glass-card-strong ui-enterprise-grid rounded-3xl p-6">
+            <div className="flex items-center justify-between gap-4">
+              <div className="text-xs uppercase tracking-[0.14em] text-white/55">Product preview</div>
+              <StatusBadge label="Live" tone="live" />
             </div>
-
-            <div className="mt-6 rounded-2xl bg-black/40 p-4 ring-1 ring-white/10">
-              <p className="text-xs leading-relaxed text-white/60">
-                Live demo: {" "}
-                <DemoDocButton
-                  label="Open the demo document"
-                  className="text-white/85 hover:underline"
-                />
-                .
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section id="how-it-works" className="mt-20 md:mt-28">
-        <div className="flex items-end justify-between gap-6">
-          <div>
-            <h2 className="text-2xl font-semibold tracking-tight">What it optimizes for</h2>
-            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-white/70">
-              A clean UX, plus security defaults that don’t rely on the link being secret.
+            <h2 className="mt-2 text-2xl font-semibold tracking-tight text-white">Delivery command panel</h2>
+            <p className="mt-3 text-sm leading-relaxed text-white/70">
+              Configure link controls, track usage, and revoke access from one clean workflow.
             </p>
-          </div>
-          <Link
-            href="/admin"
-            className="hidden rounded-2xl bg-white/5 px-4 py-2 text-sm text-white/80 ring-1 ring-white/10 hover:bg-white/10 sm:inline-flex"
-          >
-            Open admin →
-          </Link>
-        </div>
 
-        <div className="mt-6 grid gap-4 md:grid-cols-3">
-          <Feature
-            title="Small surface area"
-            desc="Purpose-built for external delivery, without broad storage complexity."
-          />
-          <Feature
-            title="Controlled delivery"
-            desc="Policy enforcement happens on every serve request."
-          />
-          <Feature
-            title="Auditability"
-            desc="Access visibility and exportable audit records support review."
-          />
-        </div>
-      </section>
-
-      <section id="security-model" className="mt-16">
-        <h2 className="text-2xl font-semibold tracking-tight">Security model (high level)</h2>
-        <div className="mt-6 grid gap-4 md:grid-cols-12">
-          <div className="md:col-span-7">
-            <div className="rounded-3xl bg-white/5 p-6 ring-1 ring-white/10">
-              <ul className="space-y-3 text-sm text-white/70">
-                <ListItem>
-                  <b className="text-white/85">Authorization lives on the server.</b> Links
-                  resolve to a record; the server decides whether to serve the file.
-                </ListItem>
-                <ListItem>
-                  <b className="text-white/85">Least privilege storage.</b> R2 objects are
-                  not public; access is mediated by the app.
-                </ListItem>
-                <ListItem>
-                  <b className="text-white/85">Access is auditable.</b> Delivery activity can be tracked for review and export.
-                </ListItem>
-                <ListItem>
-                  <b className="text-white/85">Operational guardrails.</b> Rate limiting and
-                  policy clamps reduce abuse and accidental leaks.
-                </ListItem>
-                <ListItem>
-                  <b className="text-white/85">Scan-gated delivery.</b> Files flagged as infected, failed, or quarantined are blocked.
-                </ListItem>
-              </ul>
+            <div className="mt-5 space-y-3">
+              <PreviewRow title="Share policy" body="Expires in 7 days, max views 5, password optional" />
+              <PreviewRow title="Serve posture" body="Server-authorized requests only, raw access blocked" />
+              <PreviewRow title="Current state" body="Scanned and eligible for controlled delivery" />
             </div>
-          </div>
 
-          <div className="md:col-span-5">
-            <div className="rounded-3xl bg-white/5 p-6 ring-1 ring-white/10">
-              <h3 className="text-sm font-medium text-white/90">Common controls</h3>
-              <div className="mt-4 grid gap-3">
-                <Control title="Expiration" desc="Time-box access to reduce lingering risk." />
-                <Control title="Max views" desc="Cap how many times a share can be opened." />
-                <Control title="Audit logs" desc="Know when, how, and from where it was accessed." />
-                <Control title="Revocation" desc="Disable a share immediately server-side." />
-              </div>
+            <div className="mt-6 rounded-2xl border border-white/12 bg-black/30 p-4 text-xs leading-relaxed text-white/62">
+              Built for operations and compliance-friendly teams that need strong defaults without heavy workflow friction.
             </div>
           </div>
         </div>
       </section>
 
-      <section id="why-doclinks" className="mt-16">
-        <div className="flex items-end justify-between gap-6">
-          <div>
-            <h2 className="text-2xl font-semibold tracking-tight">Why not Drive or Dropbox?</h2>
-            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-white/70">
-              Those tools optimize for broad storage and collaboration. Doclinks is built for controlled external delivery of sensitive documents.
-            </p>
-          </div>
+      <section id="why-doclinks" className="mt-16 md:mt-20">
+        <SectionIntro
+          eyebrow="Why Doclinks"
+          title="Built for controlled delivery, not open-ended file sharing."
+          body="Doclinks focuses on predictable, enforceable external delivery with controls and reviewability designed into the product surface."
+        />
+
+        <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {DIFFERENTIATORS.map((item) => (
+            <FeatureCard key={item.title} title={item.title} desc={item.desc} />
+          ))}
         </div>
+      </section>
 
-        <div className="mt-6 grid gap-4 md:grid-cols-12">
-          <div className="md:col-span-7">
-            <div className="rounded-3xl bg-white/5 p-6 ring-1 ring-white/10">
-              <h3 className="text-sm font-medium text-white/90">Doclinks vs typical share links</h3>
-              <div className="mt-4 space-y-3">
-                <Compare
-                  leftTitle="Policy enforcement"
-                  left="Server-side checks on every request (expiry, max views, throttles)."
-                  rightTitle="Typical"
-                  right="Often: “If you have the link, you’re in.”"
-                />
-                <Compare
-                  leftTitle="Observability"
-                  left="Access visibility + audit exports for operational review."
-                  rightTitle="Typical"
-                  right="Little-to-no reliable access history."
-                />
-                <Compare
-                  leftTitle="Delivery posture"
-                  left="Built for controlled delivery of sensitive external documents."
-                  rightTitle="Typical"
-                  right="Built for general storage and broad sharing convenience."
-                />
-              </div>
+      <section id="how-it-works" className="mt-16 md:mt-20">
+        <SectionIntro
+          eyebrow="How it works"
+          title="A clear workflow from upload to controlled access"
+          body="The delivery lifecycle stays simple for users while controls stay enforced by the system."
+        />
 
-              <div className="mt-6 rounded-2xl bg-black/40 p-4 ring-1 ring-white/10">
-                <p className="text-xs leading-relaxed text-white/60">
-                  The goal is clear: controlled delivery, enforced architecture, and operational clarity.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="md:col-span-5">
-            <div className="rounded-3xl bg-white/5 p-6 ring-1 ring-white/10">
-              <h3 className="text-sm font-medium text-white/90">What you can control</h3>
-              <div className="mt-4 grid gap-3">
-                <Control title="Time-box access" desc="Reduce risk with expiration." />
-                <Control title="Cap usage" desc="View caps reduce uncontrolled resharing." />
-                <Control title="Revoke instantly" desc="Disable a token server-side." />
-                <Control title="Review access" desc="Logs help you validate behavior." />
-              </div>
-            </div>
+        <div className="mt-8 glass-card-strong rounded-3xl p-6 sm:p-7">
+          <div className="grid gap-4 lg:grid-cols-4">
+            {FLOW_STEPS.map((step) => (
+              <FlowCard key={step.id} id={step.id} title={step.title} body={step.body} />
+            ))}
           </div>
         </div>
       </section>
 
-      <section className="mt-16">
-        <h2 className="text-2xl font-semibold tracking-tight">Supported Upload Types</h2>
-        <div className="mt-6 rounded-3xl bg-white/5 p-6 ring-1 ring-white/10">
-          <p className="text-sm leading-relaxed text-white/70">
-            Allowed: Documents (.pdf, .doc, .docx, .txt, .rtf, .odt), Spreadsheets (.xls, .xlsx, .csv),
-            Presentations (.ppt, .pptx), Images (.jpg, .jpeg, .png, .gif, .bmp, .heic), Archives (.zip, .rar),
-            Audio/Video (.mp3, .wav, .mp4, .mov, .avi).
-          </p>
-          <p className="mt-3 text-sm leading-relaxed text-amber-200/80">
-            Blocked: executable, script, shortcut, and macro-enabled types (including .exe, .js, .ps1, .lnk, .docm, .xlsm, .pptm), and anything not explicitly allowlisted.
-          </p>
+      <section id="use-cases" className="mt-16 md:mt-20">
+        <SectionIntro
+          eyebrow="Built for sensitive sharing"
+          title="Practical use cases teams run every week"
+          body="Doclinks is designed for high-sensitivity workflows that need professional delivery controls without heavy complexity."
+        />
+
+        <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {USE_CASES.map((useCase) => (
+            <UseCaseCard key={useCase.title} title={useCase.title} body={useCase.body} />
+          ))}
         </div>
       </section>
 
-      <section className="mt-16">
-        <h2 className="text-2xl font-semibold tracking-tight">Current build status</h2>
-        <div className="mt-6 grid gap-4 md:grid-cols-12">
-          <div className="md:col-span-7">
-            <div className="rounded-3xl bg-white/5 p-6 ring-1 ring-white/10">
-              <ul className="space-y-3 text-sm text-white/70">
-                <ListItem>
-                  <b className="text-white/85">Encryption is default.</b> New uploads are encrypted and legacy migration tooling is in place.
-                </ListItem>
-                <ListItem>
-                  <b className="text-white/85">Access control is enforced.</b> Expiry, revocation, max-views, password gates, and scan-state blocks are enforced server-side.
-                </ListItem>
-                <ListItem>
-                  <b className="text-white/85">Viewer hardening shipped.</b> Public inline flows are view-oriented with reduced direct-open and raw URL exposure.
-                </ListItem>
-                <ListItem>
-                  <b className="text-white/85">Plan guardrails are active.</b> View, storage, and active-share limits are enforced by plan.
-                </ListItem>
-                <ListItem>
-                  <b className="text-white/85">Billing enforcement is hardened.</b> Stripe signatures are validated, duplicate/out-of-order events are handled, and inactive subscriptions are downgraded automatically.
-                </ListItem>
-                <ListItem>
-                  <b className="text-white/85">Alias lifecycle is shipped.</b> Admin can create, rename, expire, and disable aliases with safer default TTL behavior.
-                </ListItem>
-              </ul>
-            </div>
+      <section id="comparison" className="mt-16 md:mt-20">
+        <SectionIntro
+          eyebrow="Security posture"
+          title="Security that does not rely on secret links"
+          body="Ordinary share URLs often assume possession equals permission. Doclinks treats every access request as an authorization decision."
+        />
+
+        <div className="mt-8 grid gap-4 lg:grid-cols-2">
+          <CompareCard
+            title="Ordinary share links"
+            subtitle="Convenient, but often weak for sensitive delivery"
+            tone="base"
+            points={[
+              "Link possession may be treated as full access",
+              "Limited lifecycle controls once shared",
+              "Weak operational visibility for review",
+              "Harder to enforce consistent policy boundaries",
+            ]}
+          />
+          <CompareCard
+            title="Doclinks"
+            subtitle="Controlled external delivery by default"
+            tone="strong"
+            points={[
+              "Server-side authorization on each serve request",
+              "Expiration, max views, and revocation controls",
+              "Audit-friendly activity visibility",
+              "Scan and policy states can block delivery automatically",
+            ]}
+          />
+        </div>
+      </section>
+
+      <section id="controls" className="mt-16 md:mt-20">
+        <SectionIntro
+          eyebrow="Control surface"
+          title="Operational controls that stay easy to use"
+          body="Policy controls are visible, clear, and built to support everyday external sharing decisions."
+        />
+
+        <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {CONTROL_SURFACES.map((item) => (
+            <FeatureCard key={item.title} title={item.title} desc={item.desc} />
+          ))}
+        </div>
+      </section>
+
+      <section id="security-model" className="mt-16 md:mt-20">
+        <SectionIntro
+          eyebrow="Product confidence"
+          title="Security architecture in plain language"
+          body="Doclinks combines protective storage boundaries, strict serve-time checks, and operational controls to keep sensitive delivery trustworthy."
+        />
+
+        <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {ARCHITECTURE_SUMMARY.map((item) => (
+            <FeatureCard key={item.title} title={item.title} desc={item.desc} />
+          ))}
+        </div>
+      </section>
+
+      <section id="actions" className="mt-16 md:mt-20">
+        <div className="glass-card-strong ui-sheen rounded-3xl p-7 sm:p-8">
+          <SectionIntro
+            eyebrow="Live product actions"
+            title="Try Doclinks now"
+            body="Start with real workflows: upload, share, review controls, and validate the delivery posture yourself."
+          />
+
+          <div className="mt-7 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <ActionTile href="/admin" title="Open admin upload" body="Upload a file and generate a controlled link." />
+            <ActionTile title="Open live demo" body="View a public demo document flow." demo />
+            <ActionTile href="/signup" title="Sign up" body="Create an account and start delivering securely." />
+            {showPricingUi ? (
+              <ActionTile href="/pricing" title="View pricing" body="Compare plans and controls." />
+            ) : (
+              <ActionTile href="#security-model" title="Review controls" body="Explore the architecture and security model." />
+            )}
           </div>
-          <div className="md:col-span-5">
-            <div className="rounded-3xl bg-white/5 p-6 ring-1 ring-white/10">
-              <h3 className="text-sm font-medium text-white/90">Ops and governance</h3>
-              <div className="mt-4 grid gap-3">
-                <Control title="Immutable audit trail" desc="Upload/view/share/admin actions append to tamper-evident logs." />
-                <Control title="Org access model" desc="Membership and invite flows back enterprise RBAC." />
-                <Control title="Cron automation" desc="Cloudflare cron handles scan, retention, billing sync, and key-rotation operational jobs." />
-                <Control title="Abuse visibility" desc="Admin abuse dashboard includes active blocked IPs and block-hit counters." />
-                <Control title="Build hygiene" desc="Runtime-only env loading avoids build-time module crashes." />
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* FAQ */}
-      <section className="mt-16">
-        <h2 className="text-2xl font-semibold tracking-tight">FAQ</h2>
-        <div className="mt-6 grid gap-4 md:grid-cols-2">
-          <Faq
-            q="Is this secure if someone forwards the link?"
-            a="Forwarding a link is expected. Doclinks relies on server-side enforcement (expiry, max views, rate limits, policy checks) rather than treating the URL as a password."
-          />
-          <Faq
-            q="Do R2 objects ever become public?"
-            a="The intended posture is private objects with access mediated by the app. The app decides if a request is allowed, then serves the content."
-          />
-          <Faq
-            q="Is this a competitor clone?"
-            a="No. It is focused on controlled external document delivery with enforced policies and audit visibility."
-          />
-          <Faq
-            q="What’s next?"
-            a="Enterprise governance controls, expanded reporting exports, and additional operational automation around cleanup and alerting."
-          />
-        </div>
-      </section>
-
-      <section className="mt-16">
-        <h2 className="text-2xl font-semibold tracking-tight">Use it</h2>
-        <div className="mt-6 grid gap-4 md:grid-cols-2">
-          <Callout
-            title="Admin upload"
-            desc="Upload supported file types and generate a shareable link."
-            href="/admin"
-            cta="Sign up"
-          />
-          <Callout
-            title="Open a demo document"
-            desc="See a live shared document behind server-side enforcement."
-            href={DEMO_DOC_URL}
-            external
-            cta="Open demo →"
-          />
         </div>
       </section>
 
       {showPricingUi ? (
-        <section id="pricing" className="mt-16">
-          <h2 className="text-2xl font-semibold tracking-tight">Pricing</h2>
-          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-white/70">
-            Transparent numbers. Clear capability differences.
-          </p>
-          <div className="mt-6 grid gap-4 md:grid-cols-2">
-            <div className="rounded-3xl bg-white/5 p-6 ring-1 ring-white/10">
-              <div className="inline-flex items-center rounded-lg border border-sky-200/70 bg-gradient-to-r from-sky-300 to-cyan-200 px-3 py-1.5 text-sm font-semibold text-black shadow-[0_8px_24px_rgba(73,179,255,0.30)]">
-                Free - $0/month
-              </div>
-              <ul className="mt-4 space-y-2 text-sm text-white/75">
-                <li>25 MB max upload</li>
-                <li>100 MB total storage</li>
-                <li>Limited active shares</li>
-                <li>Basic audit logs</li>
-              </ul>
-              <Link
-                href="/signup"
-                className="btn-base mt-5 inline-flex rounded-lg border border-sky-200/70 bg-gradient-to-r from-sky-300 to-cyan-200 px-4 py-2.5 text-sm font-semibold text-black shadow-[0_8px_24px_rgba(73,179,255,0.30)] hover:brightness-105"
-              >
-                Sign up
-              </Link>
-            </div>
-            <div className="rounded-3xl border border-amber-300/40 bg-white/5 p-6 ring-1 ring-amber-200/15">
-              <div className="inline-flex items-center rounded-lg border border-amber-200/70 bg-gradient-to-r from-amber-300 to-amber-200 px-3 py-1.5 text-sm font-semibold text-black shadow-[0_8px_24px_rgba(232,194,122,0.32)]">
-                Pro - $12/month
-              </div>
-              <ul className="mt-4 space-y-2 text-sm text-white/85">
-                <li>100 MB max upload</li>
-                <li>5 GB total storage</li>
-                <li>Custom expiration controls</li>
-                <li>Audit export</li>
-                <li>Advanced access controls</li>
-              </ul>
-              <Link
-                href="/admin/upgrade"
-                className="btn-base mt-5 inline-flex rounded-lg border border-amber-200/70 bg-gradient-to-r from-amber-300 to-amber-200 px-4 py-2.5 text-sm font-semibold text-black shadow-[0_8px_24px_rgba(232,194,122,0.32)] hover:brightness-105"
-              >
-                Upgrade to Pro
-              </Link>
-            </div>
+        <section id="pricing" className="mt-16 md:mt-20">
+          <SectionIntro
+            eyebrow="Pricing preview"
+            title="Simple pricing with clear capability boundaries"
+            body="Free is useful for early workflows. Pro adds higher limits and deeper operational controls."
+          />
+
+          <div className="mt-8 grid gap-4 lg:grid-cols-2">
+            <PricingCard
+              tier="Free"
+              price="$0/month"
+              tone="base"
+              points={[
+                "25 MB max upload",
+                "100 MB total storage",
+                "Core sharing controls",
+                "Basic audit visibility",
+              ]}
+              ctaHref="/signup"
+              ctaLabel="Start free"
+            />
+            <PricingCard
+              tier="Pro"
+              price="$12/month"
+              tone="pro"
+              points={[
+                "100 MB max upload",
+                "5 GB total storage",
+                "Advanced control surface",
+                "Audit export and stronger operations tooling",
+              ]}
+              ctaHref="/admin/upgrade"
+              ctaLabel="Upgrade to Pro"
+            />
           </div>
-          <Link
-            href="/pricing"
-            className="mt-4 inline-flex text-sm text-white/80 underline underline-offset-4 hover:text-white"
-          >
+
+          <Link href="/pricing" className="mt-5 inline-flex text-sm text-white/80 underline underline-offset-4 hover:text-white">
             View full plan comparison
           </Link>
         </section>
       ) : null}
 
-      <section className="mt-16">
-        <h2 className="text-2xl font-semibold tracking-tight">Recent releases</h2>
-        <div className="mt-6 rounded-3xl bg-white/5 p-6 ring-1 ring-white/10">
-          <ul className="space-y-3 text-sm text-white/70">
-            <li className="flex gap-2">
-              <span className="mt-2 h-1.5 w-1.5 flex-none rounded-full bg-emerald-300/60" />
-              <span>Alias lifecycle UI shipped (create, rename, expiration update, disable) with safer defaults.</span>
-            </li>
-            <li className="flex gap-2">
-              <span className="mt-2 h-1.5 w-1.5 flex-none rounded-full bg-emerald-300/60" />
-              <span>Stripe enforcement upgraded with event logging, explicit idempotency keys, and admin billing diagnostics.</span>
-            </li>
-            <li className="flex gap-2">
-              <span className="mt-2 h-1.5 w-1.5 flex-none rounded-full bg-emerald-300/60" />
-              <span>Rate-limit and abuse protections expanded with blocked-IP visibility and block-hit telemetry.</span>
-            </li>
-            <li className="flex gap-2">
-              <span className="mt-2 h-1.5 w-1.5 flex-none rounded-full bg-emerald-300/60" />
-              <span>Retention and integrity automation extended with weekly orphan sweep and stricter serve-path checks.</span>
-            </li>
+      <section id="faq" className="mt-16 md:mt-20">
+        <SectionIntro
+          eyebrow="FAQ"
+          title="Common questions"
+          body="Short answers to help teams evaluate fit quickly."
+        />
+
+        <div className="mt-8 grid gap-3 lg:grid-cols-2">
+          {FAQS.map((faq) => (
+            <details key={faq.q} className="glass-card rounded-2xl p-5 open:bg-white/10">
+              <summary className="cursor-pointer list-none text-sm font-medium text-white/90">{faq.q}</summary>
+              <p className="mt-3 text-sm leading-relaxed text-white/70">{faq.a}</p>
+            </details>
+          ))}
+        </div>
+      </section>
+
+      <section className="mt-16 md:mt-20">
+        <div className="glass-card rounded-3xl p-6 sm:p-7">
+          <SectionIntro
+            eyebrow="Shipping momentum"
+            title="Recent improvements"
+            body="Doclinks continues to harden as a practical product for controlled external delivery."
+          />
+
+          <ul className="mt-6 grid gap-3 md:grid-cols-2">
+            {MOMENTUM_ITEMS.map((item) => (
+              <li key={item} className="rounded-2xl border border-white/12 bg-black/25 p-4 text-sm leading-relaxed text-white/70">
+                {item}
+              </li>
+            ))}
           </ul>
+        </div>
+      </section>
+
+      <section className="mt-16 mb-2 md:mt-20">
+        <div className="glass-card-strong rounded-3xl p-7 sm:p-8">
+          <h2 className="text-3xl font-semibold tracking-tight text-white sm:text-4xl">Ready to move beyond basic share links?</h2>
+          <p className="mt-3 max-w-3xl text-sm leading-relaxed text-white/72">
+            Doclinks gives teams a controlled, auditable, security-first way to deliver sensitive files externally.
+          </p>
+          <div className="mt-7 flex flex-wrap gap-3">
+            <Link href="/admin" className="btn-base btn-primary rounded-xl px-6 py-3 text-sm font-semibold">
+              Start with Doclinks
+            </Link>
+            <DemoDocButton label="Open demo" className="btn-base btn-secondary rounded-xl px-6 py-3 text-sm" />
+          </div>
         </div>
       </section>
     </SiteShell>
   );
 }
 
-function Stat({ title, value }: { title: string; value: string }) {
+function SectionIntro(props: { eyebrow: string; title: string; body: string }) {
   return (
-    <div className="rounded-2xl bg-white/5 p-4 ring-1 ring-white/10">
-      <div className="text-xs text-white/60">{title}</div>
-      <div className="mt-1 text-lg font-semibold">{value}</div>
+    <div className="max-w-4xl">
+      <span className="ui-badge inline-flex rounded-full px-3 py-1 text-xs uppercase tracking-[0.15em]">{props.eyebrow}</span>
+      <h2 className="mt-4 text-3xl font-semibold tracking-tight text-white sm:text-4xl">{props.title}</h2>
+      <p className="mt-3 text-sm leading-relaxed text-white/72 sm:text-base">{props.body}</p>
     </div>
   );
 }
 
-function Step(props: { n: string; title: string; desc: string }) {
+function HeroStat(props: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl bg-white/5 p-4 ring-1 ring-white/10">
-      <div className="flex items-start gap-3">
-        <div className="grid h-7 w-7 place-items-center rounded-lg bg-white/10 text-xs font-semibold ring-1 ring-white/10">
-          {props.n}
-        </div>
-        <div>
-          <div className="text-sm font-medium text-white/90">{props.title}</div>
-          <div className="mt-1 text-xs leading-relaxed text-white/60">{props.desc}</div>
-        </div>
+    <div className="glass-card rounded-xl p-4">
+      <div className="text-xs uppercase tracking-[0.11em] text-white/55">{props.label}</div>
+      <div className="mt-1.5 text-sm font-medium text-white/92">{props.value}</div>
+    </div>
+  );
+}
+
+function StatusBadge(props: { label: string; tone: "live" | "base" }) {
+  const toneClass =
+    props.tone === "live"
+      ? "border-emerald-200/30 bg-emerald-300/10 text-emerald-100"
+      : "border-white/20 bg-white/10 text-white/80";
+
+  return <span className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-medium ${toneClass}`}>{props.label}</span>;
+}
+
+function PreviewRow(props: { title: string; body: string }) {
+  return (
+    <div className="rounded-2xl border border-white/12 bg-black/25 p-4">
+      <div className="text-xs uppercase tracking-[0.1em] text-white/55">{props.title}</div>
+      <div className="mt-1 text-sm text-white/82">{props.body}</div>
+    </div>
+  );
+}
+
+function FeatureCard(props: { title: string; desc: string }) {
+  return (
+    <div className="glass-card rounded-3xl p-6">
+      <h3 className="text-lg font-semibold tracking-tight text-white">{props.title}</h3>
+      <p className="mt-2 text-sm leading-relaxed text-white/70">{props.desc}</p>
+    </div>
+  );
+}
+
+function FlowCard(props: { id: string; title: string; body: string }) {
+  return (
+    <div className="rounded-2xl border border-white/12 bg-black/25 p-5">
+      <div className="inline-flex rounded-lg border border-sky-200/30 bg-sky-300/10 px-2.5 py-1 text-[11px] font-semibold tracking-[0.1em] text-sky-100">
+        {props.id}
       </div>
+      <h3 className="mt-3 text-lg font-semibold tracking-tight text-white">{props.title}</h3>
+      <p className="mt-2 text-sm leading-relaxed text-white/70">{props.body}</p>
     </div>
   );
 }
 
-function Feature({ title, desc }: { title: string; desc: string }) {
+function UseCaseCard(props: { title: string; body: string }) {
   return (
-    <div className="rounded-3xl bg-white/5 p-6 ring-1 ring-white/10">
-      <div className="text-lg font-semibold">{title}</div>
-      <p className="mt-2 text-sm leading-relaxed text-white/70">{desc}</p>
+    <div className="glass-card rounded-3xl p-6">
+      <h3 className="text-lg font-semibold tracking-tight text-white">{props.title}</h3>
+      <p className="mt-2 text-sm leading-relaxed text-white/70">{props.body}</p>
     </div>
   );
 }
 
-function Callout(props: {
-  title: string;
-  desc: string;
-  href: string;
-  cta: string;
-  external?: boolean;
-}) {
+function CompareCard(props: { title: string; subtitle: string; points: string[]; tone: "base" | "strong" }) {
   const className =
-    "group rounded-3xl bg-white/5 p-6 ring-1 ring-white/10 hover:bg-white/10";
+    props.tone === "strong"
+      ? "glass-card-strong rounded-3xl p-6"
+      : "glass-card rounded-3xl p-6";
 
-  if (props.external) {
+  return (
+    <div className={className}>
+      <h3 className="text-xl font-semibold tracking-tight text-white">{props.title}</h3>
+      <p className="mt-2 text-sm leading-relaxed text-white/70">{props.subtitle}</p>
+      <ul className="mt-4 space-y-2">
+        {props.points.map((point) => (
+          <li key={point} className="flex gap-2 text-sm leading-relaxed text-white/70">
+            <span className="mt-2 h-1.5 w-1.5 flex-none rounded-full bg-sky-200/70" />
+            <span>{point}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function ActionTile(props: { title: string; body: string; href?: string; demo?: boolean }) {
+  if (props.demo) {
     return (
-      <a
-        href={props.href}
-        target="_blank"
-        rel="noopener noreferrer"
-        className={className}
-        aria-label={`${props.title} (opens in a new tab)`}
-      >
-        <div className="text-lg font-semibold">{props.title}</div>
-        <p className="mt-2 text-sm leading-relaxed text-white/70">{props.desc}</p>
-        <div className="mt-4 text-sm text-white/80 group-hover:text-white">{props.cta}</div>
-      </a>
+      <div className="rounded-2xl border border-white/12 bg-black/25 p-5">
+        <div className="text-sm font-medium text-white/92">{props.title}</div>
+        <p className="mt-1 text-xs leading-relaxed text-white/64">{props.body}</p>
+        <DemoDocButton label="Open demo" className="mt-4 inline-flex text-sm text-white/86 underline underline-offset-4 hover:text-white" />
+      </div>
     );
   }
 
   return (
-    <Link href={props.href} className={className}>
-      <div className="text-lg font-semibold">{props.title}</div>
-      <p className="mt-2 text-sm leading-relaxed text-white/70">{props.desc}</p>
-      <div className="mt-4 text-sm text-white/80 group-hover:text-white">{props.cta}</div>
+    <Link href={props.href || "/"} className="rounded-2xl border border-white/12 bg-black/25 p-5 transition-colors hover:bg-white/10">
+      <div className="text-sm font-medium text-white/92">{props.title}</div>
+      <p className="mt-1 text-xs leading-relaxed text-white/64">{props.body}</p>
+      <div className="mt-4 text-sm text-white/84">Open</div>
     </Link>
   );
 }
 
-function Control(props: { title: string; desc: string }) {
-  return (
-    <div className="rounded-2xl bg-white/5 p-4 ring-1 ring-white/10">
-      <div className="text-sm font-medium text-white/90">{props.title}</div>
-      <div className="mt-1 text-xs leading-relaxed text-white/60">{props.desc}</div>
-    </div>
-  );
-}
-
-function Pill({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="rounded-full bg-white/5 px-3 py-1 text-[11px] text-white/60 ring-1 ring-white/10">
-      {children}
-    </span>
-  );
-}
-
-function Compare(props: {
-  leftTitle: string;
-  left: string;
-  rightTitle: string;
-  right: string;
+function PricingCard(props: {
+  tier: string;
+  price: string;
+  points: string[];
+  ctaHref: string;
+  ctaLabel: string;
+  tone: "base" | "pro";
 }) {
+  const className =
+    props.tone === "pro"
+      ? "rounded-3xl border border-amber-300/35 bg-white/5 p-6 ring-1 ring-amber-200/15"
+      : "glass-card rounded-3xl p-6";
+
+  const badgeClassName =
+    props.tone === "pro"
+      ? "inline-flex rounded-lg border border-amber-200/70 bg-gradient-to-r from-amber-300 to-amber-200 px-3 py-1.5 text-sm font-semibold text-black shadow-[0_8px_24px_rgba(232,194,122,0.32)]"
+      : "inline-flex rounded-lg border border-sky-200/70 bg-gradient-to-r from-sky-300 to-cyan-200 px-3 py-1.5 text-sm font-semibold text-black shadow-[0_8px_24px_rgba(73,179,255,0.30)]";
+
   return (
-    <div className="rounded-2xl bg-white/5 p-4 ring-1 ring-white/10">
-      <div className="grid gap-3 sm:grid-cols-2">
-        <div>
-          <div className="text-xs font-medium text-white/80">{props.leftTitle}</div>
-          <div className="mt-1 text-xs leading-relaxed text-white/60">{props.left}</div>
-        </div>
-        <div>
-          <div className="text-xs font-medium text-white/80">{props.rightTitle}</div>
-          <div className="mt-1 text-xs leading-relaxed text-white/60">{props.right}</div>
-        </div>
+    <div className={className}>
+      <div className={badgeClassName}>
+        {props.tier} - {props.price}
       </div>
+      <ul className="mt-4 space-y-2 text-sm text-white/80">
+        {props.points.map((point) => (
+          <li key={point} className="flex gap-2">
+            <span className="mt-2 h-1.5 w-1.5 flex-none rounded-full bg-white/40" />
+            <span>{point}</span>
+          </li>
+        ))}
+      </ul>
+      <Link href={props.ctaHref} className="btn-base btn-secondary mt-6 inline-flex rounded-xl px-4 py-2.5 text-sm">
+        {props.ctaLabel}
+      </Link>
     </div>
   );
 }
-
-function Faq(props: { q: string; a: string }) {
-  return (
-    <div className="rounded-3xl bg-white/5 p-6 ring-1 ring-white/10">
-      <div className="text-sm font-medium text-white/90">{props.q}</div>
-      <p className="mt-2 text-sm leading-relaxed text-white/70">{props.a}</p>
-    </div>
-  );
-}
-
-function ListItem({ children }: { children: React.ReactNode }) {
-  return (
-    <li className="flex gap-2">
-      <span className="mt-2 h-1.5 w-1.5 flex-none rounded-full bg-white/30" />
-      <span>{children}</span>
-    </li>
-  );
-}
-
-
-
-
-
-
