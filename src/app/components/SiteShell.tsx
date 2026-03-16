@@ -1,7 +1,7 @@
 // app/components/SiteShell.tsx
 import { SiteHeader } from "./SiteHeader";
 import { SiteFooter } from "./SiteFooter";
-import PublicFunnelTracker from "./PublicFunnelTracker";
+import PublicFunnelTrackerDeferred from "./PublicFunnelTrackerDeferred";
 
 export function SiteShell(props: {
   children: React.ReactNode;
@@ -16,7 +16,7 @@ export function SiteShell(props: {
 
   return (
     <main className="marketing-shell min-h-screen text-white">
-      <PublicFunnelTracker />
+      <PublicFunnelTrackerDeferred />
       <div className={`relative mx-auto w-full ${maxWidthClass} px-3 py-6 sm:px-4 sm:py-8 lg:px-6 lg:py-9 xl:px-8`}>
         <SiteHeader />
         {props.children}

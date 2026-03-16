@@ -7,19 +7,24 @@ import Providers from "./providers";
 const geistSans = Manrope({
   variable: "--font-geist-sans",
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700", "800"],
+  weight: ["500", "600", "700"],
+  display: "swap",
 });
 
 const geistMono = JetBrains_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
-  weight: ["400", "500", "600"],
+  weight: ["500"],
+  preload: false,
+  display: "swap",
 });
 
 const editorial = Cormorant_Garamond({
   variable: "--font-editorial",
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
+  weight: ["600", "700"],
+  preload: false,
+  display: "swap",
 });
 
 export const metadata: Metadata = {

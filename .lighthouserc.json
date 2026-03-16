@@ -5,7 +5,11 @@
       "startServerReadyPattern": "Ready",
       "startServerReadyTimeout": 120000,
       "settings": {
-        "chromeFlags": "--headless --no-sandbox --disable-gpu --user-data-dir=.tmp/lhci/chrome-profile"
+        "chromeFlags": "--headless --no-sandbox --disable-gpu --disable-extensions --disable-component-extensions-with-background-pages --proxy-server=direct:// --proxy-bypass-list=* --no-proxy-server --user-data-dir=.tmp/lhci/chrome-profile",
+        "throttlingMethod": "devtools",
+        "blockedUrlPatterns": [
+          "https://local.adguard.org/*"
+        ]
       },
       "url": [
         "http://127.0.0.1:3000/",
