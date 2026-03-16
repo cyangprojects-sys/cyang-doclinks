@@ -1,9 +1,16 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import ReportForm from "./ReportForm";
 import { SiteShell } from "@/app/components/SiteShell";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  title: "Report Abuse - cyang.io",
+  description:
+    "Report malware, phishing, illegal content, policy abuse, or suspicious sharing behavior. Reports are reviewed through moderation, quarantine, and security logging workflows.",
+};
 
 export default async function ReportPage(props: {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
@@ -15,36 +22,99 @@ export default async function ReportPage(props: {
   const token = Array.isArray(tokenRaw) ? tokenRaw[0] : tokenRaw;
   const alias = Array.isArray(aliasRaw) ? aliasRaw[0] : aliasRaw;
 
+  const hasPrefill = Boolean(token || alias);
+
   return (
     <SiteShell maxWidth="full">
-      <main className="mx-auto w-full max-w-[1600px] px-3 py-8 sm:px-4 lg:px-6">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <div className="text-xs text-white/60">cyang.io</div>
-          <h1 className="mt-1 text-xl font-semibold text-white">Report Abuse</h1>
-          <div className="mt-1 text-sm text-white/60">
-            Report malware, phishing, illegal content, policy abuse, or suspicious share behavior.
+      <section className="relative mt-10 grid gap-6 lg:grid-cols-12 lg:items-end">
+        <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
+          <div className="absolute -left-16 top-0 h-72 w-72 rounded-full bg-sky-400/12 blur-3xl" />
+          <div className="absolute right-0 top-8 h-80 w-80 rounded-full bg-teal-300/12 blur-3xl" />
+        </div>
+
+        <div className="lg:col-span-7">
+          <span className="ui-badge inline-flex rounded-full px-3 py-1 text-xs uppercase tracking-[0.16em]">Trust and safety</span>
+          <h1 className="font-editorial mt-5 max-w-4xl text-5xl leading-[1.02] tracking-tight text-white sm:text-6xl lg:text-7xl">
+            Report abuse
+            <span className="block text-white/72">quickly, clearly, and securely.</span>
+          </h1>
+          <p className="mt-7 max-w-3xl text-base leading-relaxed text-white/72 sm:text-lg">
+            Use this page to report malware, phishing, illegal content, policy abuse, or suspicious share behavior.
+            Reports are reviewed seriously and routed into moderation and quarantine workflows.
+          </p>
+
+          <div className="mt-7 flex flex-wrap gap-2">
+            <span className="ui-badge rounded-full px-3 py-1.5 text-xs">Reviewed by admins</span>
+            <span className="ui-badge rounded-full px-3 py-1.5 text-xs">Quarantine-aware</span>
+            <span className="ui-badge rounded-full px-3 py-1.5 text-xs">Security logged</span>
+            <span className="ui-badge rounded-full px-3 py-1.5 text-xs">Customer safety first</span>
+          </div>
+
+          {hasPrefill ? (
+            <div className="mt-6 inline-flex rounded-xl border border-sky-200/30 bg-sky-300/10 px-3.5 py-2 text-xs text-sky-100/85">
+              Target details were prefilled from your link context. Please verify before submitting.
+            </div>
+          ) : null}
+        </div>
+
+        <div className="lg:col-span-5">
+          <div className="glass-card-strong rounded-3xl p-6">
+            <div className="text-xs uppercase tracking-[0.14em] text-white/55">How reports are handled</div>
+            <div className="mt-4 space-y-3">
+              <ProcessRow title="1. Report received" body="Submission enters the abuse review pipeline." />
+              <ProcessRow title="2. Admin review" body="Owner/admin moderation verifies context and risk." />
+              <ProcessRow title="3. Containment" body="Risky content may be blocked, revoked, or quarantined." />
+              <ProcessRow title="4. Security logging" body="Events are logged for audit and operational follow-up." />
+            </div>
           </div>
         </div>
-        <Link href="/" className="rounded-xl bg-white/10 px-4 py-2 text-sm text-white hover:bg-white/15">
-          Home
-        </Link>
-      </div>
+      </section>
 
-      <div className="mt-4 rounded-xl border border-white/10 bg-white/5 p-4 text-xs text-white/70">
-        Include token or alias details when available. Reports feed directly into abuse moderation,
-        quarantine workflows, and immutable security event logging.
-      </div>
+      <section className="mt-12 grid gap-4 lg:grid-cols-12 lg:items-start">
+        <div className="lg:col-span-8">
+          <ReportForm token={token || null} alias={alias || null} />
+        </div>
 
-      <div className="mt-6">
-        <ReportForm token={token || null} alias={alias || null} />
-      </div>
+        <aside className="space-y-4 lg:col-span-4">
+          <div className="glass-card rounded-3xl p-6">
+            <h2 className="text-lg font-semibold tracking-tight text-white">What you can report</h2>
+            <ul className="mt-4 space-y-2 text-sm text-white/72">
+              <li className="flex gap-2"><span className="mt-2 h-1.5 w-1.5 rounded-full bg-sky-200/70" />Malware or suspicious file behavior</li>
+              <li className="flex gap-2"><span className="mt-2 h-1.5 w-1.5 rounded-full bg-sky-200/70" />Phishing or impersonation attempts</li>
+              <li className="flex gap-2"><span className="mt-2 h-1.5 w-1.5 rounded-full bg-sky-200/70" />Illegal or prohibited content</li>
+              <li className="flex gap-2"><span className="mt-2 h-1.5 w-1.5 rounded-full bg-sky-200/70" />Policy abuse or suspicious sharing patterns</li>
+            </ul>
+          </div>
 
-      <div className="mt-6 text-xs text-white/50">
-        Abuse reports are reviewed by the owner/admin team. Deliberately false reports may result in
-        access restrictions.
-      </div>
-      </main>
+          <div className="glass-card rounded-3xl p-6">
+            <h2 className="text-lg font-semibold tracking-tight text-white">Before you submit</h2>
+            <ul className="mt-4 space-y-2 text-sm text-white/72">
+              <li className="flex gap-2"><span className="mt-2 h-1.5 w-1.5 rounded-full bg-sky-200/70" />Include token, alias, or share link when possible.</li>
+              <li className="flex gap-2"><span className="mt-2 h-1.5 w-1.5 rounded-full bg-sky-200/70" />Describe what you observed and why it is risky.</li>
+              <li className="flex gap-2"><span className="mt-2 h-1.5 w-1.5 rounded-full bg-sky-200/70" />Include timing and whether you clicked or downloaded anything.</li>
+            </ul>
+          </div>
+
+          <div className="glass-card rounded-3xl p-6">
+            <h2 className="text-lg font-semibold tracking-tight text-white">Related trust links</h2>
+            <div className="mt-4 grid gap-2 text-sm">
+              <Link href="/acceptable-use" className="text-white/80 underline underline-offset-4 hover:text-white">Acceptable Use Policy</Link>
+              <Link href="/privacy" className="text-white/80 underline underline-offset-4 hover:text-white">Privacy Policy</Link>
+              <Link href="/security-disclosure" className="text-white/80 underline underline-offset-4 hover:text-white">Security Disclosure</Link>
+              <Link href="/status" className="text-white/80 underline underline-offset-4 hover:text-white">Status Center</Link>
+            </div>
+          </div>
+        </aside>
+      </section>
     </SiteShell>
+  );
+}
+
+function ProcessRow(props: { title: string; body: string }) {
+  return (
+    <div className="rounded-2xl border border-white/12 bg-black/25 p-4">
+      <div className="text-sm font-medium text-white/92">{props.title}</div>
+      <div className="mt-1 text-xs leading-relaxed text-white/64">{props.body}</div>
+    </div>
   );
 }
