@@ -34,7 +34,7 @@ export default async function ReportPage(props: {
 
         <div className="lg:col-span-7">
           <span className="ui-badge inline-flex rounded-full px-3 py-1 text-xs uppercase tracking-[0.16em]">Trust and safety</span>
-          <h1 className="font-editorial mt-5 max-w-4xl text-5xl leading-[1.02] tracking-tight text-white sm:text-6xl lg:text-7xl">
+          <h1 className="font-editorial mt-5 max-w-4xl text-4xl leading-[1.04] tracking-tight text-white sm:text-5xl lg:text-6xl">
             Report abuse
             <span className="block text-white/72">quickly, clearly, and securely.</span>
           </h1>
@@ -102,6 +102,7 @@ export default async function ReportPage(props: {
               <Link href="/privacy" className="text-white/80 underline underline-offset-4 hover:text-white">Privacy Policy</Link>
               <Link href="/security-disclosure" className="text-white/80 underline underline-offset-4 hover:text-white">Security Disclosure</Link>
               <Link href="/status" className="text-white/80 underline underline-offset-4 hover:text-white">Status Center</Link>
+              <Link href="/contact" className="text-white/80 underline underline-offset-4 hover:text-white">Contact</Link>
             </div>
           </div>
         </aside>

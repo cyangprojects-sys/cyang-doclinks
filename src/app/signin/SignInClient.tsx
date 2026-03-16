@@ -154,7 +154,7 @@ export default function SignInClient(props: SignInClientProps) {
             <div>
               <div className="inline-flex items-center gap-3 rounded-full border border-white/14 bg-white/[0.04] px-3 py-1.5 text-xs tracking-[0.14em] text-white/65 uppercase">
                 <img src="/branding/cyang_primary.svg" alt="" className="h-4 w-4 opacity-85" />
-                cyang.io / DocLinks
+                cyang.io / Doclinks
               </div>
               <h1 className="mt-5 max-w-3xl text-4xl font-semibold tracking-tight text-white sm:text-5xl">
                 Secure access,
@@ -341,7 +341,7 @@ export default function SignInClient(props: SignInClientProps) {
               </div>
 
               <div className="mt-6 rounded-xl border border-white/12 bg-black/20 p-4">
-                <div className="text-sm font-medium text-white">New to DocLinks?</div>
+                <div className="text-sm font-medium text-white">New to Doclinks?</div>
                 <p className="mt-1 text-sm text-white/62">
                   Create an account to share documents securely, manage protected links, and control member access.
                 </p>

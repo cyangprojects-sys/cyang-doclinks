@@ -117,7 +117,7 @@ export default async function LegalDocPage({
             <span className="ui-badge inline-flex rounded-full px-3 py-1 text-xs uppercase tracking-[0.16em]">
               {categoryMeta.label}
             </span>
-            <h1 className="font-editorial mt-5 max-w-5xl text-5xl leading-[1.02] tracking-tight text-white sm:text-6xl lg:text-7xl">
+            <h1 className="font-editorial mt-5 max-w-5xl text-4xl leading-[1.04] tracking-tight text-white sm:text-5xl lg:text-6xl">
               {doc.title}
             </h1>
             <p className="mt-6 max-w-4xl text-base leading-relaxed text-white/72 sm:text-lg">{doc.summary}</p>

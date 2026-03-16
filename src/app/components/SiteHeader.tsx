@@ -31,6 +31,7 @@ export async function SiteHeader() {
           {showPricingUi ? <HeaderLink href="/pricing">Pricing</HeaderLink> : null}
           <HeaderLink href="/trust">Trust</HeaderLink>
           <HeaderLink href="/about">About</HeaderLink>
+          <HeaderLink href="/contact">Contact</HeaderLink>
         </nav>
 
         <div className="flex items-center gap-2">
@@ -57,6 +58,7 @@ export async function SiteHeader() {
         {showPricingUi ? <HeaderLink href="/pricing">Pricing</HeaderLink> : null}
         <HeaderLink href="/trust">Trust</HeaderLink>
         <HeaderLink href="/about">About</HeaderLink>
+        <HeaderLink href="/contact">Contact</HeaderLink>
       </nav>
     </header>
   );

@@ -106,11 +106,12 @@ export default function DataRetentionPage() {
       <section className="mt-16 mb-2 md:mt-20">
         <div className="glass-card rounded-3xl p-7 sm:p-8">
           <h2 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">Related trust resources</h2>
-          <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
             <QuickLink href="/privacy" label="Privacy Policy" />
             <QuickLink href="/legal/data-processing-addendum" label="DPA" />
             <QuickLink href="/legal/subprocessors" label="Subprocessors" />
             <QuickLink href="/trust" label="Trust Center" />
+            <QuickLink href="/contact" label="Contact" />
           </div>
         </div>
       </section>

@@ -100,11 +100,12 @@ export default function SecurityDisclosurePage() {
           <h2 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">
             Related trust resources
           </h2>
-          <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
             <QuickLink href="/legal/security-policy" label="Security Policy" />
             <QuickLink href="/legal" label="Legal Center" />
             <QuickLink href="/status" label="Status" />
             <QuickLink href="/report" label="Report abuse" />
+            <QuickLink href="/contact" label="Contact" />
           </div>
         </div>
       </section>

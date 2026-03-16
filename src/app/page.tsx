@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { SiteShell } from "./components/SiteShell";
 import { getBillingFlags } from "@/lib/settings";
+import { isSignupEnabled } from "@/lib/signup";
 
 export const metadata: Metadata = {
   title: "cyang.io - Systems, Products, and Secure Delivery",
@@ -12,6 +13,8 @@ export const metadata: Metadata = {
 export default async function HomePage() {
   const flagsRes = await getBillingFlags();
   const showPricingUi = flagsRes.flags.pricingUiEnabled;
+  const signupEnabled = isSignupEnabled();
+  const primaryAccessHref = signupEnabled ? "/signup" : "/signin?intent=admin";
 
   return (
     <SiteShell maxWidth="full">
@@ -86,8 +89,8 @@ export default async function HomePage() {
               <Link href="/projects/doclinks" className="btn-base btn-secondary rounded-xl px-4 py-2.5 text-sm">
                 Product overview
               </Link>
-              <Link href="/signup" className="btn-base btn-secondary rounded-xl px-4 py-2.5 text-sm">
-                Get started
+              <Link href={primaryAccessHref} className="btn-base btn-secondary rounded-xl px-4 py-2.5 text-sm">
+                {signupEnabled ? "Get started" : "Sign in"}
               </Link>
             </div>
           </div>
@@ -299,7 +302,7 @@ export default async function HomePage() {
                 About cyang.io
               </Link>
               <Link href="/projects" className="btn-base btn-secondary rounded-xl px-5 py-3 text-sm">
-                Explore studio work
+                Explore portfolio
               </Link>
             </div>
           </div>
@@ -369,8 +372,12 @@ export default async function HomePage() {
           <div className="mt-7 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <FinalAction href="/projects/doclinks" label="Explore Doclinks" body="Start with the flagship product overview." />
             <FinalAction href="/projects" label="View all projects" body="See the expanding systems and products portfolio." />
-            <FinalAction href="/about" label="Learn about cyang.io" body="Read founder direction and studio approach." />
-            <FinalAction href="/signin" label="Sign in / Get started" body="Enter the platform and begin operating." />
+            <FinalAction href="/about" label="Learn about cyang.io" body="Read founder direction and product approach." />
+            <FinalAction
+              href={primaryAccessHref}
+              label={signupEnabled ? "Get started" : "Sign in"}
+              body="Enter the platform and begin operating."
+            />
           </div>
         </div>
       </section>

@@ -29,7 +29,7 @@ const HERO_CHIPS = [
 
 const WHAT_IS_ITEMS: Item[] = [
   {
-    title: "Product studio",
+    title: "Product portfolio",
     body: "cyang.io is a focused portfolio of products and systems built for practical, real-world workflows.",
   },
   {
@@ -155,7 +155,7 @@ export default async function AboutPage() {
             <Link href="/projects/doclinks" className="btn-base btn-secondary rounded-xl px-6 py-3 text-sm">
               See Doclinks
             </Link>
-            <Link href="/report" className="btn-base btn-secondary rounded-xl px-6 py-3 text-sm">
+            <Link href="/contact" className="btn-base btn-secondary rounded-xl px-6 py-3 text-sm">
               Get in touch
             </Link>
           </div>
@@ -181,7 +181,7 @@ export default async function AboutPage() {
       <section id="what-is" className="mt-16 md:mt-20">
         <SectionIntro
           eyebrow="What cyang.io is"
-          title="A focused studio for serious product systems"
+          title="A focused portfolio for serious product systems"
           body="cyang.io is a portfolio and build surface for practical software. It is intentionally compact, actively maintained, and designed to scale quality before scope."
         />
 
@@ -324,14 +324,14 @@ export default async function AboutPage() {
           </p>
 
           <div className="mt-7 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <CtaTile href="/projects" title="Browse projects" body="See the current studio portfolio." />
+            <CtaTile href="/projects" title="Browse projects" body="See the current product portfolio." />
             <CtaTile href="/projects/doclinks" title="Explore Doclinks" body="Review the flagship product in depth." />
             {showPricingUi ? (
               <CtaTile href="/pricing" title="View pricing" body="Compare plans and capability levels." />
             ) : (
               <CtaTile href="/status" title="View status" body="Check service health and operations." />
             )}
-            <CtaTile href="/report" title="Get in touch" body="Contact for questions or reporting." />
+            <CtaTile href="/contact" title="Get in touch" body="Contact for product, business, or support questions." />
           </div>
         </div>
       </section>

@@ -1,10 +1,17 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { SiteShell } from "@/app/components/SiteShell";
 import LegalCenterClient from "@/app/legal/LegalCenterClient";
 import { LEGAL_DOCS } from "@/lib/legalDocs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  title: "Legal and Trust Center - cyang.io",
+  description:
+    "Customer-facing legal, privacy, security, and reliability documentation for cyang.io and Doclinks.",
+};
 
 export default function LegalIndexPage() {
   return (
@@ -20,7 +27,7 @@ export default function LegalIndexPage() {
             <span className="ui-badge inline-flex rounded-full px-3 py-1 text-xs uppercase tracking-[0.16em]">
               Legal and Trust Center
             </span>
-            <h1 className="font-editorial mt-5 max-w-4xl text-5xl leading-[1.02] tracking-tight text-white sm:text-6xl lg:text-7xl">
+            <h1 className="font-editorial mt-5 max-w-4xl text-4xl leading-[1.04] tracking-tight text-white sm:text-5xl lg:text-6xl">
               Policies built for
               <span className="block text-white/72">clarity, trust, and serious operations.</span>
             </h1>
@@ -57,6 +64,7 @@ export default function LegalIndexPage() {
                     <Link href="/legal/data-processing-addendum" className="text-white/80 underline hover:text-white">DPA</Link>
                     <Link href="/legal/service-level-agreement" className="text-white/80 underline hover:text-white">SLA</Link>
                     <Link href="/legal/subprocessors" className="text-white/80 underline hover:text-white">Subprocessors</Link>
+                    <Link href="/trust/procurement" className="text-white/80 underline hover:text-white">Procurement pack</Link>
                   </div>
                 </div>
               </div>

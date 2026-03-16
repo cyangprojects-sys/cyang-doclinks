@@ -31,6 +31,7 @@ export async function SiteFooter() {
             title="Trust"
             links={[
               { href: "/trust", label: "Trust Center" },
+              { href: "/trust/procurement", label: "Procurement Package" },
               { href: "/legal/security-policy", label: "Security Policy" },
               { href: "/status", label: "Status" },
               { href: "/security-disclosure", label: "Security Disclosure" },
@@ -60,6 +61,7 @@ export async function SiteFooter() {
           <FooterGroup
             title="Support"
             links={[
+              { href: "/contact", label: "Contact" },
               { href: "/data-retention", label: "Data Retention" },
               { href: "/legal/data-processing-addendum", label: "DPA" },
               { href: "/legal/service-level-agreement", label: "SLA" },

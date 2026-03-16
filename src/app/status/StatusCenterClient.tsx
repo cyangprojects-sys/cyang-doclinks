@@ -738,6 +738,7 @@ export default function StatusCenterClient({ preview }: { preview: StatusPreview
           </div>
           <div className="flex flex-wrap items-center gap-2 text-sm">
             <a href="mailto:support@cyang.io" className="btn-base btn-secondary rounded-xl px-3 py-2">Contact support</a>
+            <Link href="/contact" className="btn-base btn-secondary rounded-xl px-3 py-2">Contact page</Link>
             <Link href="/security-disclosure" className="btn-base btn-secondary rounded-xl px-3 py-2">Security docs</Link>
           </div>
         </div>
@@ -779,9 +780,12 @@ export default function StatusCenterClient({ preview }: { preview: StatusPreview
 
       <section className="glass-card rounded-[24px] p-4 sm:p-5">
         <h2 className="text-base font-semibold text-white">Related trust resources</h2>
-        <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-6">
           <Link href="/trust" className="rounded-xl border border-white/12 bg-black/25 px-3 py-2 text-sm text-white/82 transition-colors hover:bg-white/10">
             Trust Center
+          </Link>
+          <Link href="/trust/procurement" className="rounded-xl border border-white/12 bg-black/25 px-3 py-2 text-sm text-white/82 transition-colors hover:bg-white/10">
+            Procurement package
           </Link>
           <Link href="/legal/security-policy" className="rounded-xl border border-white/12 bg-black/25 px-3 py-2 text-sm text-white/82 transition-colors hover:bg-white/10">
             Security Policy
@@ -791,6 +795,9 @@ export default function StatusCenterClient({ preview }: { preview: StatusPreview
           </Link>
           <Link href="/report" className="rounded-xl border border-white/12 bg-black/25 px-3 py-2 text-sm text-white/82 transition-colors hover:bg-white/10">
             Report abuse
+          </Link>
+          <Link href="/contact" className="rounded-xl border border-white/12 bg-black/25 px-3 py-2 text-sm text-white/82 transition-colors hover:bg-white/10">
+            Contact
           </Link>
         </div>
       </section>

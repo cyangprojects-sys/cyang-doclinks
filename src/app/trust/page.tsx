@@ -61,6 +61,16 @@ const TRUST_LINKS = [
     body: "Responsible vulnerability reporting and response expectations.",
     href: "/security-disclosure",
   },
+  {
+    title: "Procurement trust package",
+    body: "Fast path for security, legal, and procurement document review.",
+    href: "/trust/procurement",
+  },
+  {
+    title: "Contact",
+    body: "Get in touch for support, procurement, and trust questions.",
+    href: "/contact",
+  },
 ];
 
 export default function TrustPage() {
@@ -89,6 +99,12 @@ export default function TrustPage() {
             </Link>
             <Link href="/status" className="btn-base btn-secondary rounded-xl px-6 py-3 text-sm">
               View status
+            </Link>
+            <Link href="/trust/procurement" className="btn-base btn-secondary rounded-xl px-6 py-3 text-sm">
+              Procurement package
+            </Link>
+            <Link href="/contact" className="btn-base btn-secondary rounded-xl px-6 py-3 text-sm">
+              Contact
             </Link>
             <Link href="/report" className="btn-base btn-secondary rounded-xl px-6 py-3 text-sm">
               Report abuse
@@ -145,7 +161,7 @@ export default function TrustPage() {
             Evaluating Doclinks for business use?
           </h2>
           <p className="mt-3 max-w-3xl text-sm leading-relaxed text-white/72">
-            Start with Security Policy, DPA, SLA, and Subprocessors for procurement and compliance review.
+            Start with the procurement package, then review Security Policy, DPA, SLA, and Subprocessors for compliance review.
           </p>
           <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
             <Link href="/legal/security-policy" className="btn-base btn-secondary rounded-xl px-5 py-3 text-sm">
@@ -159,6 +175,9 @@ export default function TrustPage() {
             </Link>
             <Link href="/legal/subprocessors" className="btn-base btn-secondary rounded-xl px-5 py-3 text-sm">
               Subprocessors
+            </Link>
+            <Link href="/trust/procurement" className="btn-base btn-secondary rounded-xl px-5 py-3 text-sm">
+              Procurement package
             </Link>
           </div>
         </div>

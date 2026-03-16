@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { SiteShell } from "../components/SiteShell";
 import { getBillingFlags } from "@/lib/settings";
+import { isSignupEnabled } from "@/lib/signup";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -164,6 +165,8 @@ export default async function PricingPage() {
   if (!flagsRes.flags.pricingUiEnabled) {
     notFound();
   }
+  const signupEnabled = isSignupEnabled();
+  const primaryAccessHref = signupEnabled ? "/signup" : "/signin?intent=admin";
 
   return (
     <SiteShell maxWidth="full">
@@ -193,8 +196,8 @@ export default async function PricingPage() {
           </div>
 
           <div className="mt-9 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-            <Link href="/signup" className="btn-base btn-primary rounded-xl px-6 py-3 text-sm font-semibold">
-              Get started free
+            <Link href={primaryAccessHref} className="btn-base btn-primary rounded-xl px-6 py-3 text-sm font-semibold">
+              {signupEnabled ? "Get started free" : "Sign in"}
             </Link>
             <Link href="/signin?intent=admin" className="btn-base btn-secondary rounded-xl px-6 py-3 text-sm">
               Upgrade existing workspace
@@ -232,16 +235,16 @@ export default async function PricingPage() {
             price="$0/month"
             bestFor="Best for individual testing, light use, and proof of workflow"
             highlights={PLAN_HIGHLIGHTS.free}
-            ctaHref="/signup"
-            ctaLabel="Start Free"
+            ctaHref={primaryAccessHref}
+            ctaLabel={signupEnabled ? "Start Free" : "Sign in"}
           />
           <PlanCard
             tier="Pro"
             price="$12/month"
             bestFor="Best for client delivery, teams, higher volume, and audit visibility"
             highlights={PLAN_HIGHLIGHTS.pro}
-            ctaHref="/signup"
-            ctaLabel="Start Pro"
+            ctaHref={primaryAccessHref}
+            ctaLabel={signupEnabled ? "Start Pro" : "Sign in to upgrade"}
             recommended
           />
         </div>
@@ -345,10 +348,15 @@ export default async function PricingPage() {
             Choose the plan that matches your delivery stage today, then move up as volume and control requirements grow.
           </p>
 
-          <div className="mt-7 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            <CtaTile href="/signup" title="Start Free" body="Create an account and validate your workflow." />
+          <div className="mt-7 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <CtaTile
+              href={primaryAccessHref}
+              title={signupEnabled ? "Start Free" : "Sign in"}
+              body="Open your account and validate your workflow."
+            />
             <CtaTile href="/signin?intent=admin" title="Upgrade to Pro" body="Existing workspace owners can upgrade instantly." />
             <CtaTile href="/projects/doclinks" title="Learn about Doclinks" body="Review product capabilities and security model." />
+            <CtaTile href="/contact" title="Contact" body="Ask product, pricing, or procurement questions." />
           </div>
         </div>
       </section>

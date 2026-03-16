@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { SiteShell } from "../components/SiteShell";
+import { isSignupEnabled } from "@/lib/signup";
 
 export const metadata: Metadata = {
   title: "Projects - cyang.io",
   description:
-    "Explore the curated cyang.io project studio: maintained products, operational systems, and disciplined experiments led by the Doclinks flagship.",
+    "Explore the curated cyang.io product portfolio: maintained products, operational systems, and disciplined experiments led by the Doclinks flagship.",
 };
 
 type StudioStatus = "Live" | "Shipping" | "Experimental" | "Internal" | "Coming next";
@@ -83,7 +84,7 @@ const PROJECTS: StudioProject[] = [
   {
     name: "Automation Workbench",
     summary:
-      "Focused automation utilities for repetitive operational tasks and future studio workflow acceleration.",
+      "Focused automation utilities for repetitive operational tasks and future workflow acceleration.",
     href: "/about",
     status: "Experimental",
     category: "Studio experiment",
@@ -133,6 +134,8 @@ const SHIPPING_TRACKS: ShippingTrack[] = [
 ];
 
 export default function ProjectsPage() {
+  const signupEnabled = isSignupEnabled();
+  const primaryAccessHref = signupEnabled ? "/signup" : "/signin?intent=admin";
   const liveCount = PROJECTS.filter((project) => project.status === "Live").length;
   const activeCount = PROJECTS.filter((project) => project.status === "Live" || project.status === "Shipping").length;
 
@@ -174,7 +177,7 @@ export default function ProjectsPage() {
 
           <div className="lg:col-span-4">
             <div className="glass-card-strong rounded-3xl p-6">
-              <div className="text-xs uppercase tracking-[0.14em] text-white/55">Studio snapshot</div>
+              <div className="text-xs uppercase tracking-[0.14em] text-white/55">Portfolio snapshot</div>
               <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
                 <SnapshotStat label="Live projects" value={String(liveCount)} />
                 <SnapshotStat label="Active shipping lanes" value={String(activeCount)} />
@@ -188,7 +191,7 @@ export default function ProjectsPage() {
       <section id="flagship" className="mt-16 md:mt-20">
         <SectionHeader
           eyebrow="Featured flagship"
-          title="Doclinks is the lead product in the cyang.io studio."
+          title="Doclinks is the lead product in the cyang.io portfolio."
           body="A premium, security-first document delivery product built for controlled sharing, reliable policy behavior, and predictable customer workflows."
         />
 
@@ -215,8 +218,8 @@ export default function ProjectsPage() {
               <Link href="/projects/doclinks" className="btn-base btn-primary rounded-xl px-5 py-3 text-sm font-semibold">
                 Open Doclinks
               </Link>
-              <Link href="/signup" className="btn-base btn-secondary rounded-xl px-5 py-3 text-sm">
-                Create account
+              <Link href={primaryAccessHref} className="btn-base btn-secondary rounded-xl px-5 py-3 text-sm">
+                {signupEnabled ? "Create account" : "Sign in"}
               </Link>
               <Link href="/pricing" className="btn-base btn-secondary rounded-xl px-5 py-3 text-sm">
                 Compare plans
@@ -278,7 +281,7 @@ export default function ProjectsPage() {
         <SectionHeader
           eyebrow="Why these projects matter"
           title="Built with product discipline"
-          body="The cyang.io studio standard is practical trust: strong security posture, clear operations, high-performance UX, and controlled iteration."
+          body="The cyang.io portfolio standard is practical trust: strong security posture, clear operations, high-performance UX, and controlled iteration."
         />
 
         <div className="mt-8 grid gap-4 sm:grid-cols-2">
@@ -310,7 +313,7 @@ export default function ProjectsPage() {
           <SectionHeader
             eyebrow="Discovery"
             title="From useful tools to durable systems"
-            body="cyang.io is evolving as a long-term studio: shipping practical products while building supporting systems that keep quality and trust high at every layer."
+            body="cyang.io is evolving as a long-term software portfolio: shipping practical products while building supporting systems that keep quality and trust high at every layer."
           />
           <div className="mt-6 grid gap-4 lg:grid-cols-2">
             <DiscoveryPanel
@@ -318,7 +321,7 @@ export default function ProjectsPage() {
               items={[
                 "Customer-ready product surfaces with secure defaults",
                 "Operational systems that reduce risk and ambiguity",
-                "Reusable studio patterns for faster, safer future launches",
+                "Reusable product patterns for faster, safer future launches",
               ]}
             />
             <DiscoveryPanel
@@ -341,7 +344,11 @@ export default function ProjectsPage() {
         />
 
         <div className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <ActionTile href="/signup" title="Get started" body="Create an account and begin secure document delivery." />
+          <ActionTile
+            href={primaryAccessHref}
+            title={signupEnabled ? "Get started" : "Sign in"}
+            body="Begin secure document delivery workflows."
+          />
           <ActionTile href="/projects/doclinks" title="Explore Doclinks" body="Review the flagship product and control surface." />
           <ActionTile href="/about" title="Read the approach" body="See how cyang.io builds with strict defaults and clarity." />
           <ActionTile href="/status" title="View status" body="Check platform health and operational transparency." />

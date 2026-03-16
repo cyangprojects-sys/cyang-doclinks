@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { SiteShell } from "../../components/SiteShell";
 import { getBillingFlags } from "@/lib/settings";
+import { isSignupEnabled } from "@/lib/signup";
 
 export const metadata: Metadata = {
   title: "Doclinks - cyang.io",
@@ -178,6 +179,8 @@ const MOMENTUM_ITEMS = [
 export default async function DoclinksPage() {
   const flagsRes = await getBillingFlags();
   const showPricingUi = flagsRes.flags.pricingUiEnabled;
+  const signupEnabled = isSignupEnabled();
+  const primaryAccessHref = signupEnabled ? "/signup" : "/signin?intent=admin";
 
   return (
     <SiteShell maxWidth="full">
@@ -209,8 +212,8 @@ export default async function DoclinksPage() {
           </div>
 
           <div className="mt-9 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-            <Link href="/signup" className="btn-base btn-primary rounded-xl px-6 py-3 text-sm font-semibold">
-              Get started
+            <Link href={primaryAccessHref} className="btn-base btn-primary rounded-xl px-6 py-3 text-sm font-semibold">
+              {signupEnabled ? "Get started" : "Sign in"}
             </Link>
             {showPricingUi ? (
               <Link href="/pricing" className="btn-base btn-secondary rounded-xl px-6 py-3 text-sm">
@@ -366,10 +369,15 @@ export default async function DoclinksPage() {
             body="Start with a real account, review plan fit, and evaluate the trust posture end to end."
           />
 
-          <div className="mt-7 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <ActionTile href="/signup" title="Create account" body="Set up Doclinks and start controlled delivery." />
+          <div className="mt-7 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+            <ActionTile
+              href={primaryAccessHref}
+              title={signupEnabled ? "Create account" : "Sign in"}
+              body="Start controlled delivery workflows."
+            />
             <ActionTile href="/signin" title="Sign in" body="Access your workspace and continue active workflows." />
             <ActionTile href="/trust" title="Explore trust center" body="Review security, policy, and operations resources." />
+            <ActionTile href="/contact" title="Contact" body="Ask product or business questions." />
             {showPricingUi ? (
               <ActionTile href="/pricing" title="View pricing" body="Compare plans and controls." />
             ) : (
@@ -398,8 +406,8 @@ export default async function DoclinksPage() {
                 "Core sharing controls",
                 "Basic audit visibility",
               ]}
-              ctaHref="/signup"
-              ctaLabel="Start free"
+              ctaHref={primaryAccessHref}
+              ctaLabel={signupEnabled ? "Start free" : "Sign in"}
             />
             <PricingCard
               tier="Pro"
@@ -464,8 +472,8 @@ export default async function DoclinksPage() {
             Doclinks gives teams a controlled, auditable, security-first way to deliver sensitive files externally.
           </p>
           <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-            <Link href="/signup" className="btn-base btn-primary rounded-xl px-6 py-3 text-sm font-semibold">
-              Create account
+            <Link href={primaryAccessHref} className="btn-base btn-primary rounded-xl px-6 py-3 text-sm font-semibold">
+              {signupEnabled ? "Create account" : "Sign in"}
             </Link>
             <Link href="/trust" className="btn-base btn-secondary rounded-xl px-6 py-3 text-sm">
               Review trust
