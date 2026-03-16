@@ -1,3 +1,4 @@
+import { CANONICAL_DEMO_DOC_URL, normalizeDemoDocUrl } from "@/lib/demo";
 import { validateDocMasterKeysConfig } from "@/lib/encryption";
 
 export type AppEnvironment = "development" | "test" | "staging" | "production";
@@ -154,6 +155,51 @@ function validateEmail(findings: ConfigAuditFinding[], env: NodeJS.ProcessEnv, f
   }
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
     addFinding(findings, "error", field, "INVALID_EMAIL", `${field} must be a valid email address.`);
+  }
+}
+
+function validateDemoDocConfig(findings: ConfigAuditFinding[], env: NodeJS.ProcessEnv) {
+  const privateUrl = normalizeText(env.DEMO_DOC_URL);
+  const publicUrl = normalizeText(env.NEXT_PUBLIC_DEMO_DOC_URL);
+  const normalizedPrivate = privateUrl ? normalizeDemoDocUrl(privateUrl) : null;
+  const normalizedPublic = publicUrl ? normalizeDemoDocUrl(publicUrl) : null;
+  const canonicalUrl = normalizeDemoDocUrl(CANONICAL_DEMO_DOC_URL);
+
+  if (privateUrl && !normalizedPrivate) {
+    addFinding(
+      findings,
+      "warn",
+      "DEMO_DOC_URL",
+      "DEMO_URL_INVALID",
+      "DEMO_DOC_URL is invalid and will be ignored in favor of the built-in canonical demo link."
+    );
+  }
+  if (publicUrl && !normalizedPublic) {
+    addFinding(
+      findings,
+      "warn",
+      "NEXT_PUBLIC_DEMO_DOC_URL",
+      "DEMO_URL_INVALID",
+      "NEXT_PUBLIC_DEMO_DOC_URL is invalid and will be ignored in favor of the built-in canonical demo link."
+    );
+  }
+  if (normalizedPrivate && normalizedPublic && normalizedPrivate !== normalizedPublic) {
+    addFinding(
+      findings,
+      "warn",
+      "DEMO_DOC_URL",
+      "DEMO_URL_MISMATCH",
+      "DEMO_DOC_URL and NEXT_PUBLIC_DEMO_DOC_URL must resolve to the same demo share link."
+    );
+  }
+  if (!canonicalUrl) {
+    addFinding(
+      findings,
+      "warn",
+      "DEMO_DOC_URL",
+      "DEMO_URL_CANONICAL_INVALID",
+      "The built-in canonical demo link is invalid and should be corrected before release."
+    );
   }
 }
 
@@ -340,15 +386,7 @@ export function auditRuntimeConfig(env: NodeJS.ProcessEnv = process.env): Config
     );
   }
 
-  if (normalizeText(env.DEMO_DOC_URL) || normalizeText(env.NEXT_PUBLIC_DEMO_DOC_URL)) {
-    addFinding(
-      findings,
-      "warn",
-      "DEMO_DOC_URL",
-      "DEMO_URL_CONFIGURED",
-      "Demo share URLs are configured. Keep them isolated from production/operator workflows."
-    );
-  }
+  validateDemoDocConfig(findings, env);
 
   const errorCount = findings.filter((finding) => finding.severity === "error").length;
   const warningCount = findings.filter((finding) => finding.severity === "warn").length;

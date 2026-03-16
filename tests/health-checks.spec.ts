@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { summarizeHealthChecks, type HealthCheck } from "../src/lib/health";
+import { classifyBackupRecoverySummary, summarizeHealthChecks, type HealthCheck } from "../src/lib/health";
 
 test.describe("health readiness aggregation", () => {
   test("fails readiness when a critical dependency is down", () => {
@@ -39,5 +39,37 @@ test.describe("health readiness aggregation", () => {
     const summary = summarizeHealthChecks(checks);
     expect(summary.ok).toBeTruthy();
     expect(summary.status).toBe("ok");
+  });
+
+  test("keeps backup recovery healthy when the latest attempt failed but a recent success is still fresh", () => {
+    const result = classifyBackupRecoverySummary({
+      enabled: true,
+      tablesReady: true,
+      lastStatus: "failed",
+      maxAgeHours: 30,
+      recoveryDrillDays: 30,
+      hoursSinceLastSuccess: 4,
+      freshnessOk: true,
+      recoveryDrillDue: false,
+    });
+
+    expect(result.state).toBe("ok");
+    expect(result.summary).toContain("latest attempt failed");
+  });
+
+  test("keeps backup recovery degraded when restore drill cadence is overdue", () => {
+    const result = classifyBackupRecoverySummary({
+      enabled: true,
+      tablesReady: true,
+      lastStatus: "ok",
+      maxAgeHours: 30,
+      recoveryDrillDays: 30,
+      hoursSinceLastSuccess: 4,
+      freshnessOk: true,
+      recoveryDrillDue: true,
+    });
+
+    expect(result.state).toBe("degraded");
+    expect(result.summary).toContain("restore drill cadence");
   });
 });

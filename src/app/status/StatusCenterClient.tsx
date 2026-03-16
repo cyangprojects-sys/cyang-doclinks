@@ -2,23 +2,10 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
-
-type PlatformState =
-  | "operational"
-  | "degraded"
-  | "partial_outage"
-  | "major_outage"
-  | "maintenance";
+import { deriveStatusPageScenario, type PlatformState, type StatusSnapshot } from "@/lib/statusPageScenario";
 
 type ServiceState = PlatformState;
 type IncidentState = "investigating" | "identified" | "monitoring" | "resolved";
-
-type StatusSnapshot = {
-  ok: boolean;
-  service: string;
-  ts: number;
-  error?: string;
-};
 
 type ServiceItem = {
   key: string;
@@ -443,6 +430,7 @@ export default function StatusCenterClient({ preview }: { preview: StatusPreview
           ok: Boolean(payload.ok),
           service: typeof payload.service === "string" ? payload.service : "cyang.io",
           ts: Number(payload.ts || Date.now()),
+          status: payload.status === "ok" || payload.status === "degraded" || payload.status === "down" ? payload.status : undefined,
           error: typeof payload.error === "string" ? payload.error : undefined,
         });
         setErrorMsg(null);
@@ -521,11 +509,7 @@ export default function StatusCenterClient({ preview }: { preview: StatusPreview
   }, [subscriptionEmail]);
 
   const scenario = useMemo<PlatformState>(() => {
-    if (preview !== "live" && preview !== "loading") return preview;
-    if (!snapshot) return "operational";
-    if (snapshot.ok) return "operational";
-    if (snapshot.error === "RATE_LIMIT" || snapshot.error === "TIMEOUT") return "degraded";
-    return "partial_outage";
+    return deriveStatusPageScenario(snapshot, preview);
   }, [preview, snapshot]);
 
   const services = useMemo(() => buildServices(scenario), [scenario]);
@@ -545,6 +529,7 @@ export default function StatusCenterClient({ preview }: { preview: StatusPreview
     timestamp: snapshot?.ts ?? null,
     environment: (typeof process.env.NEXT_PUBLIC_APP_ENV === "string" && process.env.NEXT_PUBLIC_APP_ENV.trim()) || "production",
     build: (typeof process.env.NEXT_PUBLIC_BUILD_SHA === "string" && process.env.NEXT_PUBLIC_BUILD_SHA.trim()) || "current",
+    status: snapshot?.status ?? null,
     error: snapshot?.error ?? null,
   }), [snapshot]);
 

@@ -3,16 +3,26 @@
  *
  * Keep all demo CTAs pointing here so you can rotate the token in one place.
  */
-const CANONICAL_DEMO_DOC_URL = "https://www.cyang.io/s/5925b6744c38f9c6fd76efcac5fcc255";
+export const CANONICAL_DEMO_DOC_URL = "https://www.cyang.io/s/5925b6744c38f9c6fd76efcac5fcc255";
+
+export function normalizeDemoDocUrl(value: string): string | null {
+  try {
+    const url = new URL(value);
+    const host = url.hostname.trim().toLowerCase();
+    const path = url.pathname.trim();
+    if (url.protocol !== "https:") return null;
+    if (host !== "www.cyang.io") return null;
+    if (!path.startsWith("/s/") || path.includes("/raw")) return null;
+    return `${url.origin}${path}`;
+  } catch {
+    return null;
+  }
+}
 
 function assertSafeDemoDocUrl(value: string): string {
-  const url = new URL(value);
-  const host = url.hostname.trim().toLowerCase();
-  const path = url.pathname.trim();
-  if (url.protocol !== "https:") throw new Error("Invalid demo URL protocol");
-  if (host !== "www.cyang.io") throw new Error("Invalid demo URL host");
-  if (!path.startsWith("/s/") || path.includes("/raw")) throw new Error("Invalid demo URL path");
-  return `${url.origin}${path}`;
+  const normalized = normalizeDemoDocUrl(value);
+  if (!normalized) throw new Error("Invalid demo URL");
+  return normalized;
 }
 
 function configuredDemoDocUrl(): string {

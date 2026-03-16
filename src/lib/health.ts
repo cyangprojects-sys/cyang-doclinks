@@ -2,7 +2,7 @@ import { ListObjectsV2Command } from "@aws-sdk/client-s3";
 import { sql } from "@/lib/db";
 import { getR2Bucket, getR2Prefix, r2Client } from "@/lib/r2";
 import { auditRuntimeConfig, type ConfigAuditReport } from "@/lib/configAudit";
-import { getBackupRecoveryStatusSummary } from "@/lib/backupRecovery";
+import { getBackupRecoveryStatusSummary, type BackupRecoveryStatusSummary } from "@/lib/backupRecovery";
 import { getKeyRotationStatusSummary } from "@/lib/keyRotationJobs";
 
 export type HealthState = "ok" | "degraded" | "down" | "disabled";
@@ -55,6 +55,47 @@ function toLatencyDetails(startedAt: number, details?: Record<string, unknown>) 
   return {
     latencyMs: Math.max(1, Date.now() - startedAt),
     ...(details || {}),
+  };
+}
+
+export function classifyBackupRecoverySummary(summary: BackupRecoveryStatusSummary): {
+  state: Exclude<HealthState, "down">;
+  summary: string;
+} {
+  if (!summary.enabled) {
+    return {
+      state: "disabled",
+      summary: "Backup automation is not enabled.",
+    };
+  }
+
+  if (!summary.tablesReady || summary.lastStatus === "missing") {
+    return {
+      state: "degraded",
+      summary: "Backup status tables are not ready or have not received backup status yet.",
+    };
+  }
+
+  if (!summary.freshnessOk) {
+    return {
+      state: "degraded",
+      summary: "Backup freshness requires attention.",
+    };
+  }
+
+  if (summary.recoveryDrillDue) {
+    return {
+      state: "degraded",
+      summary: "Backups are current, but restore drill cadence requires attention.",
+    };
+  }
+
+  return {
+    state: "ok",
+    summary:
+      summary.lastStatus === "failed"
+        ? "Backups are within policy; the latest attempt failed but the most recent successful backup is still fresh."
+        : "Backups and restore drill cadence are within policy.",
   };
 }
 
@@ -230,35 +271,17 @@ async function probeBackupRecovery(): Promise<HealthCheck> {
   const startedAt = Date.now();
   try {
     const summary = await getBackupRecoveryStatusSummary();
-    if (!summary.enabled) {
-      return {
-        name: "backup_recovery",
-        state: "disabled",
-        critical: false,
-        summary: "Backup automation is not enabled.",
-        details: toLatencyDetails(startedAt, {
-          maxAgeHours: summary.maxAgeHours,
-          recoveryDrillDays: summary.recoveryDrillDays,
-        }),
-      };
-    }
-
-    const degraded =
-      !summary.freshnessOk ||
-      summary.recoveryDrillDue ||
-      summary.lastStatus === "failed" ||
-      summary.lastStatus === "missing";
+    const classified = classifyBackupRecoverySummary(summary);
 
     return {
       name: "backup_recovery",
-      state: degraded ? "degraded" : "ok",
+      state: classified.state,
       critical: false,
-      summary: degraded
-        ? "Backup or restore drill freshness requires attention."
-        : "Backups and restore drill cadence are within policy.",
+      summary: classified.summary,
       details: toLatencyDetails(startedAt, {
         lastStatus: summary.lastStatus,
         hoursSinceLastSuccess: summary.hoursSinceLastSuccess,
+        freshnessOk: summary.freshnessOk,
         maxAgeHours: summary.maxAgeHours,
         recoveryDrillDays: summary.recoveryDrillDays,
         recoveryDrillDue: summary.recoveryDrillDue,

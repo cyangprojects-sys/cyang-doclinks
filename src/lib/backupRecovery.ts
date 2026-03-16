@@ -1,5 +1,16 @@
 import { sql } from "@/lib/db";
 
+export type BackupRecoveryStatusSummary = {
+  enabled: boolean;
+  tablesReady: boolean;
+  lastStatus: "disabled" | "missing" | string;
+  maxAgeHours: number;
+  recoveryDrillDays: number;
+  hoursSinceLastSuccess: number | null;
+  freshnessOk: boolean;
+  recoveryDrillDue: boolean;
+};
+
 function parsePositiveInt(raw: unknown, fallback: number, min = 1, max = 3650): number {
   const rawInput = String(raw ?? "");
   if (rawInput.length > 24 || /[\r\n\0]/.test(rawInput)) return fallback;
@@ -52,7 +63,7 @@ async function tableExists(name: string): Promise<boolean> {
   }
 }
 
-export async function getBackupRecoveryStatusSummary() {
+export async function getBackupRecoveryStatusSummary(): Promise<BackupRecoveryStatusSummary> {
   const { enabled, maxAgeHours, recoveryDrillDays } = parseBackupRecoveryConfig();
   const backupRunsReady = await tableExists("public.backup_runs");
   const recoveryDrillsReady = await tableExists("public.recovery_drills");
