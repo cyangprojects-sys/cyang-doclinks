@@ -13,7 +13,6 @@ import { POST as adminBillingPortalPost } from "../src/app/api/admin/billing/por
 import { POST as adminBillingSyncPost } from "../src/app/api/admin/billing/sync/route";
 import { POST as adminBillingViewOverridePost } from "../src/app/api/admin/billing/view-override/route";
 import { POST as viewerBillingCheckoutPost } from "../src/app/api/billing/checkout/route";
-import { POST as securityMigrateLegacyPost } from "../src/app/api/admin/security/migrate-legacy/route";
 import { POST as securityOrgAccessPost } from "../src/app/api/admin/security/org-access/route";
 import { POST as securityRbacPost } from "../src/app/api/admin/security/rbac/route";
 import { POST as securityRequeueScansPost } from "../src/app/api/admin/security/requeue-scans/route";
@@ -347,14 +346,6 @@ test.describe("admin post route runtime rate-limit behavior", () => {
       envKey: "RATE_LIMIT_BILLING_CHECKOUT_PER_MIN",
       handler: viewerBillingCheckoutPost,
       url: "http://localhost/api/billing/checkout",
-    });
-  });
-
-  test("security migrate-legacy route returns RATE_LIMIT for constrained burst", async () => {
-    await expectRateLimitJsonBurst({
-      envKey: "RATE_LIMIT_ADMIN_SECURITY_MIGRATE_PER_MIN",
-      handler: securityMigrateLegacyPost,
-      url: "http://localhost/api/admin/security/migrate-legacy",
     });
   });
 

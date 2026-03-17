@@ -6,7 +6,6 @@ import { runRetention } from "@/lib/retention";
 import { runR2OrphanSweep } from "@/lib/retention";
 import { sendExpirationAlerts } from "@/lib/expirationAlerts";
 import { runAutomatedKeyRotation } from "@/lib/keyRotation";
-import { migrateLegacyEncryptionBatch } from "@/lib/encryptionMigration";
 import { runBackupRecoveryCheck } from "@/lib/backupRecovery";
 import { processKeyRotationJobs } from "@/lib/keyRotationJobs";
 import { revokeExpiredSharesBatch } from "@/lib/shareLifecycle";
@@ -76,37 +75,26 @@ export async function GET(req: NextRequest) {
     maxJobs: Math.max(1, Math.min(25, Number(process.env.KEY_ROTATION_CRON_MAX_JOBS || 5))),
   });
 
-  // 5) Optional legacy encryption migration batch
-  const legacy_migration_enabled = ["1", "true", "yes", "on"].includes(
-    String(process.env.LEGACY_MIGRATION_ENABLED || "").trim().toLowerCase()
-  );
-  const legacy_encryption_migration = legacy_migration_enabled
-    ? await migrateLegacyEncryptionBatch({
-        limit: Math.max(1, Math.min(250, Number(process.env.LEGACY_MIGRATION_BATCH || 25))),
-        dryRun: false,
-      })
-    : { enabled: false };
-
-  // 6) Auto-disable expired shares so plan limits count strictly by active records
+  // 5) Auto-disable expired shares so plan limits count strictly by active records
   const expiredSharesRevoked = await revokeExpiredSharesBatch(
     Math.max(1, Math.min(5000, Number(process.env.EXPIRED_SHARES_REVOKE_BATCH || 1000)))
   );
 
-  // 7) Monthly usage maintenance/reset hygiene
+  // 6) Monthly usage maintenance/reset hygiene
   const usage_maintenance = await runUsageMaintenance();
 
-  // 8) Optional backup + recovery checks
+  // 7) Optional backup + recovery checks
   const backup_recovery = await runBackupRecoveryCheck();
 
-  // 9) Billing entitlement maintenance (grace expiry / plan sync)
+  // 8) Billing entitlement maintenance (grace expiry / plan sync)
   const billing_sync = await runBillingMaintenance({
     maxUsers: Math.max(1, Math.min(5000, Number(process.env.BILLING_MAINTENANCE_MAX_USERS || 500))),
   });
 
-  // 9.5) Daily status digest delivery (first cron run in configured 6 AM window)
+  // 8.5) Daily status digest delivery (first cron run in configured 6 AM window)
   const status_digest = await runStatusDailyDigest();
 
-  // 10) Spike alerting rollups (best-effort)
+  // 9) Spike alerting rollups (best-effort)
   await detectScanFailureSpike();
   await detectUploadCompletionSpike();
   await detectDbErrorSpike();
@@ -161,7 +149,6 @@ export async function GET(req: NextRequest) {
     expiration_alerts,
     key_rotation,
     key_rotation_jobs,
-    legacy_encryption_migration,
     expired_shares_revoked: expiredSharesRevoked,
     usage_maintenance,
     backup_recovery,

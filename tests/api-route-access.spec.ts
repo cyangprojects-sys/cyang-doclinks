@@ -20,12 +20,8 @@ test.describe("api route access controls (static)", () => {
     expect(() => readFileSync("src/app/api/debug/alias/[alias]/route.ts", "utf8")).toThrow();
   });
 
-  test("admin dbinfo endpoint enforces owner auth with explicit auth errors", () => {
-    const code = readFileSync("src/app/api/admin/dbinfo/route.ts", "utf8");
-    expect(code.includes("isDebugApiEnabled()")).toBeTruthy();
-    expect(code.includes("enforceGlobalApiRateLimit(")).toBeTruthy();
-    expect(code.includes('await requireRole("owner")')).toBeTruthy();
-    expect(code.includes("UNAUTHENTICATED")).toBeTruthy();
-    expect(code.includes("FORBIDDEN")).toBeTruthy();
+  test("repo no longer includes owner debug inspection endpoints", () => {
+    expect(() => readFileSync("src/app/api/admin/debug/route.ts", "utf8")).toThrow();
+    expect(() => readFileSync("src/app/api/admin/dbinfo/route.ts", "utf8")).toThrow();
   });
 });

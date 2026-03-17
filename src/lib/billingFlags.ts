@@ -1,19 +1,7 @@
 // src/lib/billingFlags.ts
 // Centralized feature flags for monetization / pricing.
 
-const MAX_ENV_BOOL_LEN = 16;
-
-function envBool(name: string, fallback: boolean): boolean {
-  const v = process.env[name];
-  if (v == null) return fallback;
-  const raw = String(v);
-  if (/[\r\n\0]/.test(raw)) return fallback;
-  const s = raw.trim().toLowerCase();
-  if (!s || s.length > MAX_ENV_BOOL_LEN) return fallback;
-  if (s === "1" || s === "true" || s === "yes" || s === "y" || s === "on") return true;
-  if (s === "0" || s === "false" || s === "no" || s === "n" || s === "off") return false;
-  return fallback;
-}
+import { readEnvBoolean } from "@/lib/envConfig";
 
 /**
  * Hard enforcement of plan limits.
@@ -22,7 +10,7 @@ function envBool(name: string, fallback: boolean): boolean {
  * Set ENFORCE_PLAN_LIMITS=0 to disable in a dev environment.
  */
 export function enforcePlanLimitsEnabled(): boolean {
-  return envBool("ENFORCE_PLAN_LIMITS", true);
+  return readEnvBoolean("ENFORCE_PLAN_LIMITS", true);
 }
 
 /**
@@ -32,7 +20,7 @@ export function enforcePlanLimitsEnabled(): boolean {
  * Set PRO_PLAN_ENABLED=1 to honor users.plan_id='pro'.
  */
 export function proPlanEnabled(): boolean {
-  return envBool("PRO_PLAN_ENABLED", false);
+  return readEnvBoolean("PRO_PLAN_ENABLED", false);
 }
 
 /**
@@ -42,5 +30,5 @@ export function proPlanEnabled(): boolean {
  * Set PRICING_UI_ENABLED=1 to show upgrade links / pricing pages.
  */
 export function pricingUiEnabled(): boolean {
-  return envBool("PRICING_UI_ENABLED", false);
+  return readEnvBoolean("PRICING_UI_ENABLED", false);
 }

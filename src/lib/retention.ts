@@ -17,6 +17,7 @@
 // - RETENTION_R2_AUDIT_MAX_OBJECTS (int; default 5000)
 
 import { sql } from "@/lib/db";
+import { readEnvBoolean, readEnvInt } from "@/lib/envConfig";
 import { getRetentionSettings } from "@/lib/settings";
 import { getR2Bucket, getR2Prefix, r2Client } from "@/lib/r2";
 import { DeleteObjectsCommand, ListObjectsV2Command } from "@aws-sdk/client-s3";
@@ -39,21 +40,6 @@ export type RetentionRun = {
   results: RetentionResult[];
   source: "db" | "env";
 };
-
-function envInt(name: string, fallback: number): number {
-  const raw = (process.env[name] || "").trim();
-  const n = Number(raw);
-  if (!raw || !Number.isFinite(n) || n <= 0) return fallback;
-  return Math.floor(n);
-}
-
-function envBool(name: string, fallback: boolean): boolean {
-  const raw = (process.env[name] || "").trim().toLowerCase();
-  if (!raw) return fallback;
-  if (["1", "true", "yes", "y", "on"].includes(raw)) return true;
-  if (["0", "false", "no", "n", "off"].includes(raw)) return false;
-  return fallback;
-}
 
 function safeRetentionError(prefix: string): string {
   return `${prefix}_failed`;
@@ -304,33 +290,35 @@ export async function runR2OrphanSweep(args?: {
   maxObjects?: number;
   deleteOrphans?: boolean;
 }): Promise<RetentionResult> {
-  const rawMaxObjects = Number(args?.maxObjects ?? envInt("RETENTION_R2_AUDIT_MAX_OBJECTS", 5000));
+  const rawMaxObjects = Number(args?.maxObjects ?? readEnvInt("RETENTION_R2_AUDIT_MAX_OBJECTS", 5000, { min: 1 }));
   const maxObjects = Number.isFinite(rawMaxObjects)
     ? Math.max(1, Math.min(50_000, Math.floor(rawMaxObjects)))
     : 5000;
   const deleteOrphans =
     typeof args?.deleteOrphans === "boolean"
       ? args.deleteOrphans
-      : envBool("RETENTION_DELETE_R2_ORPHANS", false);
+      : readEnvBoolean("RETENTION_DELETE_R2_ORPHANS", false);
   return auditR2OrphanedObjects({ maxObjects, deleteOrphans });
 }
 
 export async function runRetention(): Promise<RetentionRun> {
-  const rawDays = envInt("RETENTION_DAYS", 90);
-  const dailyDays = envInt("RETENTION_DAYS_DAILY", 365);
+  const rawDays = readEnvInt("RETENTION_DAYS", 90, { min: 1 });
+  const dailyDays = readEnvInt("RETENTION_DAYS_DAILY", 365, { min: 1 });
 
   // Prefer DB settings when available (admin toggle). Fall back to env.
   const dbSettings = await getRetentionSettings();
   const source = dbSettings.ok ? ("db" as const) : ("env" as const);
 
-  const enabled = dbSettings.ok ? dbSettings.settings.enabled : envBool("RETENTION_ENABLED", true);
+  const enabled = dbSettings.ok ? dbSettings.settings.enabled : readEnvBoolean("RETENTION_ENABLED", true);
   const deleteExpiredShares = dbSettings.ok
     ? dbSettings.settings.deleteExpiredShares
-    : envBool("RETENTION_DELETE_EXPIRED_SHARES", true);
-  const shareGraceDays = dbSettings.ok ? dbSettings.settings.shareGraceDays : envInt("RETENTION_SHARE_GRACE_DAYS", 0);
-  const auditR2Orphans = envBool("RETENTION_AUDIT_R2_ORPHANS", true);
-  const deleteR2Orphans = envBool("RETENTION_DELETE_R2_ORPHANS", false);
-  const r2AuditMaxObjects = envInt("RETENTION_R2_AUDIT_MAX_OBJECTS", 5000);
+    : readEnvBoolean("RETENTION_DELETE_EXPIRED_SHARES", true);
+  const shareGraceDays = dbSettings.ok
+    ? dbSettings.settings.shareGraceDays
+    : readEnvInt("RETENTION_SHARE_GRACE_DAYS", 0, { min: 0, allowZero: true });
+  const auditR2Orphans = readEnvBoolean("RETENTION_AUDIT_R2_ORPHANS", true);
+  const deleteR2Orphans = readEnvBoolean("RETENTION_DELETE_R2_ORPHANS", false);
+  const r2AuditMaxObjects = readEnvInt("RETENTION_R2_AUDIT_MAX_OBJECTS", 5000, { min: 1 });
 
   const results: RetentionResult[] = [];
 

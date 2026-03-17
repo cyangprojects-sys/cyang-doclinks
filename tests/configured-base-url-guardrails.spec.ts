@@ -27,18 +27,11 @@ test.describe("configured base url guardrails", () => {
   test("server-side link builders use configured base-url resolver", () => {
     for (const file of [
       "src/app/admin/actions.ts",
-      "src/app/admin/(owner)/debug/page.tsx",
       "src/app/d/[alias]/actions.ts",
       "src/lib/expirationAlerts.ts",
     ]) {
       const code = readFileSync(file, "utf8");
       expect(code.includes("resolveConfiguredPublicAppBaseUrl(")).toBeTruthy();
     }
-  });
-
-  test("admin debug page does not derive origins from forwarded host headers", () => {
-    const code = readFileSync("src/app/admin/(owner)/debug/page.tsx", "utf8");
-    expect(code.includes("x-forwarded-host")).toBeFalsy();
-    expect(code.includes("h.get(\"host\")")).toBeFalsy();
   });
 });

@@ -2,11 +2,14 @@
 
 import { spawnSync } from "node:child_process";
 
-function resolveCommand(command) {
+function resolveSpawn(command, args) {
   if (process.platform === "win32" && (command === "npm" || command === "npx")) {
-    return `${command}.cmd`;
+    return {
+      command: "cmd.exe",
+      args: ["/d", "/s", "/c", command, ...args],
+    };
   }
-  return command;
+  return { command, args };
 }
 
 const commands = [
@@ -20,11 +23,16 @@ const commands = [
 
 for (const [command, args] of commands) {
   console.log(`\n==> ${command} ${args.join(" ")}`);
-  const result = spawnSync(resolveCommand(command), args, {
+  const resolved = resolveSpawn(command, args);
+  const result = spawnSync(resolved.command, resolved.args, {
     stdio: "inherit",
     shell: false,
     env: process.env,
   });
+  if (result.error) {
+    console.error(result.error);
+    process.exit(1);
+  }
   if (result.status !== 0) {
     process.exit(result.status || 1);
   }

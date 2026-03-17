@@ -1,6 +1,7 @@
 import { cookies, headers } from "next/headers";
 import { sql } from "@/lib/db";
 import { hmacSha256Hex, randomToken } from "@/lib/crypto";
+import { readPreferredEnvBoolean } from "@/lib/envConfig";
 import { hashPassword, verifyPassword } from "@/lib/password";
 
 export const SIGNUP_TERMS_VERSION = "2026-03-01";
@@ -26,16 +27,8 @@ const MAX_ACCEPTANCE_SOURCE_LEN = 80;
 const MAX_ACTIVATION_TOKEN_LEN = 512;
 const BASIC_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-function parseBooleanEnv(raw: string | undefined | null, fallback: boolean): boolean {
-  const value = String(raw || "").trim().toLowerCase();
-  if (!value) return fallback;
-  if (["1", "true", "yes", "on"].includes(value)) return true;
-  if (["0", "false", "no", "off"].includes(value)) return false;
-  return fallback;
-}
-
 export function isSignupEnabled(): boolean {
-  return parseBooleanEnv(process.env.SIGNUP_ENABLED ?? process.env.NEXT_PUBLIC_SIGNUP_ENABLED, true);
+  return readPreferredEnvBoolean(["SIGNUP_ENABLED", "NEXT_PUBLIC_SIGNUP_ENABLED"], true);
 }
 
 function normalizeEmail(emailRaw: string): string {

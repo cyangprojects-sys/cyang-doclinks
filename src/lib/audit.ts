@@ -7,6 +7,7 @@
 
 import crypto from "crypto";
 import { sql } from "@/lib/db";
+import { getHashingSalt } from "@/lib/envConfig";
 import { appendImmutableAudit } from "@/lib/immutableAudit";
 import { getTrustedClientIpFromHeaders } from "@/lib/clientIp";
 
@@ -45,7 +46,7 @@ export function getUserAgentFromHeaders(h: Headers): string {
 }
 
 export function deviceHashFrom(ip: string, userAgent: string): string | null {
-  const salt = (process.env.DEVICE_TRUST_SALT || process.env.VIEW_SALT || "").trim();
+  const salt = getHashingSalt("DEVICE_TRUST_SALT", ["VIEW_SALT"]) || "";
   if (!salt) return null;
 
   const payload = `${(ip || "").trim()}|${(userAgent || "").trim()}`;

@@ -1,4 +1,3 @@
-import { normalizeDemoDocUrl } from "@/lib/demo";
 import { validateDocMasterKeysConfig } from "@/lib/encryption";
 
 export type AppEnvironment = "development" | "test" | "staging" | "production";
@@ -158,21 +157,6 @@ function validateEmail(findings: ConfigAuditFinding[], env: NodeJS.ProcessEnv, f
   }
 }
 
-function validateDemoDocConfig(findings: ConfigAuditFinding[], env: NodeJS.ProcessEnv) {
-  const privateUrl = normalizeText(env.DEMO_DOC_URL);
-  const normalizedPrivate = privateUrl ? normalizeDemoDocUrl(privateUrl) : null;
-
-  if (privateUrl && !normalizedPrivate) {
-    addFinding(
-      findings,
-      "warn",
-      "DEMO_DOC_URL",
-      "DEMO_URL_INVALID",
-      "DEMO_DOC_URL must resolve to a valid gated share URL and is ignored when invalid."
-    );
-  }
-}
-
 function validateDeprecatedAliasUsage(findings: ConfigAuditFinding[], env: NodeJS.ProcessEnv) {
   const aliases: Array<{ preferred: string; alias: string; compare?: boolean }> = [
     { preferred: "R2_BUCKET", alias: "R2_BUCKET_NAME", compare: true },
@@ -328,15 +312,6 @@ export function auditRuntimeConfig(env: NodeJS.ProcessEnv = process.env): Config
         "ENABLE_STRICT_ENV_VALIDATION must stay enabled outside development."
       );
     }
-    if (isTruthy(env.ADMIN_DEBUG_ENABLED) || isTruthy(env.ADMIN_DEBUG_ALLOW_PROD)) {
-      addFinding(
-        findings,
-        "error",
-        "ADMIN_DEBUG_ENABLED",
-        "DEBUG_SURFACE_ENABLED",
-        "Admin debug access must stay disabled in staging/production."
-      );
-    }
     if (isTruthy(env.DEV_ALLOW_INSECURE_FALLBACK)) {
       addFinding(
         findings,
@@ -393,7 +368,6 @@ export function auditRuntimeConfig(env: NodeJS.ProcessEnv = process.env): Config
     );
   }
 
-  validateDemoDocConfig(findings, env);
   validateDeprecatedAliasUsage(findings, env);
 
   const errorCount = findings.filter((finding) => finding.severity === "error").length;

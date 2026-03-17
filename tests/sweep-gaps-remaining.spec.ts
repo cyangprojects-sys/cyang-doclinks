@@ -16,7 +16,6 @@ import {
   unwrapDataKey,
   wrapDataKey,
 } from "../src/lib/encryption";
-import { migrateLegacyEncryptionBatch } from "../src/lib/encryptionMigration";
 import { sendExpirationAlerts } from "../src/lib/expirationAlerts";
 import { appendImmutableAudit } from "../src/lib/immutableAudit";
 import { enqueueKeyRotationJob, listKeyRotationJobs, processKeyRotationJobs } from "../src/lib/keyRotationJobs";
@@ -190,7 +189,7 @@ test.describe("remaining module sweep", () => {
     ).rejects.toThrow(/Missing DATABASE_URL/);
   });
 
-  test("pdf/org/google/migration modules enforce local validation", async () => {
+  test("pdf/org/google modules enforce local validation", async () => {
     const invalidPdf = Buffer.from("not-a-pdf");
     const res = validatePdfBuffer({ bytes: invalidPdf });
     expect(res.ok).toBeFalsy();
@@ -218,7 +217,6 @@ test.describe("remaining module sweep", () => {
 
     delete process.env.R2_BUCKET;
     await expect(runR2OrphanSweep({ maxObjects: 10, deleteOrphans: false })).resolves.toMatchObject({ ok: false });
-    await expect(migrateLegacyEncryptionBatch({ limit: 1, dryRun: true })).rejects.toThrow();
 
     expect(typeof scanR2Object).toBe("function");
   });

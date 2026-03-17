@@ -6,6 +6,7 @@ import bcrypt from "bcryptjs";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { sql } from "@/lib/db";
+import { getHashingSalt, readEnvInt } from "@/lib/envConfig";
 import { resolveShareGateMeta } from "@/lib/shareGateMeta";
 import { rateLimit, stableHash } from "@/lib/rateLimit";
 
@@ -61,7 +62,7 @@ async function getClientIpFromHeaders(): Promise<string> {
 }
 
 function hashIp(ip: string) {
-    const salt = process.env.VIEW_SALT || process.env.SHARE_SALT || "";
+    const salt = getHashingSalt("VIEW_SALT", ["SHARE_SALT"]) || "";
     if (!salt || !ip) return null;
     return crypto.createHmac("sha256", salt).update(ip).digest("hex").slice(0, 32);
 }
@@ -98,7 +99,7 @@ async function throttlePasswordAttempts(args: { token: string; ip: string }): Pr
   const rl1 = await rateLimit({
     scope: "pw:share:1m",
     id,
-    limit: Number(process.env.RATE_LIMIT_PW_PER_MIN || RATE_LIMIT_PER_MIN),
+    limit: readEnvInt("RATE_LIMIT_PW_PER_MIN", RATE_LIMIT_PER_MIN, { min: 1 }),
     windowSeconds: 60,
     failClosed: true,
   });
@@ -110,7 +111,7 @@ async function throttlePasswordAttempts(args: { token: string; ip: string }): Pr
   const rl2 = await rateLimit({
     scope: "pw:share:10m",
     id,
-    limit: Number(process.env.RATE_LIMIT_PW_PER_10MIN || RATE_LIMIT_PER_10MIN),
+    limit: readEnvInt("RATE_LIMIT_PW_PER_10MIN", RATE_LIMIT_PER_10MIN, { min: 1 }),
     windowSeconds: 600,
     failClosed: true,
   });

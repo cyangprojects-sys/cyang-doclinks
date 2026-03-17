@@ -1,4 +1,5 @@
 import { sql } from "@/lib/db";
+import { readEnvBoolean, readEnvInt } from "@/lib/envConfig";
 import { getBillingFlags } from "@/lib/settings";
 import { hasActiveViewLimitOverride } from "@/lib/viewLimitOverride";
 import { rateLimit } from "@/lib/rateLimit";
@@ -73,18 +74,8 @@ function normalizeUuid(value: string | null | undefined): string | null {
   return UUID_RE.test(normalized) ? normalized : null;
 }
 
-function envFlag(name: string, fallback: boolean): boolean {
-  const raw = String(process.env[name] || "").trim().toLowerCase();
-  if (!raw) return fallback;
-  if (raw === "1" || raw === "true" || raw === "yes" || raw === "on") return true;
-  if (raw === "0" || raw === "false" || raw === "no" || raw === "off") return false;
-  return fallback;
-}
-
 function getPlanCacheMs(): number {
-  const raw = Number(process.env.PLAN_CACHE_MS || 10_000);
-  if (!Number.isFinite(raw)) return 10_000;
-  return Math.max(1_000, Math.min(60_000, Math.floor(raw)));
+  return readEnvInt("PLAN_CACHE_MS", 10_000, { min: 1_000, max: 60_000 });
 }
 
 async function billingSubscriptionsTableExists(): Promise<boolean> {
@@ -102,8 +93,8 @@ async function userHasActiveProEntitlement(userId: string): Promise<boolean> {
   const uid = normalizeUuid(userId);
   if (!uid) return false;
   if (!(await billingSubscriptionsTableExists())) return false;
-  const allowTrialing = envFlag("STRIPE_ALLOW_TRIALING_ENTITLEMENT", false);
-  const allowGrace = envFlag("STRIPE_ALLOW_GRACE_ENTITLEMENT", false);
+  const allowTrialing = readEnvBoolean("STRIPE_ALLOW_TRIALING_ENTITLEMENT", false);
+  const allowGrace = readEnvBoolean("STRIPE_ALLOW_GRACE_ENTITLEMENT", false);
   try {
     const rows = (await sql`
       select 1
@@ -229,7 +220,7 @@ export async function getPlanForUser(userId: string): Promise<Plan> {
   // Optional Stripe entitlement hardening:
   // when enabled, users marked "pro" without active paid entitlement are treated as Free.
   if (String(r.id) === "pro") {
-    const enforceStripeEntitlement = String(process.env.STRIPE_ENFORCE_ENTITLEMENT || "1").trim() !== "0";
+    const enforceStripeEntitlement = readEnvBoolean("STRIPE_ENFORCE_ENTITLEMENT", true);
     if (enforceStripeEntitlement) {
       const entitled = await userHasActiveProEntitlement(uid);
       if (!entitled) {
@@ -381,12 +372,6 @@ export type LimitResult =
   | { ok: true }
   | { ok: false; error: "LIMIT_REACHED"; message: string };
 
-function envInt(name: string, fallback: number, min: number = 1): number {
-  const raw = Number(process.env[name]);
-  if (!Number.isFinite(raw)) return fallback;
-  return Math.max(min, Math.floor(raw));
-}
-
 export async function assertCanUpload(args: {
   userId: string;
   sizeBytes: number | null;
@@ -432,7 +417,7 @@ export async function assertCanCreateShare(ownerId: string): Promise<LimitResult
   const active = await getActiveShareCountForOwner(uid);
 
   if (plan.id === "pro") {
-    const softActiveShares = envInt("PRO_SOFT_MAX_ACTIVE_SHARES", 1000);
+    const softActiveShares = readEnvInt("PRO_SOFT_MAX_ACTIVE_SHARES", 1000, { min: 1 });
     if (active >= softActiveShares) {
       void logSecurityEvent({
         type: "pro_share_soft_cap_reached",
@@ -448,7 +433,7 @@ export async function assertCanCreateShare(ownerId: string): Promise<LimitResult
     const perMinute = await rateLimit({
       scope: "pro:share_create:user:min",
       id: uid,
-      limit: envInt("PRO_SHARE_CREATE_PER_MIN", 90),
+      limit: readEnvInt("PRO_SHARE_CREATE_PER_MIN", 90, { min: 1 }),
       windowSeconds: 60,
       failClosed: true,
     });
@@ -459,8 +444,8 @@ export async function assertCanCreateShare(ownerId: string): Promise<LimitResult
     const burst = await rateLimit({
       scope: "pro:share_create:user:burst",
       id: uid,
-      limit: envInt("PRO_SHARE_CREATE_BURST_LIMIT", 300),
-      windowSeconds: envInt("PRO_SHARE_CREATE_BURST_WINDOW_SECONDS", 300),
+      limit: readEnvInt("PRO_SHARE_CREATE_BURST_LIMIT", 300, { min: 1 }),
+      windowSeconds: readEnvInt("PRO_SHARE_CREATE_BURST_WINDOW_SECONDS", 300, { min: 1 }),
       failClosed: true,
     });
     if (!burst.ok) {
@@ -488,13 +473,13 @@ export async function assertCanServeView(ownerId: string): Promise<LimitResult> 
   const plan = await getPlanForUser(uid);
   if (plan.id === "pro") {
     void maybeFlagHeavyProEgress(uid);
-    const softViews = envInt("PRO_SOFT_MAX_VIEWS_PER_MONTH", 50000);
+    const softViews = readEnvInt("PRO_SOFT_MAX_VIEWS_PER_MONTH", 50000, { min: 1 });
     const used = await getMonthlyViewCount(uid);
     if (used >= softViews) {
       const throttle = await rateLimit({
         scope: "pro:view_overage:user:min",
         id: uid,
-        limit: envInt("PRO_VIEW_OVERAGE_PER_MIN", 120),
+        limit: readEnvInt("PRO_VIEW_OVERAGE_PER_MIN", 120, { min: 1 }),
         windowSeconds: 60,
         failClosed: true,
       });
@@ -564,7 +549,7 @@ async function maybeFlagHeavyProEgress(ownerId: string): Promise<void> {
   });
   if (!(probeGate.ok && probeGate.count === 1)) return;
 
-  const softCap = envInt("PRO_SOFT_MAX_EGRESS_BYTES", 30 * 1024 * 1024 * 1024);
+  const softCap = readEnvInt("PRO_SOFT_MAX_EGRESS_BYTES", 30 * 1024 * 1024 * 1024, { min: 1 });
   const estimated = await getMonthlyEstimatedEgressBytesForOwner(uid);
   if (estimated < softCap) return;
 

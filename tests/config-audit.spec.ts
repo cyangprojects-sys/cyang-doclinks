@@ -25,7 +25,6 @@ test.describe("production config audit", () => {
         R2_SECRET_ACCESS_KEY: "replace_with_secret",
         DOC_MASTER_KEYS: VALID_DOC_MASTER_KEYS,
         ENABLE_STRICT_ENV_VALIDATION: "0",
-        ADMIN_DEBUG_ENABLED: "1",
         DEV_ALLOW_INSECURE_FALLBACK: "1",
         APP_SECRET: "replace_with_secret",
         AUTH_SECRET: "replace_with_secret",
@@ -44,7 +43,6 @@ test.describe("production config audit", () => {
     expect(report.ok).toBeFalsy();
     expect(report.status).toBe("fail");
     expect(report.findings.some((finding) => finding.field === "DATABASE_URL")).toBeTruthy();
-    expect(report.findings.some((finding) => finding.code === "DEBUG_SURFACE_ENABLED")).toBeTruthy();
     expect(report.findings.some((finding) => finding.code === "STRICT_VALIDATION_DISABLED")).toBeTruthy();
   });
 
@@ -84,52 +82,6 @@ test.describe("production config audit", () => {
     expect(report.ok).toBeTruthy();
     expect(report.status).toBe("pass");
     expect(report.errorCount).toBe(0);
-  });
-
-  test("does not warn when production keeps a valid optional demo URL configured", () => {
-    const report = auditRuntimeConfig(
-      env({
-        NODE_ENV: "production",
-        NEXT_PUBLIC_APP_ENV: "production",
-        APP_URL: "https://www.cyang.io",
-        NEXT_PUBLIC_APP_URL: "https://www.cyang.io",
-        NEXTAUTH_URL: "https://www.cyang.io",
-        DATABASE_URL: "postgresql://user:pass@db.example.com:5432/app?sslmode=require",
-        R2_ENDPOINT: "https://acct.r2.cloudflarestorage.com",
-        R2_BUCKET: "cyang-prod",
-        R2_ACCESS_KEY_ID: "prod_access_key_1234567890abcdef",
-        R2_SECRET_ACCESS_KEY: "prod_secret_key_1234567890abcdef",
-        DOC_MASTER_KEYS: VALID_DOC_MASTER_KEYS,
-        ENABLE_STRICT_ENV_VALIDATION: "1",
-        APP_SECRET: "prod_app_secret_1234567890abcdef",
-        AUTH_SECRET: "prod_auth_secret_1234567890abcdef",
-        NEXTAUTH_SECRET: "prod_nextauth_secret_1234567890abcdef",
-        VIEW_SALT: "prod_view_salt_1234567890abcdef",
-        API_KEY_SALT: "prod_api_salt_1234567890abcdef",
-        SECURITY_TELEMETRY_HASH_KEY: "prod_hash_key_1234567890abcdef",
-        CRON_SECRET: "prod_cron_secret_1234567890abcdef",
-        SHARE_COOKIE_SECRET: "prod_share_cookie_secret_1234567890abcdef",
-        ADMIN_COOKIE_SECRET: "prod_admin_cookie_secret_1234567890abcdef",
-        OIDC_SECRETS_KEY: "prod_oidc_secret_key_1234567890abcdef",
-        OWNER_EMAIL: "owner@cyang.io",
-        MALWARE_SCANNER_URL: "https://scanner.cyang.io/scan",
-        DEMO_DOC_URL: "https://www.cyang.io/s/demo-token-12345678",
-      })
-    );
-
-    expect(report.findings.some((finding) => finding.code === "DEMO_URL_INVALID")).toBeFalsy();
-  });
-
-  test("treats development as less strict while still surfacing invalid optional demo config warnings", () => {
-    const report = auditRuntimeConfig(
-      env({
-        NODE_ENV: "development",
-        DEMO_DOC_URL: "http://localhost:3000/raw/demo-token",
-      })
-    );
-
-    expect(report.errorCount).toBe(0);
-    expect(report.findings.some((finding) => finding.code === "DEMO_URL_INVALID")).toBeTruthy();
   });
 
   test("warns when deprecated env aliases are used without preferred names", () => {

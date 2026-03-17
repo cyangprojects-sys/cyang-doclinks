@@ -110,8 +110,6 @@ test.describe("api route guardrails", () => {
       "src/app/api/admin/billing/invoices/route.ts",
       "src/app/api/admin/billing/status/route.ts",
       "src/app/api/admin/db-index-audit/route.ts",
-      "src/app/api/admin/dbinfo/route.ts",
-      "src/app/api/admin/debug/route.ts",
       "src/app/api/admin/billing/route.ts",
       "src/app/api/admin/retention/run/route.ts",
       "src/app/api/admin/security/keys/route.ts",
@@ -222,9 +220,7 @@ test.describe("api route guardrails", () => {
       "src/app/api/health/ready/route.ts",
       "src/app/api/health/deps/route.ts",
       "src/app/api/backup/status/route.ts",
-      "src/app/api/admin/dbinfo/route.ts",
       "src/app/api/admin/db-index-audit/route.ts",
-      "src/app/api/admin/debug/route.ts",
     ];
     for (const route of routes) {
       const code = src(route);
@@ -281,7 +277,10 @@ test.describe("api route guardrails", () => {
     const removedRoutes = [
       "src/app/api/debug/alias/[alias]/route.ts",
       "src/app/api/admin/debug/telemetry/route.ts",
+      "src/app/api/admin/debug/route.ts",
+      "src/app/api/admin/dbinfo/route.ts",
       "src/app/api/v1/webhooks/test/route.ts",
+      "src/app/api/admin/security/migrate-legacy/route.ts",
     ];
     const files = routeFiles();
     for (const route of removedRoutes) {

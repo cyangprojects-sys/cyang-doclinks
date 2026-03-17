@@ -1,4 +1,5 @@
 import { pricingUiEnabled } from "@/lib/billingFlags";
+import { readPreferredEnvBoolean, readPreferredEnvText } from "@/lib/envConfig";
 import { getPrivacyEmail, getSecurityEmail, getSupportEmail } from "@/lib/legal";
 
 export type PublicRuntimeConfig = {
@@ -12,16 +13,8 @@ export type PublicRuntimeConfig = {
 
 let cachedPublicRuntimeConfig: PublicRuntimeConfig | null = null;
 
-function parseBooleanEnv(raw: string | undefined | null, fallback: boolean): boolean {
-  const value = String(raw || "").trim().toLowerCase();
-  if (!value) return fallback;
-  if (["1", "true", "yes", "on"].includes(value)) return true;
-  if (["0", "false", "no", "off"].includes(value)) return false;
-  return fallback;
-}
-
 function publicSignupEnabled(): boolean {
-  return parseBooleanEnv(process.env.NEXT_PUBLIC_SIGNUP_ENABLED ?? process.env.SIGNUP_ENABLED, true);
+  return readPreferredEnvBoolean(["NEXT_PUBLIC_SIGNUP_ENABLED", "SIGNUP_ENABLED"], true);
 }
 
 function normalizeEmail(value: string, fallback: string): string {
@@ -39,7 +32,7 @@ export function getPublicRuntimeConfig(): PublicRuntimeConfig {
     supportEmail: getSupportEmail(),
     securityEmail: getSecurityEmail(),
     privacyEmail: getPrivacyEmail(),
-    legalEmail: normalizeEmail(process.env.LEGAL_EMAIL || "", "legal@cyang.io"),
+    legalEmail: normalizeEmail(readPreferredEnvText("LEGAL_EMAIL") || "", "legal@cyang.io"),
   };
 
   return cachedPublicRuntimeConfig;

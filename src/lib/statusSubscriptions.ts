@@ -1,5 +1,6 @@
 import { sql } from "@/lib/db";
 import { sendMail } from "@/lib/email";
+import { readPreferredEnvText } from "@/lib/envConfig";
 import { logSecurityEvent } from "@/lib/securityTelemetry";
 
 const BASIC_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -53,7 +54,7 @@ async function contactSubscribersTableExists(): Promise<boolean> {
 }
 
 function appBaseUrl() {
-  const appUrl = String(process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || "https://www.cyang.io").trim();
+  const appUrl = readPreferredEnvText("NEXT_PUBLIC_APP_URL", ["APP_URL"]) || "https://www.cyang.io";
   return appUrl || "https://www.cyang.io";
 }
 

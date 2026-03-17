@@ -4,6 +4,7 @@
 // Requires: public.app_settings (see scripts/sql/app_settings.sql)
 
 import { sql } from "@/lib/db";
+import { readEnvBoolean, readEnvInt } from "@/lib/envConfig";
 
 export type RetentionSettings = {
   enabled: boolean;
@@ -83,9 +84,7 @@ let securityFreezeCache: SecurityFreezeCacheEntry | null = null;
 let securityFreezeInFlight: Promise<SecurityFreezeResult> | null = null;
 
 function getBillingFlagsCacheMs() {
-  const raw = Number(process.env.BILLING_FLAGS_CACHE_MS || 120_000);
-  if (!Number.isFinite(raw)) return 120_000;
-  return Math.max(5_000, Math.min(10 * 60_000, Math.floor(raw)));
+  return readEnvInt("BILLING_FLAGS_CACHE_MS", 120_000, { min: 5_000, max: 10 * 60_000 });
 }
 
 function clearBillingFlagsCache() {
@@ -94,9 +93,7 @@ function clearBillingFlagsCache() {
 }
 
 function getSecurityFreezeCacheMs() {
-  const raw = Number(process.env.SECURITY_FREEZE_CACHE_MS || 5_000);
-  if (!Number.isFinite(raw)) return 5_000;
-  return Math.max(0, Math.min(60_000, Math.floor(raw)));
+  return readEnvInt("SECURITY_FREEZE_CACHE_MS", 5_000, { min: 0, max: 60_000, allowZero: true });
 }
 
 function clearSecurityFreezeCache() {
@@ -240,9 +237,8 @@ const DEFAULT_BILLING_FLAGS: BillingFlags = {
 };
 
 function envBool(name: string): boolean | null {
-  const raw = process.env[name];
-  if (raw == null) return null;
-  return asBool(raw, false);
+  if (process.env[name] == null) return null;
+  return readEnvBoolean(name, false);
 }
 
 /**

@@ -136,9 +136,6 @@ function buildAuditFindings(env) {
   if (productionLike && !isTruthy(env.ENABLE_STRICT_ENV_VALIDATION)) {
     findings.push("ENABLE_STRICT_ENV_VALIDATION: must be enabled");
   }
-  if (productionLike && (isTruthy(env.ADMIN_DEBUG_ENABLED) || isTruthy(env.ADMIN_DEBUG_ALLOW_PROD))) {
-    findings.push("ADMIN_DEBUG_ENABLED/ADMIN_DEBUG_ALLOW_PROD: must be disabled");
-  }
   if (productionLike && isTruthy(env.DEV_ALLOW_INSECURE_FALLBACK)) {
     findings.push("DEV_ALLOW_INSECURE_FALLBACK: must be disabled");
   }

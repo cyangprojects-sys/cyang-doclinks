@@ -15,7 +15,7 @@ Status key: `done` | `pending`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\(owner)\audit\page.tsx`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\(owner)\billing\stripe\page.tsx`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\(owner)\db-debug\page.tsx` (module removed from repo)
-- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\(owner)\debug\page.tsx`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\(owner)\debug\page.tsx` (module removed from repo)
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\(owner)\dmca\DmcaActionsClient.tsx`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\(owner)\layout.tsx`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\admin\(owner)\viewer-uploads\ViewerUploadsTableClient.tsx`
@@ -31,8 +31,8 @@ Status key: `done` | `pending`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\billing\portal\route.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\billing\status\route.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\billing\sync\route.ts`
-- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\dbinfo\route.ts`
-- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\debug\route.ts`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\dbinfo\route.ts` (module removed from repo)
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\debug\route.ts` (module removed from repo)
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\security\keys\route.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\security\revoke\route.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\security\rotate\route.ts`
@@ -101,8 +101,8 @@ Remaining additional high-sensitivity modules pending: 0
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\cronAuth.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\cronTelemetry.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\dbSchema.ts`
-- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\debugAccess.ts`
-- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\demo.ts`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\debugAccess.ts` (module removed from repo)
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\demo.ts` (module removed from repo)
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\documentStatus.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\email.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\fileFamily.ts`
@@ -145,7 +145,7 @@ Remaining additional high-sensitivity modules pending: 0
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\crypto.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\cryptoSecrets.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\encryption.ts`
-- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\encryptionMigration.ts`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\lib\encryptionMigration.ts` (module removed from repo)
 
 ### Remaining additional modules (critical)
 
@@ -172,7 +172,7 @@ Remaining resweep modules in current pass: 0
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\security\revoke\route.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\security\rotate\route.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\security\rollback\route.ts`
-- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\security\migrate-legacy\route.ts`
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\security\migrate-legacy\route.ts` (module removed from repo)
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\upload\complete\route.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\security\freeze\route.ts`
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\security\rbac\route.ts`
@@ -203,7 +203,7 @@ Remaining resweep modules in current pass: 0
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\security\revoke\route.ts` (resweep: explicit per-IP throttle)
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\security\rotate\route.ts` (resweep: explicit per-IP throttle)
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\security\rollback\route.ts` (resweep: explicit per-IP throttle)
-- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\security\migrate-legacy\route.ts` (resweep: explicit per-IP throttle)
+- done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\security\migrate-legacy\route.ts` (module removed from repo)
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\security\freeze\route.ts` (resweep: explicit per-IP throttle)
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\security\rbac\route.ts` (resweep: explicit per-IP throttle)
 - done - `C:\Users\tsaab\Projects\cyang-doclinks\src\app\api\admin\security\tenant-freeze\route.ts` (resweep: explicit per-IP throttle)

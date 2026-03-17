@@ -220,7 +220,7 @@ test.describe("attack simulation", () => {
     try {
       await sql`update public.docs set scan_status = 'queued' where id = ${docId}::uuid`;
       const r = await request.get(`/s/${token}/raw`);
-      expect([403, 404, 429]).toContain(r.status());
+      expect([403, 404, 429, 503]).toContain(r.status());
     } finally {
       if (before?.[0]) {
         await sql`

@@ -2,7 +2,7 @@ import crypto from "crypto";
 import { cookies } from "next/headers";
 import { sql } from "@/lib/db";
 import { decryptSecret, encryptSecret } from "@/lib/cryptoSecrets";
-import { getInviteHashSecret } from "@/lib/envConfig";
+import { getInviteHashSecret, readEnvBoolean } from "@/lib/envConfig";
 import type { Role } from "@/lib/authz";
 
 const MFA_COOKIE = "cy_mfa";
@@ -43,16 +43,8 @@ function normalizeCode(value: unknown): string {
   return String(value || "").trim().slice(0, CODE_MAX_LEN);
 }
 
-function envBool(name: string, fallback = false): boolean {
-  const raw = String(process.env[name] || "").trim().toLowerCase();
-  if (!raw) return fallback;
-  if (["1", "true", "yes", "on"].includes(raw)) return true;
-  if (["0", "false", "no", "off"].includes(raw)) return false;
-  return fallback;
-}
-
 export function mfaEnforcementEnabled(): boolean {
-  return envBool("MFA_ENFORCE_ADMIN", false);
+  return readEnvBoolean("MFA_ENFORCE_ADMIN", false);
 }
 
 export function roleRequiresMfa(role: Role): boolean {

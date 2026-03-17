@@ -9,8 +9,7 @@ export type Permission =
   | "billing.override"
   | "retention.run"
   | "security.keys.read"
-  | "security.keys.manage"
-  | "security.migrate_legacy";
+  | "security.keys.manage";
 
 export const RBAC_PERMISSIONS: Permission[] = [
   "audit.export",
@@ -21,7 +20,6 @@ export const RBAC_PERMISSIONS: Permission[] = [
   "retention.run",
   "security.keys.read",
   "security.keys.manage",
-  "security.migrate_legacy",
 ];
 const RBAC_PERMISSION_SET = new Set<Permission>(RBAC_PERMISSIONS);
 const RBAC_ROLES: Role[] = ["viewer", "admin", "owner"];
@@ -37,7 +35,6 @@ const DEFAULT_MIN_ROLE: Record<Permission, Role> = {
   "retention.run": "admin",
   "security.keys.read": "owner",
   "security.keys.manage": "owner",
-  "security.migrate_legacy": "owner",
 };
 
 let permissionsTableExistsCache: boolean | null = null;

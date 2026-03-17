@@ -38,7 +38,6 @@ test.describe("admin security key api guardrails", () => {
       "src/app/api/admin/security/revoke/route.ts",
       "src/app/api/admin/security/rotate/route.ts",
       "src/app/api/admin/security/rollback/route.ts",
-      "src/app/api/admin/security/migrate-legacy/route.ts",
     ]) {
       const code = readFileSync(file, "utf8");
       expect(code.includes("parseJsonBodyLength")).toBeTruthy();

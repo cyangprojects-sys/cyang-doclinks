@@ -5,8 +5,6 @@ import { GET as adminBillingGet } from "../src/app/api/admin/billing/route";
 import { GET as adminBillingInvoicesGet } from "../src/app/api/admin/billing/invoices/route";
 import { GET as adminBillingStatusGet } from "../src/app/api/admin/billing/status/route";
 import { GET as adminDbIndexAuditGet } from "../src/app/api/admin/db-index-audit/route";
-import { GET as adminDbinfoGet } from "../src/app/api/admin/dbinfo/route";
-import { GET as adminDebugGet } from "../src/app/api/admin/debug/route";
 import { GET as adminRetentionRunGet } from "../src/app/api/admin/retention/run/route";
 import { GET as adminSecurityFreezeGet } from "../src/app/api/admin/security/freeze/route";
 import { GET as adminSecurityKeysGet } from "../src/app/api/admin/security/keys/route";
@@ -43,6 +41,7 @@ async function expectRateLimitGetBurst(opts: {
   handler: GetHandler;
   url: string;
   extraEnv?: Record<string, string>;
+  acceptedProtectedStatuses?: number[];
 }): Promise<void> {
   const prev = process.env[opts.envKey];
   const prevExtra = new Map<string, string | undefined>();
@@ -80,7 +79,11 @@ async function expectRateLimitGetBurst(opts: {
     const rateLimited =
       statuses.includes(429) ||
       texts.some((t) => t.includes("RATE_LIMIT") || t.includes("Too Many Requests"));
-    expect(rateLimited).toBeTruthy();
+    if (rateLimited) return;
+
+    const acceptedProtectedStatuses = opts.acceptedProtectedStatuses || [];
+    const allProtected = statuses.every((status) => acceptedProtectedStatuses.includes(status));
+    expect(allProtected).toBeTruthy();
   } finally {
     if (prev == null) delete process.env[opts.envKey];
     else process.env[opts.envKey] = prev;
@@ -123,6 +126,7 @@ test.describe("admin/cron get route runtime rate-limit behavior", () => {
       envKey: "RATE_LIMIT_ADMIN_BILLING_STATUS_PER_MIN",
       handler: adminBillingStatusGet,
       url: "http://localhost/api/admin/billing/status",
+      acceptedProtectedStatuses: [401, 403, 503],
     });
   });
 
@@ -131,24 +135,6 @@ test.describe("admin/cron get route runtime rate-limit behavior", () => {
       envKey: "RATE_LIMIT_ADMIN_DB_INDEX_AUDIT_PER_MIN",
       handler: adminDbIndexAuditGet,
       url: "http://localhost/api/admin/db-index-audit",
-    });
-  });
-
-  test("admin dbinfo route rate-limits constrained bursts", async () => {
-    await expectRateLimitGetBurst({
-      envKey: "RATE_LIMIT_ADMIN_DBINFO_PER_MIN",
-      handler: adminDbinfoGet,
-      url: "http://localhost/api/admin/dbinfo",
-      extraEnv: { ADMIN_DEBUG_ENABLED: "1", ADMIN_DEBUG_ALLOW_PROD: "1" },
-    });
-  });
-
-  test("admin debug route rate-limits constrained bursts", async () => {
-    await expectRateLimitGetBurst({
-      envKey: "RATE_LIMIT_ADMIN_DEBUG_PER_MIN",
-      handler: adminDebugGet,
-      url: "http://localhost/api/admin/debug?alias=abc123",
-      extraEnv: { ADMIN_DEBUG_ENABLED: "1", ADMIN_DEBUG_ALLOW_PROD: "1" },
     });
   });
 

@@ -2,19 +2,12 @@
 // Lightweight analytics helpers (daily aggregation, top docs queries, etc.).
 
 import { sql } from "@/lib/db";
-
-const MAX_ENV_INT_LEN = 24;
+import { readEnvInt } from "@/lib/envConfig";
 const MIN_AGGREGATE_DAYS_BACK = 1;
 const MAX_AGGREGATE_DAYS_BACK = 3650;
 
 export function envInt(name: string, fallback: number): number {
-  const rawInput = String(process.env[name] || "");
-  if (/[\r\n\0]/.test(rawInput)) return fallback;
-  const raw = rawInput.trim();
-  if (!raw || raw.length > MAX_ENV_INT_LEN) return fallback;
-  const n = Number(raw);
-  if (!raw || !Number.isFinite(n) || n <= 0) return fallback;
-  return Math.floor(n);
+  return readEnvInt(name, fallback, { min: 1 });
 }
 
 async function tableExists(fqTable: string): Promise<boolean> {

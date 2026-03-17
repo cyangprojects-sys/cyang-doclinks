@@ -1,4 +1,5 @@
 import { sql } from "@/lib/db";
+import { readEnvBoolean, readEnvInt, readPreferredEnvText } from "@/lib/envConfig";
 
 export type BackupRecoveryStatusSummary = {
   enabled: boolean;
@@ -10,22 +11,6 @@ export type BackupRecoveryStatusSummary = {
   freshnessOk: boolean;
   recoveryDrillDue: boolean;
 };
-
-function parsePositiveInt(raw: unknown, fallback: number, min = 1, max = 3650): number {
-  const rawInput = String(raw ?? "");
-  if (rawInput.length > 24 || /[\r\n\0]/.test(rawInput)) return fallback;
-  const n = Number(rawInput);
-  if (!Number.isFinite(n) || n <= 0) return fallback;
-  return Math.max(min, Math.min(max, Math.floor(n)));
-}
-
-function parseTruthy(raw: unknown): boolean {
-  const rawInput = String(raw ?? "");
-  if (/[\r\n\0]/.test(rawInput)) return false;
-  const v = rawInput.trim().toLowerCase();
-  if (!v || v.length > 16) return false;
-  return ["1", "true", "yes", "y", "on"].includes(v);
-}
 
 function normalizeWebhookUrl(raw: unknown): string {
   const value = String(raw ?? "").trim();
@@ -47,10 +32,10 @@ export function parseBackupRecoveryConfig(env: NodeJS.ProcessEnv = process.env):
   recoveryDrillDays: number;
   webhook: string;
 } {
-  const enabled = parseTruthy(env.BACKUP_AUTOMATION_ENABLED);
-  const maxAgeHours = parsePositiveInt(env.BACKUP_MAX_AGE_HOURS, 30, 1, 24 * 365);
-  const recoveryDrillDays = parsePositiveInt(env.RECOVERY_DRILL_DAYS, 30, 1, 3650);
-  const webhook = normalizeWebhookUrl(env.BACKUP_WEBHOOK_URL);
+  const enabled = readEnvBoolean("BACKUP_AUTOMATION_ENABLED", false, env);
+  const maxAgeHours = readEnvInt("BACKUP_MAX_AGE_HOURS", 30, { min: 1, max: 24 * 365, env });
+  const recoveryDrillDays = readEnvInt("RECOVERY_DRILL_DAYS", 30, { min: 1, max: 3650, env });
+  const webhook = normalizeWebhookUrl(readPreferredEnvText("BACKUP_WEBHOOK_URL", [], env));
   return { enabled, maxAgeHours, recoveryDrillDays, webhook };
 }
 
