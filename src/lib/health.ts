@@ -36,6 +36,11 @@ export type PublicHealthSnapshot = {
   error?: string;
 };
 
+type DependencyHealthCacheEntry = {
+  expiresAt: number;
+  summary: HealthSummary;
+};
+
 function worstState(states: readonly HealthState[]): "ok" | "degraded" | "down" {
   if (states.includes("down")) return "down";
   if (states.includes("degraded")) return "degraded";
@@ -441,6 +446,45 @@ export async function buildReadinessSummary(): Promise<HealthSummary> {
   return buildDependencySummary();
 }
 
+let dependencyHealthCache: DependencyHealthCacheEntry | null = null;
+let dependencyHealthInFlight: Promise<HealthSummary> | null = null;
+
+function getDependencyHealthCacheMs() {
+  const raw = Number(process.env.HEALTH_SUMMARY_CACHE_MS || 30_000);
+  if (!Number.isFinite(raw)) return 30_000;
+  return Math.max(5_000, Math.min(2 * 60_000, Math.floor(raw)));
+}
+
+export async function getCachedDependencySummary(): Promise<HealthSummary> {
+  const now = Date.now();
+  if (dependencyHealthCache && dependencyHealthCache.expiresAt > now) {
+    return dependencyHealthCache.summary;
+  }
+
+  if (!dependencyHealthInFlight) {
+    dependencyHealthInFlight = buildDependencySummary()
+      .then((summary) => {
+        dependencyHealthCache = {
+          summary,
+          expiresAt: Date.now() + getDependencyHealthCacheMs(),
+        };
+        return summary;
+      })
+      .finally(() => {
+        dependencyHealthInFlight = null;
+      });
+  }
+
+  try {
+    return await dependencyHealthInFlight;
+  } catch (error) {
+    if (dependencyHealthCache) {
+      return dependencyHealthCache.summary;
+    }
+    throw error;
+  }
+}
+
 type PublicHealthCacheEntry = {
   expiresAt: number;
   snapshot: PublicHealthSnapshot;
@@ -467,7 +511,7 @@ export async function getCachedPublicHealthSnapshot(): Promise<PublicHealthSnaps
 
   publicHealthInFlight = (async () => {
     try {
-      const summary = await buildReadinessSummary();
+      const summary = await getCachedDependencySummary();
       const snapshot: PublicHealthSnapshot = {
         ok: summary.ok,
         service: summary.service,

@@ -34,6 +34,7 @@ export type UnifiedDocRow = {
 type SortKey = "created_at" | "doc_title" | "total_views" | "last_view" | "active_shares" | "status";
 type SortDir = "asc" | "desc";
 type FilterKey = "all" | "ready" | "shared" | "awaiting_scan" | "attention" | "not_shared";
+const PENDING_SCAN_REFRESH_MS = 30_000;
 
 function formatDateTime(value: string | null) {
   if (!value) return "No activity yet";
@@ -222,8 +223,19 @@ export default function UnifiedDocsTableClient(props: {
 
   useEffect(() => {
     if (!hasPendingScans) return;
-    const id = window.setInterval(() => router.refresh(), 10_000);
-    return () => window.clearInterval(id);
+    const refreshIfVisible = () => {
+      if (document.visibilityState !== "visible") return;
+      router.refresh();
+    };
+    const id = window.setInterval(refreshIfVisible, PENDING_SCAN_REFRESH_MS);
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") refreshIfVisible();
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      window.clearInterval(id);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
   }, [hasPendingScans, router]);
 
   useEffect(() => {

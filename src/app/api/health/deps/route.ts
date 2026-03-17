@@ -2,7 +2,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
-import { buildDependencySummary, summarizeHealthChecks } from "@/lib/health";
+import { getCachedDependencySummary, summarizeHealthChecks } from "@/lib/health";
 import { enforceGlobalApiRateLimit } from "@/lib/securityTelemetry";
 import { getRouteTimeoutMs, isRouteTimeoutError, withRouteTimeout } from "@/lib/routeTimeout";
 
@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
           );
         }
 
-        const summary = await buildDependencySummary();
+        const summary = await getCachedDependencySummary();
         const readiness = summarizeHealthChecks(summary.checks);
         return NextResponse.json(summary, { status: readiness.httpStatus });
       })(),

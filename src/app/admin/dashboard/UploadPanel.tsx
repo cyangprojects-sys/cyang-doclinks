@@ -127,6 +127,7 @@ const EXECUTABLE_EXTS = new Set([
 
 const ACCEPT_ATTR =
   ".pdf,.doc,.docx,.txt,.rtf,.odt,.xls,.xlsx,.csv,.ppt,.pptx,.jpg,.jpeg,.png,.gif,.bmp,.heic,.zip,.rar,.mp3,.wav,.mp4,.mov,.avi";
+const PENDING_UPLOAD_STATUS_POLL_MS = 10_000;
 
 function extOf(name: string): string {
   const n = String(name || "").trim().toLowerCase();
@@ -279,6 +280,7 @@ export default function UploadPanel({
     let cancelled = false;
 
     async function pollStatus() {
+      if (document.visibilityState !== "visible") return;
       if (statusPollInFlightRef.current) return;
       statusPollInFlightRef.current = true;
       try {
@@ -331,11 +333,18 @@ export default function UploadPanel({
     void pollStatus();
     const timer = window.setInterval(() => {
       void pollStatus();
-    }, 5000);
+    }, PENDING_UPLOAD_STATUS_POLL_MS);
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void pollStatus();
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
 
     return () => {
       cancelled = true;
       window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
     };
   }, [pendingDocIds, pendingDocIdsKey, router]);
 

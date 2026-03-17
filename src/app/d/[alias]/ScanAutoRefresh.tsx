@@ -9,10 +9,19 @@ export default function ScanAutoRefresh() {
   const router = useRouter();
 
   useEffect(() => {
-    const id = window.setTimeout(() => {
+    const refreshIfVisible = () => {
+      if (document.visibilityState !== "visible") return;
       router.refresh();
-    }, REFRESH_DELAY_MS);
-    return () => window.clearTimeout(id);
+    };
+    const id = window.setTimeout(refreshIfVisible, REFRESH_DELAY_MS);
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") refreshIfVisible();
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      window.clearTimeout(id);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
   }, [router]);
 
   return null;

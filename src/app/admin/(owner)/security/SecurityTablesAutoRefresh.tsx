@@ -16,7 +16,7 @@ type SignaturesResponse =
     }
   | { ok: false; error: string };
 
-const POLL_MS = 8000;
+const POLL_MS = 30_000;
 
 export default function SecurityTablesAutoRefresh() {
   const router = useRouter();
@@ -27,6 +27,7 @@ export default function SecurityTablesAutoRefresh() {
     let cancelled = false;
 
     async function poll() {
+      if (document.visibilityState !== "visible") return;
       try {
         const res = await fetch("/api/admin/security/table-signatures", {
           method: "GET",
@@ -58,13 +59,19 @@ export default function SecurityTablesAutoRefresh() {
     const timer = window.setInterval(() => {
       void poll();
     }, POLL_MS);
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void poll();
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
 
     return () => {
       cancelled = true;
       window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
     };
   }, [router]);
 
   return null;
 }
-

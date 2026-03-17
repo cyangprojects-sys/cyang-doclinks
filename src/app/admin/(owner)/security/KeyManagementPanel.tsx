@@ -39,7 +39,8 @@ type KeysOk = {
 };
 type KeysErr = { ok: false; error: string; message?: string };
 type KeysResponse = KeysOk | KeysErr;
-const KEY_PANEL_POLL_MS = 10000;
+const KEY_PANEL_ACTIVE_POLL_MS = 15_000;
+const KEY_PANEL_IDLE_POLL_MS = 60_000;
 
 function keysSignature(payload: KeysResponse | null): string {
   if (!payload || !payload.ok) return "";
@@ -86,6 +87,7 @@ export default function KeyManagementPanel() {
   const changes = data && data.ok ? data.changes : [];
   const jobs = data && data.ok ? data.jobs : [];
   const jobSummary = data && data.ok ? data.job_summary : { queued: 0, running: 0, failed: 0 };
+  const hasActiveJobs = jobSummary.queued > 0 || jobSummary.running > 0;
 
   const [activateKey, setActivateKey] = useState<string>("");
   const [activateReason, setActivateReason] = useState<string>("");
@@ -115,12 +117,23 @@ export default function KeyManagementPanel() {
 
   useEffect(() => {
     void refresh();
+    const pollMs = hasActiveJobs ? KEY_PANEL_ACTIVE_POLL_MS : KEY_PANEL_IDLE_POLL_MS;
     const timer = window.setInterval(() => {
+      if (document.visibilityState !== "visible") return;
       if (busy) return;
       void refresh({ silent: true });
-    }, KEY_PANEL_POLL_MS);
-    return () => window.clearInterval(timer);
-  }, [busy, refresh]);
+    }, pollMs);
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible" && !busy) {
+        void refresh({ silent: true });
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [busy, hasActiveJobs, refresh]);
 
   async function onActivate() {
     if (!activateKey) {
