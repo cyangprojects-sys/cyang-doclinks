@@ -30,7 +30,7 @@ function argValue(flag) {
 }
 
 async function withClient(fn) {
-  const sql = createMigrationClient();
+  const sql = await createMigrationClient();
   try {
     return await fn(sql);
   } finally {

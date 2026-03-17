@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { resolve } from "node:path";
 
@@ -17,6 +18,38 @@ const BUDGETS = [
 
 function fmtKiB(bytes) {
   return `${(bytes / 1024).toFixed(1)} KiB`;
+}
+
+function resolveSpawn(command, args) {
+  if (process.platform === "win32" && (command === "npm" || command === "npx")) {
+    return {
+      command: "cmd.exe",
+      args: ["/d", "/s", "/c", command, ...args],
+    };
+  }
+  return { command, args };
+}
+
+function ensureBuildArtifacts() {
+  const hasMissingManifest = BUDGETS.some((budget) => !existsSync(resolve(ROOT, budget.manifest)));
+  if (!hasMissingManifest) return;
+  if (process.env.BUNDLE_BUDGETS_AUTO_BUILD === "0") {
+    throw new Error("Missing build manifest(s) and auto-build disabled. Run npm run build first.");
+  }
+
+  console.log("Build manifests missing. Running npm run build before bundle audit...");
+  const resolved = resolveSpawn("npm", ["run", "build"]);
+  const result = spawnSync(resolved.command, resolved.args, {
+    stdio: "inherit",
+    shell: false,
+    env: process.env,
+  });
+  if (result.error) {
+    throw result.error;
+  }
+  if (result.status !== 0) {
+    throw new Error(`npm run build failed with exit code ${result.status || 1}.`);
+  }
 }
 
 function readManifestFiles(pathname) {
@@ -39,6 +72,8 @@ function readManifestFiles(pathname) {
 }
 
 let hasFailure = false;
+
+ensureBuildArtifacts();
 
 for (const budget of BUDGETS) {
   const files = readManifestFiles(budget.manifest);

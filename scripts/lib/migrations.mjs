@@ -2,7 +2,6 @@ import { createHash } from "node:crypto";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import postgres from "postgres";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, "..", "..");
@@ -144,7 +143,8 @@ function getDatabaseUrl(env = process.env) {
   return url;
 }
 
-export function createMigrationClient(env = process.env) {
+export async function createMigrationClient(env = process.env) {
+  const { default: postgres } = await import("postgres");
   return postgres(getDatabaseUrl(env), {
     max: 1,
     idle_timeout: 5,

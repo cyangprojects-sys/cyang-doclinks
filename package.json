@@ -2,6 +2,11 @@
   "name": "cyang-doclinks",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "npm@11.6.2",
+  "engines": {
+    "node": ">=24.13.0 <25",
+    "npm": ">=11.6.2 <12"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -33,7 +38,9 @@
     "test:security:freeze:ci": "start-server-and-test \"npm run start\" http://127.0.0.1:3000 \"npm run test:security:freeze\"",
     "audit:lighthouse": "node scripts/run-lhci.mjs",
     "audit:browser": "npm run test:a11y:ci",
-    "audit:browser:ci": "npm run test:a11y:ci && npm run audit:lighthouse"
+    "audit:browser:ci": "npm run test:a11y:ci && npm run audit:lighthouse",
+    "docker:build": "docker build -t cyang-doclinks-app .",
+    "docker:test:image": "docker build -f Dockerfile.test -t cyang-doclinks-test ."
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1011.0",

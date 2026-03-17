@@ -104,6 +104,40 @@ Open `http://localhost:3000`.
 npm run build
 ```
 
+### Pinned runtime
+This repo is pinned to:
+- Node.js `24.13.0`
+- npm `11.6.2`
+
+Version manager hints:
+- [`.nvmrc`](/c:/Users/tsaab/Projects/cyang-doclinks/.nvmrc)
+- [`.node-version`](/c:/Users/tsaab/Projects/cyang-doclinks/.node-version)
+
+We do not commit `node_modules` or `.next`. Reproducibility comes from the lockfile, pinned runtime metadata, and the Docker paths below.
+
+## Containerized Build and Test
+
+If you want the full dependency/build path to run consistently on a clean machine, use Docker instead of checking in installed artifacts.
+
+### Build a production image
+```bash
+docker build -t cyang-doclinks-app .
+docker run --rm -p 3000:3000 --env-file .env.local cyang-doclinks-app
+```
+
+### Build a test image
+This image installs project dependencies plus Playwright Chromium so `npm test` can run inside the container:
+```bash
+docker build -f Dockerfile.test -t cyang-doclinks-test .
+docker run --rm --env-file .env.local cyang-doclinks-test
+```
+
+Convenience scripts:
+```bash
+npm run docker:build
+npm run docker:test:image
+```
+
 ### Production readiness validation
 ```bash
 npm run production-readiness
