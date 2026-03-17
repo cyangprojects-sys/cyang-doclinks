@@ -47,7 +47,7 @@ export type StatusPreview =
   | "maintenance"
   | "loading";
 
-const AUTO_REFRESH_MS = 45_000;
+const AUTO_REFRESH_MS = 120_000;
 const STATUS_SUBSCRIBE_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const STATUS_SUBSCRIBE_STORAGE_KEY = "cyang_status_subscription_email";
 
@@ -420,7 +420,7 @@ export default function StatusCenterClient({ preview }: { preview: StatusPreview
     if (!silent) setLoading(true);
     setRefreshing(silent);
     try {
-      const res = await fetch("/api/health/ready", { cache: "no-store", headers: { Accept: "application/json" } });
+      const res = await fetch("/api/health/public", { cache: "no-store", headers: { Accept: "application/json" } });
       const payload = (await res.json()) as Partial<StatusSnapshot>;
       if (!res.ok) {
         setSnapshot({ ok: false, service: "cyang.io", ts: Date.now(), error: typeof payload.error === "string" ? payload.error : `HTTP_${res.status}` });
@@ -453,9 +453,19 @@ export default function StatusCenterClient({ preview }: { preview: StatusPreview
   useEffect(() => {
     if (preview === "loading") return;
     const id = window.setInterval(() => {
+      if (document.visibilityState !== "visible") return;
       void refreshSnapshot(true);
     }, AUTO_REFRESH_MS);
-    return () => window.clearInterval(id);
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void refreshSnapshot(true);
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      window.clearInterval(id);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
   }, [preview, refreshSnapshot]);
 
   useEffect(() => {
@@ -553,7 +563,7 @@ export default function StatusCenterClient({ preview }: { preview: StatusPreview
             </span>
             <div className="text-xs text-white/55">Last updated {fmtDateTime(snapshot?.ts ?? null)} ({fmtRelative(snapshot?.ts ?? null)})</div>
             <div className="flex items-center gap-2">
-              <span className="rounded-full border border-white/12 bg-white/[0.04] px-2.5 py-1 text-[11px] text-white/58">Auto-refresh every 45s</span>
+              <span className="rounded-full border border-white/12 bg-white/[0.04] px-2.5 py-1 text-[11px] text-white/58">Auto-refresh every 2m while visible</span>
               <button type="button" onClick={() => void refreshSnapshot(true)} disabled={refreshing} className="btn-base rounded-xl border border-white/14 bg-white/[0.04] px-3 py-1.5 text-xs text-white/82 hover:border-white/24 hover:bg-white/[0.08] disabled:opacity-60">
                 {refreshing ? "Refreshing..." : "Refresh now"}
               </button>

@@ -28,6 +28,14 @@ export type HealthSummary = {
   };
 };
 
+export type PublicHealthSnapshot = {
+  ok: boolean;
+  service: string;
+  ts: number;
+  status?: "ok" | "degraded" | "down";
+  error?: string;
+};
+
 function worstState(states: readonly HealthState[]): "ok" | "degraded" | "down" {
   if (states.includes("down")) return "down";
   if (states.includes("degraded")) return "degraded";
@@ -431,4 +439,60 @@ export async function buildDependencySummary(): Promise<HealthSummary> {
 
 export async function buildReadinessSummary(): Promise<HealthSummary> {
   return buildDependencySummary();
+}
+
+type PublicHealthCacheEntry = {
+  expiresAt: number;
+  snapshot: PublicHealthSnapshot;
+};
+
+let publicHealthCache: PublicHealthCacheEntry | null = null;
+let publicHealthInFlight: Promise<PublicHealthSnapshot> | null = null;
+
+function getPublicHealthCacheMs() {
+  const raw = Number(process.env.STATUS_PUBLIC_HEALTH_CACHE_MS || 120_000);
+  if (!Number.isFinite(raw)) return 120_000;
+  return Math.max(15_000, Math.min(10 * 60_000, Math.floor(raw)));
+}
+
+export async function getCachedPublicHealthSnapshot(): Promise<PublicHealthSnapshot> {
+  const now = Date.now();
+  if (publicHealthCache && publicHealthCache.expiresAt > now) {
+    return publicHealthCache.snapshot;
+  }
+
+  if (publicHealthInFlight) {
+    return publicHealthInFlight;
+  }
+
+  publicHealthInFlight = (async () => {
+    try {
+      const summary = await buildReadinessSummary();
+      const snapshot: PublicHealthSnapshot = {
+        ok: summary.ok,
+        service: summary.service,
+        ts: summary.ts,
+        status: summary.status,
+      };
+      publicHealthCache = {
+        snapshot,
+        expiresAt: Date.now() + getPublicHealthCacheMs(),
+      };
+      return snapshot;
+    } catch (error: unknown) {
+      if (publicHealthCache) {
+        return publicHealthCache.snapshot;
+      }
+      return {
+        ok: false,
+        service: "cyang.io",
+        ts: Date.now(),
+        error: error instanceof Error ? error.message.slice(0, 120) : "SERVER_ERROR",
+      };
+    } finally {
+      publicHealthInFlight = null;
+    }
+  })();
+
+  return publicHealthInFlight;
 }
