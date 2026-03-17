@@ -1,13 +1,14 @@
 import { chromium } from "playwright";
 import { spawn } from "node:child_process";
 import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync } from "node:fs";
+import net from "node:net";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
 const ROOT = resolve(".");
 const LHCI_CONFIG_PATH = resolve(".lighthouserc.json");
-const LHCI_CLI_PATH = resolve("node_modules", "@lhci", "cli", "src", "cli.js");
 const LIGHTHOUSE_CLI_PATH = resolve("node_modules", "lighthouse", "cli", "index.js");
+const LIGHTHOUSE_PORT = Number(process.env.LIGHTHOUSE_PORT || 3300);
 const SAFE_CHROME_FLAGS = [
   "--headless=new",
   "--disable-gpu",
@@ -24,11 +25,15 @@ function fail(message, code = 1) {
   process.exit(code);
 }
 
+function resolveCommand(command) {
+  if (process.platform === "win32" && (command === "npm" || command === "npx")) {
+    return `${command}.cmd`;
+  }
+  return command;
+}
+
 if (!existsSync(LHCI_CONFIG_PATH)) {
   fail("Missing .lighthouserc.json.");
-}
-if (!existsSync(LHCI_CLI_PATH)) {
-  fail("Missing @lhci/cli dependency. Run `npm install` before running Lighthouse audits.");
 }
 if (!existsSync(LIGHTHOUSE_CLI_PATH)) {
   fail("Missing lighthouse CLI dependency. Run `npm install` before running Lighthouse audits.");
@@ -56,16 +61,22 @@ function parseConfig() {
       ? Number(collect.startServerReadyTimeout)
       : 120000;
   const assertions = assert.assertions || {};
+  const numberOfRunsRaw = Number(collect.numberOfRuns);
+  const numberOfRuns =
+    Number.isFinite(numberOfRunsRaw) && numberOfRunsRaw > 0
+      ? Math.max(1, Math.min(5, Math.floor(numberOfRunsRaw)))
+      : 1;
 
   if (urls.length === 0) {
     fail("No URLs configured in .lighthouserc.json under ci.collect.url.");
   }
 
   return {
-    urls,
+    urls: urls.map((url) => withPort(url, LIGHTHOUSE_PORT)),
     startServerCommand,
     startServerReadyTimeout,
     assertions,
+    numberOfRuns,
   };
 }
 
@@ -120,6 +131,71 @@ async function waitForUrl(url, timeoutMs) {
   throw new Error(`Timed out waiting for ${url}`);
 }
 
+function canConnect(hostname, port) {
+  return new Promise((resolveCheck) => {
+    const socket = net.createConnection({ host: hostname, port });
+    const finish = (connected) => {
+      try {
+        socket.destroy();
+      } catch {
+        // ignore cleanup failure
+      }
+      resolveCheck(connected);
+    };
+    socket.once("connect", () => finish(true));
+    socket.once("error", () => finish(false));
+    socket.setTimeout(500, () => finish(false));
+  });
+}
+
+async function waitForPortRelease(url, timeoutMs) {
+  const parsed = new URL(url);
+  const port = Number(parsed.port || (parsed.protocol === "https:" ? 443 : 80));
+  const hostname = parsed.hostname;
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const connected = await canConnect(hostname, port);
+    if (!connected) return;
+    await sleep(250);
+  }
+}
+
+async function pidsListeningOnPort(port) {
+  if (process.platform !== "win32") return [];
+  const result = await spawnCaptured("netstat", ["-ano", "-p", "tcp"], {
+    env,
+    cwd: ROOT,
+    forward: false,
+  });
+  if (result.code !== 0) return [];
+  const suffix = `:${port}`;
+  const pids = new Set();
+  for (const line of result.output.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed.startsWith("TCP")) continue;
+    const parts = trimmed.split(/\s+/);
+    if (parts.length < 5) continue;
+    const localAddress = parts[1] || "";
+    const state = parts[3] || "";
+    const pid = Number(parts[4] || "");
+    if (!localAddress.endsWith(suffix) || !Number.isFinite(pid) || pid <= 0) continue;
+    if (state && state !== "LISTENING" && state !== "ESTABLISHED") continue;
+    pids.add(pid);
+  }
+  return Array.from(pids.values());
+}
+
+async function forceReleaseUrlPort(url) {
+  const parsed = new URL(url);
+  const port = Number(parsed.port || (parsed.protocol === "https:" ? 443 : 80));
+  const pids = await pidsListeningOnPort(port);
+  for (const pid of pids) {
+    if (pid === process.pid) continue;
+    await killProcessTree(pid);
+  }
+  await waitForPortRelease(url, 5000);
+}
+
 function normalizeThresholdMap(assertions) {
   const categories = ["performance", "accessibility", "best-practices", "seo"];
   const out = {};
@@ -137,6 +213,12 @@ function normalizeThresholdMap(assertions) {
 
 function readJson(path) {
   return JSON.parse(readFileSync(path, "utf8"));
+}
+
+function withPort(url, port) {
+  const parsed = new URL(url);
+  parsed.port = String(port);
+  return parsed.toString();
 }
 
 function safeSlug(url, index) {
@@ -166,16 +248,27 @@ async function killProcessTree(pid) {
   }
 }
 
-async function runWindowsFallback(config) {
-  console.log("Windows LHCI fallback enabled: running Lighthouse directly against a managed Chrome instance.");
+async function runDirectLighthouse(config) {
+  console.log("Running Lighthouse directly against a managed Chrome instance.");
   const reportsDir = resolve(".lighthouseci", "manual");
   mkdirSync(reportsDir, { recursive: true });
+  const serverEnv = {
+    ...env,
+    PORT: String(LIGHTHOUSE_PORT),
+  };
 
-  const server = spawn(process.env.ComSpec || "cmd.exe", ["/d", "/s", "/c", config.startServerCommand], {
-    cwd: ROOT,
-    env,
-    stdio: "inherit",
-  });
+  const server =
+    process.platform === "win32"
+      ? spawn(process.env.ComSpec || "cmd.exe", ["/d", "/s", "/c", config.startServerCommand], {
+          cwd: ROOT,
+          env: serverEnv,
+          stdio: "inherit",
+        })
+      : spawn(process.env.SHELL || "/bin/sh", ["-lc", config.startServerCommand], {
+          cwd: ROOT,
+          env: serverEnv,
+          stdio: "inherit",
+        });
 
   let chrome = null;
 
@@ -207,39 +300,53 @@ async function runWindowsFallback(config) {
 
     for (let i = 0; i < config.urls.length; i += 1) {
       const url = config.urls[i];
-      const reportPath = join(reportsDir, `${safeSlug(url, i)}.json`);
-      const run = await spawnCaptured(
-        process.execPath,
-        [
-          LIGHTHOUSE_CLI_PATH,
-          url,
-          "--port=9222",
-          "--quiet",
-          "--output=json",
-          "--output-path",
-          reportPath,
-          "--throttling-method=devtools",
-          "--blocked-url-patterns=https://local.adguard.org/*",
-          `--chrome-flags=${SAFE_CHROME_FLAGS.join(" ")}`,
-        ],
-        {
-          cwd: ROOT,
-          env,
-          forward: false,
-        }
-      );
+      const runScores = [];
+      for (let runIndex = 0; runIndex < config.numberOfRuns; runIndex += 1) {
+        const reportPath = join(reportsDir, `${safeSlug(url, i)}-run-${runIndex + 1}.json`);
+        const run = await spawnCaptured(
+          process.execPath,
+          [
+            LIGHTHOUSE_CLI_PATH,
+            url,
+            "--port=9222",
+            "--quiet",
+            "--output=json",
+            "--output-path",
+            reportPath,
+            "--throttling-method=devtools",
+            "--blocked-url-patterns=https://local.adguard.org/*",
+            `--chrome-flags=${SAFE_CHROME_FLAGS.join(" ")}`,
+          ],
+          {
+            cwd: ROOT,
+            env,
+            forward: false,
+          }
+        );
 
-      if (run.code !== 0) {
-        process.stderr.write(run.output);
-        throw new Error(`Lighthouse failed for ${url} with exit code ${run.code}.`);
+        if (run.code !== 0) {
+          process.stderr.write(run.output);
+          throw new Error(`Lighthouse failed for ${url} with exit code ${run.code}.`);
+        }
+
+        const lhr = readJson(reportPath);
+        const categories = lhr.categories || {};
+        runScores.push({
+          performance: Number(categories.performance?.score ?? 0),
+          accessibility: Number(categories.accessibility?.score ?? 0),
+          "best-practices": Number(categories["best-practices"]?.score ?? 0),
+          seo: Number(categories.seo?.score ?? 0),
+        });
       }
 
-      const lhr = readJson(reportPath);
-      const categories = lhr.categories || {};
-      const perf = Number(categories.performance?.score ?? 0);
-      const a11y = Number(categories.accessibility?.score ?? 0);
-      const best = Number(categories["best-practices"]?.score ?? 0);
-      const seo = Number(categories.seo?.score ?? 0);
+      const perf =
+        runScores.reduce((sum, score) => sum + score.performance, 0) / Math.max(runScores.length, 1);
+      const a11y =
+        runScores.reduce((sum, score) => sum + score.accessibility, 0) / Math.max(runScores.length, 1);
+      const best =
+        runScores.reduce((sum, score) => sum + score["best-practices"], 0) / Math.max(runScores.length, 1);
+      const seo =
+        runScores.reduce((sum, score) => sum + score.seo, 0) / Math.max(runScores.length, 1);
 
       scoreLines.push(
         `${url} -> perf ${perf.toFixed(2)}, a11y ${a11y.toFixed(2)}, best-practices ${best.toFixed(
@@ -248,7 +355,9 @@ async function runWindowsFallback(config) {
       );
 
       for (const [category, min] of Object.entries(thresholds)) {
-        const score = Number(categories[category]?.score ?? 0);
+        const score =
+          runScores.reduce((sum, current) => sum + Number(current[category] ?? 0), 0) /
+          Math.max(runScores.length, 1);
         if (score < min) {
           warnings.push(`${url}: ${category} score ${score.toFixed(2)} is below configured minimum ${min.toFixed(2)}.`);
         }
@@ -262,41 +371,17 @@ async function runWindowsFallback(config) {
     return 0;
   } finally {
     if (chrome?.pid) await killProcessTree(chrome.pid);
-    if (server?.pid) await killProcessTree(server.pid);
+    if (server?.pid) {
+      await killProcessTree(server.pid);
+      await waitForPortRelease(config.urls[0], 10000);
+      await forceReleaseUrlPort(config.urls[0]);
+    }
   }
 }
 
 async function main() {
   const config = parseConfig();
-  const localWindowsMode = process.platform === "win32" && !String(process.env.CI || "").trim();
-
-  if (localWindowsMode) {
-    const code = await runWindowsFallback(config);
-    process.exit(code);
-  }
-
-  const autorun = await spawnCaptured(process.execPath, [LHCI_CLI_PATH, "autorun", "--config=.lighthouserc.json"], {
-    cwd: ROOT,
-    env,
-  });
-
-  if (autorun.code === 0) {
-    process.exit(0);
-  }
-
-  const isWindowsCleanupEperm =
-    process.platform === "win32" &&
-    /EPERM, Permission denied/i.test(autorun.output) &&
-    /chrome-launcher/i.test(autorun.output);
-
-  const allowFallback = isWindowsCleanupEperm && !String(process.env.CI || "").trim();
-
-  if (!allowFallback) {
-    process.exit(autorun.code);
-  }
-
-  console.warn("Detected Windows chrome-launcher cleanup EPERM from LHCI; switching to local fallback runner.");
-  const code = await runWindowsFallback(config);
+  const code = await runDirectLighthouse(config);
   process.exit(code);
 }
 
