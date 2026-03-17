@@ -55,6 +55,10 @@ function normalizeRole(value: unknown): Role | null {
 }
 
 export async function permissionsTableExists(): Promise<boolean> {
+  if (!String(process.env.DATABASE_URL || "").trim()) {
+    permissionsTableExistsCache = false;
+    return false;
+  }
   if (permissionsTableExistsCache != null) return permissionsTableExistsCache;
   try {
     const rows = (await sql`select to_regclass('public.role_permissions')::text as reg`) as unknown as Array<{ reg: string | null }>;

@@ -7,10 +7,6 @@ test.describe("org auth redirect base URL guardrails", () => {
     expect(code.includes("resolvePublicAppBaseUrl(req.url)")).toBeTruthy();
     expect(code.includes("new URL(\"/login\", req.url)")).toBeFalsy();
     expect(code.includes("new URL(`/org/${encodeURIComponent(slug)}/login`, req.url)")).toBeFalsy();
-    expect(
-      code.includes(
-        "new URL(\n      `/api/auth/signin/${encodeURIComponent(provider)}?callbackUrl=${encodeURIComponent(\"/admin/dashboard\")}`,\n      appBaseUrl\n    )"
-      )
-    ).toBeTruthy();
+    expect(code.includes('callbackUrl=${encodeURIComponent("/auth/continue-admin")}')).toBeTruthy();
   });
 });

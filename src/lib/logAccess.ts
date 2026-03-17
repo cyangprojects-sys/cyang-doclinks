@@ -14,11 +14,21 @@ const MAX_ALIAS_LEN = 80;
 const MAX_TOKEN_LEN = 128;
 const MAX_IP_LEN = 64;
 const MAX_USER_AGENT_LEN = 240;
+let didWarnUnexpectedAccessLogFailure = false;
 
 function sanitizeText(value: unknown, maxLen: number): string | null {
     const raw = String(value || "").trim();
     if (!raw || raw.length > maxLen || /[\r\n\0]/.test(raw)) return null;
     return raw;
+}
+
+function isExpectedBestEffortFailure(err: unknown): boolean {
+    const msg = err instanceof Error ? err.message : String(err || "");
+    return (
+        msg === "Missing DATABASE_URL" ||
+        msg === "Invalid DATABASE_URL" ||
+        msg === "Invalid DATABASE_URL protocol"
+    );
 }
 
 export async function logAccess({
@@ -53,7 +63,11 @@ export async function logAccess({
       )
     `;
     } catch (err) {
-        console.warn("Failed to log access.");
+        if (isExpectedBestEffortFailure(err)) return;
+        if (!didWarnUnexpectedAccessLogFailure) {
+            didWarnUnexpectedAccessLogFailure = true;
+            console.warn("Failed to log access.");
+        }
         // Never throw — logging should not break file delivery
     }
 }

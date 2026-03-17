@@ -7,13 +7,13 @@ test.describe("admin layout guardrails", () => {
     expect(code.includes("getServerSession")).toBeTruthy();
     expect(code.includes("if (!session?.user) redirect(\"/signin\")")).toBeTruthy();
     expect(code.includes("isAdminRole")).toBeTruthy();
-    expect(code.includes("if (!isAdminRole(rawRole)) redirect(\"/signin\")")).toBeTruthy();
+    expect(code.includes("if (!isAdminRole(user.role)) redirect(\"/viewer\")")).toBeTruthy();
   });
 
   test("/admin/(owner) layout enforces owner role", () => {
     const code = readFileSync("src/app/admin/(owner)/layout.tsx", "utf8");
     expect(code.includes("getServerSession")).toBeTruthy();
     expect(code.includes("if (!session?.user) redirect(\"/signin\")")).toBeTruthy();
-    expect(code.includes("if (!isOwner) redirect(\"/admin/dashboard\")")).toBeTruthy();
+    expect(code.includes("if (user.role !== \"owner\") redirect(\"/admin\")")).toBeTruthy();
   });
 });

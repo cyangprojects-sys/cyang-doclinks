@@ -96,7 +96,7 @@ function clearBillingFlagsCache() {
 function getSecurityFreezeCacheMs() {
   const raw = Number(process.env.SECURITY_FREEZE_CACHE_MS || 5_000);
   if (!Number.isFinite(raw)) return 5_000;
-  return Math.max(1_000, Math.min(60_000, Math.floor(raw)));
+  return Math.max(0, Math.min(60_000, Math.floor(raw)));
 }
 
 function clearSecurityFreezeCache() {

@@ -22,6 +22,7 @@ import { appendImmutableAudit } from "@/lib/immutableAudit";
 import { reportException } from "@/lib/observability";
 import { validateUploadType } from "@/lib/uploadTypeValidation";
 import { getRouteTimeoutMs, isRouteTimeoutError, withRouteTimeout } from "@/lib/routeTimeout";
+import { assertRuntimeEnv, isRuntimeEnvError } from "@/lib/runtimeEnv";
 import { withRequestTelemetry } from "@/lib/perfTelemetry";
 
 export const runtime = "nodejs";
@@ -47,10 +48,12 @@ function getKeyPrefix() {
   return p.endsWith("/") ? p : `${p}/`;
 }
 
-function authErrorCode(err: unknown): "UNAUTHENTICATED" | "FORBIDDEN" | null {
+function authErrorCode(err: unknown): "UNAUTHENTICATED" | "FORBIDDEN" | "MFA_REQUIRED" | null {
   const msg = err instanceof Error ? err.message : String(err || "");
   if (msg === "UNAUTHENTICATED") return "UNAUTHENTICATED";
   if (msg === "FORBIDDEN") return "FORBIDDEN";
+  if (msg === "MFA_REQUIRED") return "MFA_REQUIRED";
+  if (msg.includes("outside a request scope")) return "UNAUTHENTICATED";
   return null;
 }
 
@@ -68,6 +71,7 @@ export async function POST(req: Request) {
       req,
       () => withRouteTimeout(
         (async () => {
+        assertRuntimeEnv("upload_presign");
         if (parseJsonBodyLength(req) > MAX_UPLOAD_PRESIGN_BODY_BYTES) {
           return NextResponse.json({ ok: false, error: "PAYLOAD_TOO_LARGE" }, { status: 413 });
         }
@@ -78,9 +82,6 @@ export async function POST(req: Request) {
             { status: 403, headers: { "Retry-After": String(abuseBlock.retryAfterSeconds) } }
           );
         }
-        const user = await requireUser();
-        const plan = await getPlanForUser(user.id);
-
         // Global API throttle (best-effort)
         const globalRl = await enforceGlobalApiRateLimit({
           req,
@@ -95,6 +96,8 @@ export async function POST(req: Request) {
             { status: globalRl.status, headers: { "Retry-After": String(globalRl.retryAfterSeconds) } }
           );
         }
+        const user = await requireUser();
+        const plan = await getPlanForUser(user.id);
         const r2Bucket = getR2Bucket();
 
         // Upload presign throttle per-IP (stronger)
@@ -324,6 +327,15 @@ export async function POST(req: Request) {
     }
     if (authCode === "FORBIDDEN") {
       return NextResponse.json({ ok: false, error: "FORBIDDEN" }, { status: 403 });
+    }
+    if (authCode === "MFA_REQUIRED") {
+      return NextResponse.json({ ok: false, error: "MFA_REQUIRED" }, { status: 403 });
+    }
+    if (isRuntimeEnvError(err)) {
+      return NextResponse.json(
+        { ok: false, error: "ENV_MISCONFIGURED", message: "Upload configuration is unavailable." },
+        { status: 503 }
+      );
     }
     await logSecurityEvent({
       type: "upload_presign_error",

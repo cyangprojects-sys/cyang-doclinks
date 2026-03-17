@@ -80,7 +80,7 @@ test.describe("gap sweep fallback behavior", () => {
     delete process.env.RESEND_API_KEY;
     process.env.EMAIL_FROM = "DocLinks <login@cyang.io>";
     await expect(sendSignInEmail("user@example.com", "https://example.com/s/abc")).rejects.toThrow(
-      /Missing RESEND_API_KEY/
+      /Missing env: RESEND_API_KEY/
     );
 
     process.env.RESEND_API_KEY = "re_test_key";
@@ -97,7 +97,8 @@ test.describe("gap sweep fallback behavior", () => {
       await sendSignInEmail("user@example.com", "https://example.com/s/abc");
       expect(calls).toHaveLength(1);
       expect(calls[0].url).toBe("https://api.resend.com/emails");
-      expect(String((calls[0].init?.headers as Record<string, string>).Authorization || "")).toContain("re_test_key");
+      const authHeader = new Headers(calls[0].init?.headers).get("Authorization") || "";
+      expect(authHeader).toContain("re_test_key");
     } finally {
       globalThis.fetch = originalFetch;
     }

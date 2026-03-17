@@ -15,7 +15,7 @@ test.describe("auth redirect guardrails", () => {
   test("forces dashboard for external callback URLs", async () => {
     const redirect = getRedirectCallback();
     const out = await redirect({ url: "https://evil.example/phish", baseUrl });
-    expect(out).toBe(`${baseUrl}/admin/dashboard`);
+    expect(out).toBe(`${baseUrl}/auth/continue-viewer`);
   });
 
   test("allows safe internal routes only", async () => {
@@ -25,7 +25,7 @@ test.describe("auth redirect guardrails", () => {
     expect(admin).toBe(`${baseUrl}/admin/security?saved=1`);
 
     const home = await redirect({ url: "/", baseUrl });
-    expect(home).toBe(baseUrl);
+    expect(home).toBe(`${baseUrl}/`);
 
     const authRoute = await redirect({ url: "/api/auth/signout?callbackUrl=%2F", baseUrl });
     expect(authRoute).toBe(`${baseUrl}/api/auth/signout?callbackUrl=%2F`);

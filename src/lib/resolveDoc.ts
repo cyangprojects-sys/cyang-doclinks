@@ -363,6 +363,7 @@ async function resolveAliasToDocId(
 export async function resolveShareMeta(tokenInput: string): Promise<ShareMeta> {
     const { raw: token, dashed } = tokenVariants(tokenInput);
     if (!token) return { ok: false };
+    const alternateToken = dashed ?? token;
 
     // Try newer schema first (watermark_* columns present), then fall back.
     try {
@@ -391,7 +392,7 @@ export async function resolveShareMeta(tokenInput: string): Promise<ShareMeta> {
       from public.share_tokens st
       left join public.docs d on d.id = st.doc_id
       where st.token = ${token}
-        ${dashed ? sql`or st.token = ${dashed}` : sql``}
+         or st.token = ${alternateToken}
       limit 1
     `) as unknown as Array<{
             token: string;
@@ -468,7 +469,7 @@ export async function resolveShareMeta(tokenInput: string): Promise<ShareMeta> {
         from public.share_tokens st
         join public.docs d on d.id = st.doc_id
         where st.token = ${token}
-          ${dashed ? sql`or st.token = ${dashed}` : sql``}
+           or st.token = ${alternateToken}
         limit 1
       `) as unknown as Array<{
                 token: string;
@@ -529,7 +530,7 @@ export async function resolveShareMeta(tokenInput: string): Promise<ShareMeta> {
             st.password_hash
           from public.share_tokens st
           where st.token = ${token}
-            ${dashed ? sql`or st.token = ${dashed}` : sql``}
+             or st.token = ${alternateToken}
           limit 1
         `) as unknown as Array<{
                     token: string;
@@ -610,13 +611,14 @@ export async function consumeShareTokenView(
 > {
     const { raw: token, dashed } = tokenVariants(tokenInput);
     if (!token) return { ok: false, error: "NOT_FOUND" };
+    const alternateToken = dashed ?? token;
 
     // Atomic: only increments if still valid and below max (unless max_views is null/0)
     try {
         const rows = (await sql`
       update public.share_tokens st
       set views_count = coalesce(st.views_count, 0) + 1
-      where (st.token = ${token} ${dashed ? sql`or st.token = ${dashed}` : sql``})
+      where (st.token = ${token} or st.token = ${alternateToken})
         and st.revoked_at is null
         and (st.expires_at is null or st.expires_at > now())
         and (

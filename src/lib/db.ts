@@ -2,6 +2,7 @@ import { neon } from "@neondatabase/serverless";
 import { normalizeSqlFingerprint, recordQueryFrequency } from "@/lib/perfTelemetry";
 
 let cachedSql: ReturnType<typeof neon> | null = null;
+let cachedDatabaseUrl: string | null = null;
 const ALLOWED_DB_PROTOCOLS = new Set(["postgres:", "postgresql:"]);
 
 function getDatabaseUrl(): string {
@@ -25,12 +26,12 @@ function getDatabaseUrl(): string {
 }
 
 function getSql(): ReturnType<typeof neon> {
-    if (cachedSql) return cachedSql;
+  const url = getDatabaseUrl();
+  if (cachedSql && cachedDatabaseUrl === url) return cachedSql;
 
-    const url = getDatabaseUrl();
-
-    cachedSql = neon(url);
-    return cachedSql;
+  cachedSql = neon(url);
+  cachedDatabaseUrl = url;
+  return cachedSql;
 }
 
 // Lazy DB init prevents build-time module evaluation from failing in CI

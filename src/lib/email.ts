@@ -12,6 +12,7 @@ const MAX_URL_LEN = 2048;
 const SAFE_COLOR_RE = /^#(?:[0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
 const BASIC_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 let resendClient: Resend | null = null;
+let resendApiKey: string | null = null;
 
 function mustEnv(name: string) {
   const raw = String(process.env[name] || "");
@@ -104,8 +105,10 @@ function normalizeBrandColor(value: string | null | undefined): string {
 }
 
 function getResendClient(): Resend {
-  if (resendClient) return resendClient;
-  resendClient = new Resend(mustEnv("RESEND_API_KEY"));
+  const apiKey = mustEnv("RESEND_API_KEY");
+  if (resendClient && resendApiKey === apiKey) return resendClient;
+  resendClient = new Resend(apiKey);
+  resendApiKey = apiKey;
   return resendClient;
 }
 

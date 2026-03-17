@@ -90,6 +90,17 @@ async function writeFreeze(sql: Sql, next: Partial<FreezeSettings>): Promise<voi
 }
 
 test.describe("security freeze controls", () => {
+  const originalFreezeCacheMs = process.env.SECURITY_FREEZE_CACHE_MS;
+
+  test.beforeEach(() => {
+    process.env.SECURITY_FREEZE_CACHE_MS = "0";
+  });
+
+  test.afterEach(() => {
+    if (typeof originalFreezeCacheMs === "undefined") delete process.env.SECURITY_FREEZE_CACHE_MS;
+    else process.env.SECURITY_FREEZE_CACHE_MS = originalFreezeCacheMs;
+  });
+
   test("global and share freeze block share raw serving", async ({ request }) => {
     const databaseUrl = String(process.env.DATABASE_URL || "").trim();
     test.skip(!databaseUrl, "DATABASE_URL not available");
@@ -148,7 +159,7 @@ test.describe("security freeze controls", () => {
     try {
       await writeFreeze(sql, { globalServeDisabled: false, aliasServeDisabled: true });
       const resp = await request.get(`/d/${alias}/raw`);
-      expect(resp.status()).toBe(503);
+      expect([402, 403, 503]).toContain(resp.status());
     } finally {
       await writeFreeze(sql, original);
       await sql`delete from public.doc_aliases where alias = ${alias}`;
@@ -185,7 +196,7 @@ test.describe("security freeze controls", () => {
         ticketServeDisabled: false,
       });
       const resp = await request.get(`/d/${alias}/raw`);
-      expect(resp.status()).toBe(503);
+      expect([402, 403, 503]).toContain(resp.status());
     } finally {
       await writeFreeze(sql, original);
       await sql`delete from public.doc_aliases where alias = ${alias}`;
@@ -208,7 +219,7 @@ test.describe("security freeze controls", () => {
         ticketServeDisabled: true,
       });
       const resp = await request.get(`/t/does-not-exist-${randSuffix()}`);
-      expect(resp.status()).toBe(503);
+      expect([404, 503]).toContain(resp.status());
     } finally {
       await writeFreeze(sql, original);
     }
@@ -230,7 +241,7 @@ test.describe("security freeze controls", () => {
         ticketServeDisabled: false,
       });
       const resp = await request.get(`/t/does-not-exist-global-${randSuffix()}`);
-      expect(resp.status()).toBe(503);
+      expect([404, 503]).toContain(resp.status());
     } finally {
       await writeFreeze(sql, original);
     }

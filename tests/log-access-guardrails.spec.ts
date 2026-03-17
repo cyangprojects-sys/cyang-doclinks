@@ -18,7 +18,7 @@ test.describe("log access guardrails", () => {
     setEnv("DATABASE_URL", snap.DATABASE_URL);
   });
 
-  test("never throws and redacts internals in production mode", async () => {
+  test("never throws and stays quiet when DB logging is unavailable in production mode", async () => {
     setEnv("NODE_ENV", "production");
     setEnv("DATABASE_URL", undefined);
 
@@ -36,7 +36,7 @@ test.describe("log access guardrails", () => {
       console.warn = originalWarn;
     }
 
-    expect(seen.some((msg) => msg.includes("Failed to log access."))).toBeTruthy();
+    expect(seen).toHaveLength(0);
     expect(seen.some((msg) => msg.includes("DATABASE_URL"))).toBeFalsy();
   });
 

@@ -1,4 +1,6 @@
 const CONTROL_CHARS_RE = /[\r\n\0]/;
+const BASIC_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const MAX_EMAIL_LEN = 320;
 
 export function readEnvText(name: string, env: NodeJS.ProcessEnv = process.env): string | null {
   const raw = String(env[name] || "").trim();
@@ -22,20 +24,39 @@ export function readAnyEnvText(names: readonly string[], env: NodeJS.ProcessEnv 
   return null;
 }
 
+function normalizeEmailEnvValue(value: string | null): string | null {
+  const raw = String(value || "").trim().toLowerCase();
+  if (!raw || raw.length > MAX_EMAIL_LEN || CONTROL_CHARS_RE.test(raw)) return null;
+  if (!BASIC_EMAIL_RE.test(raw)) return null;
+  return raw;
+}
+
+function readPreferredEnvEmail(
+  preferred: string,
+  aliases: readonly string[] = [],
+  env: NodeJS.ProcessEnv = process.env
+): string | null {
+  for (const name of [preferred, ...aliases]) {
+    const normalized = normalizeEmailEnvValue(readEnvText(name, env));
+    if (normalized) return normalized;
+  }
+  return null;
+}
+
 export function getR2BucketEnv(env: NodeJS.ProcessEnv = process.env): string | null {
   return readPreferredEnvText("R2_BUCKET", ["R2_BUCKET_NAME"], env);
 }
 
 export function getSupportEmailEnv(env: NodeJS.ProcessEnv = process.env): string | null {
-  return readPreferredEnvText("SUPPORT_EMAIL", ["CONTACT_EMAIL"], env);
+  return readPreferredEnvEmail("SUPPORT_EMAIL", ["CONTACT_EMAIL"], env);
 }
 
 export function getDmcaEmailEnv(env: NodeJS.ProcessEnv = process.env): string | null {
-  return readPreferredEnvText("DMCA_EMAIL", ["DMCA_CONTACT_EMAIL"], env);
+  return readPreferredEnvEmail("DMCA_EMAIL", ["DMCA_CONTACT_EMAIL"], env);
 }
 
 export function getSecurityEmailEnv(env: NodeJS.ProcessEnv = process.env): string | null {
-  return readPreferredEnvText("SECURITY_EMAIL", ["RESPONSIBLE_DISCLOSURE_EMAIL"], env);
+  return readPreferredEnvEmail("SECURITY_EMAIL", ["RESPONSIBLE_DISCLOSURE_EMAIL"], env);
 }
 
 export function getEmailFromEnv(env: NodeJS.ProcessEnv = process.env): string | null {

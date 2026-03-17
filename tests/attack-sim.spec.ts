@@ -107,6 +107,8 @@ async function pickDocId(sql: Sql): Promise<string | null> {
       select d.id::text as id
       from public.docs d
       where coalesce(d.status::text, 'ready') <> 'deleted'
+        and coalesce(d.moderation_status::text, 'active') = 'active'
+        and coalesce(d.scan_status::text, 'clean') = 'clean'
       order by d.created_at desc
       limit 1
     `) as unknown as Array<{ id: string }>;

@@ -73,6 +73,15 @@ function parseJsonBodyLength(req: NextRequest): number {
   return Number.isFinite(out) ? Math.max(0, Math.floor(out)) : 0;
 }
 
+function authErrorCode(err: unknown): "UNAUTHENTICATED" | "FORBIDDEN" | "MFA_REQUIRED" | null {
+  const msg = err instanceof Error ? err.message : String(err || "");
+  if (msg === "UNAUTHENTICATED") return "UNAUTHENTICATED";
+  if (msg === "FORBIDDEN") return "FORBIDDEN";
+  if (msg === "MFA_REQUIRED") return "MFA_REQUIRED";
+  if (msg.includes("outside a request scope")) return "UNAUTHENTICATED";
+  return null;
+}
+
 async function streamToBuffer(body: AsyncIterable<unknown>): Promise<Buffer> {
   const chunks: Buffer[] = [];
   for await (const chunk of body) {
@@ -743,6 +752,25 @@ try {
     const msg = errorMessage(e) || "server_error";
     const code = sqlErrorCode(e);
     const missingColumn = extractMissingColumn(msg);
+    const authCode = authErrorCode(e);
+    if (authCode === "UNAUTHENTICATED") {
+      return NextResponse.json(
+        { ok: false, error: "UNAUTHENTICATED", message: "Sign in to finalize uploads.", stage },
+        { status: 401 }
+      );
+    }
+    if (authCode === "FORBIDDEN") {
+      return NextResponse.json(
+        { ok: false, error: "FORBIDDEN", message: "You do not have permission to finalize this upload.", stage },
+        { status: 403 }
+      );
+    }
+    if (authCode === "MFA_REQUIRED") {
+      return NextResponse.json(
+        { ok: false, error: "MFA_REQUIRED", message: "Complete MFA to finalize uploads.", stage },
+        { status: 403 }
+      );
+    }
     const stack = e instanceof Error ? e.stack || null : null;
     console.error("upload_complete_failed", {
       stage,
@@ -763,12 +791,6 @@ try {
       meta: { timeoutMs },
       });
       return NextResponse.json({ ok: false, error: "TIMEOUT", stage }, { status: 504 });
-    }
-    if (msg === "FORBIDDEN") {
-      return NextResponse.json(
-        { ok: false, error: "FORBIDDEN", message: "You do not have permission to finalize this upload.", stage },
-        { status: 403 }
-      );
     }
     if (code === "42703" || missingColumn) {
       return NextResponse.json(

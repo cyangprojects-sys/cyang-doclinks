@@ -32,11 +32,11 @@ test.describe("document status helpers", () => {
     );
   });
 
-  test("reports eligibility with warning for pending/running scans", () => {
+  test("blocks link creation while scans are pending or running", () => {
     const out = getShareEligibility({ docStateRaw: "ready", scanStateRaw: "running" });
-    expect(out.canCreateLink).toBeTruthy();
-    expect(out.warning).toContain("Security scan is still running");
-    expect(out.blockedReason).toBeNull();
+    expect(out.canCreateLink).toBeFalsy();
+    expect(out.warning).toBeNull();
+    expect(out.blockedReason).toContain("Available after scan completes");
   });
 
   test("sanitizes invalid state inputs and upload errors", () => {

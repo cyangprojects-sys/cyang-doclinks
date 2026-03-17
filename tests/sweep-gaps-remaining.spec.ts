@@ -93,7 +93,7 @@ test.describe("remaining module sweep", () => {
 
   test("db and r2 helpers fail closed without required env", async () => {
     delete process.env.DATABASE_URL;
-    expect(() => sql`select 1`).toThrow(/Missing DATABASE_URL/);
+    await expect(sql`select 1`).rejects.toThrow(/Missing DATABASE_URL/);
 
     delete process.env.R2_BUCKET;
     delete process.env.R2_BUCKET_NAME;
