@@ -7,7 +7,6 @@ import { POST as aliasesPost } from "../src/app/api/v1/aliases/route";
 import { POST as sharesPost } from "../src/app/api/v1/shares/route";
 import { POST as backupStatusPost } from "../src/app/api/backup/status/route";
 import { POST as viewerOfficePost } from "../src/app/api/viewer/office/route";
-import { POST as webhooksTestPost } from "../src/app/api/v1/webhooks/test/route";
 import { POST as stripeWebhookPost } from "../src/app/api/stripe/webhook/route";
 
 loadDotenv({ path: ".env.local", quiet: true });
@@ -81,11 +80,6 @@ test.describe("runtime oversized payload handling", () => {
     const res = await viewerOfficePost(
       jsonRequest("http://localhost/api/viewer/office", 12 * 1024, undefined, '{"rawPath":"/s/x/raw","mimeType":"text/csv"}')
     );
-    await expectPayloadTooLarge(res);
-  });
-
-  test("v1 webhook test rejects oversized payloads at runtime", async () => {
-    const res = await webhooksTestPost(jsonRequest("http://localhost/api/v1/webhooks/test", 24 * 1024));
     await expectPayloadTooLarge(res);
   });
 

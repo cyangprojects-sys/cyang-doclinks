@@ -97,16 +97,6 @@ test.describe("api route guardrails", () => {
     expect(officePreview.includes("enforceGlobalApiRateLimit(")).toBeTruthy();
   });
 
-  test("debug alias lookup route requires owner role and debug gate", () => {
-    const code = src("src/app/api/debug/alias/[alias]/route.ts");
-    expect(code.includes("enforceGlobalApiRateLimit(")).toBeTruthy();
-    expect(code.includes("RATE_LIMIT_DEBUG_ALIAS_LOOKUP_PER_MIN")).toBeTruthy();
-    expect(code.includes('await requireRole("owner")')).toBeTruthy();
-    expect(code.includes("isDebugApiEnabled()")).toBeTruthy();
-    expect(code.includes("UNAUTHENTICATED")).toBeTruthy();
-    expect(code.includes("FORBIDDEN")).toBeTruthy();
-  });
-
   test("admin analytics aggregate route is rate-limited", () => {
     const code = src("src/app/api/admin/analytics/aggregate/route.ts");
     expect(code.includes("enforceGlobalApiRateLimit(")).toBeTruthy();
@@ -235,7 +225,6 @@ test.describe("api route guardrails", () => {
       "src/app/api/admin/dbinfo/route.ts",
       "src/app/api/admin/db-index-audit/route.ts",
       "src/app/api/admin/debug/route.ts",
-      "src/app/api/debug/alias/[alias]/route.ts",
     ];
     for (const route of routes) {
       const code = src(route);
@@ -272,7 +261,6 @@ test.describe("api route guardrails", () => {
       "src/app/api/v1/aliases/route.ts",
       "src/app/api/v1/shares/route.ts",
       "src/app/api/v1/takedown/route.ts",
-      "src/app/api/v1/webhooks/test/route.ts",
     ];
     for (const route of routes) {
       const code = src(route);
@@ -287,6 +275,18 @@ test.describe("api route guardrails", () => {
     expect(code.includes("getRouteTimeoutMs(")).toBeTruthy();
     expect(code.includes("withRouteTimeout(")).toBeTruthy();
     expect(code.includes("isRouteTimeoutError(")).toBeTruthy();
+  });
+
+  test("stray debug and test-only routes remain removed", () => {
+    const removedRoutes = [
+      "src/app/api/debug/alias/[alias]/route.ts",
+      "src/app/api/admin/debug/telemetry/route.ts",
+      "src/app/api/v1/webhooks/test/route.ts",
+    ];
+    const files = routeFiles();
+    for (const route of removedRoutes) {
+      expect(files).not.toContain(route);
+    }
   });
 
   test(".env.example includes timeout env keys used by route guards", () => {
