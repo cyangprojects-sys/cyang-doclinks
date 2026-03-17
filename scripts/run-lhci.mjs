@@ -9,6 +9,7 @@ const ROOT = resolve(".");
 const LHCI_CONFIG_PATH = resolve(".lighthouserc.json");
 const LIGHTHOUSE_CLI_PATH = resolve("node_modules", "lighthouse", "cli", "index.js");
 const LIGHTHOUSE_PORT = Number(process.env.LIGHTHOUSE_PORT || 3300);
+const POSIX_SHELL = "/bin/sh";
 const SAFE_CHROME_FLAGS = [
   "--headless=new",
   "--disable-gpu",
@@ -264,7 +265,7 @@ async function runDirectLighthouse(config) {
           env: serverEnv,
           stdio: "inherit",
         })
-      : spawn(process.env.SHELL || "/bin/sh", ["-lc", config.startServerCommand], {
+      : spawn(POSIX_SHELL, ["-lc", config.startServerCommand], {
           cwd: ROOT,
           env: serverEnv,
           stdio: "inherit",
