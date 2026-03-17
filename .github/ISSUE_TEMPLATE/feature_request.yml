@@ -1,9 +1,13 @@
 name: Feature request
-description: Suggest a product or repo improvement
+description: Suggest a product or repo improvement for maintainer review
 title: "[Feature]: "
 labels:
   - enhancement
 body:
+  - type: markdown
+    attributes:
+      value: |
+        Feature requests are welcome. Public pull requests for new product code are not accepted unless Cyang.io has authorized the work in writing.
   - type: textarea
     id: problem
     attributes:

@@ -1,87 +1,40 @@
-# Contributing to cyang-doclinks
+# Repository Participation Policy
 
-Thanks for taking an interest in DocLinks.
+This repository is published under the existing Cyang.io Proprietary License in [LICENSE](LICENSE).
 
-This repository is maintained as a security-first product codebase. We welcome thoughtful contributions, but we care more about correctness, trust posture, and operational discipline than raw change volume.
+That license does not grant public permission to use, copy, modify, distribute, host, deploy, reverse engineer, or create derivative works without prior written authorization from Cyang.io.
 
-## Before You Open a PR
+## What Is Welcome
 
-Please make sure your change is:
-- grounded in the current product direction
-- compatible with the security-first serving model
-- small enough to review safely
-- validated locally before submission
+The public repo is still a valid place to:
+- report reproducible bugs in the public codebase
+- suggest product or documentation improvements
+- disclose security issues privately through the channels in [SECURITY.md](SECURITY.md)
+- ask product or operational questions through the paths in [SUPPORT.md](SUPPORT.md)
 
-If you are proposing a significant product or architectural change, open an issue first so the direction is clear before implementation work begins.
+## Code Contributions
 
-## Local Setup
+Unsolicited code contributions are not accepted through public pull requests.
 
-Pinned runtime:
-- Node.js `24.13.0`
-- npm `11.6.2`
+If Cyang.io explicitly invites or authorizes a code contribution in writing, the work must:
+- stay within the approved scope
+- preserve the repository's security-first posture
+- pass the repo's validation checks
+- be submitted under terms approved by Cyang.io
 
-Install and run:
+If you are seeking a commercial, integration, licensing, or contribution arrangement, contact:
+- legal@cyang.io
 
-```bash
-npm ci
-npm run dev
-```
+## Security Reports
 
-## Expected Validation
+Do not open public issues or pull requests for vulnerabilities, exploit paths, or sensitive security findings.
 
-Run the relevant checks for your change. For most PRs, that means:
+Use the private disclosure path in [SECURITY.md](SECURITY.md).
 
-```bash
-npm run lint
-npx tsc --noEmit -p tsconfig.json
-npm test
-npm run build
-npm run production-readiness
-```
+## Product Direction and Support
 
-If your change touches trust surfaces, delivery controls, auth, or route behavior, do not skip validation.
+For feature ideas, bug reports, or support requests, use the GitHub issue forms when appropriate or the contact paths in [SUPPORT.md](SUPPORT.md).
 
-## Contribution Guidelines
+## License Reminder
 
-### Security first
-
-Do not weaken:
-- authentication or authorization
-- document access controls
-- share / alias / ticket enforcement
-- malware, moderation, or quarantine behavior
-- auditability or security logging
-- rate limiting and abuse protection
-
-### Keep changes production-ready
-
-Please avoid:
-- speculative abstractions
-- dead code or unused endpoints
-- noisy debug surfaces
-- fake demo behavior or placeholder claims
-- broad rewrites without strong justification
-
-### Public-facing docs matter
-
-README, trust docs, issue templates, and support surfaces are part of the product experience. Keep them clear, accurate, and customer-friendly.
-
-## Pull Request Notes
-
-Helpful PRs usually include:
-- the problem being solved
-- the risk or trust impact
-- validation performed
-- any env or operational changes
-
-Use the pull request template in this repo when opening a PR.
-
-## Security Issues
-
-Please do not open public GitHub issues for vulnerabilities or exploit paths.
-
-Use the private disclosure path in [SECURITY.md](SECURITY.md) instead.
-
-## License
-
-By contributing, you agree that your contribution is submitted under the repository's existing license terms.
+This file does not change or expand the permissions granted by the repository license.

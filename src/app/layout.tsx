@@ -1,30 +1,6 @@
 // app/layout.tsx
 import type { Metadata } from "next";
-import { Manrope, JetBrains_Mono, Cormorant_Garamond } from "next/font/google";
 import "./globals.css";
-
-const geistSans = Manrope({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-  weight: ["500", "600", "700"],
-  display: "swap",
-});
-
-const geistMono = JetBrains_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-  weight: ["500"],
-  preload: false,
-  display: "swap",
-});
-
-const editorial = Cormorant_Garamond({
-  variable: "--font-editorial",
-  subsets: ["latin"],
-  weight: ["600", "700"],
-  preload: false,
-  display: "swap",
-});
 
 export const metadata: Metadata = {
   title: {
@@ -57,7 +33,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={`${geistSans.variable} ${geistMono.variable} ${editorial.variable} antialiased`}>
+      <body className="antialiased">
         {children}
       </body>
     </html>

@@ -6,6 +6,9 @@ contact_links:
   - name: Product support
     url: https://www.cyang.io/contact
     about: Get product or account help from the cyang.io team.
+  - name: Licensing and commercial use
+    url: mailto:legal@cyang.io
+    about: Ask about commercial licensing, integration approvals, or authorized contribution arrangements.
   - name: Abuse report
     url: https://www.cyang.io/report
     about: Report malware, phishing, illegal content, or suspicious sharing behavior.

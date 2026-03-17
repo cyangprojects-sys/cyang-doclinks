@@ -21,7 +21,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 24.13.0
+          node-version: 22.16.0
           cache: npm
 
       - name: Install
@@ -55,7 +55,7 @@ jobs:
         run: npm run audit:bundle-budgets
 
       - name: Typecheck
-        run: npx tsc --noEmit -p tsconfig.json
+        run: npm run typecheck
 
       - name: Audit (prod deps)
         run: npm audit --omit=dev --audit-level=high
@@ -83,7 +83,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 24.13.0
+          node-version: 22.16.0
           cache: npm
 
       - name: Install
@@ -117,7 +117,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 24.13.0
+          node-version: 22.16.0
           cache: npm
 
       - name: Install
@@ -153,7 +153,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 24.13.0
+          node-version: 22.16.0
           cache: npm
 
       - name: Install
@@ -189,7 +189,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 24.13.0
+          node-version: 22.16.0
           cache: npm
 
       - name: Install
@@ -228,7 +228,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 24.13.0
+          node-version: 22.16.0
           cache: npm
 
       - name: Install
@@ -262,7 +262,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 24.13.0
+          node-version: 22.16.0
           cache: npm
 
       - name: Install

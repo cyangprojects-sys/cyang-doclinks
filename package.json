@@ -2,10 +2,10 @@
   "name": "cyang-doclinks",
   "version": "0.1.0",
   "private": true,
-  "packageManager": "npm@11.6.2",
+  "packageManager": "npm@10.9.2",
   "engines": {
-    "node": ">=24.13.0 <25",
-    "npm": ">=11.6.2 <12"
+    "node": ">=22.16.0 <25",
+    "npm": ">=10.9.2 <12"
   },
   "scripts": {
     "dev": "next dev",
@@ -14,6 +14,7 @@
     "test:playwright": "playwright test",
     "test": "start-server-and-test \"npm run dev\" http://127.0.0.1:3000 \"npm run test:playwright\"",
     "lint": "eslint",
+    "typecheck": "node scripts/typecheck.mjs",
     "db:migrate": "node scripts/migrate.mjs",
     "db:migrations:verify": "node scripts/migrate.mjs verify",
     "audit:admin-routes": "node scripts/audit-admin-route-guards.mjs",

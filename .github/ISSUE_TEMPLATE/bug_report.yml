@@ -9,6 +9,7 @@ body:
       value: |
         Thanks for reporting this. Please do not use this form for vulnerabilities or security-sensitive findings.
         Use the security disclosure path linked in the issue template chooser instead.
+        This repository is under a proprietary license; please use this form for reporting issues, not for submitting code patches.
   - type: textarea
     id: summary
     attributes:

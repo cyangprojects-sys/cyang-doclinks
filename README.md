@@ -82,11 +82,12 @@ No screenshots are included here because this repo does not ship a maintained pu
 
 ### Prerequisites
 
-- Node.js `24.13.0`
-- npm `11.6.2`
+- Preferred baseline: Node.js `22.16.0`
+- Preferred baseline: npm `10.9.2`
+- Supported range: Node.js `>=22.16.0 <25`, npm `>=10.9.2 <12`
 - configured app environment variables
 
-Version pins are included in:
+Preferred local pins are included in:
 - `.nvmrc`
 - `.node-version`
 - `package.json` engines / packageManager
@@ -113,7 +114,7 @@ npm run release:gate
 
 ```bash
 npm run lint
-npx tsc --noEmit -p tsconfig.json
+npm run typecheck
 npm test
 npm run build
 npm run production-readiness
@@ -183,7 +184,7 @@ Current maturity:
 Additional public references:
 - [SECURITY.md](SECURITY.md)
 - [SUPPORT.md](SUPPORT.md)
-- [Contributing guide](CONTRIBUTING.md)
+- [Repository participation policy](CONTRIBUTING.md)
 - [Security Policy](docs/SECURITY_POLICY.md)
 - [Subprocessors](docs/SUBPROCESSORS.md)
 - [Production readiness](docs/production-readiness.md)
@@ -191,5 +192,7 @@ Additional public references:
 ## License
 
 Licensed under the existing Cyang.io Proprietary License in `LICENSE`.
+
+This public repository is source-available for evaluation, trust review, and issue reporting. Public code contributions are not accepted unless Cyang.io authorizes them in writing.
 
 The license file in this repository is intentionally left unchanged.

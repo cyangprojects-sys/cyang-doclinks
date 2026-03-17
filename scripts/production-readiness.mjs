@@ -20,7 +20,7 @@ const commands = [
   ["npm", ["run", "audit:route-rendering"]],
   ["npm", ["run", "audit:polling"]],
   ["npm", ["run", "lint"]],
-  ["npx", ["tsc", "--noEmit", "-p", "tsconfig.json"]],
+  ["npm", ["run", "typecheck"]],
   ["npm", ["run", "build"]],
   ["npm", ["run", "audit:bundle-budgets"]],
   ["npm", ["audit", "--omit=dev", "--audit-level=high"]],

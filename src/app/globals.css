@@ -13,6 +13,9 @@
   --accent-2: #4fd5cb;
   --premium: #e8c27a;
   --premium-2: #f3d7a1;
+  --font-geist-sans: "Avenir Next", "Segoe UI", "Helvetica Neue", Arial, ui-sans-serif, system-ui, sans-serif;
+  --font-geist-mono: "JetBrains Mono", "SFMono-Regular", Menlo, Consolas, ui-monospace, monospace;
+  --font-editorial: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, "Times New Roman", serif;
 }
 
 @theme inline {

@@ -2,9 +2,12 @@
 
 import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, statSync } from "node:fs";
+import { createRequire } from "node:module";
 import { resolve } from "node:path";
 
 const ROOT = process.cwd();
+const require = createRequire(import.meta.url);
+const NEXT_BIN = require.resolve("next/dist/bin/next");
 
 const BUDGETS = [
   { label: "home", manifest: ".next/server/app/page/react-loadable-manifest.json", maxBytes: 140 * 1024 },
@@ -20,16 +23,6 @@ function fmtKiB(bytes) {
   return `${(bytes / 1024).toFixed(1)} KiB`;
 }
 
-function resolveSpawn(command, args) {
-  if (process.platform === "win32" && (command === "npm" || command === "npx")) {
-    return {
-      command: "cmd.exe",
-      args: ["/d", "/s", "/c", command, ...args],
-    };
-  }
-  return { command, args };
-}
-
 function ensureBuildArtifacts() {
   const hasMissingManifest = BUDGETS.some((budget) => !existsSync(resolve(ROOT, budget.manifest)));
   if (!hasMissingManifest) return;
@@ -37,9 +30,8 @@ function ensureBuildArtifacts() {
     throw new Error("Missing build manifest(s) and auto-build disabled. Run npm run build first.");
   }
 
-  console.log("Build manifests missing. Running npm run build before bundle audit...");
-  const resolved = resolveSpawn("npm", ["run", "build"]);
-  const result = spawnSync(resolved.command, resolved.args, {
+  console.log("Build manifests missing. Running next build before bundle audit...");
+  const result = spawnSync(process.execPath, [NEXT_BIN, "build"], {
     stdio: "inherit",
     shell: false,
     env: process.env,
@@ -48,7 +40,7 @@ function ensureBuildArtifacts() {
     throw result.error;
   }
   if (result.status !== 0) {
-    throw new Error(`npm run build failed with exit code ${result.status || 1}.`);
+    throw new Error(`next build failed with exit code ${result.status || 1}.`);
   }
 }
 

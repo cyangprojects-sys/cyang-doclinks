@@ -170,7 +170,7 @@ async function checkMigrationStatus(env) {
     return;
   }
 
-  const sql = createMigrationClient(env);
+  const sql = await createMigrationClient(env);
   try {
     const status = await getMigrationStatus({ sql, env });
     if (status.drift.length) {

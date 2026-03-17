@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 
-FROM node:24.13.0-bookworm-slim AS base
+FROM node:22.16.0-bookworm-slim AS base
 ENV CI=1
 ENV NEXT_TELEMETRY_DISABLED=1
 WORKDIR /app

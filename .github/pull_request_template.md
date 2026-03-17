@@ -2,6 +2,8 @@
 
 Describe the change in plain language.
 
+Important: this repository is maintained under a proprietary license. Public code changes should only be opened if they were explicitly requested or authorized by Cyang.io.
+
 ## Why This Change
 
 Explain the problem, risk, or user need this PR addresses.
@@ -9,7 +11,7 @@ Explain the problem, risk, or user need this PR addresses.
 ## Validation
 
 - [ ] `npm run lint`
-- [ ] `npx tsc --noEmit -p tsconfig.json`
+- [ ] `npm run typecheck`
 - [ ] `npm test`
 - [ ] `npm run build`
 - [ ] `npm run production-readiness`

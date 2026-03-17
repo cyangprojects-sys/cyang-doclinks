@@ -11,7 +11,7 @@ test.describe("ci workflow guardrails", () => {
     expect(code.includes("npm run db:migrations:verify")).toBeTruthy();
     expect(code.includes("npm run release:gate -- --allow-missing-env")).toBeTruthy();
     expect(code.includes("npm run build")).toBeTruthy();
-    expect(code.includes("npx tsc --noEmit -p tsconfig.json")).toBeTruthy();
+    expect(code.includes("npm run typecheck")).toBeTruthy();
     expect(code.includes("npm run audit:admin-routes")).toBeTruthy();
     expect(code.includes("npm audit --omit=dev")).toBeTruthy();
     expect(code.includes("tests/client-ip-helpers.spec.ts")).toBeTruthy();
