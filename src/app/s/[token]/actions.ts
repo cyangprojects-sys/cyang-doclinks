@@ -6,7 +6,7 @@ import bcrypt from "bcryptjs";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { sql } from "@/lib/db";
-import { resolveShareMeta } from "@/lib/resolveDoc";
+import { resolveShareGateMeta } from "@/lib/shareGateMeta";
 import { rateLimit, stableHash } from "@/lib/rateLimit";
 
 const UNLOCK_HOURS = 8;
@@ -147,7 +147,7 @@ export async function verifySharePasswordCore(
 
     if (!token || !isShareToken(token)) return { ok: false, error: "not_found", message: "Missing token." };
 
-    const share = await resolveShareMeta(token);
+    const share = await resolveShareGateMeta(token);
     if (!share.ok) return { ok: false, error: "not_found", message: "Share not found." };
 
     // Recipient restriction (forward protection)

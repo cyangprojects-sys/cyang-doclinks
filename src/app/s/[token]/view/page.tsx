@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import SecurePdfCanvasViewer from "@/app/components/SecurePdfCanvasViewer";
-import { resolveShareMeta } from "@/lib/resolveDoc";
+import { resolveShareGateMeta } from "@/lib/shareGateMeta";
 import { detectFileFamily, fileFamilyLabel, isMicrosoftOfficeDocument } from "@/lib/fileFamily";
 import { ShareBadge, ShareShell } from "../ShareShell";
 import { sql } from "@/lib/db";
@@ -67,7 +67,7 @@ export default async function ShareTokenViewPage(props: {
   const t = (token || "").trim();
   if (!t) redirect("/");
 
-  const meta = await resolveShareMeta(t);
+  const meta = await resolveShareGateMeta(t);
   if (!meta.ok) return <FailState token={t} title="Not found" body="This share link does not exist." />;
   if (meta.revokedAt) return <FailState token={t} title="Link revoked" body="This share link has been revoked." />;
   if (isExpired(meta.expiresAt))

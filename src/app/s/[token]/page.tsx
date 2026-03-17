@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import PasswordGate from "./passwordGate";
 import { isShareUnlockedAction, verifySharePasswordAction } from "./actions";
-import { resolveShareMeta } from "@/lib/resolveDoc";
+import { resolveShareGateMeta } from "@/lib/shareGateMeta";
 import { ShareBadge, ShareShell } from "./ShareShell";
 import { getPackById } from "@/lib/packs";
 
@@ -67,7 +67,7 @@ export default async function ShareTokenPage(props: {
   const t = (token || "").trim();
   if (!t) redirect("/");
 
-  const meta = await resolveShareMeta(t);
+  const meta = await resolveShareGateMeta(t);
   if (!meta.ok) return <FailState token={t} title="Not found" body="This share link does not exist." />;
   if (meta.revokedAt) return <FailState token={t} title="Link revoked" body="This share link has been revoked." />;
   if (isExpired(meta.expiresAt))

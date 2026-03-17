@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { resolveShareMeta } from "@/lib/resolveDoc";
+import { resolveShareGateMeta } from "@/lib/shareGateMeta";
 import { sql } from "@/lib/db";
 import { isMicrosoftOfficeDocument } from "@/lib/fileFamily";
 import { enforceGlobalApiRateLimit } from "@/lib/securityTelemetry";
@@ -36,7 +36,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ token: stri
   const t = (token || "").trim();
   if (!t) return new NextResponse("Not found", { status: 404 });
 
-  const meta = await resolveShareMeta(t);
+  const meta = await resolveShareGateMeta(t);
   if (!meta.ok) return new NextResponse("Not found", { status: 404 });
   if (meta.revokedAt) return new NextResponse("Revoked", { status: 410 });
   if (isExpired(meta.expiresAt)) return new NextResponse("Link expired", { status: 410 });
