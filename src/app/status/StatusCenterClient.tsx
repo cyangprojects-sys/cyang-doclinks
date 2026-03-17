@@ -47,6 +47,16 @@ export type StatusPreview =
   | "maintenance"
   | "loading";
 
+const PREVIEW_VALUES = new Set<StatusPreview>([
+  "live",
+  "operational",
+  "degraded",
+  "partial_outage",
+  "major_outage",
+  "maintenance",
+  "loading",
+]);
+
 const AUTO_REFRESH_MS = 120_000;
 const STATUS_SUBSCRIBE_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const STATUS_SUBSCRIBE_STORAGE_KEY = "cyang_status_subscription_email";
@@ -405,8 +415,17 @@ function LoadingSkeleton() {
   );
 }
 
-export default function StatusCenterClient({ preview }: { preview: StatusPreview }) {
-  const [loading, setLoading] = useState(preview === "loading");
+function readPreviewFromLocation(): StatusPreview {
+  if (typeof window === "undefined") return "live";
+  const preview = String(new URLSearchParams(window.location.search).get("preview") || "")
+    .trim()
+    .toLowerCase() as StatusPreview;
+  return PREVIEW_VALUES.has(preview) ? preview : "live";
+}
+
+export default function StatusCenterClient({ preview }: { preview?: StatusPreview }) {
+  const [previewMode, setPreviewMode] = useState<StatusPreview>(preview ?? "live");
+  const [loading, setLoading] = useState((preview ?? "live") === "loading");
   const [refreshing, setRefreshing] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [snapshot, setSnapshot] = useState<StatusSnapshot | null>(null);
@@ -415,8 +434,14 @@ export default function StatusCenterClient({ preview }: { preview: StatusPreview
   const [subscriptionBusy, setSubscriptionBusy] = useState(false);
   const [subscriptionFeedback, setSubscriptionFeedback] = useState<{ tone: "success" | "error"; message: string } | null>(null);
 
+  useEffect(() => {
+    const nextPreview = preview ?? readPreviewFromLocation();
+    setPreviewMode(nextPreview);
+    setLoading(nextPreview === "loading");
+  }, [preview]);
+
   const refreshSnapshot = useCallback(async (silent = false) => {
-    if (preview === "loading") return;
+    if (previewMode === "loading") return;
     if (!silent) setLoading(true);
     setRefreshing(silent);
     try {
@@ -443,15 +468,15 @@ export default function StatusCenterClient({ preview }: { preview: StatusPreview
       setRefreshing(false);
       setLastRefreshAt(Date.now());
     }
-  }, [preview]);
+  }, [previewMode]);
 
   useEffect(() => {
-    if (preview === "loading") return;
+    if (previewMode === "loading") return;
     void refreshSnapshot(false);
-  }, [preview, refreshSnapshot]);
+  }, [previewMode, refreshSnapshot]);
 
   useEffect(() => {
-    if (preview === "loading") return;
+    if (previewMode === "loading") return;
     const id = window.setInterval(() => {
       if (document.visibilityState !== "visible") return;
       void refreshSnapshot(true);
@@ -466,7 +491,7 @@ export default function StatusCenterClient({ preview }: { preview: StatusPreview
       window.clearInterval(id);
       document.removeEventListener("visibilitychange", onVisibilityChange);
     };
-  }, [preview, refreshSnapshot]);
+  }, [previewMode, refreshSnapshot]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -519,8 +544,8 @@ export default function StatusCenterClient({ preview }: { preview: StatusPreview
   }, [subscriptionEmail]);
 
   const scenario = useMemo<PlatformState>(() => {
-    return deriveStatusPageScenario(snapshot, preview);
-  }, [preview, snapshot]);
+    return deriveStatusPageScenario(snapshot, previewMode);
+  }, [previewMode, snapshot]);
 
   const services = useMemo(() => buildServices(scenario), [scenario]);
   const incidents = useMemo(() => buildIncidents(scenario), [scenario]);

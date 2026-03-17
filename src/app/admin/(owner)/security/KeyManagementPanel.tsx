@@ -39,8 +39,8 @@ type KeysOk = {
 };
 type KeysErr = { ok: false; error: string; message?: string };
 type KeysResponse = KeysOk | KeysErr;
-const KEY_PANEL_ACTIVE_POLL_MS = 15_000;
-const KEY_PANEL_IDLE_POLL_MS = 60_000;
+const KEY_PANEL_ACTIVE_POLL_MS = 30_000;
+const KEY_PANEL_IDLE_POLL_MS = 120_000;
 
 function keysSignature(payload: KeysResponse | null): string {
   if (!payload || !payload.ok) return "";

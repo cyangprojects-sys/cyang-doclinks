@@ -42,6 +42,7 @@ export default async function ViewerLayout({
     orgId,
     orgSlug,
     isOwner: false,
+    requestedBadges: ["documents", "links"],
   });
   const viewerNavItems: AdminNavItem[] = ADMIN_NAV_ITEMS.filter((item) =>
     item.key === "overview" ||

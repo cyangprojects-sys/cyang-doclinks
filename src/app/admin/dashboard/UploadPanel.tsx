@@ -127,7 +127,8 @@ const EXECUTABLE_EXTS = new Set([
 
 const ACCEPT_ATTR =
   ".pdf,.doc,.docx,.txt,.rtf,.odt,.xls,.xlsx,.csv,.ppt,.pptx,.jpg,.jpeg,.png,.gif,.bmp,.heic,.zip,.rar,.mp3,.wav,.mp4,.mov,.avi";
-const PENDING_UPLOAD_STATUS_POLL_MS = 10_000;
+// Keep active upload status fresh without turning a hidden tab into a steady DB heartbeat.
+const PENDING_UPLOAD_STATUS_POLL_MS = 20_000;
 
 function extOf(name: string): string {
   const n = String(name || "").trim().toLowerCase();

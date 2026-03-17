@@ -3,11 +3,13 @@ export interface Env {
   TARGET_NIGHTLY_URL: string;
   TARGET_KEY_ROTATION_URL: string;
   TARGET_WEBHOOKS_URL: string;
-  TARGET_AGGREGATE_URL: string;
   TARGET_RETENTION_URL: string;
-  TARGET_BILLING_SYNC_URL: string;
   CRON_SECRET: string; // stored as a Cloudflare secret
 }
+
+const TEN_MINUTE_SCHEDULE = "*/10 * * * *";
+const NIGHTLY_SCHEDULE = "5 6 * * *";
+const RETENTION_SCHEDULE = "17 2 * * *";
 
 const worker = {
   async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
@@ -20,23 +22,19 @@ export default worker;
 async function runScheduled(event: ScheduledEvent, env: Env) {
   const cron = String(event.cron || "").trim();
   const now = new Date(event.scheduledTime);
-  const hour = now.getUTCHours();
   const minute = now.getUTCMinutes();
   const jobs: Array<{ name: string; url: string; method: "GET" | "POST" }> = [];
 
-  // Single trigger strategy: route all schedules from one every-minute cron.
-  if (cron === "* * * * *") {
+  // Keep Cloudflare invocations sparse enough that Neon can autosuspend between
+  // idle periods. The 10-minute trigger fans out only the jobs that need it.
+  if (cron === TEN_MINUTE_SCHEDULE) {
     jobs.push({ name: "scan", url: env.TARGET_SCAN_URL, method: "GET" });
-    if (minute % 5 === 0) jobs.push({ name: "webhooks", url: env.TARGET_WEBHOOKS_URL, method: "GET" });
-    if (minute % 15 === 0) jobs.push({ name: "key-rotation", url: env.TARGET_KEY_ROTATION_URL, method: "GET" });
-    if (minute % 30 === 0) jobs.push({ name: "aggregate", url: env.TARGET_AGGREGATE_URL, method: "GET" });
-    if (minute === 5) {
-      jobs.push({ name: "nightly", url: env.TARGET_NIGHTLY_URL, method: "GET" });
-      jobs.push({ name: "billing-sync", url: env.TARGET_BILLING_SYNC_URL, method: "GET" });
-    }
-    if (hour === 2 && minute === 17) {
-      jobs.push({ name: "retention", url: env.TARGET_RETENTION_URL, method: "GET" });
-    }
+    jobs.push({ name: "webhooks", url: env.TARGET_WEBHOOKS_URL, method: "GET" });
+    if (minute % 30 === 0) jobs.push({ name: "key-rotation", url: env.TARGET_KEY_ROTATION_URL, method: "GET" });
+  } else if (cron === NIGHTLY_SCHEDULE) {
+    jobs.push({ name: "nightly", url: env.TARGET_NIGHTLY_URL, method: "GET" });
+  } else if (cron === RETENTION_SCHEDULE) {
+    jobs.push({ name: "retention", url: env.TARGET_RETENTION_URL, method: "GET" });
   }
 
   const failures: Array<{ name: string; status: number; body: string }> = [];

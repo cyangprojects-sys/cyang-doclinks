@@ -34,7 +34,8 @@ export type UnifiedDocRow = {
 type SortKey = "created_at" | "doc_title" | "total_views" | "last_view" | "active_shares" | "status";
 type SortDir = "asc" | "desc";
 type FilterKey = "all" | "ready" | "shared" | "awaiting_scan" | "attention" | "not_shared";
-const PENDING_SCAN_REFRESH_MS = 30_000;
+// Pending scans still refresh automatically, but on a slower cadence so idle tabs do less work.
+const PENDING_SCAN_REFRESH_MS = 60_000;
 
 function formatDateTime(value: string | null) {
   if (!value) return "No activity yet";

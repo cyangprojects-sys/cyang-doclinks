@@ -3,14 +3,18 @@
 This Worker runs on Cloudflare Cron Triggers and calls your Next.js cron endpoints on `cyang.io`.
 
 Current schedules:
-- Single Cloudflare trigger: `* * * * *`
-- Routed in-worker:
-  - every minute -> `/api/cron/scan`
-  - every 5 minutes -> `/api/cron/webhooks`
-  - every 15 minutes -> `/api/cron/key-rotation`
-  - every 30 minutes -> `/api/cron/aggregate`
-  - hourly at minute 5 -> `/api/cron/nightly` and `/api/cron/billing-sync`
+- `*/10 * * * *`
+  - every 10 minutes -> `/api/cron/scan`
+  - every 10 minutes -> `/api/cron/webhooks`
+  - every 30 minutes -> `/api/cron/key-rotation`
+- `5 6 * * *`
+  - daily at 06:05 UTC -> `/api/cron/nightly`
+- `17 2 * * *`
   - daily at 02:17 UTC -> `/api/cron/retention`
+
+Notes:
+- `/api/cron/nightly` already runs the aggregate and billing-maintenance work, so those jobs are no longer scheduled separately from Cloudflare.
+- The 10-minute trigger is intentional so Neon can autosuspend between idle periods instead of being poked every minute.
 
 ## What you need to do in the app (cyang-doclinks)
 
@@ -40,7 +44,7 @@ npx wrangler deploy
 ```
 
 ### Optional settings
-- Update `TARGET_WEBHOOKS_URL`, `TARGET_SCAN_URL`, `TARGET_KEY_ROTATION_URL`, `TARGET_AGGREGATE_URL`, `TARGET_NIGHTLY_URL`, `TARGET_BILLING_SYNC_URL`, and `TARGET_RETENTION_URL` in `wrangler.toml` if route paths differ.
+- Update `TARGET_WEBHOOKS_URL`, `TARGET_SCAN_URL`, `TARGET_KEY_ROTATION_URL`, `TARGET_NIGHTLY_URL`, and `TARGET_RETENTION_URL` in `wrangler.toml` if route paths differ.
 
 ## Logs
 View logs in Cloudflare dashboard, or run:
