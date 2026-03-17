@@ -1,0 +1,30 @@
+name: Feature request
+description: Suggest a product or repo improvement
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem are you trying to solve?
+      placeholder: Describe the user or operator problem clearly.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed improvement
+      placeholder: Describe the change you would like to see.
+    validations:
+      required: true
+  - type: textarea
+    id: value
+    attributes:
+      label: Why this matters
+      description: Explain the customer, trust, developer, or operational value.
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Links, examples, screenshots, or related issues if helpful.

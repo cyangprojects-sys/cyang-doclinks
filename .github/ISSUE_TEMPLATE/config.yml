@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security disclosure
+    url: https://www.cyang.io/security-disclosure
+    about: Report vulnerabilities or security-sensitive findings privately.
+  - name: Product support
+    url: https://www.cyang.io/contact
+    about: Get product or account help from the cyang.io team.
+  - name: Abuse report
+    url: https://www.cyang.io/report
+    about: Report malware, phishing, illegal content, or suspicious sharing behavior.

@@ -1,97 +1,98 @@
-# cyang-doclinks
+# cyang DocLinks
 
-Secure document delivery with server-enforced magic links.
+Secure document sharing for teams that need more than a public file link.
 
-This project is not "public file hosting with pretty URLs". It is a policy-enforced link system where every view request is resolved, authorized, metered, and audited before content is served.
+[Live product](https://www.cyang.io) · [Trust Center](https://www.cyang.io/trust) · [Status](https://www.cyang.io/status) · [Security disclosure](https://www.cyang.io/security-disclosure) · [Contact](https://www.cyang.io/contact)
 
-## What This Project Is For
+## What It Is
 
-`cyang-doclinks` is designed for teams that need to share documents quickly without giving up control after the link is sent.
+DocLinks is cyang.io's controlled document delivery product. It lets teams share documents through short links, while keeping access policy, serving behavior, and auditability enforced on every request.
 
-Core goals:
-- Make sharing easy for legitimate users (short links, minimal friction).
-- Enforce access policy on every request (not just at share creation time).
-- Keep operator visibility high (audit logs, admin actions, abuse controls).
-- Preserve recoverability and operational discipline (cron jobs, retention flows, security guardrails).
+This repo is the public codebase behind that product direction. It reflects a security-first sharing system, not a generic file-hosting demo.
 
-## Magic Link Model (Deep Dive)
+## Why It Exists
 
-### 1. Upload and registration
-A user uploads a PDF through the admin upload flow. The system:
-- Validates upload constraints.
-- Encrypts data by default.
-- Stores document metadata and pointer information.
-- Records immutable audit events.
+Most document sharing tools make distribution easy, then give you very little control once the link leaves your hands.
 
-### 2. Share token creation
-A share action mints a token (magic link) with optional controls such as:
-- expiration timestamp
-- max views
-- password and/or recipient email checks
-- geo/policy restrictions
-- watermark behavior
+DocLinks exists for teams that need to:
+- share sensitive documents without turning them into public files
+- revoke or expire access after a link is sent
+- apply view limits, password gates, and download controls
+- keep an operational trail of what happened and when
+- run a product that feels professional to the recipient and disciplined to the operator
 
-The output is a user-facing link under `/s/[token]`.
+## Key Capabilities
 
-### 3. Resolve + gate on each access
-When a viewer opens a magic link, the app does not trust the URL alone. It resolves token state and enforces gates in real time:
-- revoked? deny
-- expired? deny
-- maxed out? deny
-- password/email requirements unmet? deny
-- moderation/quarantine/scan state blocked? deny
-- plan quota exceeded? deny or degrade based on policy
+What is implemented in this repo today:
+- Server-enforced share links under `/s/[token]`, not trust-the-URL delivery
+- Document access gates for expiration, max views, password protection, recipient checks, and policy state
+- Ticketed document serving paths for tighter delivery control
+- Encrypted document handling and private object storage flows
+- Malware, moderation, quarantine, and risky-state blocking before public delivery
+- Admin and owner workflows for uploads, revocation, audit review, abuse handling, and security controls
+- Viewer-specific dashboard and document experience with reduced scope
+- Stripe-backed billing and plan-enforcement hooks
+- Health, status, backup, retention, and release-readiness validation paths
 
-Only after passing gates is a short-lived ticket minted for actual content serving.
+## Security and Trust
 
-### 4. Ticketed content serving
-The document stream path uses short-lived tickets and hardened headers. This reduces direct object exposure and helps avoid long-lived capability leaks.
+DocLinks is designed around server-side enforcement, not “best effort” client behavior.
 
-### 5. Audit and analytics trail
-High-value actions append to immutable logs (uploads, views, shares, security/admin actions). This supports forensic review and operational reporting.
+The repo currently shows a real production-minded posture:
+- authenticated admin and owner surfaces
+- role and permission boundaries
+- private object storage by default
+- request-time share and alias policy enforcement
+- abuse throttling and rate limiting on sensitive routes
+- immutable audit logging and structured security telemetry
+- malware and moderation-aware delivery decisions
+- release-gate, migration, backup, and production-readiness checks
 
-## Security and Trust Boundaries
+Important: this repo does not claim compliance programs or certifications that are not documented here. The trust posture is grounded in the actual code and operational docs in this repository.
 
-The system follows a layered model:
-- Identity/role checks for admin and owner surfaces.
-- Token- and alias-based policy checks at serving boundaries.
-- Object storage is private by default.
-- Files failing moderation/scan/quarantine policy are blocked from serving.
-- Rate limiting and abuse telemetry protect sensitive endpoints.
+## Who It Is For
 
-Important principle: possession of a URL is not sufficient authority.
+DocLinks is a fit for teams that share documents where control matters after send:
+- startups and SaaS teams sharing customer-facing documents
+- operations and finance teams distributing sensitive PDFs
+- legal, procurement, and vendor-review workflows
+- security-conscious product teams that need revocation, auditability, and delivery controls
 
-## Admin and Operator Workflows
+## Product Experience
 
-Owner/admin surfaces include tools for:
-- upload and document lifecycle management
-- share/token revocation and policy updates
-- audit log inspection/export
-- abuse and moderation actions
-- security key and rotation operations
-- plan limit overrides and operational controls
+The public product experience in this repo is built around:
+- clean, short share links
+- guarded document delivery instead of open blob URLs
+- trust surfaces such as status, legal, procurement, and security disclosure pages
+- separate operator and viewer experiences rather than a single overloaded admin UI
 
-Viewer-facing users get reduced dashboard scope and least-privilege actions.
+No screenshots are included here because this repo does not ship a maintained public asset set for README visuals today. It is better to omit them than fake them.
 
-## Architecture (Practical)
+## Live Links
 
-- Framework: Next.js App Router (server routes + server actions)
-- Data: Postgres (Neon in deployed environments)
-- Object storage: Cloudflare R2
-- Scheduled operations: Cloudflare cron workers + app cron routes
-- Monitoring hooks: structured security/operational telemetry
+- Product: https://www.cyang.io
+- Trust Center: https://www.cyang.io/trust
+- Procurement / Trust Package: https://www.cyang.io/trust/procurement
+- Status: https://www.cyang.io/status
+- Security Disclosure: https://www.cyang.io/security-disclosure
+- Abuse Reporting: https://www.cyang.io/report
+- Contact: https://www.cyang.io/contact
 
-Detailed architecture reference:
-- `ARCHITECTURE.md` (trust boundaries, enforcement order, encryption/retention lifecycle, tenant isolation)
-
-## Local Development
+## Developer Quick Start
 
 ### Prerequisites
-- Node.js 20+
-- npm
-- A configured database and required app secrets/env vars
 
-### Run
+- Node.js `24.13.0`
+- npm `11.6.2`
+- configured app environment variables
+
+Version pins are included in:
+- `.nvmrc`
+- `.node-version`
+- `package.json` engines / packageManager
+
+### Local development
+
 ```bash
 npm ci
 npm run dev
@@ -99,139 +100,96 @@ npm run dev
 
 Open `http://localhost:3000`.
 
-### Build check (recommended before push)
+### Environment setup
+
+Use `.env.example` as the starting point for local configuration. The repo includes env and release validation so missing or unsafe settings are caught early:
+
 ```bash
-npm run build
+npm run audit:env-example
+npm run release:gate
 ```
 
-### Pinned runtime
-This repo is pinned to:
-- Node.js `24.13.0`
-- npm `11.6.2`
+### Core commands
 
-Version manager hints:
-- [`.nvmrc`](/c:/Users/tsaab/Projects/cyang-doclinks/.nvmrc)
-- [`.node-version`](/c:/Users/tsaab/Projects/cyang-doclinks/.node-version)
+```bash
+npm run lint
+npx tsc --noEmit -p tsconfig.json
+npm test
+npm run build
+npm run production-readiness
+```
 
-We do not commit `node_modules` or `.next`. Reproducibility comes from the lockfile, pinned runtime metadata, and the Docker paths below.
+## Quality and Operations
 
-## Containerized Build and Test
+This repo includes production-minded validation and operational checks, including:
+- lint and typecheck
+- Playwright coverage for security, attack-simulation, accessibility, and guardrail behavior
+- ordered migration manifest verification
+- release-gate config validation
+- bundle-budget audit
+- backup / restore verification support
+- staging fire-drill scripts
 
-If you want the full dependency/build path to run consistently on a clean machine, use Docker instead of checking in installed artifacts.
+Useful commands:
 
-### Build a production image
+```bash
+npm run production-readiness
+npm run release:gate
+npm run db:migrations:verify
+npm run fire-drill:staging
+```
+
+## Reproducible Build and Test Paths
+
+This repo does not commit `node_modules` or `.next`. Reproducibility comes from the lockfile, pinned runtime metadata, CI validation, and the container paths below.
+
+### Production image
+
 ```bash
 docker build -t cyang-doclinks-app .
 docker run --rm -p 3000:3000 --env-file .env.local cyang-doclinks-app
 ```
 
-### Build a test image
-This image installs project dependencies plus Playwright Chromium so `npm test` can run inside the container:
+### Test image
+
 ```bash
 docker build -f Dockerfile.test -t cyang-doclinks-test .
 docker run --rm --env-file .env.local cyang-doclinks-test
 ```
 
 Convenience scripts:
+
 ```bash
 npm run docker:build
 npm run docker:test:image
 ```
 
-### Production readiness validation
-```bash
-npm run production-readiness
-```
-
-### Release gate with real deploy env
-```bash
-npm run release:gate
-```
-
-### Ordered database migrations
-```bash
-npm run db:migrations:verify
-npm run db:migrate -- status
-npm run db:migrate -- apply
-```
-
-### Staging fire drill
-```bash
-npm run fire-drill:staging
-```
-
-## Browser Accessibility and Quality Audits
-
-### Axe (Playwright)
-Runs WCAG-focused checks on rendered pages:
-```bash
-npm run test:a11y:ci
-```
-
-### Attack simulation (Playwright)
-Runs negative-path security checks (capability abuse, direct-route access, brute-force style probing):
-```bash
-npm run test:attack:ci
-```
-
-### Local browser audit
-Runs axe checks locally:
-```bash
-npm run audit:browser
-```
-
-### Lighthouse (optional local, standard in CI)
-```bash
-npm run audit:lighthouse
-```
-
-## API and Route Surface
-
-Representative areas:
-- Admin APIs under `/api/admin/*`
-- Public share flow under `/s/[token]`, `/s/[token]/view`, `/s/[token]/raw`
-- Ticketed content serving under `/t/[ticketId]`
-- Alias/document flows under `/d/[alias]`
-
 ## Project Status
 
-This repo is actively hardened for secure beta operation:
-- encryption-by-default posture
-- stronger serve-path controls
-- immutable audit logging
-- monetization/usage enforcement hooks
-- org membership/invite foundation
-- cloud cron-backed maintenance operations
+This is an actively hardened public repo for a serious secure-sharing product, not a one-page prototype.
 
-Recent shipped updates (March 2026):
-- Alias lifecycle management UI: create, rename, expire, and disable alias controls.
-- Stripe enforcement hardening: webhook signature validation, dedupe/idempotency tracking, out-of-order protection, and admin billing debug visibility.
-- Abuse operations expansion: blocked IP rollups, active blocked IP viewer, and block-hit telemetry.
-- Retention/integrity hardening: weekly orphan sweep route, safer orphan-deletion defaults, and serve-path missing-object checks.
-- Legal center rollout: `/legal` section with Terms, Privacy, AUP, DMCA, DPA, SLA, Security Policy, and Subprocessors sourced from repo docs.
-- Production-readiness hardening: ordered DB migrations with a ledger, release-gate validation, live/ready/dependency health endpoints, and scripted backup/restore fire drills.
+Current maturity:
+- security-focused beta / production-hardening stage
+- strong route, serve-path, and trust-surface discipline
+- operational tooling for migrations, release gates, retention, backups, and incident response
+- continued polish on UX, trust presentation, and operator workflows
 
-## Stripe Billing
+## Support and Disclosure
 
-Owner billing controls now include Stripe Checkout + Customer Portal flows, with signed webhook ingestion and idempotent event processing.
+- Product/support questions: [support@cyang.io](mailto:support@cyang.io)
+- Security disclosures: [security@cyang.io](mailto:security@cyang.io)
+- Privacy and legal questions: [privacy@cyang.io](mailto:privacy@cyang.io), [legal@cyang.io](mailto:legal@cyang.io)
 
-See:
-- `scripts/sql/stripe_billing.sql`
-- `scripts/sql/stripe_event_log.sql`
-- `docs/stripe-billing-runbook.md`
-- `docs/next-steps-rollout.md`
-- `docs/database-migrations.md`
-- `docs/production-readiness.md`
-
-## Incident Response
-
-Operational incident handling now has a dedicated runbook for severity levels, kill-switches, tenant/share freeze flows, and emergency revoke testing.
-
-See:
-- `docs/incident-response-runbook.md`
-- `docs/backup-recovery-runbook.md`
+Additional public references:
+- [SECURITY.md](SECURITY.md)
+- [SUPPORT.md](SUPPORT.md)
+- [Contributing guide](CONTRIBUTING.md)
+- [Security Policy](docs/SECURITY_POLICY.md)
+- [Subprocessors](docs/SUBPROCESSORS.md)
+- [Production readiness](docs/production-readiness.md)
 
 ## License
 
-Licensed under the Cyang.io Proprietary License.
-See `LICENSE`.
+Licensed under the existing Cyang.io Proprietary License in `LICENSE`.
+
+The license file in this repository is intentionally left unchanged.
