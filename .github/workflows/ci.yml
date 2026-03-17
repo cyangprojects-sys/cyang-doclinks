@@ -39,17 +39,33 @@ jobs:
       - name: Admin Route Guard Audit
         run: npm run audit:admin-routes
 
+      - name: Public Render Audit
+        run: npm run audit:public-rendering
+
+      - name: Polling Discipline Audit
+        run: npm run audit:polling
+
       - name: Release Gate (Repo)
         run: npm run release:gate -- --allow-missing-env
 
       - name: Build
         run: npm run build
 
+      - name: Bundle Budget Audit
+        run: npm run audit:bundle-budgets
+
       - name: Typecheck
         run: npx tsc --noEmit -p tsconfig.json
 
       - name: Audit (prod deps)
         run: npm audit --omit=dev --audit-level=high
+
+      - name: Upload Next Build
+        uses: actions/upload-artifact@v4
+        with:
+          name: next-build
+          path: .next
+          if-no-files-found: error
 
   security-unit:
     if: github.event_name == 'push' || github.event_name == 'pull_request'
@@ -82,6 +98,10 @@ jobs:
           tests/key-rotation-config.spec.ts
           tests/billing-subscription-helpers.spec.ts
           tests/security-policy.spec.ts
+          tests/public-runtime-config.spec.ts
+          tests/viewer-shell-separation.spec.ts
+          tests/office-preview-source.spec.ts
+          tests/viewer-office-route-guardrails.spec.ts
 
   browser-a11y:
     if: github.event_name == 'push' || github.event_name == 'pull_request'
@@ -103,8 +123,11 @@ jobs:
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
 
-      - name: Build
-        run: npm run build
+      - name: Download Next Build
+        uses: actions/download-artifact@v4
+        with:
+          name: next-build
+          path: .next
 
       - name: Axe (Playwright)
         run: npm run test:a11y:ci
@@ -133,8 +156,11 @@ jobs:
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
 
-      - name: Build
-        run: npm run build
+      - name: Download Next Build
+        uses: actions/download-artifact@v4
+        with:
+          name: next-build
+          path: .next
 
       - name: Attack Simulation
         run: npm run test:attack:ci
@@ -163,8 +189,11 @@ jobs:
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
 
-      - name: Build
-        run: npm run build
+      - name: Download Next Build
+        uses: actions/download-artifact@v4
+        with:
+          name: next-build
+          path: .next
 
       - name: Billing Webhook Integration
         run: npm run test:billing:webhook:ci
@@ -196,8 +225,11 @@ jobs:
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
 
-      - name: Build
-        run: npm run build
+      - name: Download Next Build
+        uses: actions/download-artifact@v4
+        with:
+          name: next-build
+          path: .next
 
       - name: Security State Integration
         run: npm run test:security:state:ci

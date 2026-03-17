@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { SiteShell } from "@/app/components/SiteShell";
-import { getBillingFlags } from "@/lib/settings";
-import { getPrivacyEmail, getSecurityEmail, getSupportEmail } from "@/lib/legal";
+import { getPublicRuntimeConfig } from "@/lib/publicRuntimeConfig";
 
 export const runtime = "nodejs";
 export const revalidate = 900;
@@ -13,16 +12,16 @@ export const metadata: Metadata = {
     "Contact cyang.io for product support, business questions, privacy requests, and security reporting.",
 };
 
-export default async function ContactPage() {
-  const supportEmail = getSupportEmail();
-  const securityEmail = getSecurityEmail();
-  const privacyEmail = getPrivacyEmail();
-  const legalEmail = "legal@cyang.io";
-  const flagsRes = await getBillingFlags();
-  const showPricingUi = flagsRes.flags.pricingUiEnabled;
+export default function ContactPage() {
+  const publicConfig = getPublicRuntimeConfig();
+  const supportEmail = publicConfig.supportEmail;
+  const securityEmail = publicConfig.securityEmail;
+  const privacyEmail = publicConfig.privacyEmail;
+  const legalEmail = publicConfig.legalEmail;
+  const showPricingUi = publicConfig.showPricingUi;
 
   return (
-    <SiteShell maxWidth="full">
+    <SiteShell maxWidth="full" publicConfig={publicConfig}>
       <section className="relative mt-10 grid gap-6 lg:grid-cols-12 lg:items-end">
         <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
           <div className="absolute -left-16 top-0 h-72 w-72 rounded-full bg-sky-400/12 blur-3xl" />

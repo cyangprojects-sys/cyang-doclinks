@@ -4,10 +4,7 @@ import { requireRole } from "@/lib/authz";
 import DashboardHeaderActions from "./DashboardHeaderActions";
 import UploadPanel from "./UploadPanel";
 import {
-  getDashboardActivityData,
-  getDashboardDocumentsData,
-  getDashboardHomeData,
-  getDashboardLinksData,
+  getDashboardOverviewData,
 } from "./data";
 import { getShareEligibility, normalizeScanState } from "@/lib/documentStatus";
 
@@ -54,13 +51,8 @@ export default async function AdminDashboardPage({
     redirect("/");
   }
 
-  const [params, homeData, docsData, linksData, activityData] = await Promise.all([
-    searchParams,
-    getDashboardHomeData(user),
-    getDashboardDocumentsData(user),
-    getDashboardLinksData(user),
-    getDashboardActivityData(user),
-  ]);
+  const [params, overview] = await Promise.all([searchParams, getDashboardOverviewData(user)]);
+  const { homeData, docsData, linksData, activityData } = overview;
 
   const headerDocs = homeData.headerDocs;
   const autoOpenPicker = String(params?.openPicker || "") === "1";
@@ -143,6 +135,9 @@ export default async function AdminDashboardPage({
 
           <div className="rounded-[28px] border border-white/10 bg-white/[0.04] p-5">
             <div className="text-xs uppercase tracking-[0.16em] text-white/45">At a glance</div>
+            <div className="mt-2 text-[11px] uppercase tracking-[0.16em] text-white/38">
+              Snapshot updated {fmtDateTime(new Date(overview.snapshotGeneratedAt).toISOString())}
+            </div>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
                 <div className="text-xs text-white/45">Documents</div>

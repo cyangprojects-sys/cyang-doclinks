@@ -1,10 +1,9 @@
 // app/components/SiteFooter.tsx
 import Link from "next/link";
-import { getBillingFlags } from "@/lib/settings";
+import type { PublicRuntimeConfig } from "@/lib/publicRuntimeConfig";
 
-export async function SiteFooter() {
-  const flagsRes = await getBillingFlags();
-  const showPricingUi = flagsRes.flags.pricingUiEnabled;
+export function SiteFooter({ config }: { config: PublicRuntimeConfig }) {
+  const showPricingUi = config.showPricingUi;
 
   return (
     <footer className="mt-18 sm:mt-24">

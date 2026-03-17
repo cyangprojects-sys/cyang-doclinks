@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { SiteShell } from "./components/SiteShell";
-import { getBillingFlags } from "@/lib/settings";
-import { isSignupEnabled } from "@/lib/signup";
+import { getPublicRuntimeConfig } from "@/lib/publicRuntimeConfig";
 
 export const revalidate = 900;
 
@@ -12,14 +11,14 @@ export const metadata: Metadata = {
     "cyang.io builds disciplined, security-first products and operational systems. Doclinks is the featured flagship for controlled document delivery.",
 };
 
-export default async function HomePage() {
-  const flagsRes = await getBillingFlags();
-  const showPricingUi = flagsRes.flags.pricingUiEnabled;
-  const signupEnabled = isSignupEnabled();
+export default function HomePage() {
+  const publicConfig = getPublicRuntimeConfig();
+  const showPricingUi = publicConfig.showPricingUi;
+  const signupEnabled = publicConfig.signupEnabled;
   const primaryAccessHref = signupEnabled ? "/signup" : "/signin?intent=admin";
 
   return (
-    <SiteShell maxWidth="full">
+    <SiteShell maxWidth="full" publicConfig={publicConfig}>
       <section className="relative mt-10 grid gap-6 lg:grid-cols-12 lg:items-end">
         <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
           <div className="absolute -left-16 top-0 h-64 w-64 rounded-full bg-sky-400/12 blur-3xl" />

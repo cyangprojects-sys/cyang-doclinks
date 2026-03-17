@@ -2,10 +2,8 @@ import { redirect } from "next/navigation";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import { ensureUserByEmail } from "@/lib/authz";
-import { getBillingFlags } from "@/lib/settings";
-import AdminShell from "@/app/admin/_components/AdminShell";
-import { ADMIN_NAV_ITEMS, type AdminNavItem } from "@/app/admin/_components/adminNavigation";
-import { getAdminShellContext } from "@/app/admin/_components/adminShellData";
+import ViewerShell from "./_components/ViewerShell";
+import { getViewerShellContext } from "./_components/viewerShellData";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -35,42 +33,15 @@ export default async function ViewerLayout({
     redirect("/admin");
   }
 
-  const billingFlags = await getBillingFlags();
-  const shellContext = await getAdminShellContext({
+  const shellContext = await getViewerShellContext({
     userId: user.id,
-    email: session.user.email,
     orgId,
     orgSlug,
-    isOwner: false,
-    requestedBadges: ["documents", "links"],
   });
-  const viewerNavItems: AdminNavItem[] = ADMIN_NAV_ITEMS.filter((item) =>
-    item.key === "overview" ||
-    item.key === "documents" ||
-    item.key === "links" ||
-    item.key === "activity"
-  ).map((item) => ({
-    ...item,
-    href: item.href.replace(/^\/admin\b/, "/viewer"),
-  }));
-  const viewerContext = {
-    ...shellContext,
-    workspaceLabel: "Member workspace",
-    roleLabel: "Member",
-  };
 
   return (
-    <AdminShell
-      email={session.user.email}
-      isOwner={false}
-      showPricingUi={billingFlags.flags.pricingUiEnabled}
-      context={viewerContext}
-      routeBase="/viewer"
-      navItems={viewerNavItems}
-      profileHref="/viewer"
-      signOutCallbackUrl="/signin"
-    >
+    <ViewerShell email={session.user.email} context={shellContext}>
       {children}
-    </AdminShell>
+    </ViewerShell>
   );
 }

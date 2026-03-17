@@ -2,11 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { convertOfficeBytes } from "@/lib/officePreview";
 import { enforceGlobalApiRateLimit } from "@/lib/securityTelemetry";
-import { resolvePublicAppBaseUrl } from "@/lib/publicBaseUrl";
 import { getRouteTimeoutMs, isRouteTimeoutError, withRouteTimeout } from "@/lib/routeTimeout";
+import { readOfficePreviewSource } from "@/lib/officePreviewSource";
 
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
 
 const BodySchema = z.object({
   rawPath: z.string().min(1),
@@ -82,28 +81,19 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: "BAD_PATH" }, { status: 400 });
     }
 
-    let appBaseUrl: string;
-    try {
-      appBaseUrl = resolvePublicAppBaseUrl(req.url);
-    } catch {
-      return NextResponse.json({ ok: false, error: "ENV_MISCONFIGURED" }, { status: 500 });
+    const src = new URL(rawPath, req.url);
+    if (src.origin !== new URL(req.url).origin || !isAllowedRawPath(src.pathname)) {
+      return NextResponse.json({ ok: false, error: "BAD_PATH" }, { status: 400 });
     }
 
-    const src = new URL(rawPath, appBaseUrl);
     const upstream = await withRouteTimeout(
-      fetch(src.toString(), {
-        method: "GET",
-        cache: "no-store",
-        headers: {
-          cookie: req.headers.get("cookie") || "",
-          accept: `${mimeType},*/*`,
-        },
+      readOfficePreviewSource({
+        req,
+        rawPath,
+        mimeType,
       }),
       OFFICE_PREVIEW_FETCH_TIMEOUT_MS
     );
-    if (src.origin !== new URL(appBaseUrl).origin || !isAllowedRawPath(src.pathname)) {
-      return NextResponse.json({ ok: false, error: "BAD_PATH" }, { status: 400 });
-    }
 
     if (!upstream.ok) {
       return NextResponse.json(
@@ -112,8 +102,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const ab = await withRouteTimeout(upstream.arrayBuffer(), OFFICE_PREVIEW_FETCH_TIMEOUT_MS);
-    const bytes = Buffer.from(ab);
+    const bytes = upstream.bytes;
     const absMax = Number(process.env.UPLOAD_ABSOLUTE_MAX_BYTES || 104_857_600);
     if (Number.isFinite(absMax) && absMax > 0 && bytes.length > absMax) {
       return NextResponse.json(

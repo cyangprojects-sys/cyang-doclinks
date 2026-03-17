@@ -6,8 +6,11 @@ test.describe("viewer office route guardrails", () => {
     const code = readFileSync("src/app/api/viewer/office/route.ts", "utf8");
     expect(code.includes("MAX_VIEWER_OFFICE_BODY_BYTES")).toBeTruthy();
     expect(code.includes("isSupportedOfficeMime")).toBeTruthy();
+    expect(code.includes("readOfficePreviewSource(")).toBeTruthy();
     expect(code.includes("withRouteTimeout(")).toBeTruthy();
     expect(code.includes("isRouteTimeoutError")).toBeTruthy();
     expect(code.includes("error: \"TIMEOUT\"")).toBeTruthy();
+    expect(code.includes("resolvePublicAppBaseUrl")).toBeFalsy();
+    expect(code.includes("fetch(")).toBeFalsy();
   });
 });

@@ -6,9 +6,12 @@ const commands = [
   ["npm", ["run", "audit:env-example"]],
   ["node", ["scripts/migrate.mjs", "verify"]],
   ["npm", ["run", "audit:admin-routes"]],
+  ["npm", ["run", "audit:public-rendering"]],
+  ["npm", ["run", "audit:polling"]],
   ["npm", ["run", "lint"]],
   ["npx", ["tsc", "--noEmit", "-p", "tsconfig.json"]],
   ["npm", ["run", "build"]],
+  ["npm", ["run", "audit:bundle-budgets"]],
   ["npm", ["audit", "--omit=dev", "--audit-level=high"]],
   ["node", ["scripts/release-gate.mjs", "--allow-missing-env"]],
 ];

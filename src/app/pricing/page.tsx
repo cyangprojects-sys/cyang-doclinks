@@ -2,8 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { SiteShell } from "../components/SiteShell";
-import { getBillingFlags } from "@/lib/settings";
-import { isSignupEnabled } from "@/lib/signup";
+import { getPublicRuntimeConfig } from "@/lib/publicRuntimeConfig";
 
 export const runtime = "nodejs";
 export const revalidate = 300;
@@ -159,16 +158,16 @@ const FAQS = [
   },
 ];
 
-export default async function PricingPage() {
-  const flagsRes = await getBillingFlags();
-  if (!flagsRes.flags.pricingUiEnabled) {
+export default function PricingPage() {
+  const publicConfig = getPublicRuntimeConfig();
+  if (!publicConfig.showPricingUi) {
     notFound();
   }
-  const signupEnabled = isSignupEnabled();
+  const signupEnabled = publicConfig.signupEnabled;
   const primaryAccessHref = signupEnabled ? "/signup" : "/signin?intent=admin";
 
   return (
-    <SiteShell maxWidth="full">
+    <SiteShell maxWidth="full" publicConfig={publicConfig}>
       <section className="relative mt-10 grid gap-6 lg:grid-cols-12 lg:items-end">
         <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
           <div className="absolute -left-16 top-0 h-72 w-72 rounded-full bg-sky-400/12 blur-3xl" />

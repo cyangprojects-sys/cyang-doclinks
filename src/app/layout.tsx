@@ -2,7 +2,6 @@
 import type { Metadata } from "next";
 import { Manrope, JetBrains_Mono, Cormorant_Garamond } from "next/font/google";
 import "./globals.css";
-import Providers from "./providers";
 
 const geistSans = Manrope({
   variable: "--font-geist-sans",
@@ -59,7 +58,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable} ${editorial.variable} antialiased`}>
-        <Providers>{children}</Providers>
+        {children}
       </body>
     </html>
   );

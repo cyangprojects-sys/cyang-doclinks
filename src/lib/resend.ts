@@ -1,15 +1,6 @@
-const MAX_ENV_VALUE_LEN = 512;
-const MAX_EMAIL_LEN = 320;
-const MAX_URL_LEN = 2048;
-const BASIC_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+import { sendHtmlEmail } from "@/lib/email";
 
-function requireEnv(name: "RESEND_API_KEY" | "EMAIL_FROM"): string {
-  const raw = String(process.env[name] || "");
-  if (!raw || raw.length > MAX_ENV_VALUE_LEN || /[\r\n\0]/.test(raw)) throw new Error(`Missing ${name}`);
-  const value = raw.trim();
-  if (!value) throw new Error(`Missing ${name}`);
-  return value;
-}
+const MAX_URL_LEN = 2048;
 
 function esc(value: string): string {
   return value
@@ -18,15 +9,6 @@ function esc(value: string): string {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
-}
-
-function normalizeRecipientEmail(value: string): string {
-  const email = String(value || "").trim().toLowerCase();
-  if (!email || email.length > MAX_EMAIL_LEN || /[\r\n\0]/.test(email)) {
-    throw new Error("INVALID_EMAIL_TO");
-  }
-  if (!BASIC_EMAIL_RE.test(email)) throw new Error("INVALID_EMAIL_TO");
-  return email;
 }
 
 function normalizeSignInUrl(value: string): string {
@@ -44,10 +26,7 @@ function normalizeSignInUrl(value: string): string {
 }
 
 export async function sendSignInEmail(to: string, signInUrl: string) {
-  const recipient = normalizeRecipientEmail(to);
   const safeSignInUrl = normalizeSignInUrl(signInUrl);
-  const resendApiKey = requireEnv("RESEND_API_KEY");
-  const emailFrom = requireEnv("EMAIL_FROM");
   const subject = "Sign in to view your document";
 
   const text =
@@ -63,31 +42,15 @@ export async function sendSignInEmail(to: string, signInUrl: string) {
     </div>
   `;
 
-  const resp = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${resendApiKey}`,
-      "Content-Type": "application/json",
-      // Optional but often helpful for auth links:
-      "X-Entity-Ref-ID": `signin-${Date.now()}`,
-    },
-    body: JSON.stringify({
-      from: emailFrom, // "DocLinks <login@cyang.io>"
-      to: recipient,
-      subject,
-      text,
-      html,
-      // Optional but can help reduce no-reply spam scoring:
-      reply_to: emailFrom,
-      headers: {
-        // Helps some clients show a single thread per sign-in attempt:
-        "X-Auto-Response-Suppress": "All",
-      },
-    }),
+  await sendHtmlEmail({
+    to,
+    subject,
+    text,
+    html,
+    entityRefId: `signin-${Date.now()}`,
+    tags: [
+      { name: "template", value: "signin_link" },
+      { name: "channel", value: "auth" },
+    ],
   });
-
-  if (!resp.ok) {
-    const text = await resp.text();
-    throw new Error(`Resend error: ${resp.status} ${text}`);
-  }
 }

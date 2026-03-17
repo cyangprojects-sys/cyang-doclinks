@@ -37,6 +37,18 @@ type DashboardCtx = {
   docFilter: ReturnType<typeof sql>;
 };
 
+export type DashboardHomeData = Awaited<ReturnType<typeof getDashboardHomeData>>;
+export type DashboardDocumentsData = Awaited<ReturnType<typeof getDashboardDocumentsData>>;
+export type DashboardLinksData = Awaited<ReturnType<typeof getDashboardLinksData>>;
+export type DashboardActivityData = Awaited<ReturnType<typeof getDashboardActivityData>>;
+export type DashboardOverviewData = {
+  homeData: DashboardHomeData;
+  docsData: DashboardDocumentsData;
+  linksData: DashboardLinksData;
+  activityData: DashboardActivityData;
+  snapshotGeneratedAt: number;
+};
+
 type DashboardSchemaState = Omit<
   DashboardCtx,
   "canSeeAll" | "canCheckEncryptionStatus" | "planId" | "nowTs" | "docFilter"
@@ -47,8 +59,22 @@ type DashboardSchemaCacheEntry = {
   value: DashboardSchemaState;
 };
 
+type DashboardCtxCacheEntry = {
+  expiresAt: number;
+  value: DashboardCtx;
+};
+
+type DashboardOverviewCacheEntry = {
+  expiresAt: number;
+  value: DashboardOverviewData;
+};
+
 let dashboardSchemaCache: DashboardSchemaCacheEntry | null = null;
 let dashboardSchemaInFlight: Promise<DashboardSchemaState> | null = null;
+const dashboardCtxCache = new Map<string, DashboardCtxCacheEntry>();
+const dashboardCtxInFlight = new Map<string, Promise<DashboardCtx>>();
+const dashboardOverviewCache = new Map<string, DashboardOverviewCacheEntry>();
+const dashboardOverviewInFlight = new Map<string, Promise<DashboardOverviewData>>();
 
 async function tableExists(fqTable: string): Promise<boolean> {
   try {
@@ -79,6 +105,38 @@ function getDashboardSchemaCacheMs(): number {
   const raw = Number(process.env.DASHBOARD_SCHEMA_CACHE_MS || 60_000);
   if (!Number.isFinite(raw)) return 60_000;
   return Math.max(5_000, Math.min(10 * 60_000, Math.floor(raw)));
+}
+
+function getDashboardOverviewCacheMs(): number {
+  const raw = Number(process.env.DASHBOARD_OVERVIEW_CACHE_MS || 30_000);
+  if (!Number.isFinite(raw)) return 30_000;
+  return Math.max(5_000, Math.min(2 * 60_000, Math.floor(raw)));
+}
+
+function getDashboardCtxCacheKey(u: AuthedUser): string {
+  return [u.id, u.email, u.role, u.orgId ?? "", u.orgSlug ?? ""].join("|");
+}
+
+function setDashboardCtxCache(key: string, value: DashboardCtx) {
+  dashboardCtxCache.set(key, {
+    value,
+    expiresAt: Date.now() + getDashboardOverviewCacheMs(),
+  });
+  if (dashboardCtxCache.size > 200) {
+    const oldestKey = dashboardCtxCache.keys().next().value;
+    if (oldestKey) dashboardCtxCache.delete(oldestKey);
+  }
+}
+
+function setDashboardOverviewCache(key: string, value: DashboardOverviewData) {
+  dashboardOverviewCache.set(key, {
+    value,
+    expiresAt: Date.now() + getDashboardOverviewCacheMs(),
+  });
+  if (dashboardOverviewCache.size > 100) {
+    const oldestKey = dashboardOverviewCache.keys().next().value;
+    if (oldestKey) dashboardOverviewCache.delete(oldestKey);
+  }
 }
 
 async function getDashboardSchemaState(): Promise<DashboardSchemaState> {
@@ -130,32 +188,52 @@ async function getDashboardSchemaState(): Promise<DashboardSchemaState> {
 }
 
 async function getCtx(u: AuthedUser): Promise<DashboardCtx> {
-  const canSeeAll = roleAtLeast(u.role, "admin");
-  const canCheckEncryptionStatus = roleAtLeast(u.role, "owner");
-  const [userPlan, schema] = await Promise.all([getPlanForUser(u.id), getDashboardSchemaState()]);
-  const planId = String(userPlan.id || "free").toLowerCase() === "pro" ? "pro" : "free";
-  const nowTs = Date.now();
+  const cacheKey = getDashboardCtxCacheKey(u);
+  const cached = dashboardCtxCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.value;
+  }
 
-  const orgFilter = schema.hasOrgId && u.orgId ? sql`and d.org_id = ${u.orgId}::uuid` : sql``;
-  const ownerFilter = !canSeeAll
-    ? schema.hasOwnerId
-      ? schema.hasCreatedByEmail
-        ? sql`and (d.owner_id = ${u.id}::uuid or (d.owner_id is null and lower(coalesce(d.created_by_email,'')) = lower(${u.email})))`
-        : sql`and d.owner_id = ${u.id}::uuid`
-      : schema.hasCreatedByEmail
-        ? sql`and lower(coalesce(d.created_by_email,'')) = lower(${u.email})`
-        : sql``
-    : sql``;
-  const docFilter = sql`${orgFilter} ${ownerFilter}`;
+  const existing = dashboardCtxInFlight.get(cacheKey);
+  if (existing) {
+    return existing;
+  }
 
-  return {
-    canSeeAll,
-    canCheckEncryptionStatus,
-    planId,
-    nowTs,
-    ...schema,
-    docFilter,
-  };
+  const loadPromise = (async (): Promise<DashboardCtx> => {
+    const canSeeAll = roleAtLeast(u.role, "admin");
+    const canCheckEncryptionStatus = roleAtLeast(u.role, "owner");
+    const [userPlan, schema] = await Promise.all([getPlanForUser(u.id), getDashboardSchemaState()]);
+    const planId = String(userPlan.id || "free").toLowerCase() === "pro" ? "pro" : "free";
+    const nowTs = Date.now();
+
+    const orgFilter = schema.hasOrgId && u.orgId ? sql`and d.org_id = ${u.orgId}::uuid` : sql``;
+    const ownerFilter = !canSeeAll
+      ? schema.hasOwnerId
+        ? schema.hasCreatedByEmail
+          ? sql`and (d.owner_id = ${u.id}::uuid or (d.owner_id is null and lower(coalesce(d.created_by_email,'')) = lower(${u.email})))`
+          : sql`and d.owner_id = ${u.id}::uuid`
+        : schema.hasCreatedByEmail
+          ? sql`and lower(coalesce(d.created_by_email,'')) = lower(${u.email})`
+          : sql``
+      : sql``;
+    const docFilter = sql`${orgFilter} ${ownerFilter}`;
+
+    const value: DashboardCtx = {
+      canSeeAll,
+      canCheckEncryptionStatus,
+      planId,
+      nowTs,
+      ...schema,
+      docFilter,
+    };
+    setDashboardCtxCache(cacheKey, value);
+    return value;
+  })().finally(() => {
+    dashboardCtxInFlight.delete(cacheKey);
+  });
+
+  dashboardCtxInFlight.set(cacheKey, loadPromise);
+  return loadPromise;
 }
 
 export async function getDashboardHomeData(u: AuthedUser) {
@@ -434,4 +512,41 @@ export async function getDashboardActivityData(u: AuthedUser) {
     viewsRows,
     missingCoreTables: !ctx.hasDocs || !ctx.hasDocViews,
   };
+}
+
+export async function getDashboardOverviewData(u: AuthedUser): Promise<DashboardOverviewData> {
+  const cacheKey = getDashboardCtxCacheKey(u);
+  const cached = dashboardOverviewCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.value;
+  }
+
+  const existing = dashboardOverviewInFlight.get(cacheKey);
+  if (existing) {
+    return existing;
+  }
+
+  const loadPromise = (async (): Promise<DashboardOverviewData> => {
+    const [homeData, docsData, linksData, activityData] = await Promise.all([
+      getDashboardHomeData(u),
+      getDashboardDocumentsData(u),
+      getDashboardLinksData(u),
+      getDashboardActivityData(u),
+    ]);
+
+    const value: DashboardOverviewData = {
+      homeData,
+      docsData,
+      linksData,
+      activityData,
+      snapshotGeneratedAt: Date.now(),
+    };
+    setDashboardOverviewCache(cacheKey, value);
+    return value;
+  })().finally(() => {
+    dashboardOverviewInFlight.delete(cacheKey);
+  });
+
+  dashboardOverviewInFlight.set(cacheKey, loadPromise);
+  return loadPromise;
 }

@@ -1,11 +1,9 @@
 import Link from "next/link";
-import { getBillingFlags } from "@/lib/settings";
-import { isSignupEnabled } from "@/lib/signup";
+import type { PublicRuntimeConfig } from "@/lib/publicRuntimeConfig";
 
-export async function SiteHeader() {
-  const flagsRes = await getBillingFlags();
-  const showPricingUi = flagsRes.flags.pricingUiEnabled;
-  const signupEnabled = isSignupEnabled();
+export function SiteHeader({ config }: { config: PublicRuntimeConfig }) {
+  const showPricingUi = config.showPricingUi;
+  const signupEnabled = config.signupEnabled;
 
   return (
     <header className="glass-card-strong ui-sheen sticky top-2 z-40 rounded-2xl px-4 py-3 sm:px-6">

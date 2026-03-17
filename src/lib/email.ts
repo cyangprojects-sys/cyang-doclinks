@@ -5,6 +5,9 @@ const MAX_ENV_VALUE_LEN = 512;
 const MAX_EMAIL_LEN = 320;
 const MAX_SUBJECT_LEN = 200;
 const MAX_TEXT_LEN = 12000;
+const MAX_HEADER_VALUE_LEN = 512;
+const MAX_TAG_NAME_LEN = 64;
+const MAX_TAG_VALUE_LEN = 128;
 const MAX_URL_LEN = 2048;
 const SAFE_COLOR_RE = /^#(?:[0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
 const BASIC_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -42,6 +45,26 @@ function normalizePlainText(value: string): string {
     throw new Error("INVALID_EMAIL_TEXT");
   }
   return text;
+}
+
+function normalizeOptionalPlainText(value: string | null | undefined): string | undefined {
+  if (!value) return undefined;
+  return normalizePlainText(value);
+}
+
+function normalizeHeaderValue(value: string | null | undefined): string | undefined {
+  const raw = String(value || "").trim();
+  if (!raw || raw.length > MAX_HEADER_VALUE_LEN || /[\r\n\0]/.test(raw)) return undefined;
+  return raw;
+}
+
+function normalizeTag(tag: { name: string; value: string }): { name: string; value: string } | null {
+  const name = String(tag?.name || "").trim().toLowerCase();
+  const value = String(tag?.value || "").trim();
+  if (!name || !value) return null;
+  if (name.length > MAX_TAG_NAME_LEN || value.length > MAX_TAG_VALUE_LEN) return null;
+  if (/[^a-z0-9_.:-]/.test(name) || /[\r\n\0]/.test(value)) return null;
+  return { name, value };
 }
 
 function normalizeHttpUrl(value: string, fieldName: "shareUrl" | "activationUrl" | "brandLogoUrl"): string {
@@ -92,19 +115,72 @@ type BasicMail = {
   text: string;
 };
 
-export async function sendMail(m: BasicMail) {
-  const to = normalizeRecipientEmail(m.to);
-  const subject = normalizeSubject(m.subject);
-  const text = normalizePlainText(m.text);
+type MailSendOptions = {
+  to: string;
+  subject: string;
+  text?: string | null;
+  html?: string | null;
+  replyTo?: string | null;
+  entityRefId?: string | null;
+  suppressAutoResponse?: boolean;
+  tags?: Array<{ name: string; value: string }>;
+};
+
+async function sendEmailMessage(message: MailSendOptions) {
   const resend = getResendClient();
   const from = mustEnv("EMAIL_FROM");
+  const to = normalizeRecipientEmail(message.to);
+  const subject = normalizeSubject(message.subject);
+  const text = normalizeOptionalPlainText(message.text);
+  const html = message.html ? String(message.html).trim() : undefined;
+  const replyTo = message.replyTo ? normalizeRecipientEmail(message.replyTo) : undefined;
+  const entityRefId = normalizeHeaderValue(message.entityRefId);
+  const tags = (message.tags || [])
+    .map((tag) => normalizeTag(tag))
+    .filter((tag): tag is { name: string; value: string } => Boolean(tag));
+  const headers: Record<string, string> = {};
 
-  // Minimal plain-text email (back-compat for admin actions)
-  await resend.emails.send({
+  if (entityRefId) {
+    headers["X-Entity-Ref-ID"] = entityRefId;
+  }
+  if (message.suppressAutoResponse) {
+    headers["X-Auto-Response-Suppress"] = "All";
+  }
+
+  const payload = {
     from,
     to,
     subject,
     text,
+    html,
+    replyTo,
+    headers: Object.keys(headers).length ? headers : undefined,
+    tags: tags.length ? tags : undefined,
+  } as Parameters<typeof resend.emails.send>[0];
+
+  await resend.emails.send(payload);
+}
+
+export async function sendMail(m: BasicMail) {
+  await sendEmailMessage({
+    to: m.to,
+    subject: m.subject,
+    text: m.text,
+  });
+}
+
+export async function sendHtmlEmail(message: {
+  to: string;
+  subject: string;
+  html: string;
+  text?: string | null;
+  replyTo?: string | null;
+  entityRefId?: string | null;
+  tags?: Array<{ name: string; value: string }>;
+}) {
+  await sendEmailMessage({
+    ...message,
+    suppressAutoResponse: true,
   });
 }
 
@@ -125,26 +201,21 @@ export type ShareEmailParams = {
 };
 
 export async function sendShareEmail(p: ShareEmailParams) {
-  const to = normalizeRecipientEmail(p.to);
-  const subject = normalizeSubject(p.subject);
-  const resend = getResendClient();
-  const from = mustEnv("EMAIL_FROM");
-
   const html = renderShareEmailHtml(p);
 
-  await resend.emails.send({
-    from,
-    to,
-    subject,
+  await sendEmailMessage({
+    to: p.to,
+    subject: p.subject,
     html,
+    tags: [
+      { name: "template", value: "share_link" },
+      { name: "channel", value: "document_share" },
+    ],
   });
 }
 
 export async function sendAccountActivationEmail(args: { to: string; activationUrl: string }) {
-  const to = normalizeRecipientEmail(args.to);
   const activationUrl = normalizeHttpUrl(args.activationUrl, "activationUrl");
-  const resend = getResendClient();
-  const from = mustEnv("EMAIL_FROM");
 
   const subject = "Activate your cyang.io account";
   const text =
@@ -161,12 +232,15 @@ export async function sendAccountActivationEmail(args: { to: string; activationU
     </div>
   `;
 
-  await resend.emails.send({
-    from,
-    to,
+  await sendEmailMessage({
+    to: args.to,
     subject,
     text,
     html,
+    tags: [
+      { name: "template", value: "account_activation" },
+      { name: "channel", value: "account" },
+    ],
   });
 }
 

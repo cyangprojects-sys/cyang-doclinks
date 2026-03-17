@@ -10,6 +10,7 @@ import { assertCanCreateShare, getPlanForUser, normalizeExpiresAtForPlan, normal
 import { resolveConfiguredPublicAppBaseUrl } from "@/lib/publicBaseUrl";
 import { DEFAULT_SHARE_SETTINGS, PRO_PACK_UPSELL_MESSAGE, applyPack, getPackById, isPackAvailableForPlan } from "@/lib/packs";
 import { getShareEligibility } from "@/lib/documentStatus";
+import { sendHtmlEmail } from "@/lib/email";
 
 /**
  * NOTE:
@@ -104,44 +105,6 @@ function buildShareUrl(token: string): string {
   return `${base}/s/${token}`;
 }
 
-async function trySendResendEmail(opts: {
-  to: string;
-  subject: string;
-  html: string;
-}): Promise<{ ok: true } | { ok: false; message: string }> {
-  const key = process.env.RESEND_API_KEY;
-  const from =
-    process.env.EMAIL_FROM ||
-    process.env.RESEND_FROM ||
-    "Cyang Docs <no-reply@cyang.io>";
-
-  if (!key) return { ok: false, message: "Email service unavailable" };
-
-  try {
-    const r = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${key}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        from,
-        to: [opts.to],
-        subject: opts.subject,
-        html: opts.html,
-      }),
-    });
-
-    if (!r.ok) {
-      return { ok: false, message: "Failed to send email" };
-    }
-
-    return { ok: true };
-  } catch (e: unknown) {
-    return { ok: false, message: "Failed to send email" };
-  }
-}
-
 export async function sendShareLinkEmail(form: FormData): Promise<SendShareEmailResult> {
   try {
     const token = readFormText(form, "token", MAX_TOKEN_LEN).toLowerCase();
@@ -233,14 +196,18 @@ export async function sendShareLinkEmail(form: FormData): Promise<SendShareEmail
       </div>
     `;
 
-    const sent = await trySendResendEmail({
-      to: toEmail,
-      subject: `Cyang Docs: ${title}`,
-      html,
-    });
-
-    if (!sent.ok) {
-      return { ok: false, error: "email_failed", message: sent.message };
+    try {
+      await sendHtmlEmail({
+        to: toEmail,
+        subject: `Cyang Docs: ${title}`,
+        html,
+        tags: [
+          { name: "template", value: "share_link_manual" },
+          { name: "channel", value: "document_share" },
+        ],
+      });
+    } catch {
+      return { ok: false, error: "email_failed", message: "Failed to send email" };
     }
 
     return { ok: true };
@@ -520,7 +487,19 @@ export async function createAndEmailShareToken(
       </div>
     `;
 
-    await trySendResendEmail({ to: toEmail, subject, html });
+    try {
+      await sendHtmlEmail({
+        to: toEmail,
+        subject,
+        html,
+        tags: [
+          { name: "template", value: "share_link_created" },
+          { name: "channel", value: "document_share" },
+        ],
+      });
+    } catch {
+      // Share creation should still succeed even if email delivery fails.
+    }
     return {
       ok: true,
       token,
