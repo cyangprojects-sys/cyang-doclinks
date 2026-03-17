@@ -12,6 +12,7 @@
 
 import crypto from "crypto";
 import { sql } from "@/lib/db";
+import { getHashingSalt } from "@/lib/envConfig";
 
 const MAX_LIMIT = 10_000;
 const MAX_WINDOW_SECONDS = 86_400;
@@ -47,7 +48,7 @@ function normalizeKey(value: unknown, maxLen: number): string {
 }
 
 export function stableHash(input: string, saltEnv: string = "VIEW_SALT"): string {
-  const salt = (process.env[saltEnv] || process.env.VIEW_SALT || process.env.NEXTAUTH_SECRET || "").trim();
+  const salt = getHashingSalt(saltEnv) || "";
   const safeInput = String(input || "").slice(0, MAX_HASH_INPUT_LEN);
   if (!salt) {
     const allowInsecureFallback =

@@ -6,7 +6,6 @@ import { listKeyRotationJobs, getKeyRotationStatusSummary } from "@/lib/keyRotat
 import { enforceGlobalApiRateLimit } from "@/lib/securityTelemetry";
 
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
 
 function authErrorCode(e: unknown): "UNAUTHENTICATED" | "FORBIDDEN" | null {
   const message = e instanceof Error ? e.message : String(e || "");

@@ -2,7 +2,6 @@ import { sql } from "@/lib/db";
 import AbuseActionsClient from "./AbuseActionsClient";
 
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
 
 type Row = {
   id: string;

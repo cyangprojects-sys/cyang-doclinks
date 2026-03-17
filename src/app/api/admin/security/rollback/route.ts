@@ -8,7 +8,6 @@ import { appendImmutableAudit } from "@/lib/immutableAudit";
 import { getRouteTimeoutMs, isRouteTimeoutError, withRouteTimeout } from "@/lib/routeTimeout";
 
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
 
 const Body = z.object({
   change_id: z.string().uuid(),

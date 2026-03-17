@@ -7,7 +7,6 @@ import { getRouteTimeoutMs, isRouteTimeoutError, withRouteTimeout } from "@/lib/
 import { withRequestTelemetry } from "@/lib/perfTelemetry";
 
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
 const MAX_BACKUP_STATUS_BODY_BYTES = 16 * 1024;
 const MAX_DETAIL_STRING_LEN = 256;
 

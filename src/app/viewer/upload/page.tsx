@@ -2,7 +2,6 @@ import { redirect } from "next/navigation";
 import { getAuthedUser } from "@/lib/authz";
 
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
 
 export default async function ViewerUploadRedirectPage() {
   const u = await getAuthedUser();

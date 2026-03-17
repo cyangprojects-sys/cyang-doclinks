@@ -2,7 +2,6 @@ import { sql } from "@/lib/db";
 import DmcaActionsClient from "./DmcaActionsClient";
 
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
 
 type Row = {
   id: string;

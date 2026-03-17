@@ -6,7 +6,6 @@ import { enforceGlobalApiRateLimit } from "@/lib/securityTelemetry";
 import { resolvePublicAppBaseUrl } from "@/lib/publicBaseUrl";
 
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
 
 const ALLOWED = new Set(["google", "enterprise-oidc"]);
 const SLUG_RE = /^[a-z0-9][a-z0-9-]{0,63}$/i;

@@ -1,6 +1,5 @@
 // src/app/api/v1/takedown/route.ts
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";

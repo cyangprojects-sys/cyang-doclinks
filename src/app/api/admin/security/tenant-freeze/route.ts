@@ -7,7 +7,6 @@ import { resolvePublicAppBaseUrl } from "@/lib/publicBaseUrl";
 import { getRouteTimeoutMs, isRouteTimeoutError, withRouteTimeout } from "@/lib/routeTimeout";
 
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
 const MAX_SECURITY_TENANT_FREEZE_BODY_BYTES = 8 * 1024;
 
 function asBool(v: unknown): boolean {

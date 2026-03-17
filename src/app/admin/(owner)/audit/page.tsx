@@ -5,8 +5,6 @@ import { unstable_noStore as noStore } from "next/cache";
 import { getAuthedUser } from "@/lib/authz";
 
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
 type GenericRow = Record<string, unknown>;
 function errorMessage(e: unknown): string {
   if (process.env.NODE_ENV !== "production") {

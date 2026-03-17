@@ -3,7 +3,6 @@ import { PACKS } from "@/lib/packs";
 import { AdminPageIntro, AdminSection } from "../_components/AdminPagePrimitives";
 
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
 
 export default async function BrandingPage() {
   await requireRole("owner");

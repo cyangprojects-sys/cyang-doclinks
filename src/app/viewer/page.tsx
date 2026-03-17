@@ -9,8 +9,6 @@ import {
 import { getShareEligibility, normalizeScanState } from "@/lib/documentStatus";
 
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
 
 function fmtDateTime(s: string | null): string {
   if (!s) return "No activity yet";

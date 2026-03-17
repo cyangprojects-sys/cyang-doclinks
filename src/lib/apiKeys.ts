@@ -1,5 +1,6 @@
 // src/lib/apiKeys.ts
 import crypto from "crypto";
+import { getApiKeySaltEnv } from "@/lib/envConfig";
 
 const MAX_API_KEY_INPUT_LEN = 512;
 
@@ -14,7 +15,7 @@ export type ApiKeyRecord = {
 };
 
 function normSecretSalt(): string {
-  const salt = (process.env.API_KEY_SALT || process.env.NEXTAUTH_SECRET || process.env.VIEW_SALT || "").trim();
+  const salt = getApiKeySaltEnv() || "";
   if (!salt) throw new Error("Missing API_KEY_SALT (or NEXTAUTH_SECRET/VIEW_SALT fallback)");
   return salt;
 }

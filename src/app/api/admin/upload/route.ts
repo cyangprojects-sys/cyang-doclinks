@@ -1,6 +1,5 @@
 // src/app/api/admin/upload/route.ts
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
 
 import { NextResponse, type NextRequest } from "next/server";
 import { requireRole } from "@/lib/authz";

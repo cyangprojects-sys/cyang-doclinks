@@ -11,6 +11,7 @@
     "db:migrations:verify": "node scripts/migrate.mjs verify",
     "audit:admin-routes": "node scripts/audit-admin-route-guards.mjs",
     "audit:public-rendering": "node scripts/audit-public-rendering.mjs",
+    "audit:route-rendering": "node scripts/audit-route-handler-rendering.mjs",
     "audit:polling": "node scripts/audit-polling-discipline.mjs",
     "audit:bundle-budgets": "node scripts/audit-bundle-budgets.mjs",
     "audit:env-example": "node scripts/check-env-example.mjs",

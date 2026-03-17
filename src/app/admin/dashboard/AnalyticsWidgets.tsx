@@ -11,8 +11,6 @@ import {
 } from "@/lib/monetization";
 
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
 
 async function tableExists(fqTable: string): Promise<boolean> {
   try {

@@ -7,6 +7,7 @@ const commands = [
   ["node", ["scripts/migrate.mjs", "verify"]],
   ["npm", ["run", "audit:admin-routes"]],
   ["npm", ["run", "audit:public-rendering"]],
+  ["npm", ["run", "audit:route-rendering"]],
   ["npm", ["run", "audit:polling"]],
   ["npm", ["run", "lint"]],
   ["npx", ["tsc", "--noEmit", "-p", "tsconfig.json"]],

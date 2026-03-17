@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs";
+import { getR2BucketEnv } from "./src/lib/envConfig";
 
 const isProd = process.env.NODE_ENV === "production";
 
@@ -68,7 +69,7 @@ function cspValue(frameAncestors: string) {
       const endpointUrl = new URL(r2Endpoint);
       connectSources.add(endpointUrl.origin);
 
-      const bucket = String(process.env.R2_BUCKET || process.env.R2_BUCKET_NAME || "").trim();
+      const bucket = getR2BucketEnv() || "";
       if (
         bucket &&
         endpointUrl.hostname.endsWith(".r2.cloudflarestorage.com") &&

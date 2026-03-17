@@ -9,7 +9,6 @@ import { clientIpKey, enforceGlobalApiRateLimit, logSecurityEvent } from "@/lib/
 import { getRouteTimeoutMs, isRouteTimeoutError, withRouteTimeout } from "@/lib/routeTimeout";
 
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
 const MAX_UPLOAD_ABORT_BODY_BYTES = 8 * 1024;
 
 const BodySchema = z.object({

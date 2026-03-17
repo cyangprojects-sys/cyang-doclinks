@@ -14,7 +14,6 @@ import { resolvePublicAppBaseUrl } from "@/lib/publicBaseUrl";
 import { getRouteTimeoutMs, isRouteTimeoutError, withRouteTimeout } from "@/lib/routeTimeout";
 
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
 const MAX_ORG_ACCESS_FORM_BYTES = 8 * 1024;
 
 function normEmail(email: unknown): string {

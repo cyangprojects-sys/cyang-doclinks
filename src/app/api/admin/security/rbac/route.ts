@@ -12,7 +12,6 @@ import { enforceGlobalApiRateLimit, logSecurityEvent } from "@/lib/securityTelem
 import { resolvePublicAppBaseUrl } from "@/lib/publicBaseUrl";
 
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
 
 const ROLES: Role[] = ["viewer", "admin", "owner"];
 const MAX_SECURITY_RBAC_BODY_BYTES = 8 * 1024;

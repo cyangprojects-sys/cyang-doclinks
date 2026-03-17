@@ -7,7 +7,6 @@ import { listOrgMemberships, listPendingOrgInvites, orgMembershipTablesReady } f
 import { getRouteTimeoutMs, isRouteTimeoutError, withRouteTimeout } from "@/lib/routeTimeout";
 
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
 
 function makeHash(parts: Array<string | number | boolean | null | undefined>): string {
   return parts.map((p) => String(p ?? "")).join("|");

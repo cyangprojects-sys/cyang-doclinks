@@ -8,8 +8,6 @@ import { saveExpirationAlertsAction } from "../_actions/workspaceSettings";
 import { AdminPageIntro, AdminSection, AdminTabs } from "../_components/AdminPagePrimitives";
 
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
 
 const DEFAULT_EXPIRATION_ALERT_SETTINGS = {
   enabled: true,

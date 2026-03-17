@@ -13,10 +13,18 @@ import { generateApiKey, hashApiKey } from "@/lib/apiKeys";
 import { emitWebhook } from "@/lib/webhooks";
 import { appendImmutableAudit } from "@/lib/immutableAudit";
 import { resolveConfiguredPublicAppBaseUrl } from "@/lib/publicBaseUrl";
-import { getDemoShareToken } from "@/lib/demo";
 
 function getBaseUrl() {
   return resolveConfiguredPublicAppBaseUrl();
+}
+
+async function tableExists(name: string): Promise<boolean> {
+  try {
+    const rows = (await sql`select to_regclass(${name})::text as reg`) as unknown as Array<{ reg: string | null }>;
+    return Boolean(rows?.[0]?.reg);
+  } catch {
+    return false;
+  }
 }
 
 async function appendAdminAudit(args: {
@@ -94,32 +102,6 @@ async function resolveR2LocationForDoc(docId: string): Promise<{ bucket: string;
   const r2k = rows2[0]?.r2_key ?? null;
   if (!r2b || !r2k) throw new Error("Doc not found.");
   return { bucket: r2b, key: r2k };
-}
-
-async function tableExists(name: string): Promise<boolean> {
-  try {
-    const rows = (await sql`select to_regclass(${name})::text as reg`) as unknown as Array<{ reg: string | null }>;
-    return Boolean(rows?.[0]?.reg);
-  } catch {
-    return false;
-  }
-}
-
-async function assertNotDemoDocument(docId: string): Promise<void> {
-  const demoToken = getDemoShareToken();
-  if (!demoToken) return;
-  const shareTokensExists = await tableExists("public.share_tokens");
-  if (!shareTokensExists) return;
-  const rows = (await sql`
-    select 1
-    from public.share_tokens
-    where token = ${demoToken}
-      and doc_id = ${docId}::uuid
-    limit 1
-  `) as unknown as Array<{ "?column?": number }>;
-  if (rows.length) {
-    throw new Error("This document is protected as the configured demo document. Update DEMO_DOC_URL first.");
-  }
 }
 
 function normalizeAliasInput(input: string): string {
@@ -452,8 +434,6 @@ export async function deleteDocAction(formData: FormData): Promise<void> {
   if (!docId) throw new Error("Missing docId.");
 
   await requireDocWrite(docId);
-  await assertNotDemoDocument(docId);
-
   const drows = (await sql`
     select title::text as title
     from public.docs
@@ -869,8 +849,6 @@ export async function bulkDeleteDocsAction(formData: FormData): Promise<void> {
 
     try {
       await requireDocWrite(id);
-      await assertNotDemoDocument(id);
-
       const drows = (await sql`
         select title::text as title
         from public.docs

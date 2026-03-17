@@ -25,7 +25,6 @@ import { getRouteTimeoutMs, isRouteTimeoutError, withRouteTimeout } from "@/lib/
 import { withRequestTelemetry } from "@/lib/perfTelemetry";
 
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
 const MAX_UPLOAD_PRESIGN_BODY_BYTES = 16 * 1024;
 
 // Enterprise: encryption is mandatory.

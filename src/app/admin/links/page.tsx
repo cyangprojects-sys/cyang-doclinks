@@ -6,8 +6,6 @@ import SharesTableClient from "@/app/admin/dashboard/SharesTableClient";
 import { getDashboardLinksData, getDashboardHomeData } from "@/app/admin/dashboard/data";
 
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
 
 export default async function AdminLinksPage() {
   let user;

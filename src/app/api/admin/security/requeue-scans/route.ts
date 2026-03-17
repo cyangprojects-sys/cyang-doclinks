@@ -6,7 +6,6 @@ import { resolvePublicAppBaseUrl } from "@/lib/publicBaseUrl";
 import { getRouteTimeoutMs, isRouteTimeoutError, withRouteTimeout } from "@/lib/routeTimeout";
 
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
 const MAX_REQUEUE_SCANS_BODY_BYTES = 4 * 1024;
 
 function parseBodyLength(req: Request): number {

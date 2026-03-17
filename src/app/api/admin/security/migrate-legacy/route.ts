@@ -5,7 +5,6 @@ import { migrateLegacyEncryptionBatch } from "@/lib/encryptionMigration";
 import { enforceGlobalApiRateLimit, logSecurityEvent } from "@/lib/securityTelemetry";
 
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
 
 const Body = z.object({
   limit: z.number().int().positive().max(250).optional(),

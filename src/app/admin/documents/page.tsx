@@ -8,8 +8,6 @@ import { getDashboardDocumentsData } from "@/app/admin/dashboard/data";
 import { resolveConfiguredPublicAppBaseUrl } from "@/lib/publicBaseUrl";
 
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
 
 export default async function AdminDocumentsPage({
   searchParams,

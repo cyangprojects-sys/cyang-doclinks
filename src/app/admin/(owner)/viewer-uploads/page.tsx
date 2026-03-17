@@ -3,7 +3,6 @@ import { sql } from "@/lib/db";
 import ViewerUploadsTableClient, { type ViewerUploadRow } from "./ViewerUploadsTableClient";
 
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
 
 async function tableExists(fqTable: string): Promise<boolean> {
   try {

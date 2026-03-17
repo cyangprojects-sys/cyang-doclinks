@@ -1,10 +1,3 @@
-/**
- * Canonical public demo document link for cyang.io.
- *
- * Keep all demo CTAs pointing here so you can rotate the token in one place.
- */
-export const CANONICAL_DEMO_DOC_URL = "https://www.cyang.io/s/5925b6744c38f9c6fd76efcac5fcc255";
-
 export function normalizeDemoDocUrl(value: string): string | null {
   try {
     const url = new URL(value);
@@ -25,21 +18,21 @@ function assertSafeDemoDocUrl(value: string): string {
   return normalized;
 }
 
-function configuredDemoDocUrl(): string {
-  const raw =
-    String(process.env.DEMO_DOC_URL || "").trim() ||
-    String(process.env.NEXT_PUBLIC_DEMO_DOC_URL || "").trim() ||
-    CANONICAL_DEMO_DOC_URL;
+export function getConfiguredDemoDocUrl(): string | null {
+  const raw = String(process.env.DEMO_DOC_URL || "").trim();
+  if (!raw) return null;
   try {
     return assertSafeDemoDocUrl(raw);
   } catch {
-    return assertSafeDemoDocUrl(CANONICAL_DEMO_DOC_URL);
+    return null;
   }
 }
 
 export function getDemoShareToken(): string | null {
   try {
-    const url = new URL(configuredDemoDocUrl());
+    const configured = getConfiguredDemoDocUrl();
+    if (!configured) return null;
+    const url = new URL(configured);
     const parts = url.pathname.split("/").filter(Boolean);
     if (parts.length < 2) return null;
     if (parts[0] !== "s") return null;
@@ -51,5 +44,5 @@ export function getDemoShareToken(): string | null {
   }
 }
 
-export const DEMO_DOC_URL = configuredDemoDocUrl();
+export const DEMO_DOC_URL = getConfiguredDemoDocUrl();
 

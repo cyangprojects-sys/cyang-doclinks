@@ -6,7 +6,6 @@ import { enforceGlobalApiRateLimit } from "@/lib/securityTelemetry";
 import { resolvePublicAppBaseUrl } from "@/lib/publicBaseUrl";
 
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
 
 function isExpired(expiresAt: string | null) {
   if (!expiresAt) return false;

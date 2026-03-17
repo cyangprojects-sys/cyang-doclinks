@@ -1,4 +1,4 @@
-import { CANONICAL_DEMO_DOC_URL, normalizeDemoDocUrl } from "@/lib/demo";
+import { normalizeDemoDocUrl } from "@/lib/demo";
 import { validateDocMasterKeysConfig } from "@/lib/encryption";
 
 export type AppEnvironment = "development" | "test" | "staging" | "production";
@@ -160,10 +160,7 @@ function validateEmail(findings: ConfigAuditFinding[], env: NodeJS.ProcessEnv, f
 
 function validateDemoDocConfig(findings: ConfigAuditFinding[], env: NodeJS.ProcessEnv) {
   const privateUrl = normalizeText(env.DEMO_DOC_URL);
-  const publicUrl = normalizeText(env.NEXT_PUBLIC_DEMO_DOC_URL);
   const normalizedPrivate = privateUrl ? normalizeDemoDocUrl(privateUrl) : null;
-  const normalizedPublic = publicUrl ? normalizeDemoDocUrl(publicUrl) : null;
-  const canonicalUrl = normalizeDemoDocUrl(CANONICAL_DEMO_DOC_URL);
 
   if (privateUrl && !normalizedPrivate) {
     addFinding(
@@ -171,35 +168,45 @@ function validateDemoDocConfig(findings: ConfigAuditFinding[], env: NodeJS.Proce
       "warn",
       "DEMO_DOC_URL",
       "DEMO_URL_INVALID",
-      "DEMO_DOC_URL is invalid and will be ignored in favor of the built-in canonical demo link."
+      "DEMO_DOC_URL must resolve to a valid gated share URL and is ignored when invalid."
     );
   }
-  if (publicUrl && !normalizedPublic) {
-    addFinding(
-      findings,
-      "warn",
-      "NEXT_PUBLIC_DEMO_DOC_URL",
-      "DEMO_URL_INVALID",
-      "NEXT_PUBLIC_DEMO_DOC_URL is invalid and will be ignored in favor of the built-in canonical demo link."
-    );
-  }
-  if (normalizedPrivate && normalizedPublic && normalizedPrivate !== normalizedPublic) {
-    addFinding(
-      findings,
-      "warn",
-      "DEMO_DOC_URL",
-      "DEMO_URL_MISMATCH",
-      "DEMO_DOC_URL and NEXT_PUBLIC_DEMO_DOC_URL must resolve to the same demo share link."
-    );
-  }
-  if (!canonicalUrl) {
-    addFinding(
-      findings,
-      "warn",
-      "DEMO_DOC_URL",
-      "DEMO_URL_CANONICAL_INVALID",
-      "The built-in canonical demo link is invalid and should be corrected before release."
-    );
+}
+
+function validateDeprecatedAliasUsage(findings: ConfigAuditFinding[], env: NodeJS.ProcessEnv) {
+  const aliases: Array<{ preferred: string; alias: string; compare?: boolean }> = [
+    { preferred: "R2_BUCKET", alias: "R2_BUCKET_NAME", compare: true },
+    { preferred: "SUPPORT_EMAIL", alias: "CONTACT_EMAIL", compare: true },
+    { preferred: "SECURITY_EMAIL", alias: "RESPONSIBLE_DISCLOSURE_EMAIL", compare: true },
+    { preferred: "DMCA_EMAIL", alias: "DMCA_CONTACT_EMAIL", compare: true },
+    { preferred: "EMAIL_FROM", alias: "RESEND_FROM", compare: true },
+  ];
+
+  for (const { preferred, alias, compare } of aliases) {
+    const preferredValue = normalizeText(env[preferred]);
+    const aliasValue = normalizeText(env[alias]);
+    if (!aliasValue) continue;
+
+    if (!preferredValue) {
+      addFinding(
+        findings,
+        "warn",
+        alias,
+        "LEGACY_ALIAS_ONLY",
+        `${alias} is set without ${preferred}. Prefer ${preferred} for new deployments and keep ${alias} only during migration windows.`
+      );
+      continue;
+    }
+
+    if (compare && preferredValue !== aliasValue) {
+      addFinding(
+        findings,
+        "warn",
+        alias,
+        "LEGACY_ALIAS_MISMATCH",
+        `${alias} does not match ${preferred}. ${preferred} is authoritative; align or remove the alias to reduce operator confusion.`
+      );
+    }
   }
 }
 
@@ -387,6 +394,7 @@ export function auditRuntimeConfig(env: NodeJS.ProcessEnv = process.env): Config
   }
 
   validateDemoDocConfig(findings, env);
+  validateDeprecatedAliasUsage(findings, env);
 
   const errorCount = findings.filter((finding) => finding.severity === "error").length;
   const warningCount = findings.filter((finding) => finding.severity === "warn").length;

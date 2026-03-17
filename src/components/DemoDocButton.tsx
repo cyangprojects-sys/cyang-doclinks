@@ -20,6 +20,8 @@ export function DemoDocButton({
   className = "",
   title = "Open demo document (new tab)",
 }: DemoDocButtonProps) {
+  if (!DEMO_DOC_URL) return null;
+
   return (
     <a
       href={DEMO_DOC_URL}

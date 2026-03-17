@@ -7,8 +7,6 @@ import CreateApiKeyForm from "./CreateApiKeyForm";
 import RevokeApiKeyButton from "./RevokeApiKeyButton";
 
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
 
 type Row = {
   id: string;

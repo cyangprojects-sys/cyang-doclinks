@@ -5,8 +5,6 @@ import ViewerUploadsPage from "../(owner)/viewer-uploads/page";
 import { AdminPageIntro, AdminTabs } from "../_components/AdminPagePrimitives";
 
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
 
 const TABS = [
   { key: "uploads", label: "Viewer Uploads", href: "/admin/review?tab=uploads" },

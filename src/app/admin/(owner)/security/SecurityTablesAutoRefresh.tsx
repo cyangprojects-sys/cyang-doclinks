@@ -17,7 +17,7 @@ type SignaturesResponse =
   | { ok: false; error: string };
 
 // Owner security tables stay self-updating, but not on a cadence that keeps the DB warm unnecessarily.
-const POLL_MS = 60_000;
+const POLL_MS = 180_000;
 
 export default function SecurityTablesAutoRefresh() {
   const router = useRouter();

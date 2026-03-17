@@ -11,8 +11,6 @@ import {
 import { getBillingFlags } from "@/lib/settings";
 
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
 type StripeInvoice = {
   id?: string;
   number?: string;

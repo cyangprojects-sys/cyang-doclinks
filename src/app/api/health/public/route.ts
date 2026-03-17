@@ -1,5 +1,4 @@
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
 import { enforceGlobalApiRateLimit } from "@/lib/securityTelemetry";
@@ -7,8 +6,8 @@ import { getCachedPublicHealthSnapshot } from "@/lib/health";
 import { getRouteTimeoutMs, isRouteTimeoutError, withRouteTimeout } from "@/lib/routeTimeout";
 import { withRequestTelemetry } from "@/lib/perfTelemetry";
 
-const PUBLIC_STATUS_S_MAXAGE = 120;
-const PUBLIC_STATUS_STALE_WHILE_REVALIDATE = 300;
+const PUBLIC_STATUS_S_MAXAGE = 300;
+const PUBLIC_STATUS_STALE_WHILE_REVALIDATE = 900;
 
 export async function GET(req: NextRequest) {
   const timeoutMs = getRouteTimeoutMs("ROUTE_TIMEOUT_HEALTH_MS", 3_000);

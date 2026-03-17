@@ -57,7 +57,7 @@ const PREVIEW_VALUES = new Set<StatusPreview>([
   "loading",
 ]);
 
-const AUTO_REFRESH_MS = 120_000;
+const AUTO_REFRESH_MS = 600_000;
 const STATUS_SUBSCRIBE_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const STATUS_SUBSCRIBE_STORAGE_KEY = "cyang_status_subscription_email";
 
@@ -546,13 +546,21 @@ export default function StatusCenterClient({ preview }: { preview?: StatusPrevie
   const scenario = useMemo<PlatformState>(() => {
     return deriveStatusPageScenario(snapshot, previewMode);
   }, [previewMode, snapshot]);
+  const isPreviewScenario = previewMode !== "live" && previewMode !== "loading";
 
   const services = useMemo(() => buildServices(scenario), [scenario]);
-  const incidents = useMemo(() => buildIncidents(scenario), [scenario]);
-  const uptime = useMemo(() => buildUptime(scenario), [scenario]);
+  const incidents = useMemo(
+    () => (isPreviewScenario ? buildIncidents(scenario) : []),
+    [isPreviewScenario, scenario]
+  );
+  const uptime = useMemo(
+    () => (isPreviewScenario ? buildUptime(scenario) : []),
+    [isPreviewScenario, scenario]
+  );
   const state = useMemo(() => services.reduce<PlatformState>((worst, cur) => (statusRank(cur.status) > statusRank(worst) ? cur.status : worst), "operational"), [services]);
   const stateUi = useMemo(() => statusConfig(state), [state]);
   const uptimePercent = useMemo(() => {
+    if (!uptime.length) return null;
     const avg = uptime.reduce((sum, d) => sum + uptimeWeight(d.status), 0) / Math.max(uptime.length, 1);
     return Math.min(100, avg);
   }, [uptime]);
@@ -575,11 +583,9 @@ export default function StatusCenterClient({ preview }: { preview?: StatusPrevie
       <section className="glass-card-strong ui-sheen rounded-[30px] p-6 sm:p-8">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <div className="text-xs uppercase tracking-[0.16em] text-white/55">cyang.io Trust Center</div>
-            <h1 className="mt-2 text-3xl font-semibold tracking-tight text-white sm:text-4xl">System Status</h1>
-            <p className="mt-3 max-w-3xl text-sm leading-6 text-white/68 sm:text-base">
-              Live health and availability for cyang.io services. Check platform reliability, recent incidents, and update cadence in one place.
-            </p>
+            <div className="text-xs uppercase tracking-[0.16em] text-white/55">Current service posture</div>
+            <h2 className="mt-2 text-2xl font-semibold tracking-tight text-white sm:text-3xl">{stateUi.headline}</h2>
+            <p className="mt-3 max-w-3xl text-sm leading-6 text-white/68 sm:text-base">{stateUi.summary}</p>
           </div>
           <div className="flex flex-col items-end gap-2">
             <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium ${stateUi.badge}`}>
@@ -588,7 +594,7 @@ export default function StatusCenterClient({ preview }: { preview?: StatusPrevie
             </span>
             <div className="text-xs text-white/55">Last updated {fmtDateTime(snapshot?.ts ?? null)} ({fmtRelative(snapshot?.ts ?? null)})</div>
             <div className="flex items-center gap-2">
-              <span className="rounded-full border border-white/12 bg-white/[0.04] px-2.5 py-1 text-[11px] text-white/58">Auto-refresh every 2m while visible</span>
+              <span className="rounded-full border border-white/12 bg-white/[0.04] px-2.5 py-1 text-[11px] text-white/58">Auto-refresh every 10m while visible</span>
               <button type="button" onClick={() => void refreshSnapshot(true)} disabled={refreshing} className="btn-base rounded-xl border border-white/14 bg-white/[0.04] px-3 py-1.5 text-xs text-white/82 hover:border-white/24 hover:bg-white/[0.08] disabled:opacity-60">
                 {refreshing ? "Refreshing..." : "Refresh now"}
               </button>
@@ -603,14 +609,21 @@ export default function StatusCenterClient({ preview }: { preview?: StatusPrevie
         <div className="grid gap-4 xl:grid-cols-[1.2fr_minmax(0,0.8fr)]">
           <div>
             <div className="text-xs uppercase tracking-[0.16em] text-white/45">Overall platform status</div>
-            <h2 className="mt-2 text-2xl font-semibold text-white">{stateUi.headline}</h2>
-            <p className="mt-3 max-w-2xl text-sm text-white/67">{stateUi.summary}</p>
+            <h2 className="mt-2 text-2xl font-semibold text-white">Live summary and service coverage</h2>
+            <p className="mt-3 max-w-2xl text-sm text-white/67">
+              Public traffic reads a cached health snapshot, while authenticated operators can still drill into deeper
+              diagnostics through the linked readiness and dependency endpoints.
+            </p>
           </div>
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
             <div className="rounded-2xl border border-white/12 bg-white/[0.04] p-4">
               <div className="text-xs uppercase tracking-[0.16em] text-white/45">30-day uptime</div>
-              <div className="mt-2 text-2xl font-semibold text-white">{uptimePercent.toFixed(2)}%</div>
-              <div className="mt-1 text-sm text-white/60">Platform availability over the last 30 days.</div>
+              <div className="mt-2 text-2xl font-semibold text-white">{uptimePercent != null ? `${uptimePercent.toFixed(2)}%` : "Live snapshot"}</div>
+              <div className="mt-1 text-sm text-white/60">
+                {uptimePercent != null
+                  ? "Platform availability over the last 30 days."
+                  : "Cached public health summary from the current live snapshot."}
+              </div>
             </div>
             <div className="rounded-2xl border border-white/12 bg-white/[0.04] p-4">
               <div className="text-xs uppercase tracking-[0.16em] text-white/45">Open incidents</div>
@@ -662,7 +675,15 @@ export default function StatusCenterClient({ preview }: { preview?: StatusPrevie
           <div className="text-xs uppercase tracking-[0.16em] text-white/45">Incident history</div>
           <h2 className="mt-2 text-xl font-semibold text-white">Recent events</h2>
         </div>
-        {incidents.length === 0 ? (
+        {!isPreviewScenario ? (
+          <div className="rounded-2xl border border-dashed border-white/16 bg-white/[0.03] px-5 py-8 text-center">
+            <div className="text-lg font-semibold text-white">Live snapshot mode</div>
+            <p className="mx-auto mt-2 max-w-2xl text-sm text-white/62">
+              This public page shows the current cached service snapshot. Historical incident publishing stays manual so
+              we do not fabricate timelines from a single health check.
+            </p>
+          </div>
+        ) : incidents.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-white/16 bg-white/[0.03] px-5 py-8 text-center">
             <div className="text-lg font-semibold text-white">No recent incidents</div>
             <p className="mx-auto mt-2 max-w-2xl text-sm text-white/62">We have not recorded incidents in the current reporting window. Core systems are operating as expected.</p>
@@ -704,34 +725,54 @@ export default function StatusCenterClient({ preview }: { preview?: StatusPrevie
 
       <section className="glass-card-strong rounded-[30px] p-5 sm:p-6">
         <div className="mb-4">
-          <div className="text-xs uppercase tracking-[0.16em] text-white/45">Reliability</div>
-          <h2 className="mt-2 text-xl font-semibold text-white">Uptime over 30 days</h2>
+          <div className="text-xs uppercase tracking-[0.16em] text-white/45">{isPreviewScenario ? "Reliability" : "Snapshot model"}</div>
+          <h2 className="mt-2 text-xl font-semibold text-white">{isPreviewScenario ? "Uptime over 30 days" : "How this status page stays cheap and accurate"}</h2>
         </div>
-        <div className="grid gap-4 xl:grid-cols-[1.35fr_minmax(0,0.65fr)]">
-          <div className="rounded-2xl border border-white/12 bg-white/[0.03] p-4">
-            <div className="mt-3 grid grid-cols-[repeat(15,minmax(0,1fr))] gap-1 sm:grid-cols-[repeat(30,minmax(0,1fr))]">
-              {uptime.map((day) => (
-                <div key={day.date} className={`h-8 rounded ${dailyBarClass(day.status)}`} title={`${fmtDateTime(day.date)} · ${statusConfig(day.status).short}`} />
-              ))}
+        {isPreviewScenario ? (
+          <div className="grid gap-4 xl:grid-cols-[1.35fr_minmax(0,0.65fr)]">
+            <div className="rounded-2xl border border-white/12 bg-white/[0.03] p-4">
+              <div className="mt-3 grid grid-cols-[repeat(15,minmax(0,1fr))] gap-1 sm:grid-cols-[repeat(30,minmax(0,1fr))]">
+                {uptime.map((day) => (
+                  <div key={day.date} className={`h-8 rounded ${dailyBarClass(day.status)}`} title={`${fmtDateTime(day.date)} · ${statusConfig(day.status).short}`} />
+                ))}
+              </div>
+              <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-white/58">
+                <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-emerald-300/90" />Operational</span>
+                <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-amber-300/90" />Degraded</span>
+                <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-orange-300/90" />Partial outage</span>
+                <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-rose-300/90" />Major outage</span>
+                <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-sky-300/90" />Maintenance</span>
+              </div>
             </div>
-            <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-white/58">
-              <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-emerald-300/90" />Operational</span>
-              <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-amber-300/90" />Degraded</span>
-              <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-orange-300/90" />Partial outage</span>
-              <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-rose-300/90" />Major outage</span>
-              <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-sky-300/90" />Maintenance</span>
+            <div className="rounded-2xl border border-white/12 bg-white/[0.03] p-4">
+              <div className="text-xs uppercase tracking-[0.16em] text-white/45">Highlights</div>
+              <div className="mt-3 text-3xl font-semibold text-white">{uptimePercent?.toFixed(2)}%</div>
+              <div className="mt-1 text-sm text-white/63">Platform uptime over the last 30 days.</div>
+              <div className="mt-4 space-y-2 text-sm text-white/65">
+                <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2"><span className="font-medium text-white">Open incidents:</span> {openIncidents}</div>
+                <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2"><span className="font-medium text-white">Last refresh:</span> {lastRefreshAt ? fmtDateTime(lastRefreshAt) : "Pending"}</div>
+              </div>
             </div>
           </div>
-          <div className="rounded-2xl border border-white/12 bg-white/[0.03] p-4">
-            <div className="text-xs uppercase tracking-[0.16em] text-white/45">Highlights</div>
-            <div className="mt-3 text-3xl font-semibold text-white">{uptimePercent.toFixed(2)}%</div>
-            <div className="mt-1 text-sm text-white/63">Platform uptime over the last 30 days.</div>
-            <div className="mt-4 space-y-2 text-sm text-white/65">
-              <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2"><span className="font-medium text-white">Open incidents:</span> {openIncidents}</div>
-              <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2"><span className="font-medium text-white">Last refresh:</span> {lastRefreshAt ? fmtDateTime(lastRefreshAt) : "Pending"}</div>
+        ) : (
+          <div className="grid gap-4 xl:grid-cols-3">
+            <div className="rounded-2xl border border-white/12 bg-white/[0.03] p-4">
+              <div className="text-xs uppercase tracking-[0.16em] text-white/45">Current source</div>
+              <div className="mt-2 text-lg font-semibold text-white">Cached public health snapshot</div>
+              <div className="mt-1 text-sm text-white/63">Anonymous traffic reads a lightweight summary instead of live dependency fan-out.</div>
+            </div>
+            <div className="rounded-2xl border border-white/12 bg-white/[0.03] p-4">
+              <div className="text-xs uppercase tracking-[0.16em] text-white/45">Refresh policy</div>
+              <div className="mt-2 text-lg font-semibold text-white">Manual plus slow auto-refresh</div>
+              <div className="mt-1 text-sm text-white/63">The page refreshes while visible every 10 minutes and immediately when you reopen the tab.</div>
+            </div>
+            <div className="rounded-2xl border border-white/12 bg-white/[0.03] p-4">
+              <div className="text-xs uppercase tracking-[0.16em] text-white/45">Historical reporting</div>
+              <div className="mt-2 text-lg font-semibold text-white">Published intentionally</div>
+              <div className="mt-1 text-sm text-white/63">We do not synthesize incident timelines or uptime history from a single transient health check.</div>
             </div>
           </div>
-        </div>
+        )}
       </section>
 
       <details className="glass-card-strong rounded-[24px] p-4 sm:p-5">
@@ -799,29 +840,6 @@ export default function StatusCenterClient({ preview }: { preview?: StatusPrevie
         ) : null}
       </section>
 
-      <section className="glass-card rounded-[24px] p-4 sm:p-5">
-        <h2 className="text-base font-semibold text-white">Related trust resources</h2>
-        <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-6">
-          <Link href="/trust" className="rounded-xl border border-white/12 bg-black/25 px-3 py-2 text-sm text-white/82 transition-colors hover:bg-white/10">
-            Trust Center
-          </Link>
-          <Link href="/trust/procurement" className="rounded-xl border border-white/12 bg-black/25 px-3 py-2 text-sm text-white/82 transition-colors hover:bg-white/10">
-            Procurement package
-          </Link>
-          <Link href="/legal/security-policy" className="rounded-xl border border-white/12 bg-black/25 px-3 py-2 text-sm text-white/82 transition-colors hover:bg-white/10">
-            Security Policy
-          </Link>
-          <Link href="/legal/service-level-agreement" className="rounded-xl border border-white/12 bg-black/25 px-3 py-2 text-sm text-white/82 transition-colors hover:bg-white/10">
-            SLA
-          </Link>
-          <Link href="/report" className="rounded-xl border border-white/12 bg-black/25 px-3 py-2 text-sm text-white/82 transition-colors hover:bg-white/10">
-            Report abuse
-          </Link>
-          <Link href="/contact" className="rounded-xl border border-white/12 bg-black/25 px-3 py-2 text-sm text-white/82 transition-colors hover:bg-white/10">
-            Contact
-          </Link>
-        </div>
-      </section>
     </div>
   );
 }

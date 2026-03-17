@@ -3,6 +3,7 @@ import { sql } from "@/lib/db";
 import { rateLimit } from "@/lib/rateLimit";
 import { appendImmutableAudit } from "@/lib/immutableAudit";
 import { getTrustedClientIpFromHeaders } from "@/lib/clientIp";
+import { getSecurityTelemetryHashKey } from "@/lib/envConfig";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -54,13 +55,7 @@ function securityTelemetryDbEnabled(): boolean {
  * Hash IP address (privacy safe logging)
  */
 export function hashIp(ip: string): string {
-  const key = String(
-    process.env.SECURITY_TELEMETRY_HASH_KEY ||
-      process.env.VIEW_SALT ||
-      process.env.NEXTAUTH_SECRET ||
-      process.env.APP_SECRET ||
-      ""
-  ).trim();
+  const key = getSecurityTelemetryHashKey() || "";
   if (key) {
     return crypto.createHmac("sha256", key).update(ip).digest("hex");
   }

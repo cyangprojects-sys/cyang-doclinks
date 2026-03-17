@@ -3,11 +3,9 @@ import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/authz";
 import DashboardHeaderActions from "@/app/admin/dashboard/DashboardHeaderActions";
 import ViewsByDocTableClient from "@/app/admin/dashboard/ViewsByDocTableClient";
-import { getDashboardActivityData, getDashboardHomeData } from "@/app/admin/dashboard/data";
+import { getDashboardActivityPageData } from "@/app/admin/dashboard/data";
 
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
 
 function fmtInt(n: number) {
   try {
@@ -15,6 +13,13 @@ function fmtInt(n: number) {
   } catch {
     return String(n);
   }
+}
+
+function fmtDateTime(s: string | null): string {
+  if (!s) return "No activity yet";
+  const d = new Date(s);
+  if (Number.isNaN(d.getTime())) return s;
+  return d.toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 }
 
 export default async function ViewerActivityPage() {
@@ -29,7 +34,7 @@ export default async function ViewerActivityPage() {
     redirect("/admin/activity");
   }
 
-  const [activityData, homeData] = await Promise.all([getDashboardActivityData(user), getDashboardHomeData(user)]);
+  const { activityData, homeData, snapshotGeneratedAt } = await getDashboardActivityPageData(user);
   const totalViews = activityData.viewsRows.reduce((sum, row) => sum + row.views, 0);
   const activeFiles = activityData.viewsRows.filter((row) => row.views > 0).length;
   const recentFiles = activityData.viewsRows.filter((row) => row.last_view).length;
@@ -62,6 +67,9 @@ export default async function ViewerActivityPage() {
               <Link href="/viewer/links" className="btn-base btn-secondary rounded-2xl px-4 py-3 text-sm">
                 Manage shared links
               </Link>
+            </div>
+            <div className="mt-4 text-[11px] uppercase tracking-[0.16em] text-white/38">
+              Snapshot updated {fmtDateTime(new Date(snapshotGeneratedAt).toISOString())}
             </div>
           </div>
 

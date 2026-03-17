@@ -6,7 +6,6 @@ import { enforceGlobalApiRateLimit, logSecurityEvent } from "@/lib/securityTelem
 import { appendImmutableAudit } from "@/lib/immutableAudit";
 
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
 
 const Body = z.object({
   key_id: z.string().min(1),

@@ -6,7 +6,6 @@ import { enforceGlobalApiRateLimit, logSecurityEvent } from "@/lib/securityTelem
 import { appendImmutableAudit } from "@/lib/immutableAudit";
 
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
 
 const KEY_ID_RE = /^[A-Za-z0-9._:-]{1,128}$/;
 const MAX_SECURITY_REVOKE_BODY_BYTES = 8 * 1024;

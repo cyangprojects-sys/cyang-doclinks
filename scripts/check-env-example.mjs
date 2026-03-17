@@ -3,7 +3,7 @@ import { join, extname } from "node:path";
 
 const root = process.cwd();
 const envExamplePath = join(root, ".env.example");
-const TARGET_PATHS = ["src", "next.config.ts"];
+const TARGET_PATHS = ["src", "scripts", "next.config.ts"];
 
 const INCLUDED_EXT = new Set([".ts", ".tsx", ".js", ".mjs", ".cjs"]);
 const SKIP_DIRS = new Set([
@@ -16,6 +16,15 @@ const SKIP_DIRS = new Set([
   "test-results",
 ]);
 const SKIP_FILES = new Set([".env.local", ".env.production", ".env.example"]);
+const IGNORE_KEYS = new Set([
+  "CI",
+  "COMSPEC",
+  "PLAYWRIGHT_BASE_URL",
+  "SWEEP_DIAG",
+  "SWEEP_ONLY_DIAG",
+  "SWEEP_TEST_EMAIL",
+  "SWEEP_TEST_PASSWORD",
+]);
 
 function listFiles(dir) {
   const out = [];
@@ -45,12 +54,30 @@ function parseEnvExampleKeys(content) {
 
 function collectStaticEnvRefs(code) {
   const keys = new Set();
-  const dot = /process\.env\.([A-Z][A-Z0-9_]*)/g;
+  const dot = /process\.env\.([A-Z][A-Z0-9_]*)(?![A-Za-z0-9_])/g;
   let m;
-  while ((m = dot.exec(code)) !== null) keys.add(m[1]);
+  while ((m = dot.exec(code)) !== null) {
+    if (!IGNORE_KEYS.has(m[1])) keys.add(m[1]);
+  }
 
   const bracket = /process\.env\[(["'])([A-Z][A-Z0-9_]*)\1\]/g;
-  while ((m = bracket.exec(code)) !== null) keys.add(m[2]);
+  while ((m = bracket.exec(code)) !== null) {
+    if (!IGNORE_KEYS.has(m[2])) keys.add(m[2]);
+  }
+
+  const helperSingle = /\b(?:readEnvText|getHashingSalt)\(\s*(["'])([A-Z][A-Z0-9_]*)\1/g;
+  while ((m = helperSingle.exec(code)) !== null) {
+    if (!IGNORE_KEYS.has(m[2])) keys.add(m[2]);
+  }
+
+  const helperArrays = /\b(?:readPreferredEnvText|readAnyEnvText)\(\s*(?:["'][A-Z][A-Z0-9_]*["']\s*,\s*)?\[([^\]]*)\]/g;
+  while ((m = helperArrays.exec(code)) !== null) {
+    const items = m[1].match(/["']([A-Z][A-Z0-9_]*)["']/g) || [];
+    for (const item of items) {
+      const key = item.slice(1, -1);
+      if (!IGNORE_KEYS.has(key)) keys.add(key);
+    }
+  }
   return keys;
 }
 

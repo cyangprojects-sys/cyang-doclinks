@@ -7,7 +7,6 @@ import { enqueueKeyRotationJob } from "@/lib/keyRotationJobs";
 import { appendImmutableAudit } from "@/lib/immutableAudit";
 
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
 
 const KEY_ID_RE = /^[A-Za-z0-9._:-]{1,128}$/;
 const MAX_SECURITY_ROTATE_BODY_BYTES = 8 * 1024;

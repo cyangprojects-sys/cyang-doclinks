@@ -4,8 +4,6 @@ import WebhooksPage from "../(owner)/webhooks/page";
 import { AdminPageIntro, AdminTabs } from "../_components/AdminPagePrimitives";
 
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
 
 const TABS = [
   { key: "webhooks", label: "Webhooks", href: "/admin/integrations?tab=webhooks" },

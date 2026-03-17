@@ -8,8 +8,6 @@ import { normalizeScanState } from "@/lib/documentStatus";
 import { sql } from "@/lib/db";
 
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
 
 export default async function AdminUploadsPage({
   searchParams,

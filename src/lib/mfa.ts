@@ -2,6 +2,7 @@ import crypto from "crypto";
 import { cookies } from "next/headers";
 import { sql } from "@/lib/db";
 import { decryptSecret, encryptSecret } from "@/lib/cryptoSecrets";
+import { getInviteHashSecret } from "@/lib/envConfig";
 import type { Role } from "@/lib/authz";
 
 const MFA_COOKIE = "cy_mfa";
@@ -75,7 +76,7 @@ export async function mfaTableExists(): Promise<boolean> {
 }
 
 function signingKey(): string {
-  const k = String(process.env.NEXTAUTH_SECRET || process.env.VIEW_SALT || "").trim();
+  const k = getInviteHashSecret() || "";
   if (!k) throw new Error("Missing NEXTAUTH_SECRET or VIEW_SALT for MFA cookie signing.");
   return k;
 }

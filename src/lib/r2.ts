@@ -14,6 +14,7 @@
 //    types yet, so we apply them behind a safe `as any` cast.
 
 import { S3Client } from "@aws-sdk/client-s3";
+import { getR2BucketEnv } from "@/lib/envConfig";
 
 const R2_BUCKET_RE = /^[A-Za-z0-9](?:[A-Za-z0-9._-]{1,62})$/;
 
@@ -51,7 +52,7 @@ function requireEnv(name: "R2_ENDPOINT" | "R2_ACCESS_KEY_ID" | "R2_SECRET_ACCESS
 }
 
 export function getR2Bucket(): string {
-  const bucket = (process.env.R2_BUCKET || process.env.R2_BUCKET_NAME || "").trim();
+  const bucket = getR2BucketEnv() || "";
   if (!bucket) throw new Error("Missing R2_BUCKET env var");
   if (!R2_BUCKET_RE.test(bucket)) throw new Error("Invalid R2 bucket name");
   return bucket;

@@ -1,6 +1,5 @@
 // src/app/auth/google/start/route.ts
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
 
 import { NextRequest } from "next/server";
 import { createGoogleAuthRequest } from "@/lib/oauth-google";

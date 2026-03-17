@@ -5,7 +5,6 @@ import { enforceGlobalApiRateLimit } from "@/lib/securityTelemetry";
 import { getRouteTimeoutMs, isRouteTimeoutError, withRouteTimeout } from "@/lib/routeTimeout";
 
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
 
 type SeqScanRiskRow = {
   relname: string;

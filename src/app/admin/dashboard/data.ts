@@ -49,6 +49,12 @@ export type DashboardOverviewData = {
   snapshotGeneratedAt: number;
 };
 
+export type DashboardActivityPageData = {
+  homeData: DashboardHomeData;
+  activityData: DashboardActivityData;
+  snapshotGeneratedAt: number;
+};
+
 type DashboardSchemaState = Omit<
   DashboardCtx,
   "canSeeAll" | "canCheckEncryptionStatus" | "planId" | "nowTs" | "docFilter"
@@ -69,12 +75,19 @@ type DashboardOverviewCacheEntry = {
   value: DashboardOverviewData;
 };
 
+type DashboardActivityPageCacheEntry = {
+  expiresAt: number;
+  value: DashboardActivityPageData;
+};
+
 let dashboardSchemaCache: DashboardSchemaCacheEntry | null = null;
 let dashboardSchemaInFlight: Promise<DashboardSchemaState> | null = null;
 const dashboardCtxCache = new Map<string, DashboardCtxCacheEntry>();
 const dashboardCtxInFlight = new Map<string, Promise<DashboardCtx>>();
 const dashboardOverviewCache = new Map<string, DashboardOverviewCacheEntry>();
 const dashboardOverviewInFlight = new Map<string, Promise<DashboardOverviewData>>();
+const dashboardActivityPageCache = new Map<string, DashboardActivityPageCacheEntry>();
+const dashboardActivityPageInFlight = new Map<string, Promise<DashboardActivityPageData>>();
 
 async function tableExists(fqTable: string): Promise<boolean> {
   try {
@@ -136,6 +149,17 @@ function setDashboardOverviewCache(key: string, value: DashboardOverviewData) {
   if (dashboardOverviewCache.size > 100) {
     const oldestKey = dashboardOverviewCache.keys().next().value;
     if (oldestKey) dashboardOverviewCache.delete(oldestKey);
+  }
+}
+
+function setDashboardActivityPageCache(key: string, value: DashboardActivityPageData) {
+  dashboardActivityPageCache.set(key, {
+    value,
+    expiresAt: Date.now() + getDashboardOverviewCacheMs(),
+  });
+  if (dashboardActivityPageCache.size > 100) {
+    const oldestKey = dashboardActivityPageCache.keys().next().value;
+    if (oldestKey) dashboardActivityPageCache.delete(oldestKey);
   }
 }
 
@@ -548,5 +572,38 @@ export async function getDashboardOverviewData(u: AuthedUser): Promise<Dashboard
   });
 
   dashboardOverviewInFlight.set(cacheKey, loadPromise);
+  return loadPromise;
+}
+
+export async function getDashboardActivityPageData(u: AuthedUser): Promise<DashboardActivityPageData> {
+  const cacheKey = getDashboardCtxCacheKey(u);
+  const cached = dashboardActivityPageCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.value;
+  }
+
+  const existing = dashboardActivityPageInFlight.get(cacheKey);
+  if (existing) {
+    return existing;
+  }
+
+  const loadPromise = (async (): Promise<DashboardActivityPageData> => {
+    const [homeData, activityData] = await Promise.all([
+      getDashboardHomeData(u),
+      getDashboardActivityData(u),
+    ]);
+
+    const value: DashboardActivityPageData = {
+      homeData,
+      activityData,
+      snapshotGeneratedAt: Date.now(),
+    };
+    setDashboardActivityPageCache(cacheKey, value);
+    return value;
+  })().finally(() => {
+    dashboardActivityPageInFlight.delete(cacheKey);
+  });
+
+  dashboardActivityPageInFlight.set(cacheKey, loadPromise);
   return loadPromise;
 }

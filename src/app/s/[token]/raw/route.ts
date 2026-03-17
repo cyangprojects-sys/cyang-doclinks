@@ -26,7 +26,6 @@ import { getShareEligibility } from "@/lib/documentStatus";
 import { withRequestTelemetry } from "@/lib/perfTelemetry";
 
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
 
 function isBlockedTopLevelOpen(req: NextRequest): boolean {
   const dest = (req.headers.get("sec-fetch-dest") || "").toLowerCase();

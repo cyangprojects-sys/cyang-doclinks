@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import { sql } from "@/lib/db";
+import { getViewBindingSecret } from "@/lib/envConfig";
 import { getClientIp } from "@/lib/view";
 
 export type AccessTicketPurpose = "preview_view" | "file_download" | "watermarked_file_download";
@@ -34,11 +35,8 @@ function normalizeTextOrNull(value: unknown, maxLen: number): string | null {
 }
 
 function bindingSecret() {
-  const viewSalt = (process.env.VIEW_SALT || "").trim();
-  if (viewSalt) return viewSalt;
-
-  const authSecret = (process.env.NEXTAUTH_SECRET || "").trim();
-  if (authSecret) return authSecret;
+  const bindingKey = getViewBindingSecret();
+  if (bindingKey) return bindingKey;
 
   const allowInsecureFallback =
     process.env.NODE_ENV !== "production" &&

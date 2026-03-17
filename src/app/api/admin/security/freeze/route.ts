@@ -6,7 +6,6 @@ import { enforceGlobalApiRateLimit, logSecurityEvent } from "@/lib/securityTelem
 import { resolvePublicAppBaseUrl } from "@/lib/publicBaseUrl";
 
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
 const MAX_SECURITY_FREEZE_BODY_BYTES = 8 * 1024;
 
 function asBool(v: unknown): boolean {

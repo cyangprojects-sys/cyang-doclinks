@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import { sql } from "@/lib/db";
 import type { Role } from "@/lib/authz";
+import { getInviteHashSecret } from "@/lib/envConfig";
 
 export type OrgMembershipRole = Role;
 
@@ -32,7 +33,7 @@ function normEmail(email: string): string {
 }
 
 function inviteHashSecret(): string {
-  const secret = (process.env.NEXTAUTH_SECRET || process.env.VIEW_SALT || "").trim();
+  const secret = getInviteHashSecret() || "";
   if (!secret) throw new Error("Missing NEXTAUTH_SECRET or VIEW_SALT for invite hashing.");
   return secret;
 }

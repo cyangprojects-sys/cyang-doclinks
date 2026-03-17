@@ -494,8 +494,8 @@ let publicHealthCache: PublicHealthCacheEntry | null = null;
 let publicHealthInFlight: Promise<PublicHealthSnapshot> | null = null;
 
 function getPublicHealthCacheMs() {
-  const raw = Number(process.env.STATUS_PUBLIC_HEALTH_CACHE_MS || 120_000);
-  if (!Number.isFinite(raw)) return 120_000;
+  const raw = Number(process.env.STATUS_PUBLIC_HEALTH_CACHE_MS || 300_000);
+  if (!Number.isFinite(raw)) return 300_000;
   return Math.max(15_000, Math.min(10 * 60_000, Math.floor(raw)));
 }
 

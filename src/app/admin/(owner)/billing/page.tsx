@@ -16,8 +16,6 @@ import StripeBillingPage from "./stripe/page";
 import { AdminPageIntro, AdminTabs } from "../../_components/AdminPagePrimitives";
 
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
 
 function Card({ children }: { children: React.ReactNode }) {
   return <div className="glass-card-strong rounded-2xl p-5">{children}</div>;
