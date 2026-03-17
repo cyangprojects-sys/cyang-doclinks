@@ -147,6 +147,17 @@ const nextConfig: NextConfig = {
 
     return [
       {
+        // Brand assets are versioned by filename changes, so they can be cached
+        // aggressively at the edge without risking stale dynamic content.
+        source: "/branding/:path*",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=31536000, immutable",
+          },
+        ],
+      },
+      {
         source: "/serve/:path*",
         headers: serveHeaders,
       },

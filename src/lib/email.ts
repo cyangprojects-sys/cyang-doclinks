@@ -8,6 +8,7 @@ const MAX_TEXT_LEN = 12000;
 const MAX_URL_LEN = 2048;
 const SAFE_COLOR_RE = /^#(?:[0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
 const BASIC_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+let resendClient: Resend | null = null;
 
 function mustEnv(name: string) {
   const raw = String(process.env[name] || "");
@@ -79,6 +80,12 @@ function normalizeBrandColor(value: string | null | undefined): string {
   return "#0B2A4A";
 }
 
+function getResendClient(): Resend {
+  if (resendClient) return resendClient;
+  resendClient = new Resend(mustEnv("RESEND_API_KEY"));
+  return resendClient;
+}
+
 type BasicMail = {
   to: string;
   subject: string;
@@ -89,7 +96,7 @@ export async function sendMail(m: BasicMail) {
   const to = normalizeRecipientEmail(m.to);
   const subject = normalizeSubject(m.subject);
   const text = normalizePlainText(m.text);
-  const resend = new Resend(mustEnv("RESEND_API_KEY"));
+  const resend = getResendClient();
   const from = mustEnv("EMAIL_FROM");
 
   // Minimal plain-text email (back-compat for admin actions)
@@ -120,7 +127,7 @@ export type ShareEmailParams = {
 export async function sendShareEmail(p: ShareEmailParams) {
   const to = normalizeRecipientEmail(p.to);
   const subject = normalizeSubject(p.subject);
-  const resend = new Resend(mustEnv("RESEND_API_KEY"));
+  const resend = getResendClient();
   const from = mustEnv("EMAIL_FROM");
 
   const html = renderShareEmailHtml(p);
@@ -136,7 +143,7 @@ export async function sendShareEmail(p: ShareEmailParams) {
 export async function sendAccountActivationEmail(args: { to: string; activationUrl: string }) {
   const to = normalizeRecipientEmail(args.to);
   const activationUrl = normalizeHttpUrl(args.activationUrl, "activationUrl");
-  const resend = new Resend(mustEnv("RESEND_API_KEY"));
+  const resend = getResendClient();
   const from = mustEnv("EMAIL_FROM");
 
   const subject = "Activate your cyang.io account";

@@ -445,7 +445,7 @@ export default function StatusCenterClient({ preview }: { preview?: StatusPrevie
     if (!silent) setLoading(true);
     setRefreshing(silent);
     try {
-      const res = await fetch("/api/health/public", { cache: "no-store", headers: { Accept: "application/json" } });
+      const res = await fetch("/api/health/public", { headers: { Accept: "application/json" } });
       const payload = (await res.json()) as Partial<StatusSnapshot>;
       if (!res.ok) {
         setSnapshot({ ok: false, service: "cyang.io", ts: Date.now(), error: typeof payload.error === "string" ? payload.error : `HTTP_${res.status}` });

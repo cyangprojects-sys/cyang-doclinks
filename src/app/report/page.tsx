@@ -4,7 +4,8 @@ import ReportForm from "./ReportForm";
 import { SiteShell } from "@/app/components/SiteShell";
 
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
+export const dynamic = "force-static";
+export const revalidate = 3600;
 
 export const metadata: Metadata = {
   title: "Report Abuse - cyang.io",
@@ -12,18 +13,7 @@ export const metadata: Metadata = {
     "Report malware, phishing, illegal content, policy abuse, or suspicious sharing behavior. Reports are reviewed through moderation, quarantine, and security logging workflows.",
 };
 
-export default async function ReportPage(props: {
-  searchParams?: Promise<Record<string, string | string[] | undefined>>;
-}) {
-  const sp = (await props.searchParams) || {};
-  const tokenRaw = sp.token;
-  const aliasRaw = sp.alias;
-
-  const token = Array.isArray(tokenRaw) ? tokenRaw[0] : tokenRaw;
-  const alias = Array.isArray(aliasRaw) ? aliasRaw[0] : aliasRaw;
-
-  const hasPrefill = Boolean(token || alias);
-
+export default function ReportPage() {
   return (
     <SiteShell maxWidth="full">
       <section className="relative mt-10 grid gap-6 lg:grid-cols-12 lg:items-end">
@@ -49,12 +39,6 @@ export default async function ReportPage(props: {
             <span className="ui-badge rounded-full px-3 py-1.5 text-xs">Security logged</span>
             <span className="ui-badge rounded-full px-3 py-1.5 text-xs">Customer safety first</span>
           </div>
-
-          {hasPrefill ? (
-            <div className="mt-6 inline-flex rounded-xl border border-sky-200/30 bg-sky-300/10 px-3.5 py-2 text-xs text-sky-100/85">
-              Target details were prefilled from your link context. Please verify before submitting.
-            </div>
-          ) : null}
         </div>
 
         <div className="lg:col-span-5">
@@ -72,7 +56,7 @@ export default async function ReportPage(props: {
 
       <section className="mt-12 grid gap-4 lg:grid-cols-12 lg:items-start">
         <div className="lg:col-span-8">
-          <ReportForm token={token || null} alias={alias || null} />
+          <ReportForm />
         </div>
 
         <aside className="space-y-4 lg:col-span-4">

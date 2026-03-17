@@ -111,10 +111,24 @@ function categoryLabel(category: ReportCategory): string {
   return CATEGORY_OPTIONS.find((option) => option.id === category)?.label || category;
 }
 
+function readPrefillFromLocation(): { token: string | null; alias: string | null } {
+  if (typeof window === "undefined") {
+    return { token: null, alias: null };
+  }
+  const searchParams = new URLSearchParams(window.location.search);
+  return {
+    token: normalizeToken(searchParams.get("token")),
+    alias: normalizeAlias(searchParams.get("alias")),
+  };
+}
+
 export default function ReportForm({ token, alias }: Props) {
+  const prefillToken = useMemo(() => normalizeToken(token), [token]);
+  const prefillAlias = useMemo(() => normalizeAlias(alias), [alias]);
+  const locationPrefill = useMemo(() => readPrefillFromLocation(), []);
   const [category, setCategory] = useState<ReportCategory | null>(null);
-  const [tokenInput, setTokenInput] = useState(token || "");
-  const [aliasInput, setAliasInput] = useState(alias || "");
+  const [tokenInput, setTokenInput] = useState(prefillToken || locationPrefill.token || "");
+  const [aliasInput, setAliasInput] = useState(prefillAlias || locationPrefill.alias || "");
   const [shareLink, setShareLink] = useState("");
   const [documentName, setDocumentName] = useState("");
   const [encounterSource, setEncounterSource] = useState<EncounterSource>("email");
@@ -127,6 +141,7 @@ export default function ReportForm({ token, alias }: Props) {
   const [touched, setTouched] = useState<Record<string, boolean>>({});
 
   const parsedLink = useMemo(() => parseShareLink(shareLink), [shareLink]);
+  const hasPrefill = Boolean(prefillToken || prefillAlias || locationPrefill.token || locationPrefill.alias);
 
   const resolvedToken = useMemo(
     () => normalizeToken(tokenInput) || parsedLink.token || null,
@@ -306,6 +321,12 @@ export default function ReportForm({ token, alias }: Props) {
         <h2 className="text-2xl font-semibold tracking-tight text-white">Submit abuse report</h2>
         <span className="text-xs text-white/55">Fields marked optional can be left blank</span>
       </div>
+
+      {hasPrefill ? (
+        <div className="mt-4 inline-flex rounded-xl border border-sky-200/30 bg-sky-300/10 px-3.5 py-2 text-xs text-sky-100/85">
+          Target details were prefilled from your link context. Please verify before submitting.
+        </div>
+      ) : null}
 
       <fieldset className="mt-6">
         <legend className="text-sm font-medium text-white/90">1. Report category</legend>

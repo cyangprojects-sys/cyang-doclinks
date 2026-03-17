@@ -288,6 +288,7 @@ export async function runStatusDailyDigest(args?: {
 
   for (let i = 0; i < recipients.length; i += batchSize) {
     const chunk = recipients.slice(i, i + batchSize);
+    const successfulEmails: string[] = [];
     const results = await Promise.allSettled(
       chunk.map(async (recipient) => {
         await sendMail({
@@ -295,15 +296,18 @@ export async function runStatusDailyDigest(args?: {
           subject,
           text,
         });
-        await sql`
-          update public.contact_subscribers
-          set
-            last_status_digest_date = ${local.dayKey}::date,
-            last_status_digest_sent_at = now()
-          where email = ${recipient.email}
-        `;
+        successfulEmails.push(recipient.email);
       })
     );
+    if (successfulEmails.length > 0) {
+      await sql`
+        update public.contact_subscribers
+        set
+          last_status_digest_date = ${local.dayKey}::date,
+          last_status_digest_sent_at = now()
+        where email = any(${successfulEmails}::text[])
+      `;
+    }
     for (const result of results) {
       if (result.status === "fulfilled") {
         sent += 1;

@@ -19,8 +19,13 @@ We evaluate subprocessors for:
 
 | Provider | Purpose | Data categories processed | Primary region relevance | Trust / privacy reference |
 |---|---|---|---|---|
-| Cloudflare, Inc. | Edge routing, DNS, security controls, caching and traffic filtering | IP address, request metadata, security telemetry | Global edge network | https://www.cloudflare.com/trust-hub/ |
-| Hetzner Online GmbH | Compute and hosting infrastructure | Account metadata, operational service data, encrypted document workflows | EU-hosted infrastructure footprint | https://www.hetzner.com/legal/privacy-policy |
+| Vercel Inc. | Primary application hosting, build pipeline, static asset delivery, and serverless execution | IP address, request metadata, deployment metadata, application telemetry | US and global edge footprint | https://vercel.com/legal/privacy-policy |
+| Neon, Inc. | Managed Postgres database hosting, branching, backup, and restore operations | Account data, document metadata, audit logs, billing state, operational telemetry | US-hosted managed database infrastructure | https://neon.tech/privacy-policy |
+| Cloudflare, Inc. | DNS, CDN caching, WAF/rate limiting, R2 object storage, and scheduled worker execution | IP address, request metadata, security telemetry, stored document objects, backup artifacts | Global edge network and storage footprint | https://www.cloudflare.com/trust-hub/ |
+| GitHub, Inc. | Source control, CI/CD automation, and scheduled backup workflows | Source code metadata, deployment metadata, backup artifacts, operational run metadata | US-hosted and regional automation infrastructure | https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement |
+| Google LLC | Google OAuth authentication for supported sign-in flows | Email address, profile identifier, authentication metadata | Global infrastructure | https://policies.google.com/privacy |
+| Functional Software, Inc. (Sentry) | Error monitoring, crash diagnostics, and request-level observability | Error events, request metadata, limited operational telemetry | US and global processing footprint | https://sentry.io/privacy/ |
+| Hetzner Online GmbH | Optional self-hosted malware scanning and supporting compute when dedicated scanner infrastructure is enabled | Operational service data, scanner telemetry, encrypted document workflows routed for malware review | EU-hosted infrastructure footprint | https://www.hetzner.com/legal/privacy-policy |
 | Stripe, Inc. | Subscription billing and payment processing | Billing identifiers, transaction metadata, business contact details | US and regional processing infrastructure | https://stripe.com/privacy |
 | Resend, Inc. | Transactional email delivery | Email addresses, email event metadata, support communications metadata | US and regional delivery infrastructure | https://resend.com/legal/privacy-policy |
 

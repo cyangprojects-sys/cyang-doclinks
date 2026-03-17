@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { signIn } from "next-auth/react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 type AccessIntent = "admin" | "viewer";
 
@@ -94,31 +94,12 @@ export default function SignInClient(props: SignInClientProps) {
   const initialOwnerReveal = props.initialIntent === "admin";
   const [ownerRevealOpen, setOwnerRevealOpen] = useState(initialOwnerReveal);
   const [intent, setIntent] = useState<AccessIntent>(initialOwnerReveal ? "admin" : "viewer");
-  const [isGoogleEnabled, setIsGoogleEnabled] = useState(props.googleConfigured);
-  const [isEnterpriseEnabled, setIsEnterpriseEnabled] = useState(props.enterpriseConfigured);
   const [busyProvider, setBusyProvider] = useState<"google" | "enterprise-sso" | null>(null);
+  const isGoogleEnabled = props.googleConfigured;
+  const isEnterpriseEnabled = props.enterpriseConfigured;
 
   const errorMessage = mapAuthError(props.authError);
   const callbackUrl = callbackForIntent(intent);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch("/api/auth/providers", { cache: "no-store" });
-        if (!res.ok) return;
-        const providers = (await res.json()) as Record<string, unknown>;
-        if (cancelled) return;
-        setIsGoogleEnabled(Boolean(providers?.google));
-        setIsEnterpriseEnabled(Boolean(providers?.["enterprise-sso"]));
-      } catch {
-        // Keep server-derived defaults if provider discovery fails.
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   const intentTitle = intent === "admin" ? "Admin / Owner workspace access" : "Member / Recipient access";
   const intentSubtext =

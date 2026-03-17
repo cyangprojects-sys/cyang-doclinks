@@ -4,7 +4,8 @@ import { getSecurityEmail } from "@/lib/legal";
 import { SiteShell } from "@/app/components/SiteShell";
 
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
+export const dynamic = "force-static";
+export const revalidate = 3600;
 
 export const metadata: Metadata = {
   title: "Security Disclosure - cyang.io",

@@ -9,6 +9,7 @@ import { withRequestTelemetry } from "@/lib/perfTelemetry";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 const MAX_BACKUP_STATUS_BODY_BYTES = 16 * 1024;
+const MAX_DETAIL_STRING_LEN = 256;
 
 const BodySchema = z.object({
   status: z.enum(["ok", "failed", "skipped", "success"]).default("ok"),
@@ -37,6 +38,50 @@ function parseJsonBodyLength(req: NextRequest): number {
   const raw = String(req.headers.get("content-length") || "").trim();
   const out = Number(raw);
   return Number.isFinite(out) ? Math.max(0, Math.floor(out)) : 0;
+}
+
+function normalizeDetailString(value: unknown): string | null {
+  const text = String(value || "").trim();
+  if (!text || text.length > MAX_DETAIL_STRING_LEN || /[\r\n\0]/.test(text)) {
+    return null;
+  }
+  return text;
+}
+
+async function findExistingBackupRunId(args: {
+  source: string;
+  backupFile: string | null;
+  repository: string | null;
+  runId: string | null;
+  runAttempt: string | null;
+}): Promise<string | null> {
+  if (args.runId) {
+    const rows = await sql<{ id: string }>`
+      select id
+      from public.backup_runs
+      where coalesce(details->>'source', '') = ${args.source}
+        and coalesce(details->>'run_id', '') = ${args.runId}
+        and coalesce(details->>'run_attempt', '') = ${args.runAttempt || ""}
+        and coalesce(details->>'repository', '') = ${args.repository || ""}
+      order by created_at desc
+      limit 1
+    `;
+    if (rows[0]?.id) return rows[0].id;
+  }
+
+  if (args.backupFile) {
+    const rows = await sql<{ id: string }>`
+      select id
+      from public.backup_runs
+      where coalesce(details->>'source', '') = ${args.source}
+        and coalesce(details->>'backup_file', '') = ${args.backupFile}
+      order by created_at desc
+      limit 1
+    `;
+    if (rows[0]?.id) return rows[0].id;
+  }
+
+  return null;
 }
 
 export async function POST(req: NextRequest) {
@@ -73,19 +118,46 @@ export async function POST(req: NextRequest) {
         }
 
         const payload = parsed.data;
+        const source = normalizeDetailString(payload.source) || "github-actions";
+        const repository = normalizeDetailString(payload.details?.repository);
+        const runId = normalizeDetailString(payload.details?.run_id);
+        const runAttempt = normalizeDetailString(payload.details?.run_attempt);
+        const backupFile = normalizeDetailString(payload.backup_file);
         const details = {
-          source: payload.source || "github-actions",
-          backup_file: payload.backup_file || null,
-          reported_at: new Date().toISOString(),
           ...(payload.details || {}),
+          source,
+          backup_file: backupFile,
+          reported_at: new Date().toISOString(),
         };
 
-        await sql`
-          insert into public.backup_runs (status, details)
-          values (${payload.status}, ${JSON.stringify(details)}::jsonb)
-        `;
+        const existingId = await findExistingBackupRunId({
+          source,
+          backupFile,
+          repository,
+          runId,
+          runAttempt,
+        });
 
-        return NextResponse.json({ ok: true, status: payload.status });
+        if (existingId) {
+          await sql`
+            update public.backup_runs
+            set
+              status = ${payload.status},
+              details = ${JSON.stringify(details)}::jsonb
+            where id = ${existingId}
+          `;
+        } else {
+          await sql`
+            insert into public.backup_runs (status, details)
+            values (${payload.status}, ${JSON.stringify(details)}::jsonb)
+          `;
+        }
+
+        return NextResponse.json({
+          ok: true,
+          status: payload.status,
+          deduped: Boolean(existingId),
+        });
         })(),
         timeoutMs
       ),
