@@ -24,30 +24,30 @@ export async function isGlobalServeDisabled(): Promise<boolean> {
 }
 
 export async function isShareServingDisabled(): Promise<boolean> {
-  const global = await isGlobalServeDisabled();
-  if (global) return true;
+  const envGlobalDisabled = envBool("SECURITY_GLOBAL_SERVE_DISABLE", false);
+  if (envGlobalDisabled) return true;
   const envDisabled = envBool("SECURITY_SHARE_SERVE_DISABLE", false);
   if (envDisabled) return true;
   const db = await getSecurityFreezeSettings();
-  return Boolean(db.settings.shareServeDisabled);
+  return Boolean(db.settings.globalServeDisabled || db.settings.shareServeDisabled);
 }
 
 export async function isAliasServingDisabled(): Promise<boolean> {
-  const global = await isGlobalServeDisabled();
-  if (global) return true;
+  const envGlobalDisabled = envBool("SECURITY_GLOBAL_SERVE_DISABLE", false);
+  if (envGlobalDisabled) return true;
   const envDisabled = envBool("SECURITY_ALIAS_SERVE_DISABLE", false);
   if (envDisabled) return true;
   const db = await getSecurityFreezeSettings();
-  return Boolean(db.settings.aliasServeDisabled);
+  return Boolean(db.settings.globalServeDisabled || db.settings.aliasServeDisabled);
 }
 
 export async function isTicketServingDisabled(): Promise<boolean> {
-  const global = await isGlobalServeDisabled();
-  if (global) return true;
+  const envGlobalDisabled = envBool("SECURITY_GLOBAL_SERVE_DISABLE", false);
+  if (envGlobalDisabled) return true;
   const envDisabled = envBool("SECURITY_TICKET_SERVE_DISABLE", false);
   if (envDisabled) return true;
   const db = await getSecurityFreezeSettings();
-  return Boolean(db.settings.ticketServeDisabled);
+  return Boolean(db.settings.globalServeDisabled || db.settings.ticketServeDisabled);
 }
 
 export function isSecurityTestNoDbMode(): boolean {

@@ -59,6 +59,51 @@ function settingsErrorCode(errorLike: unknown): string {
   return "SETTINGS_UNAVAILABLE";
 }
 
+type BillingFlagsResult =
+  | { ok: true; flags: BillingFlags }
+  | { ok: false; error: string; flags: BillingFlags };
+
+type BillingFlagsCacheEntry = {
+  expiresAt: number;
+  value: BillingFlagsResult;
+};
+
+type SecurityFreezeResult =
+  | { ok: true; settings: SecurityFreezeSettings }
+  | { ok: false; error: string; settings: SecurityFreezeSettings };
+
+type SecurityFreezeCacheEntry = {
+  expiresAt: number;
+  value: SecurityFreezeResult;
+};
+
+let billingFlagsCache: BillingFlagsCacheEntry | null = null;
+let billingFlagsInFlight: Promise<BillingFlagsResult> | null = null;
+let securityFreezeCache: SecurityFreezeCacheEntry | null = null;
+let securityFreezeInFlight: Promise<SecurityFreezeResult> | null = null;
+
+function getBillingFlagsCacheMs() {
+  const raw = Number(process.env.BILLING_FLAGS_CACHE_MS || 120_000);
+  if (!Number.isFinite(raw)) return 120_000;
+  return Math.max(5_000, Math.min(10 * 60_000, Math.floor(raw)));
+}
+
+function clearBillingFlagsCache() {
+  billingFlagsCache = null;
+  billingFlagsInFlight = null;
+}
+
+function getSecurityFreezeCacheMs() {
+  const raw = Number(process.env.SECURITY_FREEZE_CACHE_MS || 5_000);
+  if (!Number.isFinite(raw)) return 5_000;
+  return Math.max(1_000, Math.min(60_000, Math.floor(raw)));
+}
+
+function clearSecurityFreezeCache() {
+  securityFreezeCache = null;
+  securityFreezeInFlight = null;
+}
+
 export async function getRetentionSettings(): Promise<
   | { ok: true; settings: RetentionSettings }
   | { ok: false; error: string }
@@ -208,40 +253,59 @@ function envBool(name: string): boolean | null {
  * 2) env vars (ENFORCE_PLAN_LIMITS / PRO_PLAN_ENABLED / PRICING_UI_ENABLED)
  * 3) defaults (fail-closed)
  */
-export async function getBillingFlags(): Promise<
-  | { ok: true; flags: BillingFlags }
-  | { ok: false; error: string; flags: BillingFlags }
-> {
+export async function getBillingFlags(): Promise<BillingFlagsResult> {
   const envDefaults: BillingFlags = {
     enforcePlanLimits: envBool("ENFORCE_PLAN_LIMITS") ?? DEFAULT_BILLING_FLAGS.enforcePlanLimits,
     proPlanEnabled: envBool("PRO_PLAN_ENABLED") ?? DEFAULT_BILLING_FLAGS.proPlanEnabled,
     pricingUiEnabled: envBool("PRICING_UI_ENABLED") ?? DEFAULT_BILLING_FLAGS.pricingUiEnabled,
   };
 
-  try {
-    const rows = (await sql`
-      select value
-      from public.app_settings
-      where key = 'billing_flags'
-      limit 1
-    `) as unknown as Array<{ value: unknown }>;
-
-    const value = asSettingsObject(rows?.[0]?.value ?? null);
-    if (!value) {
-      return { ok: true, flags: { ...envDefaults } };
-    }
-
-    return {
-      ok: true,
-      flags: {
-        enforcePlanLimits: asBool(value.enforcePlanLimits, envDefaults.enforcePlanLimits),
-        proPlanEnabled: asBool(value.proPlanEnabled, envDefaults.proPlanEnabled),
-        pricingUiEnabled: asBool(value.pricingUiEnabled, envDefaults.pricingUiEnabled),
-      },
-    };
-  } catch (e) {
-    return { ok: false, error: settingsErrorCode(e), flags: { ...envDefaults } };
+  const now = Date.now();
+  if (billingFlagsCache && billingFlagsCache.expiresAt > now) {
+    return billingFlagsCache.value;
   }
+
+  if (!billingFlagsInFlight) {
+    billingFlagsInFlight = (async (): Promise<BillingFlagsResult> => {
+      try {
+        const rows = (await sql`
+          select value
+          from public.app_settings
+          where key = 'billing_flags'
+          limit 1
+        `) as unknown as Array<{ value: unknown }>;
+
+        const value = asSettingsObject(rows?.[0]?.value ?? null);
+        const result: BillingFlagsResult = !value
+          ? { ok: true, flags: { ...envDefaults } }
+          : {
+              ok: true,
+              flags: {
+                enforcePlanLimits: asBool(value.enforcePlanLimits, envDefaults.enforcePlanLimits),
+                proPlanEnabled: asBool(value.proPlanEnabled, envDefaults.proPlanEnabled),
+                pricingUiEnabled: asBool(value.pricingUiEnabled, envDefaults.pricingUiEnabled),
+              },
+            };
+
+        billingFlagsCache = {
+          value: result,
+          expiresAt: Date.now() + getBillingFlagsCacheMs(),
+        };
+        return result;
+      } catch (e) {
+        const result: BillingFlagsResult = { ok: false, error: settingsErrorCode(e), flags: { ...envDefaults } };
+        billingFlagsCache = {
+          value: result,
+          expiresAt: Date.now() + getBillingFlagsCacheMs(),
+        };
+        return result;
+      } finally {
+        billingFlagsInFlight = null;
+      }
+    })();
+  }
+
+  return billingFlagsInFlight;
 }
 
 export async function setBillingFlags(next: Partial<BillingFlags>): Promise<
@@ -263,6 +327,7 @@ export async function setBillingFlags(next: Partial<BillingFlags>): Promise<
       values ('billing_flags', ${merged}::jsonb)
       on conflict (key) do update set value = excluded.value
     `;
+    clearBillingFlagsCache();
     return { ok: true, flags: merged };
   } catch (e) {
     return { ok: false, error: settingsErrorCode(e) };
@@ -285,35 +350,58 @@ const DEFAULT_SECURITY_FREEZE: SecurityFreezeSettings = {
   ticketServeDisabled: false,
 };
 
-export async function getSecurityFreezeSettings(): Promise<
-  | { ok: true; settings: SecurityFreezeSettings }
-  | { ok: false; error: string; settings: SecurityFreezeSettings }
-> {
-  try {
-    const rows = (await sql`
-      select value
-      from public.app_settings
-      where key = 'security_freeze'
-      limit 1
-    `) as unknown as Array<{ value: unknown }>;
-
-    const value = asSettingsObject(rows?.[0]?.value ?? null);
-    if (!value) {
-      return { ok: true, settings: { ...DEFAULT_SECURITY_FREEZE } };
-    }
-
-    return {
-      ok: true,
-      settings: {
-        globalServeDisabled: asBool(value.globalServeDisabled, DEFAULT_SECURITY_FREEZE.globalServeDisabled),
-        shareServeDisabled: asBool(value.shareServeDisabled, DEFAULT_SECURITY_FREEZE.shareServeDisabled),
-        aliasServeDisabled: asBool(value.aliasServeDisabled, DEFAULT_SECURITY_FREEZE.aliasServeDisabled),
-        ticketServeDisabled: asBool(value.ticketServeDisabled, DEFAULT_SECURITY_FREEZE.ticketServeDisabled),
-      },
-    };
-  } catch (e) {
-    return { ok: false, error: settingsErrorCode(e), settings: { ...DEFAULT_SECURITY_FREEZE } };
+export async function getSecurityFreezeSettings(): Promise<SecurityFreezeResult> {
+  const now = Date.now();
+  if (securityFreezeCache && securityFreezeCache.expiresAt > now) {
+    return securityFreezeCache.value;
   }
+
+  if (!securityFreezeInFlight) {
+    securityFreezeInFlight = (async (): Promise<SecurityFreezeResult> => {
+      try {
+        const rows = (await sql`
+          select value
+          from public.app_settings
+          where key = 'security_freeze'
+          limit 1
+        `) as unknown as Array<{ value: unknown }>;
+
+        const value = asSettingsObject(rows?.[0]?.value ?? null);
+        const result: SecurityFreezeResult = !value
+          ? { ok: true, settings: { ...DEFAULT_SECURITY_FREEZE } }
+          : {
+              ok: true,
+              settings: {
+                globalServeDisabled: asBool(value.globalServeDisabled, DEFAULT_SECURITY_FREEZE.globalServeDisabled),
+                shareServeDisabled: asBool(value.shareServeDisabled, DEFAULT_SECURITY_FREEZE.shareServeDisabled),
+                aliasServeDisabled: asBool(value.aliasServeDisabled, DEFAULT_SECURITY_FREEZE.aliasServeDisabled),
+                ticketServeDisabled: asBool(value.ticketServeDisabled, DEFAULT_SECURITY_FREEZE.ticketServeDisabled),
+              },
+            };
+
+        securityFreezeCache = {
+          value: result,
+          expiresAt: Date.now() + getSecurityFreezeCacheMs(),
+        };
+        return result;
+      } catch (e) {
+        const result: SecurityFreezeResult = {
+          ok: false,
+          error: settingsErrorCode(e),
+          settings: { ...DEFAULT_SECURITY_FREEZE },
+        };
+        securityFreezeCache = {
+          value: result,
+          expiresAt: Date.now() + getSecurityFreezeCacheMs(),
+        };
+        return result;
+      } finally {
+        securityFreezeInFlight = null;
+      }
+    })();
+  }
+
+  return securityFreezeInFlight;
 }
 
 export async function setSecurityFreezeSettings(next: Partial<SecurityFreezeSettings>): Promise<
@@ -340,6 +428,7 @@ export async function setSecurityFreezeSettings(next: Partial<SecurityFreezeSett
       values ('security_freeze', ${merged}::jsonb)
       on conflict (key) do update set value = excluded.value
     `;
+    clearSecurityFreezeCache();
     return { ok: true, settings: merged };
   } catch (e) {
     return { ok: false, error: settingsErrorCode(e) };
