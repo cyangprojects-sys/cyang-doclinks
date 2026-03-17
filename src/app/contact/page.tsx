@@ -5,7 +5,7 @@ import { getBillingFlags } from "@/lib/settings";
 import { getPrivacyEmail, getSecurityEmail, getSupportEmail } from "@/lib/legal";
 
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
+export const revalidate = 900;
 
 export const metadata: Metadata = {
   title: "Contact - cyang.io",

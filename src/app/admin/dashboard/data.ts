@@ -37,6 +37,19 @@ type DashboardCtx = {
   docFilter: ReturnType<typeof sql>;
 };
 
+type DashboardSchemaState = Omit<
+  DashboardCtx,
+  "canSeeAll" | "canCheckEncryptionStatus" | "planId" | "nowTs" | "docFilter"
+>;
+
+type DashboardSchemaCacheEntry = {
+  expiresAt: number;
+  value: DashboardSchemaState;
+};
+
+let dashboardSchemaCache: DashboardSchemaCacheEntry | null = null;
+let dashboardSchemaInFlight: Promise<DashboardSchemaState> | null = null;
+
 async function tableExists(fqTable: string): Promise<boolean> {
   try {
     const rows = (await sql`select to_regclass(${fqTable})::text as reg`) as unknown as Array<{ reg: string | null }>;
@@ -62,28 +75,74 @@ async function columnExists(table: string, column: string): Promise<boolean> {
   }
 }
 
+function getDashboardSchemaCacheMs(): number {
+  const raw = Number(process.env.DASHBOARD_SCHEMA_CACHE_MS || 60_000);
+  if (!Number.isFinite(raw)) return 60_000;
+  return Math.max(5_000, Math.min(10 * 60_000, Math.floor(raw)));
+}
+
+async function getDashboardSchemaState(): Promise<DashboardSchemaState> {
+  const now = Date.now();
+  if (dashboardSchemaCache && dashboardSchemaCache.expiresAt > now) {
+    return dashboardSchemaCache.value;
+  }
+
+  if (!dashboardSchemaInFlight) {
+    dashboardSchemaInFlight = (async (): Promise<DashboardSchemaState> => {
+      const [
+        hasDocs,
+        hasDocViews,
+        hasShareTokens,
+        hasDocAliases,
+        hasOwnerId,
+        hasOrgId,
+        hasCreatedByEmail,
+      ] = await Promise.all([
+        tableExists("public.docs"),
+        tableExists("public.doc_views"),
+        tableExists("public.share_tokens"),
+        tableExists("public.doc_aliases"),
+        columnExists("docs", "owner_id"),
+        columnExists("docs", "org_id"),
+        columnExists("docs", "created_by_email"),
+      ]);
+
+      const value: DashboardSchemaState = {
+        hasDocs,
+        hasDocViews,
+        hasShareTokens,
+        hasDocAliases,
+        hasOwnerId,
+        hasOrgId,
+        hasCreatedByEmail,
+      };
+      dashboardSchemaCache = {
+        value,
+        expiresAt: Date.now() + getDashboardSchemaCacheMs(),
+      };
+      return value;
+    })().finally(() => {
+      dashboardSchemaInFlight = null;
+    });
+  }
+
+  return dashboardSchemaInFlight;
+}
+
 async function getCtx(u: AuthedUser): Promise<DashboardCtx> {
   const canSeeAll = roleAtLeast(u.role, "admin");
   const canCheckEncryptionStatus = roleAtLeast(u.role, "owner");
-  const userPlan = await getPlanForUser(u.id);
+  const [userPlan, schema] = await Promise.all([getPlanForUser(u.id), getDashboardSchemaState()]);
   const planId = String(userPlan.id || "free").toLowerCase() === "pro" ? "pro" : "free";
   const nowTs = Date.now();
 
-  const hasDocs = await tableExists("public.docs");
-  const hasDocViews = await tableExists("public.doc_views");
-  const hasShareTokens = await tableExists("public.share_tokens");
-  const hasDocAliases = await tableExists("public.doc_aliases");
-  const hasOwnerId = await columnExists("docs", "owner_id");
-  const hasOrgId = await columnExists("docs", "org_id");
-  const hasCreatedByEmail = await columnExists("docs", "created_by_email");
-
-  const orgFilter = hasOrgId && u.orgId ? sql`and d.org_id = ${u.orgId}::uuid` : sql``;
+  const orgFilter = schema.hasOrgId && u.orgId ? sql`and d.org_id = ${u.orgId}::uuid` : sql``;
   const ownerFilter = !canSeeAll
-    ? hasOwnerId
-      ? hasCreatedByEmail
+    ? schema.hasOwnerId
+      ? schema.hasCreatedByEmail
         ? sql`and (d.owner_id = ${u.id}::uuid or (d.owner_id is null and lower(coalesce(d.created_by_email,'')) = lower(${u.email})))`
         : sql`and d.owner_id = ${u.id}::uuid`
-      : hasCreatedByEmail
+      : schema.hasCreatedByEmail
         ? sql`and lower(coalesce(d.created_by_email,'')) = lower(${u.email})`
         : sql``
     : sql``;
@@ -94,13 +153,7 @@ async function getCtx(u: AuthedUser): Promise<DashboardCtx> {
     canCheckEncryptionStatus,
     planId,
     nowTs,
-    hasDocs,
-    hasDocViews,
-    hasShareTokens,
-    hasDocAliases,
-    hasOwnerId,
-    hasOrgId,
-    hasCreatedByEmail,
+    ...schema,
     docFilter,
   };
 }

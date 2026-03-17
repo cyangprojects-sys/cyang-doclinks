@@ -22,6 +22,7 @@ import { appendImmutableAudit } from "@/lib/immutableAudit";
 import { reportException } from "@/lib/observability";
 import { validateUploadType } from "@/lib/uploadTypeValidation";
 import { getRouteTimeoutMs, isRouteTimeoutError, withRouteTimeout } from "@/lib/routeTimeout";
+import { withRequestTelemetry } from "@/lib/perfTelemetry";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -64,8 +65,10 @@ export async function POST(req: Request) {
   const ipInfo = clientIpKey(req);
   const timeoutMs = getRouteTimeoutMs("ROUTE_TIMEOUT_UPLOAD_PRESIGN_MS", 20_000);
   try {
-    return await withRouteTimeout(
-      (async () => {
+    return await withRequestTelemetry(
+      req,
+      () => withRouteTimeout(
+        (async () => {
         if (parseJsonBodyLength(req) > MAX_UPLOAD_PRESIGN_BODY_BYTES) {
           return NextResponse.json({ ok: false, error: "PAYLOAD_TOO_LARGE" }, { status: 413 });
         }
@@ -304,8 +307,10 @@ export async function POST(req: Request) {
             "x-amz-meta-orig-ext": declaredType.ext,
           },
         });
-      })(),
-      timeoutMs
+        })(),
+        timeoutMs
+      ),
+      { routeKey: "/api/admin/upload/presign" }
     );
   } catch (err: unknown) {
     if (isRouteTimeoutError(err)) {

@@ -6,12 +6,15 @@ import { NextResponse, type NextRequest } from "next/server";
 import { enforceGlobalApiRateLimit } from "@/lib/securityTelemetry";
 import { getRouteTimeoutMs, isRouteTimeoutError, withRouteTimeout } from "@/lib/routeTimeout";
 import { getCachedDependencySummary, summarizeHealthChecks } from "@/lib/health";
+import { withRequestTelemetry } from "@/lib/perfTelemetry";
 
 export async function GET(req: NextRequest) {
   const timeoutMs = getRouteTimeoutMs("ROUTE_TIMEOUT_HEALTH_MS", 3_000);
   try {
-    return await withRouteTimeout(
-      (async () => {
+    return await withRequestTelemetry(
+      req,
+      () => withRouteTimeout(
+        (async () => {
         const rl = await enforceGlobalApiRateLimit({
           req,
           scope: "ip:health",
@@ -30,8 +33,10 @@ export async function GET(req: NextRequest) {
         const readiness = summarizeHealthChecks(summary.checks);
 
         return NextResponse.json(summary, { status: readiness.httpStatus });
-      })(),
-      timeoutMs
+        })(),
+        timeoutMs
+      ),
+      { routeKey: "/api/health" }
     );
   } catch (e: unknown) {
     if (isRouteTimeoutError(e)) {

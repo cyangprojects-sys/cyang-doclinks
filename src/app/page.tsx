@@ -4,6 +4,8 @@ import { SiteShell } from "./components/SiteShell";
 import { getBillingFlags } from "@/lib/settings";
 import { isSignupEnabled } from "@/lib/signup";
 
+export const revalidate = 900;
+
 export const metadata: Metadata = {
   title: "cyang.io - Systems, Products, and Secure Delivery",
   description:

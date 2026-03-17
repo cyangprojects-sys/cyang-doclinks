@@ -6,6 +6,7 @@ import { clientIpKey, enforceGlobalApiRateLimit } from "@/lib/securityTelemetry"
 import { getRouteTimeoutMs, isRouteTimeoutError, withRouteTimeout } from "@/lib/routeTimeout";
 import { reportException } from "@/lib/observability";
 import { normalizeSubscriptionEmail, subscribeStatusUpdates } from "@/lib/statusSubscriptions";
+import { withRequestTelemetry } from "@/lib/perfTelemetry";
 
 type SubscribeBody = {
   email?: string | null;
@@ -28,8 +29,10 @@ function normalizePath(pathname: string): string {
 export async function POST(req: NextRequest) {
   const timeoutMs = getRouteTimeoutMs("ROUTE_TIMEOUT_STATUS_SUBSCRIBE_MS", 10_000);
   try {
-    return await withRouteTimeout(
-      (async () => {
+    return await withRequestTelemetry(
+      req,
+      () => withRouteTimeout(
+        (async () => {
         const rl = await enforceGlobalApiRateLimit({
           req,
           scope: "ip:status_subscribe",
@@ -94,8 +97,10 @@ export async function POST(req: NextRequest) {
           }
           throw error;
         }
-      })(),
-      timeoutMs
+        })(),
+        timeoutMs
+      ),
+      { routeKey: "/api/status/subscribe" }
     );
   } catch (error: unknown) {
     if (isRouteTimeoutError(error)) {

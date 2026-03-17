@@ -1,4 +1,5 @@
 import { neon } from "@neondatabase/serverless";
+import { normalizeSqlFingerprint, recordQueryFrequency } from "@/lib/perfTelemetry";
 
 let cachedSql: ReturnType<typeof neon> | null = null;
 const ALLOWED_DB_PROTOCOLS = new Set(["postgres:", "postgresql:"]);
@@ -35,5 +36,26 @@ function getSql(): ReturnType<typeof neon> {
 // Lazy DB init prevents build-time module evaluation from failing in CI
 // when DATABASE_URL is intentionally not present.
 type SqlCompat = <T = unknown>(strings: TemplateStringsArray, ...values: unknown[]) => Promise<T[]>;
-export const sql: SqlCompat = (strings, ...values) =>
-  (getSql() as unknown as SqlCompat)(strings, ...values);
+export const sql: SqlCompat = async <T = unknown>(
+  strings: TemplateStringsArray,
+  ...values: unknown[]
+): Promise<T[]> => {
+  const started = Date.now();
+  const fingerprint = normalizeSqlFingerprint(strings);
+  try {
+    const result = await (getSql() as unknown as SqlCompat)(strings, ...values);
+    recordQueryFrequency({
+      fingerprint,
+      durationMs: Date.now() - started,
+      ok: true,
+    });
+    return result as T[];
+  } catch (error) {
+    recordQueryFrequency({
+      fingerprint,
+      durationMs: Date.now() - started,
+      ok: false,
+    });
+    throw error;
+  }
+};

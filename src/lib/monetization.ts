@@ -59,6 +59,13 @@ const OWNER_UNLIMITED_PLAN: Plan = {
 };
 
 let billingSubscriptionsTableExistsCache: boolean | null = null;
+type PlanCacheEntry = {
+  expiresAt: number;
+  value: Plan;
+};
+
+const planCache = new Map<string, PlanCacheEntry>();
+const planInFlight = new Map<string, Promise<Plan>>();
 
 function normalizeUuid(value: string | null | undefined): string | null {
   const normalized = String(value || "").trim();
@@ -72,6 +79,12 @@ function envFlag(name: string, fallback: boolean): boolean {
   if (raw === "1" || raw === "true" || raw === "yes" || raw === "on") return true;
   if (raw === "0" || raw === "false" || raw === "no" || raw === "off") return false;
   return fallback;
+}
+
+function getPlanCacheMs(): number {
+  const raw = Number(process.env.PLAN_CACHE_MS || 10_000);
+  if (!Number.isFinite(raw)) return 10_000;
+  return Math.max(1_000, Math.min(60_000, Math.floor(raw)));
 }
 
 async function billingSubscriptionsTableExists(): Promise<boolean> {
@@ -121,6 +134,18 @@ async function userHasActiveProEntitlement(userId: string): Promise<boolean> {
 export async function getPlanForUser(userId: string): Promise<Plan> {
   const uid = normalizeUuid(userId);
   if (!uid) return FREE_PLAN;
+  const now = Date.now();
+  const cached = planCache.get(uid);
+  if (cached && cached.expiresAt > now) {
+    return cached.value;
+  }
+
+  const existing = planInFlight.get(uid);
+  if (existing) {
+    return existing;
+  }
+
+  const pending = (async (): Promise<Plan> => {
   const billingRes = await getBillingFlags();
   const billing = billingRes.flags;
 
@@ -155,25 +180,49 @@ export async function getPlanForUser(userId: string): Promise<Plan> {
       limit 1
     `) as unknown as typeof rows;
   } catch {
-    return FREE_PLAN;
+    const fallback = FREE_PLAN;
+    planCache.set(uid, {
+      value: fallback,
+      expiresAt: Date.now() + getPlanCacheMs(),
+    });
+    return fallback;
   }
 
   const r = rows?.[0];
   if (!r) {
     // Fail closed to Free if user row exists but plan missing.
-    return FREE_PLAN;
+    const fallback = FREE_PLAN;
+    planCache.set(uid, {
+      value: fallback,
+      expiresAt: Date.now() + getPlanCacheMs(),
+    });
+    return fallback;
   }
 
   // Product invariant: owner accounts are never constrained by plan limits.
   if (String(r.role || "").toLowerCase() === "owner") {
+    planCache.set(uid, {
+      value: OWNER_UNLIMITED_PLAN,
+      expiresAt: Date.now() + getPlanCacheMs(),
+    });
     return OWNER_UNLIMITED_PLAN;
   }
 
   // Free policy is a product invariant; enforce canonical values even if DB row is stale.
-  if (String(r.id) === "free") return FREE_PLAN;
+  if (String(r.id) === "free") {
+    planCache.set(uid, {
+      value: FREE_PLAN,
+      expiresAt: Date.now() + getPlanCacheMs(),
+    });
+    return FREE_PLAN;
+  }
 
   // Hidden pricing flag: "pro" is present but does not grant unlimited behavior until enabled.
   if (String(r.id) === "pro" && !billing.proPlanEnabled) {
+    planCache.set(uid, {
+      value: FREE_PLAN,
+      expiresAt: Date.now() + getPlanCacheMs(),
+    });
     return FREE_PLAN;
   }
 
@@ -184,15 +233,23 @@ export async function getPlanForUser(userId: string): Promise<Plan> {
     if (enforceStripeEntitlement) {
       const entitled = await userHasActiveProEntitlement(uid);
       if (!entitled) {
+        planCache.set(uid, {
+          value: FREE_PLAN,
+          expiresAt: Date.now() + getPlanCacheMs(),
+        });
         return FREE_PLAN;
       }
     }
     // Pro policy invariant: enforce canonical product limits/features.
+    planCache.set(uid, {
+      value: PRO_PLAN,
+      expiresAt: Date.now() + getPlanCacheMs(),
+    });
     return PRO_PLAN;
   }
 
   const normalizedId = String(r.id || "free") as Plan["id"];
-  return {
+  const computedPlan: Plan = {
     id: normalizedId,
     name: String(r.name || "Free"),
     maxViewsPerMonth: r.max_views_per_month ?? null,
@@ -204,6 +261,20 @@ export async function getPlanForUser(userId: string): Promise<Plan> {
     allowAuditExport: Boolean(r.allow_audit_export),
     allowAdvancedAnalytics: normalizedId !== "free",
   };
+  planCache.set(uid, {
+    value: computedPlan,
+    expiresAt: Date.now() + getPlanCacheMs(),
+  });
+  return computedPlan;
+  })();
+
+  planInFlight.set(
+    uid,
+    pending.finally(() => {
+      planInFlight.delete(uid);
+    })
+  );
+  return pending;
 }
 
 export async function getOwnerIdForDoc(docId: string): Promise<string | null> {

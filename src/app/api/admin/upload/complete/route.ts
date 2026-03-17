@@ -22,6 +22,7 @@ import { assertRuntimeEnv, isRuntimeEnvError } from "@/lib/runtimeEnv";
 import { validateUploadType } from "@/lib/uploadTypeValidation";
 import { resolvePublicAppBaseUrl } from "@/lib/publicBaseUrl";
 import { findMissingPublicTableColumns } from "@/lib/dbSchema";
+import { withRequestTelemetry } from "@/lib/perfTelemetry";
 
 type CompleteRequest = {
   // Newer flow: doc_id from /presign response
@@ -101,8 +102,10 @@ export async function POST(req: NextRequest) {
   const timeoutMs = getRouteTimeoutMs("ROUTE_TIMEOUT_UPLOAD_COMPLETE_MS", 45_000);
   let stage = "init";
   try {
-    return await withRouteTimeout(
-      (async () => {
+    return await withRequestTelemetry(
+      req,
+      () => withRouteTimeout(
+        (async () => {
         stage = "runtime_env";
         assertRuntimeEnv("upload_complete");
 
@@ -732,8 +735,10 @@ try {
           scan_state: updatedRows?.[0]?.scan_state ?? "pending",
           moderation_status: updatedRows?.[0]?.moderation_status ?? "active",
         });
-      })(),
-      timeoutMs
+        })(),
+        timeoutMs
+      ),
+      { routeKey: "/api/admin/upload/complete" }
     );
   } catch (e: unknown) {
     const msg = errorMessage(e) || "server_error";

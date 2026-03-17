@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { clientIpKey, enforceGlobalApiRateLimit, logSecurityEvent } from "@/lib/securityTelemetry";
 import { getRouteTimeoutMs, isRouteTimeoutError, withRouteTimeout } from "@/lib/routeTimeout";
 import { reportException } from "@/lib/observability";
+import { withRequestTelemetry } from "@/lib/perfTelemetry";
 
 type FunnelEventBody = {
   action?: unknown;
@@ -101,8 +102,10 @@ function parseEventBody(body: FunnelEventBody) {
 export async function POST(req: NextRequest) {
   const timeoutMs = getRouteTimeoutMs("ROUTE_TIMEOUT_PUBLIC_FUNNEL_MS", 7_500);
   try {
-    return await withRouteTimeout(
-      (async () => {
+    return await withRequestTelemetry(
+      req,
+      () => withRouteTimeout(
+        (async () => {
         const rl = await enforceGlobalApiRateLimit({
           req,
           scope: "ip:public_funnel_event",
@@ -157,8 +160,10 @@ export async function POST(req: NextRequest) {
         });
 
         return NextResponse.json({ ok: true });
-      })(),
-      timeoutMs
+        })(),
+        timeoutMs
+      ),
+      { routeKey: "/api/v1/public/funnel" }
     );
   } catch (error: unknown) {
     if (isRouteTimeoutError(error)) {
@@ -172,4 +177,3 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "SERVER_ERROR", message: "Unable to track event." }, { status: 500 });
   }
 }
-

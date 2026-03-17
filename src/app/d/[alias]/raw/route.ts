@@ -17,6 +17,7 @@ import { getRouteTimeoutMs, isRouteTimeoutError, withRouteTimeout } from "@/lib/
 import { assertRuntimeEnv, isRuntimeEnvError } from "@/lib/runtimeEnv";
 import { detectFileFamily, isMicrosoftOfficeDocument } from "@/lib/fileFamily";
 import { resolvePublicAppBaseUrl } from "@/lib/publicBaseUrl";
+import { withRequestTelemetry } from "@/lib/perfTelemetry";
 
 function normalizeAlias(alias: string): string | null {
   try {
@@ -177,8 +178,10 @@ export async function GET(
 ): Promise<Response> {
   const timeoutMs = getRouteTimeoutMs("ROUTE_TIMEOUT_ALIAS_RAW_MS", 25_000);
   try {
-    return await withRouteTimeout(
-      (async () => {
+    return await withRequestTelemetry(
+      req,
+      () => withRouteTimeout(
+        (async () => {
         assertRuntimeEnv("alias_raw");
 
         if (isSecurityTestNoDbMode()) {
@@ -370,8 +373,10 @@ if (shouldCountView(req)) {
             "Cache-Control": "private, no-store",
           },
         });
-      })(),
-      timeoutMs
+        })(),
+        timeoutMs
+      ),
+      { routeKey: "/d/[alias]/raw" }
     );
   } catch (err: unknown) {
     if (isRuntimeEnvError(err)) {

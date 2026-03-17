@@ -14,6 +14,7 @@ import { resolvePublicAppBaseUrl } from "@/lib/publicBaseUrl";
 import { DEFAULT_SHARE_SETTINGS, PRO_PACK_UPSELL_MESSAGE, applyPack, getPackById, isPackAvailableForPlan } from "@/lib/packs";
 import { getShareEligibility } from "@/lib/documentStatus";
 import { getRouteTimeoutMs, isRouteTimeoutError, withRouteTimeout } from "@/lib/routeTimeout";
+import { withRequestTelemetry } from "@/lib/perfTelemetry";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const BASIC_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -60,8 +61,10 @@ export async function POST(req: NextRequest) {
   const ipInfo = clientIpKey(req);
   const timeoutMs = getRouteTimeoutMs("ROUTE_TIMEOUT_API_V1_SHARES_MS", 20_000);
   try {
-    return await withRouteTimeout(
-      (async () => {
+    return await withRequestTelemetry(
+      req,
+      () => withRouteTimeout(
+        (async () => {
         const rl = await enforceGlobalApiRateLimit({
           req,
           scope: "ip:api",
@@ -357,8 +360,10 @@ export async function POST(req: NextRequest) {
           pack_version: selectedPack.version,
           adjusted_for_plan: adjustedForPlan,
         });
-      })(),
-      timeoutMs
+        })(),
+        timeoutMs
+      ),
+      { routeKey: "/api/v1/shares" }
     );
   } catch (e: unknown) {
     if (isRouteTimeoutError(e)) {

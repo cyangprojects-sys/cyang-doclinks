@@ -8,6 +8,7 @@ import { emitWebhook } from "@/lib/webhooks";
 import { clientIpKey, enforceGlobalApiRateLimit, logDbErrorEvent } from "@/lib/securityTelemetry";
 import { appendImmutableAudit } from "@/lib/immutableAudit";
 import { getRouteTimeoutMs, isRouteTimeoutError, withRouteTimeout } from "@/lib/routeTimeout";
+import { withRequestTelemetry } from "@/lib/perfTelemetry";
 
 type PgErrorLike = { code?: unknown; message?: unknown };
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -54,8 +55,10 @@ function isLegacyAliasMetadataMissing(e: unknown): boolean {
 export async function POST(req: NextRequest) {
   const timeoutMs = getRouteTimeoutMs("ROUTE_TIMEOUT_API_V1_ALIASES_MS", 15_000);
   try {
-    return await withRouteTimeout(
-      (async () => {
+    return await withRequestTelemetry(
+      req,
+      () => withRouteTimeout(
+        (async () => {
         const ipInfo = clientIpKey(req);
         const rl = await enforceGlobalApiRateLimit({
           req,
@@ -183,8 +186,10 @@ export async function POST(req: NextRequest) {
         );
 
         return NextResponse.json({ ok: true, alias: createdAlias, doc_id: docId });
-      })(),
-      timeoutMs
+        })(),
+        timeoutMs
+      ),
+      { routeKey: "/api/v1/aliases" }
     );
   } catch (e: unknown) {
     if (isRouteTimeoutError(e)) {

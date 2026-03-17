@@ -6,8 +6,7 @@ import { getBillingFlags } from "@/lib/settings";
 import { isSignupEnabled } from "@/lib/signup";
 
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
+export const revalidate = 300;
 
 export const metadata: Metadata = {
   title: "Pricing - Doclinks",

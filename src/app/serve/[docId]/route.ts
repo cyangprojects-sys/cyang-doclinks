@@ -19,6 +19,7 @@ import { getRouteTimeoutMs, isRouteTimeoutError, withRouteTimeout } from "@/lib/
 import { enforceIpAbuseBlock, logDbErrorEvent, logSecurityEvent, maybeBlockIpOnAbuse } from "@/lib/securityTelemetry";
 import { assertRuntimeEnv, isRuntimeEnvError } from "@/lib/runtimeEnv";
 import { resolvePublicAppBaseUrl } from "@/lib/publicBaseUrl";
+import { withRequestTelemetry } from "@/lib/perfTelemetry";
 
 function hashIp(ip: string) {
   const salt = process.env.VIEW_SALT || "";
@@ -40,8 +41,10 @@ function parseDisposition(req: NextRequest): "inline" | "attachment" {
 export async function GET(req: NextRequest, ctx: { params: Promise<{ docId: string }> }) {
   const timeoutMs = getRouteTimeoutMs("ROUTE_TIMEOUT_SERVE_MS", 25_000);
   try {
-    return await withRouteTimeout(
-      (async () => {
+    return await withRequestTelemetry(
+      req,
+      () => withRouteTimeout(
+        (async () => {
         assertRuntimeEnv("serve");
 
         if (isSecurityTestNoDbMode()) {
@@ -312,8 +315,10 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ docId: stri
             ...rateLimitHeaders(ipRl),
           },
         });
-      })(),
-      timeoutMs
+        })(),
+        timeoutMs
+      ),
+      { routeKey: "/serve/[docId]" }
     );
   } catch (e: unknown) {
     if (isRuntimeEnvError(e)) {

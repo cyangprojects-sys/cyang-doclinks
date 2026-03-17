@@ -3,6 +3,8 @@ import Link from "next/link";
 import { SiteShell } from "../components/SiteShell";
 import { getBillingFlags } from "@/lib/settings";
 
+export const revalidate = 900;
+
 export const metadata: Metadata = {
   title: "About - cyang.io",
   description:

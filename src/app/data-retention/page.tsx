@@ -4,7 +4,7 @@ import { getPrivacyEmail } from "@/lib/legal";
 import { SiteShell } from "@/app/components/SiteShell";
 
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
+export const revalidate = 3600;
 
 export const metadata: Metadata = {
   title: "Data Retention - cyang.io",

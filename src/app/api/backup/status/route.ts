@@ -4,6 +4,7 @@ import { z } from "zod";
 import { sql } from "@/lib/db";
 import { enforceGlobalApiRateLimit } from "@/lib/securityTelemetry";
 import { getRouteTimeoutMs, isRouteTimeoutError, withRouteTimeout } from "@/lib/routeTimeout";
+import { withRequestTelemetry } from "@/lib/perfTelemetry";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -41,8 +42,10 @@ function parseJsonBodyLength(req: NextRequest): number {
 export async function POST(req: NextRequest) {
   const timeoutMs = getRouteTimeoutMs("ROUTE_TIMEOUT_BACKUP_STATUS_MS", 10_000);
   try {
-    return await withRouteTimeout(
-      (async () => {
+    return await withRequestTelemetry(
+      req,
+      () => withRouteTimeout(
+        (async () => {
         if (!isAuthorized(req)) {
           return NextResponse.json({ ok: false, error: "NOT_FOUND" }, { status: 404 });
         }
@@ -83,8 +86,10 @@ export async function POST(req: NextRequest) {
         `;
 
         return NextResponse.json({ ok: true, status: payload.status });
-      })(),
-      timeoutMs
+        })(),
+        timeoutMs
+      ),
+      { routeKey: "/api/backup/status" }
     );
   } catch (e: unknown) {
     if (isRouteTimeoutError(e)) {

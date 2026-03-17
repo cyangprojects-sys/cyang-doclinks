@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { enforceGlobalApiRateLimit } from "@/lib/securityTelemetry";
 import { getCachedPublicHealthSnapshot } from "@/lib/health";
 import { getRouteTimeoutMs, isRouteTimeoutError, withRouteTimeout } from "@/lib/routeTimeout";
+import { withRequestTelemetry } from "@/lib/perfTelemetry";
 
 const PUBLIC_STATUS_S_MAXAGE = 120;
 const PUBLIC_STATUS_STALE_WHILE_REVALIDATE = 300;
@@ -12,8 +13,10 @@ const PUBLIC_STATUS_STALE_WHILE_REVALIDATE = 300;
 export async function GET(req: NextRequest) {
   const timeoutMs = getRouteTimeoutMs("ROUTE_TIMEOUT_HEALTH_MS", 3_000);
   try {
-    return await withRouteTimeout(
-      (async () => {
+    return await withRequestTelemetry(
+      req,
+      () => withRouteTimeout(
+        (async () => {
         const rl = await enforceGlobalApiRateLimit({
           req,
           scope: "ip:health",
@@ -40,8 +43,10 @@ export async function GET(req: NextRequest) {
             "Cache-Control": `public, s-maxage=${PUBLIC_STATUS_S_MAXAGE}, stale-while-revalidate=${PUBLIC_STATUS_STALE_WHILE_REVALIDATE}`,
           },
         });
-      })(),
-      timeoutMs
+        })(),
+        timeoutMs
+      ),
+      { routeKey: "/api/health/public" }
     );
   } catch (error: unknown) {
     if (isRouteTimeoutError(error)) {

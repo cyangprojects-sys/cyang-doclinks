@@ -23,6 +23,7 @@ import { assertRuntimeEnv, isRuntimeEnvError } from "@/lib/runtimeEnv";
 import { detectFileFamily, isMicrosoftOfficeDocument } from "@/lib/fileFamily";
 import { resolvePublicAppBaseUrl } from "@/lib/publicBaseUrl";
 import { getShareEligibility } from "@/lib/documentStatus";
+import { withRequestTelemetry } from "@/lib/perfTelemetry";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -155,8 +156,10 @@ export async function GET(
 ) {
   const timeoutMs = getRouteTimeoutMs("ROUTE_TIMEOUT_SHARE_RAW_MS", 25_000);
   try {
-    return await withRouteTimeout(
-      (async () => {
+    return await withRequestTelemetry(
+      req,
+      () => withRouteTimeout(
+        (async () => {
         assertRuntimeEnv("share_raw");
 
         if (isSecurityTestNoDbMode()) {
@@ -534,8 +537,10 @@ export async function GET(
             "Cache-Control": "private, no-store",
           },
         });
-      })(),
-      timeoutMs
+        })(),
+        timeoutMs
+      ),
+      { routeKey: "/s/[token]/raw" }
     );
   } catch (e: unknown) {
     if (isRuntimeEnvError(e)) {

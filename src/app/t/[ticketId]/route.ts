@@ -13,6 +13,7 @@ import { allowUnencryptedServing, isSecurityTestNoDbMode, isTicketServingDisable
 import { getRouteTimeoutMs, isRouteTimeoutError, withRouteTimeout } from "@/lib/routeTimeout";
 import { assertRuntimeEnv, isRuntimeEnvError } from "@/lib/runtimeEnv";
 import { stampPdfWithWatermark } from "@/lib/pdfWatermark";
+import { withRequestTelemetry } from "@/lib/perfTelemetry";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -161,8 +162,10 @@ export async function GET(
     ContentLength?: number;
   };
   try {
-    return await withRouteTimeout(
-      (async () => {
+    return await withRequestTelemetry(
+      req,
+      () => withRouteTimeout(
+        (async () => {
         assertRuntimeEnv("ticket_serve");
 
         if (isSecurityTestNoDbMode()) {
@@ -580,8 +583,10 @@ export async function GET(
           status: contentRange ? 206 : 200,
           headers,
         });
-      })(),
-      timeoutMs
+        })(),
+        timeoutMs
+      ),
+      { routeKey: "/t/[ticketId]" }
     );
   } catch (e: unknown) {
     if (isRuntimeEnvError(e)) {

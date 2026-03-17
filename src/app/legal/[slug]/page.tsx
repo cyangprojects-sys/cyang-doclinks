@@ -14,7 +14,8 @@ import {
 } from "@/lib/legalDocs";
 
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
+export const dynamicParams = false;
+export const revalidate = 3600;
 
 export async function generateStaticParams() {
   return LEGAL_DOCS.map((doc) => ({ slug: doc.slug }));

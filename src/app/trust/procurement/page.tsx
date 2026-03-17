@@ -4,7 +4,7 @@ import { SiteShell } from "@/app/components/SiteShell";
 import { getSecurityEmail, getSupportEmail } from "@/lib/legal";
 
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
+export const revalidate = 3600;
 
 export const metadata: Metadata = {
   title: "Procurement and Trust Package - cyang.io",
@@ -267,4 +267,3 @@ function ContactTile(props: { href: string; label: string; detail: string }) {
     </Link>
   );
 }
-

@@ -5,7 +5,7 @@ import LegalCenterClient from "@/app/legal/LegalCenterClient";
 import { LEGAL_DOCS } from "@/lib/legalDocs";
 
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
+export const revalidate = 3600;
 
 export const metadata: Metadata = {
   title: "Legal and Trust Center - cyang.io",
