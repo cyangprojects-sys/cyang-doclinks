@@ -273,3 +273,67 @@ export async function applyMigrations({ sql, env = process.env, dryRun = false }
 
   return applied;
 }
+
+export async function adoptMigrations({
+  sql,
+  env = process.env,
+  versions = null,
+  note = "",
+}) {
+  const status = await getMigrationStatus({ sql, env });
+  if (status.drift.length) {
+    const versionsWithDrift = status.drift.map((item) => item.version).join(", ");
+    throw new Error(`Applied migration checksum drift detected for: ${versionsWithDrift}`);
+  }
+
+  const requested = versions == null ? null : new Set(versions);
+  const pendingByVersion = new Map(status.pending.map((migration) => [migration.version, migration]));
+  const targetMigrations =
+    requested == null
+      ? status.pending
+      : Array.from(requested, (version) => {
+          const migration = pendingByVersion.get(version);
+          if (!migration) {
+            throw new Error(`Cannot adopt migration that is not pending: ${version}`);
+          }
+          return migration;
+        });
+
+  if (!targetMigrations.length) {
+    return [];
+  }
+
+  const adopted = [];
+  await sql.begin(async (trx) => {
+    await trx.unsafe(
+      `select pg_advisory_xact_lock(${MIGRATION_LOCK_KEY_A}::int, ${MIGRATION_LOCK_KEY_B}::int)`
+    );
+
+    for (const migration of targetMigrations) {
+      await trx.unsafe(
+        `
+          insert into public.schema_migrations (version, source_path, checksum_sha256, execution_ms, metadata)
+          values ($1, $2, $3, $4, $5::jsonb)
+        `,
+        [
+          migration.version,
+          migration.sourceRelativePath,
+          migration.checksum,
+          1,
+          JSON.stringify({
+            adopted: true,
+            note: note || null,
+            wrapper: migration.wrapperPath.replace(`${REPO_ROOT}\\`, "").replace(/\\/g, "/"),
+          }),
+        ]
+      );
+
+      adopted.push({
+        version: migration.version,
+        checksum: migration.checksum,
+      });
+    }
+  });
+
+  return adopted;
+}

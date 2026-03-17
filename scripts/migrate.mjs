@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import {
+  adoptMigrations,
   applyMigrations,
   createMigrationClient,
   getMigrationStatus,
@@ -14,7 +15,18 @@ function usage() {
   node scripts/migrate.mjs status
   node scripts/migrate.mjs apply
   node scripts/migrate.mjs apply --dry-run
+  node scripts/migrate.mjs adopt --all-pending [--note "adopted from manual SQL"]
 `);
+}
+
+function hasFlag(flag) {
+  return process.argv.includes(flag);
+}
+
+function argValue(flag) {
+  const index = process.argv.indexOf(flag);
+  if (index === -1) return null;
+  return process.argv[index + 1] || null;
 }
 
 async function withClient(fn) {
@@ -28,7 +40,7 @@ async function withClient(fn) {
 
 async function main() {
   const command = String(process.argv[2] || "verify").trim().toLowerCase();
-  const dryRun = process.argv.includes("--dry-run");
+  const dryRun = hasFlag("--dry-run");
 
   if (command === "help" || command === "--help" || command === "-h") {
     usage();
@@ -70,6 +82,25 @@ async function main() {
       );
     }
     console.log(`${dryRun ? "Planned" : "Applied"} ${applied.length} migration(s).`);
+    return;
+  }
+
+  if (command === "adopt") {
+    const allPending = hasFlag("--all-pending");
+    const note = String(argValue("--note") || "").trim();
+    if (!allPending) {
+      throw new Error("Adopt requires --all-pending. This command only records already-applied schema state in the ledger.");
+    }
+
+    const adopted = await withClient((sql) => adoptMigrations({ sql, note }));
+    if (!adopted.length) {
+      console.log("No pending migrations to adopt.");
+      return;
+    }
+    for (const migration of adopted) {
+      console.log(`${migration.version}\tadopted\t${migration.checksum}`);
+    }
+    console.log(`Adopted ${adopted.length} migration(s) into the ledger.`);
     return;
   }
 

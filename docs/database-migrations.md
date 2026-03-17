@@ -24,6 +24,12 @@ Apply pending migrations:
 npm run db:migrate -- apply
 ```
 
+Adopt an existing database whose schema was applied outside the ledger:
+
+```bash
+npm run db:migrate -- adopt --all-pending --note "adopted from manual SQL"
+```
+
 ## How It Works
 
 - Ordered wrapper files live in `db/migrations/0001__*.sql`.
@@ -61,6 +67,15 @@ npm run db:migrations:verify
 2. Apply pending migrations on staging.
 3. Run `npm run release:gate`.
 4. Repeat on production during the deployment window.
+
+## Adopting an Existing Database
+
+Use `adopt --all-pending` only when the database schema already matches the repo migrations but `public.schema_migrations` is empty or incomplete because the SQL was applied manually before the ledger existed.
+
+- `adopt` does not execute migration SQL.
+- It records pending wrappers in `public.schema_migrations` using the current repo checksums.
+- This is intended for one-time ledger repair or migration-tool cutovers.
+- Do not use it to skip real schema changes that have not actually been applied.
 
 ## Rollback Guidance
 
