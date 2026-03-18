@@ -5,7 +5,7 @@ import { type ShareRow } from "./SharesTableClient";
 import { type UnifiedDocRow } from "./UnifiedDocsTableClient";
 import { type ViewsByDocRow } from "./ViewsByDocTableClient";
 
-export type HeaderDoc = {
+type HeaderDoc = {
   docId: string;
   title: string;
   docState?: string | null;
@@ -13,7 +13,7 @@ export type HeaderDoc = {
   moderationStatus?: string | null;
 };
 
-export type RecentDocRow = {
+type RecentDocRow = {
   doc_id: string;
   doc_title: string | null;
   doc_state: string | null;
@@ -40,7 +40,7 @@ type DashboardCtx = {
 export type DashboardHomeData = Awaited<ReturnType<typeof getDashboardHomeData>>;
 export type DashboardDocumentsData = Awaited<ReturnType<typeof getDashboardDocumentsData>>;
 export type DashboardLinksData = Awaited<ReturnType<typeof getDashboardLinksData>>;
-export type DashboardActivityData = Awaited<ReturnType<typeof getDashboardActivityData>>;
+type DashboardActivityData = Awaited<ReturnType<typeof getDashboardActivityData>>;
 export type DashboardOverviewData = {
   homeData: DashboardHomeData;
   docsData: DashboardDocumentsData;

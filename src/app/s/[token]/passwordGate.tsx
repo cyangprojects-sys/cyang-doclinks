@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { verifySharePasswordResultAction } from "./actions";
 
-export type PasswordGateProps = {
+type PasswordGateProps = {
   token: string;
   hasPassword?: boolean;
   requireEmail?: boolean;

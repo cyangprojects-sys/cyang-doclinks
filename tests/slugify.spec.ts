@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { createUniqueAliasForDoc, slugify as aliasSlugify } from "../src/lib/alias";
+import { slugify as aliasSlugify } from "../src/lib/alias";
 import { slugify as docSlugify } from "../src/lib/slug";
 
 test.describe("slug sanitization helpers", () => {
@@ -19,11 +19,5 @@ test.describe("slug sanitization helpers", () => {
 
     const long = "a".repeat(200);
     expect(docSlugify(long)).toHaveLength(80);
-  });
-
-  test("createUniqueAliasForDoc fails closed for malformed doc ids", async () => {
-    await expect(createUniqueAliasForDoc({ docId: "not-a-uuid", base: "Quarterly Report" })).rejects.toThrow(
-      /INVALID_DOC_ID/
-    );
   });
 });

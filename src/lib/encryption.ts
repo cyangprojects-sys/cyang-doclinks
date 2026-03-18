@@ -41,13 +41,6 @@ function decodeBase64Strict(value: string): Buffer | null {
   return out.length ? out : null;
 }
 
-function isTruthy(value: unknown): boolean {
-  const raw = String(value ?? "");
-  if (/[\r\n\0]/.test(raw)) return false;
-  const normalized = raw.trim().toLowerCase();
-  return normalized === "1" || normalized === "true" || normalized === "yes" || normalized === "on";
-}
-
 function parseMasterKeysFromRaw(raw: string | null | undefined): MasterKeyValidation {
   const input = String(raw || "").trim();
   if (!input) return { ok: true, keys: [] };
@@ -166,14 +159,6 @@ export function generateDataKey(): Buffer {
 
 export function generateIv(): Buffer {
   return crypto.randomBytes(12);
-}
-
-/**
- * Should the upload path force server-side encryption at rest for R2.
- * This is a toggle: encryption-at-rest is handled by the storage provider.
- */
-export function shouldForceSse(): boolean {
-  return isTruthy(process.env.R2_FORCE_SSE ?? process.env.FORCE_R2_SSE ?? "");
 }
 
 /**

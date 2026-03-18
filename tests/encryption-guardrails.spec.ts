@@ -2,26 +2,17 @@ import { expect, test } from "@playwright/test";
 import {
   decryptAes256Gcm,
   encryptAes256Gcm,
-  shouldForceSse,
   validateDocMasterKeysConfig,
   wrapDataKey,
 } from "../src/lib/encryption";
 
 const ENV_SNAPSHOT = {
   DOC_MASTER_KEYS: process.env.DOC_MASTER_KEYS,
-  R2_FORCE_SSE: process.env.R2_FORCE_SSE,
-  FORCE_R2_SSE: process.env.FORCE_R2_SSE,
 };
 
 test.afterEach(() => {
   if (typeof ENV_SNAPSHOT.DOC_MASTER_KEYS === "undefined") delete process.env.DOC_MASTER_KEYS;
   else process.env.DOC_MASTER_KEYS = ENV_SNAPSHOT.DOC_MASTER_KEYS;
-
-  if (typeof ENV_SNAPSHOT.R2_FORCE_SSE === "undefined") delete process.env.R2_FORCE_SSE;
-  else process.env.R2_FORCE_SSE = ENV_SNAPSHOT.R2_FORCE_SSE;
-
-  if (typeof ENV_SNAPSHOT.FORCE_R2_SSE === "undefined") delete process.env.FORCE_R2_SSE;
-  else process.env.FORCE_R2_SSE = ENV_SNAPSHOT.FORCE_R2_SSE;
 });
 
 test.describe("encryption guardrails", () => {
@@ -34,13 +25,6 @@ test.describe("encryption guardrails", () => {
     const tooMany = validateDocMasterKeysConfig(JSON.stringify(many));
     expect(tooMany.ok).toBeFalsy();
   });
-
-  test("fails closed on control characters in SSE toggle values", () => {
-    process.env.R2_FORCE_SSE = "true\n";
-    delete process.env.FORCE_R2_SSE;
-    expect(shouldForceSse()).toBeFalsy();
-  });
-
   test("validates AES buffer lengths before crypto operations", () => {
     const key = Buffer.alloc(32, 1);
     const iv = Buffer.alloc(12, 2);

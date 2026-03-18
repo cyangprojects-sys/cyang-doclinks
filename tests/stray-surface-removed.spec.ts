@@ -31,9 +31,13 @@ test.describe("stray surfaces removed", () => {
 
   test("stray support libs stay removed", () => {
     const removedFiles = [
+      "src/lib/admin.ts",
+      "src/lib/auth.ts",
       "src/lib/debugAccess.ts",
       "src/lib/demo.ts",
       "src/lib/encryptionMigration.ts",
+      "src/lib/logAccess.ts",
+      "src/lib/owner.ts",
     ];
     for (const file of removedFiles) {
       expect(existsSync(file)).toBeFalsy();

@@ -84,25 +84,6 @@ export function readEnvInt(
   return value;
 }
 
-export function readPreferredEnvInt(
-  names: readonly string[],
-  fallback: number,
-  options: {
-    min?: number;
-    max?: number;
-    env?: NodeJS.ProcessEnv;
-    allowZero?: boolean;
-    maxLen?: number;
-  } = {}
-): number {
-  const env = options.env ?? process.env;
-  for (const name of names) {
-    if (!readEnvText(name, env)) continue;
-    return readEnvInt(name, fallback, { ...options, env });
-  }
-  return fallback;
-}
-
 function normalizeEmailEnvValue(value: string | null): string | null {
   const raw = String(value || "").trim().toLowerCase();
   if (!raw || raw.length > MAX_EMAIL_LEN || CONTROL_CHARS_RE.test(raw)) return null;
@@ -136,10 +117,6 @@ export function getDmcaEmailEnv(env: NodeJS.ProcessEnv = process.env): string | 
 
 export function getSecurityEmailEnv(env: NodeJS.ProcessEnv = process.env): string | null {
   return readPreferredEnvEmail("SECURITY_EMAIL", ["RESPONSIBLE_DISCLOSURE_EMAIL"], env);
-}
-
-export function getEmailFromEnv(env: NodeJS.ProcessEnv = process.env): string | null {
-  return readPreferredEnvText("EMAIL_FROM", ["RESEND_FROM"], env);
 }
 
 export function getViewBindingSecret(env: NodeJS.ProcessEnv = process.env): string | null {

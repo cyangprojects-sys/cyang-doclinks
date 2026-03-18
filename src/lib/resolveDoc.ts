@@ -88,11 +88,6 @@ function norm(s: string): string {
     }
 }
 
-function normEmail(s: string | null | undefined): string | null {
-    const v = String(s || "").trim().toLowerCase();
-    return v ? v : null;
-}
-
 function isExpired(expiresAt: string | Date | null): boolean {
     if (!expiresAt) return false;
     const t =
@@ -577,10 +572,6 @@ export async function resolveShareMeta(tokenInput: string): Promise<ShareMeta> {
     }
 }
 
-/**
- * Token resolution for /raw: increments views atomically while enforcing revoked/expired/max_views.
- * Keeps your current behavior: increments even if password-gated.
- */
 /**
  * Token resolution for /raw: NO increment. Used to check existence + gating state and to get doc_id.
  */

@@ -6,7 +6,6 @@ import {
   getPlanForUser,
   getActiveShareCountForOwner,
   getStorageBytesForOwner,
-  getMonthlyViewCount,
   getDailyUploadCount,
 } from "@/lib/monetization";
 
@@ -38,19 +37,6 @@ function fmtMinsAgo(iso: string | null): string {
   if (mins < 60) return `${mins} min ago`;
   const hrs = Math.floor(mins / 60);
   return `${hrs}h ago`;
-}
-
-function fmtBytes(n: number | null): string {
-  if (n == null || !Number.isFinite(n) || n < 0) return "-";
-  const units = ["B", "KB", "MB", "GB", "TB"];
-  let v = n;
-  let i = 0;
-  while (v >= 1024 && i < units.length - 1) {
-    v /= 1024;
-    i += 1;
-  }
-  const digits = i === 0 ? 0 : i <= 2 ? 1 : 2;
-  return `${v.toFixed(digits)} ${units[i]}`;
 }
 
 function fmtStorageUsedForHome(n: number | null): string {
@@ -85,25 +71,18 @@ export default async function AnalyticsWidgets({
   const ownerFilterShares = ownerId ? sql`and st.owner_id = ${ownerId}::uuid` : sql``;
 
   // --- usage snapshot (current user)
-  let usagePlanName = "Free";
   let usagePlanId = "free";
   let usageMaxActiveShares: number | null = 3;
-  let usageMaxStorageBytes: number | null = 104857600;
-  let usageMaxViewsPerMonth: number | null = 100;
   let usageMaxUploadsPerDay: number | null = 10;
   let usageMaxFileSizeBytes: number | null = 26214400;
   let usageActiveShares = 0;
   let usageStorage = 0;
-  let usageMonthlyViews: number | null = null;
   let usageDailyUploads: number | null = null;
 
   try {
     const usagePlan = await getPlanForUser(userId);
-    usagePlanName = usagePlan.name || "Free";
     usagePlanId = String(usagePlan.id || "free").toLowerCase();
     usageMaxActiveShares = usagePlan.maxActiveShares;
-    usageMaxStorageBytes = usagePlan.maxStorageBytes;
-    usageMaxViewsPerMonth = usagePlan.maxViewsPerMonth;
     usageMaxUploadsPerDay = usagePlan.maxUploadsPerDay;
     usageMaxFileSizeBytes = usagePlan.maxFileSizeBytes;
   } catch {
@@ -118,11 +97,6 @@ export default async function AnalyticsWidgets({
     usageStorage = await getStorageBytesForOwner(userId);
   } catch {
     usageStorage = 0;
-  }
-  try {
-    usageMonthlyViews = await getMonthlyViewCount(userId);
-  } catch {
-    usageMonthlyViews = null;
   }
   try {
     usageDailyUploads = await getDailyUploadCount(userId);
@@ -316,15 +290,12 @@ export default async function AnalyticsWidgets({
   let presignErrors24h = 0;
   let abuseSpikes24h = 0;
   let deadLetterBacklog = 0;
-  let cronRuns24h = 0;
-  let cronFailures24h = 0;
   let cronFreshHealthy = 0;
   let cronFreshTotal = 0;
   let backupLastStatus: string | null = null;
   let backupLastCreatedAt: string | null = null;
   let backupRunCount = 0;
   let backupHoursSinceLastSuccess: number | null = null;
-  let backupFreshOk = false;
   let backupUsesGithubReporting = false;
   let topSecurityTypes: Array<{ type: string; c: number }> = [];
   let unencryptedDocs = 0;
@@ -386,23 +357,6 @@ export default async function AnalyticsWidgets({
       deadLetterAlerts24h = Number(rows?.[0]?.dead_letter_alerts ?? 0);
       presignErrors24h = Number(rows?.[0]?.presign_errors ?? 0);
       abuseSpikes24h = Number(rows?.[0]?.abuse_spikes ?? 0);
-    } catch {
-      // ignore
-    }
-
-    try {
-      const rows = (await sql`
-        select
-          coalesce(sum(case when se.type in ('cron_run_ok','cron_run_failed') then 1 else 0 end), 0)::int as runs,
-          coalesce(sum(case when se.type = 'cron_run_failed' then 1 else 0 end), 0)::int as failures
-        from public.security_events se
-        where se.created_at > now() - interval '24 hours'
-          ${ownerId
-            ? sql`and (se.actor_user_id = ${ownerId}::uuid or se.actor_user_id is null)`
-            : sql``}
-      `) as unknown as Array<{ runs: number; failures: number }>;
-      cronRuns24h = Number(rows?.[0]?.runs ?? 0);
-      cronFailures24h = Number(rows?.[0]?.failures ?? 0);
     } catch {
       // ignore
     }
@@ -494,10 +448,6 @@ export default async function AnalyticsWidgets({
       `) as unknown as Array<{ hours_since: number | string | null }>;
       const h = rows?.[0]?.hours_since;
       backupHoursSinceLastSuccess = h == null ? null : Number(h);
-      backupFreshOk =
-        backupHoursSinceLastSuccess != null &&
-        Number.isFinite(backupHoursSinceLastSuccess) &&
-        backupHoursSinceLastSuccess <= backupMaxAgeHours;
     } catch {
       // ignore
     }

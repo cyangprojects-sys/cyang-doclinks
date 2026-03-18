@@ -134,7 +134,6 @@ async function deleteOlderThan(args: {
       }
     } catch (e) {
       // Try the next column candidate.
-      const msg = e instanceof Error ? e.message : String(e);
       // If table doesn't exist, surface it immediately.
       if (isPgErrCode(e, "42P01")) {
         return { table, ok: false, error: "Table not found (SQLSTATE 42P01)." };

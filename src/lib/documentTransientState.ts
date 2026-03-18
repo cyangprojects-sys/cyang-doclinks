@@ -62,10 +62,6 @@ export function isDocumentStatusActive(source: DocumentStatusSource): boolean {
   return status.scan_state === "PENDING" || status.scan_state === "RUNNING" || status.scan_state === "NOT_SCHEDULED";
 }
 
-export function isDocumentStatusTerminal(source: DocumentStatusSource): boolean {
-  return !isDocumentStatusActive(source);
-}
-
 export function toDocumentStatusSnapshot(input: {
   doc_id: string;
   doc_state: NullableString;

@@ -268,18 +268,6 @@ export async function getPlanForUser(userId: string): Promise<Plan> {
   return pending;
 }
 
-export async function getOwnerIdForDoc(docId: string): Promise<string | null> {
-  const id = normalizeUuid(docId);
-  if (!id) return null;
-  const rows = (await sql`
-    select owner_id::text as owner_id
-    from public.docs
-    where id = ${id}::uuid
-    limit 1
-  `) as unknown as Array<{ owner_id: string | null }>;
-  return rows?.[0]?.owner_id ?? null;
-}
-
 export async function getActiveShareCountForOwner(ownerId: string): Promise<number> {
   const uid = normalizeUuid(ownerId);
   if (!uid) return 0;

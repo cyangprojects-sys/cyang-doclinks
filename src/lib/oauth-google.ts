@@ -43,7 +43,7 @@ let _configPromise: Promise<client.Configuration> | null = null;
 /**
  * Lazily discover + cache OIDC configuration for Google.
  */
-export async function getGoogleConfig(): Promise<client.Configuration> {
+async function getGoogleConfig(): Promise<client.Configuration> {
   if (!_configPromise) {
     _configPromise = client.discovery(
       GOOGLE_ISSUER,
@@ -74,7 +74,7 @@ export type GoogleAuthRequest = {
  * Create an authorization request using Authorization Code + PKCE.
  * You must persist codeVerifier/state/nonce until the callback.
  */
-export async function createGoogleAuthRequest(alias: string): Promise<GoogleAuthRequest> {
+export async function createGoogleAuthRequest(): Promise<GoogleAuthRequest> {
   const config = await getGoogleConfig();
 
   const codeVerifier = client.randomPKCECodeVerifier();
@@ -83,8 +83,6 @@ export async function createGoogleAuthRequest(alias: string): Promise<GoogleAuth
   const state = client.randomState();
   const nonce = client.randomNonce();
 
-  // Include alias in the round-trip using "state" or a separate cookie/db row.
-  // Here we pass alias as an extra param; you can remove if you prefer.
   const url = client.buildAuthorizationUrl(config, {
     redirect_uri: googleRedirectUri(),
     scope: "openid email profile",
@@ -93,10 +91,6 @@ export async function createGoogleAuthRequest(alias: string): Promise<GoogleAuth
     code_challenge_method: "S256",
     state,
     nonce,
-    // Optional: keep this if your routes expect it
-    // (Google will round-trip unknown params back to redirect_uri in some cases,
-    // but do not rely on it universally; best to store alias server-side.)
-    // alias,
   });
 
   return {

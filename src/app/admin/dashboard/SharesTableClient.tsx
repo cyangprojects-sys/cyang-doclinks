@@ -37,13 +37,6 @@ type SharePatchInput = SharePatch | ((row: ShareRow) => SharePatch);
 type Status = "all" | "active" | "maxed";
 type StatusFilter = Status | "expiring";
 
-function formatDate(value: string | null) {
-  if (!value) return "No date";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString(undefined, { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
-}
-
 function formatShortDate(value: string | null) {
   if (!value) return "No date";
   const date = new Date(value);

@@ -40,11 +40,11 @@ export type ShareStatsResult =
   | { ok: true; row: ShareRow }
   | { ok: false; error: string; message?: string };
 
-export type RevokeShareResult =
+type RevokeShareResult =
   | { ok: true; token: string }
   | { ok: false; error: string; message?: string };
 
-export type SendShareEmailResult =
+type SendShareEmailResult =
   | { ok: true }
   | { ok: false; error: string; message?: string };
 

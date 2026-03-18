@@ -10,8 +10,6 @@ type PerfCounter = {
 const MAX_ROUTE_KEYS = 256;
 const MAX_QUERY_KEYS = 512;
 const MAX_KEY_LEN = 220;
-const startedAt = Date.now();
-
 const routeCounters = new Map<string, PerfCounter>();
 const queryCounters = new Map<string, PerfCounter>();
 
@@ -65,25 +63,6 @@ function bumpCounter(map: Map<string, PerfCounter>, key: string, maxEntries: num
   counter.totalDurationMs += safeDurationMs;
   counter.maxDurationMs = Math.max(counter.maxDurationMs, safeDurationMs);
   counter.lastSeenAt = now;
-}
-
-function summarizeCounters(map: Map<string, PerfCounter>, limit: number) {
-  return Array.from(map.values())
-    .sort((left, right) => {
-      if (right.count !== left.count) return right.count - left.count;
-      if (right.totalDurationMs !== left.totalDurationMs) return right.totalDurationMs - left.totalDurationMs;
-      return right.lastSeenAt - left.lastSeenAt;
-    })
-    .slice(0, Math.max(1, limit))
-    .map((counter) => ({
-      key: counter.key,
-      count: counter.count,
-      errorCount: counter.errorCount,
-      totalDurationMs: counter.totalDurationMs,
-      avgDurationMs: counter.count > 0 ? Math.round(counter.totalDurationMs / counter.count) : 0,
-      maxDurationMs: counter.maxDurationMs,
-      lastSeenAt: new Date(counter.lastSeenAt).toISOString(),
-    }));
 }
 
 export function normalizeSqlFingerprint(strings: TemplateStringsArray | readonly string[]): string {
@@ -156,18 +135,4 @@ export async function withRequestTelemetry<T>(
     });
     throw error;
   }
-}
-
-export function getPerfTelemetrySnapshot(args?: { routeLimit?: number; queryLimit?: number }) {
-  const routeLimit = Math.max(1, Math.min(50, Math.floor(args?.routeLimit ?? 20)));
-  const queryLimit = Math.max(1, Math.min(50, Math.floor(args?.queryLimit ?? 20)));
-  return {
-    ok: true,
-    startedAt: new Date(startedAt).toISOString(),
-    uptimeSeconds: Math.max(0, Math.floor((Date.now() - startedAt) / 1000)),
-    routeKeyCount: routeCounters.size,
-    queryKeyCount: queryCounters.size,
-    topRoutes: summarizeCounters(routeCounters, routeLimit),
-    topQueries: summarizeCounters(queryCounters, queryLimit),
-  };
 }

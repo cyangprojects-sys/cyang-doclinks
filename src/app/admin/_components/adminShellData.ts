@@ -1,7 +1,7 @@
 import { classifyBillingEntitlement, getBillingSnapshotForUser } from "@/lib/billingSubscription";
 import { sql } from "@/lib/db";
 
-export type AdminShellBadgeMap = Partial<Record<
+type AdminShellBadgeMap = Partial<Record<
   | "documents"
   | "links"
   | "security"
@@ -13,7 +13,7 @@ export type AdminShellBadgeMap = Partial<Record<
   { tone: "default" | "warning" | "danger"; value: string }
 >>;
 
-export type AdminShellBadgeKey = keyof AdminShellBadgeMap;
+type AdminShellBadgeKey = keyof AdminShellBadgeMap;
 
 export type AdminShellContext = {
   workspaceName: string;

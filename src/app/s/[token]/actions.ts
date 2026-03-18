@@ -122,7 +122,7 @@ async function throttlePasswordAttempts(args: { token: string; ip: string }): Pr
   return { ok: true };
 }
 
-export type VerifySharePasswordResult =
+type VerifySharePasswordResult =
     | { ok: true }
     | {
         ok: false;

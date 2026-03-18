@@ -63,9 +63,9 @@ function isLikelyEmail(email: string): boolean {
   return EMAIL_RE.test(normalized);
 }
 
-export const isGoogleConfigured = hasEnv("GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET");
+const isGoogleConfigured = hasEnv("GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET");
 
-export const isEnterpriseSsoConfigured = hasEnv(
+const isEnterpriseSsoConfigured = hasEnv(
   "OIDC_ISSUER",
   "OIDC_CLIENT_ID",
   "OIDC_CLIENT_SECRET"

@@ -15,7 +15,7 @@ export type AdminIconName =
   | "profile"
   | "search";
 
-export type AdminNavAudience = "both" | "owner";
+type AdminNavAudience = "both" | "owner";
 
 export type AdminNavItem = {
   key: string;
@@ -27,7 +27,7 @@ export type AdminNavItem = {
   group: "workspace" | "security" | "workspace_controls" | "platform";
 };
 
-export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
+const ADMIN_NAV_ITEMS: AdminNavItem[] = [
   {
     key: "overview",
     label: "Overview",

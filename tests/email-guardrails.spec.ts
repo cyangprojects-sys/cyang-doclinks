@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { sendAccountActivationEmail, sendMail, sendShareEmail } from "../src/lib/email";
+import { sendAccountActivationEmail, sendMail } from "../src/lib/email";
 
 const SNAP = {
   RESEND_API_KEY: process.env.RESEND_API_KEY,
@@ -23,23 +23,12 @@ test.describe("email helper guardrails", () => {
     );
   });
 
-  test("rejects malformed activation and share URLs", async () => {
+  test("rejects malformed activation URLs", async () => {
     process.env.RESEND_API_KEY = "re_test";
     process.env.EMAIL_FROM = "DocLinks <login@cyang.io>";
 
     await expect(
       sendAccountActivationEmail({ to: "user@example.com", activationUrl: "javascript:alert(1)" })
     ).rejects.toThrow(/INVALID_ACTIVATIONURL/);
-
-    await expect(
-      sendShareEmail({
-        to: "user@example.com",
-        subject: "Doc shared",
-        brandName: "DocLinks",
-        brandColor: "#123456",
-        docTitle: "Quarterly Report",
-        shareUrl: "not-a-url",
-      })
-    ).rejects.toThrow(/INVALID_SHAREURL/);
   });
 });

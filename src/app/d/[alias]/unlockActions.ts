@@ -13,7 +13,7 @@ import {
 import { deviceHashFrom, getClientIpFromHeaders, getUserAgentFromHeaders, isDeviceTrustedForDoc, trustDeviceForDoc } from "@/lib/audit";
 import { rateLimit, stableHash } from "@/lib/rateLimit";
 
-export type VerifyAliasPasswordResult =
+type VerifyAliasPasswordResult =
     | { ok: true }
     | { ok: false; error: "not_found" | "expired" | "revoked" | "bad_password"; message: string };
 

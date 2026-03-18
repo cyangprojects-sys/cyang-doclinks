@@ -102,7 +102,6 @@ const BLOCKED_MIME_EXACT = new Set([
   "image/svg+xml",
 ]);
 
-export const ALLOWED_UPLOAD_EXTENSIONS = ALLOWED.map((s) => s.ext);
 const MAX_FILENAME_LEN = 240;
 const MAX_EXT_LEN = 16;
 const MAX_MIME_LEN = 160;

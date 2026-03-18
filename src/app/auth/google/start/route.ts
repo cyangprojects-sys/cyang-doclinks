@@ -46,7 +46,7 @@ export async function GET(req: NextRequest, _ctx: { params: Promise<Record<strin
     });
   }
 
-  const { authorizationUrl, codeVerifier, state, nonce } = await createGoogleAuthRequest(alias);
+  const { authorizationUrl, codeVerifier, state, nonce } = await createGoogleAuthRequest();
 
   const headers = new Headers();
   headers.set("Cache-Control", "no-store");

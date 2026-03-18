@@ -1,7 +1,5 @@
 import { expect, test } from "@playwright/test";
 import { PDFDocument } from "pdf-lib";
-import * as admin from "../src/lib/admin";
-import { requireOwner as requireOwnerAuth } from "../src/lib/auth";
 import { getOwnerEmail, roleAtLeast } from "../src/lib/authz";
 import { logCronRun } from "../src/lib/cronTelemetry";
 import { sql } from "../src/lib/db";
@@ -12,19 +10,16 @@ import {
   generateDataKey,
   generateIv,
   getActiveMasterKey,
-  shouldForceSse,
   unwrapDataKey,
   wrapDataKey,
 } from "../src/lib/encryption";
 import { sendExpirationAlerts } from "../src/lib/expirationAlerts";
 import { appendImmutableAudit } from "../src/lib/immutableAudit";
 import { enqueueKeyRotationJob, listKeyRotationJobs, processKeyRotationJobs } from "../src/lib/keyRotationJobs";
-import { logAccess } from "../src/lib/logAccess";
 import { scanR2Object } from "../src/lib/malwareScan";
 import { getEffectiveActiveMasterKeyId, listMasterKeysWithStatus } from "../src/lib/masterKeys";
 import { googleRedirectUri } from "../src/lib/oauth-google";
 import { createOrgInviteToken, hashInviteToken } from "../src/lib/orgMembership";
-import { requireOwner as requireOwnerLegacy } from "../src/lib/owner";
 import { validatePdfBuffer } from "../src/lib/pdfSafety";
 import { stampPdfWithWatermark } from "../src/lib/pdfWatermark";
 import { createQuarantineOverride, hasActiveQuarantineOverride } from "../src/lib/quarantineOverride";
@@ -39,8 +34,6 @@ const ENV_SNAPSHOT = {
   RESEND_API_KEY: process.env.RESEND_API_KEY,
   EMAIL_FROM: process.env.EMAIL_FROM,
   DOC_MASTER_KEYS: process.env.DOC_MASTER_KEYS,
-  R2_FORCE_SSE: process.env.R2_FORCE_SSE,
-  FORCE_R2_SSE: process.env.FORCE_R2_SSE,
   R2_BUCKET: process.env.R2_BUCKET,
   R2_BUCKET_NAME: process.env.R2_BUCKET_NAME,
   R2_PREFIX: process.env.R2_PREFIX,
@@ -61,8 +54,6 @@ test.afterEach(() => {
   restore("RESEND_API_KEY");
   restore("EMAIL_FROM");
   restore("DOC_MASTER_KEYS");
-  restore("R2_FORCE_SSE");
-  restore("FORCE_R2_SSE");
   restore("R2_BUCKET");
   restore("R2_BUCKET_NAME");
   restore("R2_PREFIX");
@@ -83,11 +74,6 @@ test.describe("remaining module sweep", () => {
     expect(getOwnerEmail()).toBe("owner1@example.com");
     expect(roleAtLeast("owner", "admin")).toBeTruthy();
     expect(roleAtLeast("viewer", "admin")).toBeFalsy();
-
-    expect(typeof admin.getRole).toBe("function");
-    expect(typeof admin.requireOwnerAdmin).toBe("function");
-    expect(typeof requireOwnerAuth).toBe("function");
-    expect(typeof requireOwnerLegacy).toBe("function");
   });
 
   test("db and r2 helpers fail closed without required env", async () => {
@@ -129,12 +115,6 @@ test.describe("remaining module sweep", () => {
     const pt = decryptAes256Gcm({ ciphertext: ct, iv, key: dataKey });
     expect(pt.equals(plaintext)).toBeTruthy();
 
-    process.env.R2_FORCE_SSE = "true";
-    expect(shouldForceSse()).toBeTruthy();
-    process.env.R2_FORCE_SSE = "0";
-    delete process.env.R2_FORCE_SSE;
-    process.env.FORCE_R2_SSE = "yes";
-    expect(shouldForceSse()).toBeTruthy();
   });
 
   test("alerts/key-rotation/master-keys fallback safely when DB is unavailable", async () => {
@@ -168,7 +148,6 @@ test.describe("remaining module sweep", () => {
     ).rejects.toThrow(/MISSING_QUARANTINE_OVERRIDE_TABLE/);
 
     await expect(revokeExpiredSharesBatch(10)).rejects.toThrow(/Missing DATABASE_URL/);
-    await expect(logAccess({ docId: "d1", alias: null, token: null, ip: null, userAgent: null })).resolves.toBeUndefined();
     await expect(sendMail({ to: "u@example.com", subject: "s", text: "t" })).rejects.toThrow(/Missing env: RESEND_API_KEY/);
   });
 

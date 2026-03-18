@@ -442,10 +442,6 @@ export async function buildDependencySummary(): Promise<HealthSummary> {
   };
 }
 
-export async function buildReadinessSummary(): Promise<HealthSummary> {
-  return buildDependencySummary();
-}
-
 let dependencyHealthCache: DependencyHealthCacheEntry | null = null;
 let dependencyHealthInFlight: Promise<HealthSummary> | null = null;
 

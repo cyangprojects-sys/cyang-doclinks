@@ -232,10 +232,6 @@ export function getRelatedLegalDocs(slug: string): LegalDocMeta[] {
     .filter((value): value is LegalDocMeta => Boolean(value));
 }
 
-export function getLegalDocsByCategory(category: LegalDocCategory): LegalDocMeta[] {
-  return LEGAL_DOCS.filter((doc) => doc.category === category);
-}
-
 export async function readLegalDocMarkdown(file: string) {
   const name = String(file || "").trim().slice(0, 128);
   const base = docsDir();

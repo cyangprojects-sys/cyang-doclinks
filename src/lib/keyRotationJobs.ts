@@ -1,5 +1,5 @@
 import { sql } from "@/lib/db";
-import { countDocsEncryptedWithKey, rotateDocKeys } from "@/lib/masterKeys";
+import { rotateDocKeys } from "@/lib/masterKeys";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const MAX_KEY_ID_LEN = 64;
@@ -210,10 +210,4 @@ export async function getKeyRotationStatusSummary() {
     from public.key_rotation_jobs
   `) as unknown as Array<{ queued: number; running: number; failed: number }>;
   return rows?.[0] ?? { queued: 0, running: 0, failed: 0 };
-}
-
-export async function estimateRollbackImpact(args: { fromKeyId: string; toKeyId: string }) {
-  const nowOnTo = await countDocsEncryptedWithKey(args.toKeyId);
-  const stillOnFrom = await countDocsEncryptedWithKey(args.fromKeyId);
-  return { nowOnTo, stillOnFrom };
 }

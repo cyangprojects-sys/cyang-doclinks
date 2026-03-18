@@ -1,7 +1,7 @@
 import { getPlanForUser } from "@/lib/monetization";
 import { sql } from "@/lib/db";
 
-export type ViewerShellBadgeMap = Partial<Record<
+type ViewerShellBadgeMap = Partial<Record<
   "documents" | "links",
   { tone: "default" | "warning" | "danger"; value: string }
 >>;

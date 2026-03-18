@@ -8,11 +8,6 @@ import { clientIpKey, enforceGlobalApiRateLimit, logSecurityEvent } from "@/lib/
 import { appendImmutableAudit } from "@/lib/immutableAudit";
 import { getRouteTimeoutMs, isRouteTimeoutError, withRouteTimeout } from "@/lib/routeTimeout";
 
-type Action =
-  | { action: "set_status"; noticeId: string; status: "new" | "reviewing" | "accepted" | "rejected" | "actioned"; adminNotes?: string | null }
-  | { action: "takedown_doc"; noticeId: string; docId: string; reason?: string | null; confirm?: string | null }
-  | { action: "restore_doc"; noticeId: string; docId: string; reason?: string | null; confirm?: string | null };
-
 type JsonBody = Record<string, unknown>;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const MAX_DMCA_BODY_BYTES = 24 * 1024;

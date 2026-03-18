@@ -4,7 +4,7 @@ import { cookies } from "next/headers";
 
 import { authOptions } from "@/auth";
 import { sql } from "@/lib/db";
-import { ORG_COOKIE_NAME, ORG_INVITE_COOKIE_NAME } from "@/lib/tenant";
+import { ORG_INVITE_COOKIE_NAME } from "@/lib/tenant";
 import { getOrgBySlug, orgAllowsEmail } from "@/lib/orgs";
 import { acceptInviteForUser, getActiveMembership, orgMembershipTablesReady, upsertMembership } from "@/lib/orgMembership";
 import { hasValidMfaCookie, mfaTableExists, roleRequiresMfa } from "@/lib/mfa";
@@ -413,23 +413,6 @@ export async function requireRole(minRole: Role): Promise<AuthedUser> {
   const u = await requireUser();
   if (!roleAtLeast(u.role, minRole)) throw new Error("FORBIDDEN");
   return u;
-}
-
-/**
- * Returns the org slug requested (cookie) if present.
- * Useful for pages that need to render /org/[slug] experiences.
- */
-export async function getOrgSlugHint(): Promise<string | null> {
-  try {
-    // In Next.js App Router, cookies() may be async depending on version.
-    const c = await cookies();
-    const v = c.get(ORG_COOKIE_NAME)?.value ?? "";
-    const slug = String(v || "").trim().toLowerCase();
-    if (!slug) return null;
-    return ORG_SLUG_RE.test(slug) ? slug : null;
-  } catch {
-    return null;
-  }
 }
 
 /**

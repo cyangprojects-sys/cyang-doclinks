@@ -26,7 +26,7 @@ function normalizeWebhookUrl(raw: unknown): string {
   return parsed.toString();
 }
 
-export function parseBackupRecoveryConfig(env: NodeJS.ProcessEnv = process.env): {
+function parseBackupRecoveryConfig(env: NodeJS.ProcessEnv = process.env): {
   enabled: boolean;
   maxAgeHours: number;
   recoveryDrillDays: number;

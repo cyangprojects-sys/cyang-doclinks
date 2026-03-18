@@ -38,7 +38,7 @@ type UptimeDay = {
   status: PlatformState;
 };
 
-export type StatusPreview =
+type StatusPreview =
   | "live"
   | "operational"
   | "degraded"

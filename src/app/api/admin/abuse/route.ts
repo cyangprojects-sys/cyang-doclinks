@@ -8,13 +8,6 @@ import { createQuarantineOverride, revokeActiveQuarantineOverride } from "@/lib/
 import { appendImmutableAudit } from "@/lib/immutableAudit";
 import { getRouteTimeoutMs, isRouteTimeoutError, withRouteTimeout } from "@/lib/routeTimeout";
 
-type Action =
-  | { action: "disable_doc"; docId: string; reason?: string | null; reportId?: string | null }
-  | { action: "override_quarantine"; docId: string; reason?: string | null; ttlMinutes?: number; confirm: string }
-  | { action: "revoke_override"; docId: string; reason?: string | null; confirm: string }
-  | { action: "revoke_share"; token: string; reason?: string | null; reportId?: string | null }
-  | { action: "close_report"; reportId: string; notes?: string | null };
-
 type JsonBody = Record<string, unknown>;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const MAX_ADMIN_ABUSE_BODY_BYTES = 32 * 1024;
@@ -81,12 +74,10 @@ export async function POST(req: NextRequest) {
           return NextResponse.json({ ok: false, error: "PAYLOAD_TOO_LARGE" }, { status: 413 });
         }
 
-        let body: Action;
         let rawBody: JsonBody;
         try {
           const parsed = await req.json();
           rawBody = parsed && typeof parsed === "object" && !Array.isArray(parsed) ? (parsed as JsonBody) : ({} as JsonBody);
-          body = rawBody as Action;
         } catch {
           return NextResponse.json({ ok: false, error: "BAD_JSON" }, { status: 400 });
         }

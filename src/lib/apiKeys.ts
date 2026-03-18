@@ -4,16 +4,6 @@ import { getApiKeySaltEnv } from "@/lib/envConfig";
 
 const MAX_API_KEY_INPUT_LEN = 512;
 
-export type ApiKeyRecord = {
-  id: string;
-  owner_id: string;
-  name: string;
-  prefix: string;
-  created_at: string;
-  revoked_at: string | null;
-  last_used_at: string | null;
-};
-
 function normSecretSalt(): string {
   const salt = getApiKeySaltEnv() || "";
   if (!salt) throw new Error("Missing API_KEY_SALT (or NEXTAUTH_SECRET/VIEW_SALT fallback)");
