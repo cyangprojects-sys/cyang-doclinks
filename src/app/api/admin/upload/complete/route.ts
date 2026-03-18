@@ -114,9 +114,6 @@ export async function POST(req: NextRequest) {
       req,
       () => withRouteTimeout(
         (async () => {
-        stage = "runtime_env";
-        assertRuntimeEnv("upload_complete");
-
         stage = "global_rate_limit";
         const globalRl = await enforceGlobalApiRateLimit({
           req,
@@ -132,9 +129,21 @@ export async function POST(req: NextRequest) {
           );
         }
 
+    stage = "parse_body";
+    if (parseJsonBodyLength(req) > MAX_UPLOAD_COMPLETE_BODY_BYTES) {
+      return NextResponse.json({ ok: false, error: "PAYLOAD_TOO_LARGE" }, { status: 413 });
+    }
+    const parsedBody = await req.json().catch(() => null);
+    if (!parsedBody || typeof parsedBody !== "object" || Array.isArray(parsedBody)) {
+      return NextResponse.json({ ok: false, error: "bad_request", message: "Request body must be a JSON object." }, { status: 400 });
+    }
+    const body = parsedBody as CompleteRequest;
+
         stage = "auth";
-        const r2Bucket = getR2Bucket();
         const user = await requireUser();
+        stage = "runtime_env";
+        assertRuntimeEnv("upload_complete");
+        const r2Bucket = getR2Bucket();
         const plan = await getPlanForUser(user.id);
 
         // Upload complete throttle per-IP
@@ -165,16 +174,6 @@ export async function POST(req: NextRequest) {
             { status: completeRl.status, headers: { "Retry-After": String(completeRl.retryAfterSeconds) } }
           );
         }
-
-    stage = "parse_body";
-    if (parseJsonBodyLength(req) > MAX_UPLOAD_COMPLETE_BODY_BYTES) {
-      return NextResponse.json({ ok: false, error: "PAYLOAD_TOO_LARGE" }, { status: 413 });
-    }
-    const parsedBody = await req.json().catch(() => null);
-    if (!parsedBody || typeof parsedBody !== "object" || Array.isArray(parsedBody)) {
-      return NextResponse.json({ ok: false, error: "bad_request", message: "Request body must be a JSON object." }, { status: 400 });
-    }
-    const body = parsedBody as CompleteRequest;
 
     const title = body.title ?? null;
     const originalFilename = body.original_filename ?? null;
@@ -771,6 +770,9 @@ try {
         { status: 403 }
       );
     }
+    if (isRuntimeEnvError(e)) {
+      return NextResponse.json({ ok: false, error: "ENV_MISCONFIGURED", stage }, { status: 500 });
+    }
     const stack = e instanceof Error ? e.stack || null : null;
     console.error("upload_complete_failed", {
       stage,
@@ -778,9 +780,6 @@ try {
       message: msg,
       stack,
     });
-    if (isRuntimeEnvError(e)) {
-      return NextResponse.json({ ok: false, error: "ENV_MISCONFIGURED", stage }, { status: 503 });
-    }
     if (isRouteTimeoutError(e)) {
       await logSecurityEvent({
         type: "upload_complete_timeout",

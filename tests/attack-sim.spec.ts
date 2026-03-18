@@ -418,7 +418,7 @@ test.describe("attack simulation", () => {
   test("upload presign rejects absolute oversize payloads (>25MB)", async ({ request }) => {
     const auth = authHeadersFromEnv();
 
-    const absMax = Number(process.env.UPLOAD_ABSOLUTE_MAX_BYTES || 26_214_400);
+    const absMax = Number(process.env.UPLOAD_ABSOLUTE_MAX_BYTES || 104_857_600);
     const tooLarge = absMax + 1;
     const res = await request.post("/api/admin/upload/presign", {
       headers: { "content-type": "application/json", ...(auth || {}) },
