@@ -98,10 +98,11 @@ export default async function SecurityCenterPage() {
   }>;
 
   const highEvents = securityEvents.filter((event) => String(event.severity || "").toLowerCase() === "high").length;
+  const hasActiveSecurityWork = Number(queue.queued ?? 0) > 0 || Number(queue.running ?? 0) > 0;
 
   return (
     <div className="space-y-6">
-      <SecurityTablesAutoRefresh />
+      <SecurityTablesAutoRefresh initialActiveWork={hasActiveSecurityWork} />
 
       <AdminPageIntro
         eyebrow="Security Center"

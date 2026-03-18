@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useConditionalPolling } from "@/hooks/useConditionalPolling";
+import { dispatchSecurityRefreshWatch } from "./securityRefreshWatch";
 
 type MasterKeyRow = { id: string; active: boolean; revoked: boolean };
 type MasterKeyChange = {
@@ -39,8 +41,8 @@ type KeysOk = {
 };
 type KeysErr = { ok: false; error: string; message?: string };
 type KeysResponse = KeysOk | KeysErr;
-const KEY_PANEL_ACTIVE_POLL_MS = 60_000;
-const KEY_PANEL_IDLE_POLL_MS = 300_000;
+const KEY_PANEL_POLL_START_MS = 15_000;
+const KEY_PANEL_POLL_MAX_MS = 60_000;
 
 function keysSignature(payload: KeysResponse | null): string {
   if (!payload || !payload.ok) return "";
@@ -76,10 +78,19 @@ function toUserError(e: unknown, fallback: string): string {
   return fallback;
 }
 
+function hasRunningJobs(payload: KeysResponse | null): boolean {
+  return Boolean(
+    payload &&
+      payload.ok &&
+      (Number(payload.job_summary.queued ?? 0) > 0 || Number(payload.job_summary.running ?? 0) > 0)
+  );
+}
+
 export default function KeyManagementPanel() {
   const [data, setData] = useState<KeysResponse | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [watchJobs, setWatchJobs] = useState(false);
   const signatureRef = useRef<string>("");
 
   const keys = useMemo(() => (data && data.ok ? data.keys : []), [data]);
@@ -95,45 +106,38 @@ export default function KeyManagementPanel() {
   const [toKey, setToKey] = useState<string>("");
   const [limit, setLimit] = useState<number>(250);
 
-  const refresh = useCallback(async (opts?: { silent?: boolean }) => {
+  const refresh = useCallback(async (opts?: { silent?: boolean }): Promise<KeysResponse | null> => {
     if (!opts?.silent) setError(null);
     const r = await fetch("/api/admin/security/keys", { method: "GET" });
     const j = (await r.json().catch(() => null)) as KeysResponse | null;
     if (!j) {
       if (!opts?.silent) setError("Failed to load keys.");
-      return;
+      return null;
     }
     const nextSignature = keysSignature(j);
-    if (nextSignature && nextSignature !== signatureRef.current) {
+    if (!signatureRef.current || (nextSignature && nextSignature !== signatureRef.current)) {
       signatureRef.current = nextSignature;
-      setData(j);
-    } else if (!data) {
       setData(j);
     }
     if ((!r.ok || !j.ok) && !opts?.silent) {
       setError(j.ok ? "Failed to load keys." : (j.error || "Failed to load keys."));
     }
-  }, [data]);
+    if (!hasRunningJobs(j)) setWatchJobs(false);
+    return j;
+  }, []);
 
   useEffect(() => {
     void refresh();
-    const pollMs = hasActiveJobs ? KEY_PANEL_ACTIVE_POLL_MS : KEY_PANEL_IDLE_POLL_MS;
-    const timer = window.setInterval(() => {
-      if (document.visibilityState !== "visible") return;
-      if (busy) return;
-      void refresh({ silent: true });
-    }, pollMs);
-    const onVisibilityChange = () => {
-      if (document.visibilityState === "visible" && !busy) {
-        void refresh({ silent: true });
-      }
-    };
-    document.addEventListener("visibilitychange", onVisibilityChange);
-    return () => {
-      window.clearInterval(timer);
-      document.removeEventListener("visibilitychange", onVisibilityChange);
-    };
-  }, [busy, hasActiveJobs, refresh]);
+  }, [refresh]);
+
+  useConditionalPolling({
+    enabled: !busy && (hasActiveJobs || watchJobs),
+    getDelayMs: ({ attempt }) => Math.min(KEY_PANEL_POLL_START_MS * 2 ** attempt, KEY_PANEL_POLL_MAX_MS),
+    poll: async () => {
+      const next = await refresh({ silent: true });
+      return hasRunningJobs(next) || watchJobs;
+    },
+  });
 
   async function onActivate() {
     if (!activateKey) {
@@ -151,6 +155,7 @@ export default function KeyManagementPanel() {
       });
       const j = (await r.json().catch(() => null)) as { ok?: boolean; error?: string } | null;
       if (!r.ok || !j?.ok) throw new Error(j?.error || "Activate failed.");
+      dispatchSecurityRefreshWatch();
       await refresh();
     } catch (e: unknown) {
       setError(toUserError(e, "Activate failed."));
@@ -171,6 +176,7 @@ export default function KeyManagementPanel() {
       });
       const j = (await r.json().catch(() => null)) as { ok?: boolean; error?: string } | null;
       if (!r.ok || !j?.ok) throw new Error(j?.error || "Revoke failed.");
+      dispatchSecurityRefreshWatch();
       await refresh();
     } catch (e: unknown) {
       setError(toUserError(e, "Revoke failed."));
@@ -203,6 +209,8 @@ export default function KeyManagementPanel() {
       });
       const j = (await r.json().catch(() => null)) as { ok?: boolean; error?: string } | null;
       if (!r.ok || !j?.ok) throw new Error(j?.error || "Failed to enqueue rotation job.");
+      setWatchJobs(true);
+      dispatchSecurityRefreshWatch();
       await refresh();
     } catch (e: unknown) {
       setError(toUserError(e, "Failed to enqueue rotation job."));
@@ -224,6 +232,7 @@ export default function KeyManagementPanel() {
       });
       const j = (await r.json().catch(() => null)) as { ok?: boolean; error?: string } | null;
       if (!r.ok || !j?.ok) throw new Error(j?.error || "Rollback failed.");
+      dispatchSecurityRefreshWatch();
       await refresh();
     } catch (e: unknown) {
       setError(toUserError(e, "Rollback failed."));
@@ -352,6 +361,7 @@ export default function KeyManagementPanel() {
             <span>Queued: {jobSummary.queued}</span>
             <span>Running: {jobSummary.running}</span>
             <span>Failed: {jobSummary.failed}</span>
+            <span>{hasActiveJobs || watchJobs ? "Watching active jobs" : "Idle until a job starts"}</span>
           </div>
           <button
             onClick={() => void onEnqueueRotation()}

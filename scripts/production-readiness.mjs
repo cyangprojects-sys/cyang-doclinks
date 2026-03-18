@@ -16,6 +16,7 @@ const commands = [
   ["npm", ["run", "audit:env-example"]],
   ["node", ["scripts/migrate.mjs", "verify"]],
   ["npm", ["run", "audit:admin-routes"]],
+  ["npm", ["run", "audit:admin-polling"]],
   ["npm", ["run", "audit:public-rendering"]],
   ["npm", ["run", "audit:route-rendering"]],
   ["npm", ["run", "audit:polling"]],

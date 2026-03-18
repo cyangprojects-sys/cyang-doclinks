@@ -22,6 +22,8 @@ export type ViewsByDocRow = {
   last_view: string | null;
 };
 
+type ViewsRowUpdater = (rows: ViewsByDocRow[]) => ViewsByDocRow[];
+
 type FilterKey = "all" | "engaged" | "recent" | "quiet" | "blocked";
 
 function formatNumber(value: number) {
@@ -118,6 +120,7 @@ export default function ViewsByDocTableClient(props: {
   const [limit, setLimit] = useState(initialLimit);
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [rows, setRows] = useState(props.rows);
 
   const filter: FilterKey =
     filterFromUrl === "engaged" || filterFromUrl === "recent" || filterFromUrl === "quiet" || filterFromUrl === "blocked"
@@ -129,6 +132,10 @@ export default function ViewsByDocTableClient(props: {
     const id = window.setTimeout(() => setCopiedId(null), 1800);
     return () => window.clearTimeout(id);
   }, [copiedId]);
+
+  useEffect(() => {
+    setRows(props.rows);
+  }, [props.rows]);
 
   function syncUrl(next: { viewQ?: string; viewFilter?: FilterKey; viewLimit?: number }) {
     const params = new URLSearchParams(sp.toString());
@@ -151,19 +158,19 @@ export default function ViewsByDocTableClient(props: {
 
   const counts = useMemo(() => {
     const next: Record<FilterKey, number> = {
-      all: props.rows.length,
+      all: rows.length,
       engaged: 0,
       recent: 0,
       quiet: 0,
       blocked: 0,
     };
-    for (const row of props.rows) next[getRowFilter(row)] += 1;
+    for (const row of rows) next[getRowFilter(row)] += 1;
     return next;
-  }, [props.rows]);
+  }, [rows]);
 
   const filtered = useMemo(() => {
     const normalizedQ = q.trim().toLowerCase();
-    const next = props.rows.filter((row) => {
+    const next = rows.filter((row) => {
       const matchesFilter = filter === "all" ? true : getRowFilter(row) === filter;
       if (!matchesFilter) return false;
       if (!normalizedQ) return true;
@@ -179,15 +186,15 @@ export default function ViewsByDocTableClient(props: {
         return rightTs - leftTs;
       })
       .slice(0, limit);
-  }, [filter, limit, props.rows, q]);
+  }, [filter, limit, q, rows]);
 
   const selectedIds = useMemo(() => Object.keys(selected).filter((id) => selected[id]), [selected]);
   const visibleIds = useMemo(() => filtered.map((row) => row.doc_id), [filtered]);
   const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => selected[id]);
   const anySelected = selectedIds.length > 0;
 
-  const topViewed = props.rows[0] ?? null;
-  const recentlyViewed = useMemo(() => props.rows.filter((row) => !!row.last_view).length, [props.rows]);
+  const topViewed = rows[0] ?? null;
+  const recentlyViewed = useMemo(() => rows.filter((row) => !!row.last_view).length, [rows]);
   const quietCount = counts.quiet;
 
   async function copyLink(row: ViewsByDocRow) {
@@ -207,9 +214,9 @@ export default function ViewsByDocTableClient(props: {
   }
 
   function downloadCsvForSelected() {
-    const rows = props.rows.filter((row) => selected[row.doc_id]);
+    const selectedRows = rows.filter((row) => selected[row.doc_id]);
     const header = ["file_id", "file_name", "alias", "views", "unique_visits", "last_view"].join(",");
-    const lines = rows.map((row) =>
+    const lines = selectedRows.map((row) =>
       [
         row.doc_id,
         JSON.stringify(row.doc_title || ""),
@@ -230,10 +237,10 @@ export default function ViewsByDocTableClient(props: {
     URL.revokeObjectURL(url);
   }
 
-  function runAction(action: (fd: FormData) => Promise<void>, fd: FormData) {
+  function runAction(action: (fd: FormData) => Promise<void>, fd: FormData, updater?: ViewsRowUpdater) {
     startTransition(async () => {
       await action(fd);
-      router.refresh();
+      if (updater) setRows((current) => updater(current));
     });
   }
 
@@ -548,7 +555,9 @@ export default function ViewsByDocTableClient(props: {
                             onClick={() => {
                               const fd = new FormData();
                               fd.set("docId", row.doc_id);
-                              runAction(disableAliasForDocAction, fd);
+                              runAction(disableAliasForDocAction, fd, (current) =>
+                                current.map((item) => (item.doc_id === row.doc_id ? { ...item, alias: null } : item))
+                              );
                             }}
                             disabled={isPending}
                             className="btn-base w-full rounded-xl border border-white/12 bg-white/[0.04] px-3 py-2 text-sm text-white/75 hover:border-white/20 hover:bg-white/[0.08] hover:text-white disabled:opacity-40"
@@ -569,7 +578,7 @@ export default function ViewsByDocTableClient(props: {
       <div className="border-t border-white/10 px-5 py-4">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div className="text-sm text-white/60">
-            Showing <span className="text-white">{filtered.length}</span> of <span className="text-white">{props.rows.length}</span> files
+            Showing <span className="text-white">{filtered.length}</span> of <span className="text-white">{rows.length}</span> files
           </div>
           <div className="flex flex-wrap gap-2">
             {canManageShares ? (
@@ -592,7 +601,11 @@ export default function ViewsByDocTableClient(props: {
                   onClick={() => {
                     const fd = new FormData();
                     fd.set("docIds", JSON.stringify(selectedIds));
-                    runAction(bulkDisableAliasesForDocsAction, fd);
+                    runAction(bulkDisableAliasesForDocsAction, fd, (current) =>
+                      current.map((item) =>
+                        selectedIds.includes(item.doc_id) ? { ...item, alias: null } : item
+                      )
+                    );
                   }}
                   className="btn-base rounded-xl border border-white/12 bg-white/[0.04] px-3 py-2 text-sm text-white/75 hover:border-white/20 hover:bg-white/[0.08] hover:text-white disabled:opacity-40"
                 >

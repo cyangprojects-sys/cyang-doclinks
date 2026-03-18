@@ -1,7 +1,12 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useConditionalPolling } from "@/hooks/useConditionalPolling";
+import {
+  DEFAULT_SECURITY_REFRESH_WATCH_MS,
+  SECURITY_REFRESH_WATCH_EVENT,
+} from "./securityRefreshWatch";
 
 type SignaturesResponse =
   | {
@@ -13,66 +18,68 @@ type SignaturesResponse =
         orgMembership: string;
         rbacOverrides: string;
       };
+      has_active_work: boolean;
     }
   | { ok: false; error: string };
 
-// Owner security tables stay self-updating, but not on a cadence that keeps the DB warm unnecessarily.
-const POLL_MS = 180_000;
+const SECURITY_POLL_MS = 60_000;
 
-export default function SecurityTablesAutoRefresh() {
+export default function SecurityTablesAutoRefresh({
+  initialActiveWork = false,
+}: {
+  initialActiveWork?: boolean;
+}) {
   const router = useRouter();
   const previousSignatureRef = useRef<string | null>(null);
-  const refreshInFlightRef = useRef(false);
+  const watchUntilRef = useRef(0);
+  const [watchEnabled, setWatchEnabled] = useState(initialActiveWork);
 
   useEffect(() => {
-    let cancelled = false;
+    const onWatch = (event: Event) => {
+      const detail = event instanceof CustomEvent ? event.detail : null;
+      const ttlMs = Number(detail?.ttlMs || DEFAULT_SECURITY_REFRESH_WATCH_MS);
+      watchUntilRef.current = Date.now() + Math.max(15_000, ttlMs);
+      setWatchEnabled(true);
+    };
 
-    async function poll() {
-      if (document.visibilityState !== "visible") return;
+    window.addEventListener(SECURITY_REFRESH_WATCH_EVENT, onWatch);
+    return () => {
+      window.removeEventListener(SECURITY_REFRESH_WATCH_EVENT, onWatch);
+    };
+  }, []);
+
+  useConditionalPolling({
+    enabled: watchEnabled,
+    getDelayMs: () => SECURITY_POLL_MS,
+    poll: async () => {
       try {
         const res = await fetch("/api/admin/security/table-signatures", {
           method: "GET",
           cache: "no-store",
         });
         const json = (await res.json().catch(() => null)) as SignaturesResponse | null;
-        if (cancelled || !res.ok || !json || json.ok !== true) return;
+        if (!res.ok || !json || json.ok !== true) return true;
 
         const currentSignature = JSON.stringify(json.signatures);
-        if (!previousSignatureRef.current) {
-          previousSignatureRef.current = currentSignature;
-          return;
-        }
-        if (currentSignature === previousSignatureRef.current) return;
+        const signatureChanged =
+          Boolean(previousSignatureRef.current) && currentSignature !== previousSignatureRef.current;
 
         previousSignatureRef.current = currentSignature;
-        if (refreshInFlightRef.current) return;
-        refreshInFlightRef.current = true;
-        router.refresh();
-        window.setTimeout(() => {
-          refreshInFlightRef.current = false;
-        }, 1500);
+        if (signatureChanged) {
+          // A real table change merits one authoritative server refresh, then the watcher keeps
+          // running only while there is still background security work or a short post-action watch window.
+          watchUntilRef.current = Date.now() + DEFAULT_SECURITY_REFRESH_WATCH_MS;
+          router.refresh();
+        }
+
+        const keepWatching = json.has_active_work || Date.now() < watchUntilRef.current;
+        if (!keepWatching) setWatchEnabled(false);
+        return keepWatching;
       } catch {
-        // best-effort polling
+        return true;
       }
-    }
-
-    void poll();
-    const timer = window.setInterval(() => {
-      void poll();
-    }, POLL_MS);
-    const onVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
-        void poll();
-      }
-    };
-    document.addEventListener("visibilitychange", onVisibilityChange);
-
-    return () => {
-      cancelled = true;
-      window.clearInterval(timer);
-      document.removeEventListener("visibilitychange", onVisibilityChange);
-    };
-  }, [router]);
+    },
+  });
 
   return null;
 }

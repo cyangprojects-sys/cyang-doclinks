@@ -31,6 +31,8 @@ export type ShareRow = {
   has_password: boolean;
 };
 
+type ShareUpdater = (rows: ShareRow[]) => ShareRow[];
+
 type Status = "all" | "active" | "maxed";
 type StatusFilter = Status | "expiring";
 
@@ -98,6 +100,7 @@ export default function SharesTableClient(props: {
 
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
+  const [shares, setShares] = useState(props.shares);
 
   const q = (sp.get("shareQ") || "").trim();
   const statusRaw = (sp.get("shareStatus") || "all").trim().toLowerCase();
@@ -113,15 +116,19 @@ export default function SharesTableClient(props: {
     return () => window.clearTimeout(id);
   }, [copiedToken]);
 
+  useEffect(() => {
+    setShares(props.shares);
+  }, [props.shares]);
+
   const reusableShares = useMemo(() => {
-    return props.shares.filter((share) => {
+    return shares.filter((share) => {
       if (share.revoked_at) return false;
       if (!share.expires_at) return true;
       const expTs = new Date(share.expires_at).getTime();
       if (Number.isNaN(expTs)) return true;
       return expTs > props.nowTs;
     });
-  }, [props.nowTs, props.shares]);
+  }, [props.nowTs, shares]);
 
   const counts = useMemo(() => {
     const next: Record<StatusFilter, number> = {
@@ -181,9 +188,15 @@ export default function SharesTableClient(props: {
     router.replace(`${pathname}${qs ? `?${qs}` : ""}`, { scroll: false });
   }
 
-  async function runActionAndRefresh(fn: (fd: FormData) => Promise<void>, fd: FormData) {
+  function extendExpiry(value: string | null, days: number) {
+    const currentTs = value ? new Date(value).getTime() : 0;
+    const baseTs = Number.isFinite(currentTs) && currentTs > Date.now() ? currentTs : Date.now();
+    return new Date(baseTs + days * 24 * 60 * 60 * 1000).toISOString();
+  }
+
+  async function runAction(fn: (fd: FormData) => Promise<void>, fd: FormData, updater?: ShareUpdater) {
     await fn(fd);
-    router.refresh();
+    if (updater) setShares((current) => updater(current));
   }
 
   function downloadCsvForSelected() {
@@ -358,19 +371,39 @@ export default function SharesTableClient(props: {
                           <SharePasswordForm
                             token={share.token}
                             hasPassword={Boolean(share.has_password)}
-                            setAction={async (fd) => runActionAndRefresh(setSharePasswordAction, fd)}
-                            clearAction={async (fd) => runActionAndRefresh(clearSharePasswordAction, fd)}
+                            setAction={async (fd) =>
+                              runAction(setSharePasswordAction, fd, (current) =>
+                                current.map((row) => (row.token === share.token ? { ...row, has_password: true } : row))
+                              )}
+                            clearAction={async (fd) =>
+                              runAction(clearSharePasswordAction, fd, (current) =>
+                                current.map((row) => (row.token === share.token ? { ...row, has_password: false } : row))
+                              )}
                           />
 
                           <div className="flex flex-wrap gap-2">
-                            <form action={async (fd) => runActionAndRefresh(extendShareExpirationAction, fd)}>
+                            <form
+                              action={async (fd) =>
+                                runAction(extendShareExpirationAction, fd, (current) =>
+                                  current.map((row) =>
+                                    row.token === share.token ? { ...row, expires_at: extendExpiry(row.expires_at, 7) } : row
+                                  )
+                                )}
+                            >
                               <input type="hidden" name="token" value={share.token} />
                               <input type="hidden" name="days" value="7" />
                               <button type="submit" disabled={Boolean(share.revoked_at)} className="btn-base btn-secondary rounded-xl px-3 py-2 text-sm disabled:opacity-40">
                                 Extend 7 days
                               </button>
                             </form>
-                            <form action={async (fd) => runActionAndRefresh(extendShareExpirationAction, fd)}>
+                            <form
+                              action={async (fd) =>
+                                runAction(extendShareExpirationAction, fd, (current) =>
+                                  current.map((row) =>
+                                    row.token === share.token ? { ...row, expires_at: extendExpiry(row.expires_at, 30) } : row
+                                  )
+                                )}
+                            >
                               <input type="hidden" name="token" value={share.token} />
                               <input type="hidden" name="days" value="30" />
                               <button type="submit" disabled={Boolean(share.revoked_at)} className="btn-base btn-secondary rounded-xl px-3 py-2 text-sm disabled:opacity-40">
@@ -378,7 +411,19 @@ export default function SharesTableClient(props: {
                               </button>
                             </form>
                             <form
-                              action={async (fd) => runActionAndRefresh(setShareMaxViewsAction, fd)}
+                              action={async (fd) =>
+                                runAction(setShareMaxViewsAction, fd, (current) => {
+                                  const nextMaxViewsRaw = String(fd.get("maxViews") || "").trim();
+                                  const nextMaxViews = Number(nextMaxViewsRaw);
+                                  return current.map((row) =>
+                                    row.token === share.token
+                                      ? {
+                                          ...row,
+                                          max_views: Number.isFinite(nextMaxViews) ? nextMaxViews : row.max_views,
+                                        }
+                                      : row
+                                  );
+                                })}
                               onSubmit={(event) => {
                                 const input = event.currentTarget.querySelector('input[name="maxViews"]') as HTMLInputElement | null;
                                 const value = window.prompt("Set a total view limit. Use 0 for no cap.", share.max_views == null ? "" : String(share.max_views));
@@ -395,13 +440,18 @@ export default function SharesTableClient(props: {
                                 Set view limit
                               </button>
                             </form>
-                            <form action={async (fd) => runActionAndRefresh(resetShareViewsCountAction, fd)}>
+                            <form
+                              action={async (fd) =>
+                                runAction(resetShareViewsCountAction, fd, (current) =>
+                                  current.map((row) => (row.token === share.token ? { ...row, view_count: 0 } : row))
+                                )}
+                            >
                               <input type="hidden" name="token" value={share.token} />
                               <button type="submit" disabled={Boolean(share.revoked_at)} className="btn-base btn-secondary rounded-xl px-3 py-2 text-sm disabled:opacity-40">
                                 Reset views
                               </button>
                             </form>
-                            <form action={async (fd) => runActionAndRefresh(forceSharePasswordResetAction, fd)}>
+                            <form action={async (fd) => runAction(forceSharePasswordResetAction, fd)}>
                               <input type="hidden" name="token" value={share.token} />
                               <button type="submit" disabled={Boolean(share.revoked_at)} className="btn-base btn-secondary rounded-xl px-3 py-2 text-sm disabled:opacity-40">
                                 Clear saved password
@@ -434,7 +484,12 @@ export default function SharesTableClient(props: {
                       <RevokeShareForm
                         token={share.token}
                         revoked={Boolean(share.revoked_at)}
-                        action={async (fd) => runActionAndRefresh(revokeDocShareAction, fd)}
+                        action={async (fd) =>
+                          runAction(revokeDocShareAction, fd, (current) =>
+                            current.map((row) =>
+                              row.token === share.token ? { ...row, revoked_at: new Date().toISOString() } : row
+                            )
+                          )}
                       />
                       <div className="pt-1 text-[11px] text-white/40">
                         Link ID: <span className="font-mono">{share.token.slice(0, 8)}…{share.token.slice(-4)}</span>
@@ -454,14 +509,30 @@ export default function SharesTableClient(props: {
           <div className="flex flex-wrap gap-2">
             {canManageBulk ? (
               <>
-                <form action={async (fd) => runActionAndRefresh(bulkRevokeSharesAction, fd)} onSubmit={(e) => { if (!anySelected) e.preventDefault(); }}>
+                <form
+                  action={async (fd) =>
+                    runAction(bulkRevokeSharesAction, fd, (current) =>
+                      current.map((row) =>
+                        selectedTokens.includes(row.token) ? { ...row, revoked_at: new Date().toISOString() } : row
+                      )
+                    )}
+                  onSubmit={(e) => { if (!anySelected) e.preventDefault(); }}
+                >
                   <input type="hidden" name="tokens" value={JSON.stringify(selectedTokens)} />
                   <button type="submit" disabled={!anySelected} className="btn-base btn-danger rounded-xl px-3 py-2 text-sm disabled:opacity-40">
                     Remove selected access
                   </button>
                 </form>
                 <form
-                  action={async (fd) => runActionAndRefresh(bulkExtendSharesAction, fd)}
+                  action={async (fd) =>
+                    runAction(bulkExtendSharesAction, fd, (current) => {
+                      const days = Number(fd.get("days") || 0);
+                      return current.map((row) =>
+                        selectedTokens.includes(row.token) && Number.isFinite(days) && days > 0
+                          ? { ...row, expires_at: extendExpiry(row.expires_at, days) }
+                          : row
+                      );
+                    })}
                   onSubmit={(event) => {
                     if (!anySelected) {
                       event.preventDefault();

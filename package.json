@@ -18,6 +18,7 @@
     "db:migrate": "node scripts/migrate.mjs",
     "db:migrations:verify": "node scripts/migrate.mjs verify",
     "audit:admin-routes": "node scripts/audit-admin-route-guards.mjs",
+    "audit:admin-polling": "node scripts/audit-admin-polling-targets.mjs",
     "audit:public-rendering": "node scripts/audit-public-rendering.mjs",
     "audit:route-rendering": "node scripts/audit-route-handler-rendering.mjs",
     "audit:polling": "node scripts/audit-polling-discipline.mjs",

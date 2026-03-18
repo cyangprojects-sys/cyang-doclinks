@@ -126,6 +126,33 @@ export async function GET(req: Request) {
           rbacOverrides = "n/a";
         }
 
+        let hasActiveWork = false;
+        try {
+          const scanRows = (await sql`
+            select exists(
+              select 1
+              from public.malware_scan_jobs
+              where status in ('queued', 'running')
+            ) as active
+          `) as unknown as Array<{ active: boolean }>;
+          hasActiveWork = Boolean(scanRows?.[0]?.active);
+        } catch {
+          hasActiveWork = false;
+        }
+
+        try {
+          const keyRows = (await sql`
+            select exists(
+              select 1
+              from public.key_rotation_jobs
+              where status in ('queued', 'running')
+            ) as active
+          `) as unknown as Array<{ active: boolean }>;
+          hasActiveWork = hasActiveWork || Boolean(keyRows?.[0]?.active);
+        } catch {
+          // key rotation jobs are optional in some environments
+        }
+
         return NextResponse.json({
           ok: true,
           signatures: {
@@ -135,6 +162,7 @@ export async function GET(req: Request) {
             orgMembership,
             rbacOverrides,
           },
+          has_active_work: hasActiveWork,
         });
       })(),
       timeoutMs

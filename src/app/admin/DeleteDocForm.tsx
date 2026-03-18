@@ -8,12 +8,14 @@ export default function DeleteDocForm({
   docId,
   title,
   action,
+  onDeleted,
   label = "Delete",
   variant = "danger",
 }: {
   docId: string;
   title: string;
   action: (formData: FormData) => Promise<void>;
+  onDeleted?: (docId: string) => void;
   label?: string;
   variant?: "danger" | "subtle";
 }) {
@@ -34,7 +36,8 @@ export default function DeleteDocForm({
         setPending(true);
         try {
           await action(fd);
-          router.refresh();
+          if (onDeleted) onDeleted(docId);
+          else router.refresh();
         } finally {
           setPending(false);
         }

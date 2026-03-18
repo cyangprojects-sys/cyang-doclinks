@@ -1,28 +1,26 @@
 "use client";
 
-import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useConditionalPolling } from "@/hooks/useConditionalPolling";
 
-const REFRESH_DELAY_MS = 5000;
+const REFRESH_DELAY_MS = 5_000;
+const MAX_SCAN_REFRESH_MS = 60_000;
+const MAX_SCAN_REFRESH_ATTEMPTS = 20;
 
 export default function ScanAutoRefresh() {
   const router = useRouter();
 
-  useEffect(() => {
-    const refreshIfVisible = () => {
-      if (document.visibilityState !== "visible") return;
+  useConditionalPolling({
+    enabled: true,
+    getDelayMs: ({ attempt }) => Math.min(REFRESH_DELAY_MS * 2 ** attempt, MAX_SCAN_REFRESH_MS),
+    maxAttempts: MAX_SCAN_REFRESH_ATTEMPTS,
+    poll: () => {
+      // This component only mounts when the alias page already knows a scan/rescan is active.
+      // Once the server reports a terminal state, the refreshed tree unmounts this watcher.
       router.refresh();
-    };
-    const id = window.setTimeout(refreshIfVisible, REFRESH_DELAY_MS);
-    const onVisibilityChange = () => {
-      if (document.visibilityState === "visible") refreshIfVisible();
-    };
-    document.addEventListener("visibilitychange", onVisibilityChange);
-    return () => {
-      window.clearTimeout(id);
-      document.removeEventListener("visibilitychange", onVisibilityChange);
-    };
-  }, [router]);
+      return true;
+    },
+  });
 
   return null;
 }

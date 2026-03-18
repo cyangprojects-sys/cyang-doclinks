@@ -167,9 +167,14 @@ export default function UnifiedDocsTableClient(props: {
   const documentsPath = `${basePath}/documents`;
   const linksPath = `${basePath}/links`;
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [removedDocIds, setRemovedDocIds] = useState<string[]>([]);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const lastPendingRefreshAtRef = useRef(0);
+  const rows = useMemo(
+    () => props.rows.filter((row) => !removedDocIds.includes(row.doc_id)),
+    [props.rows, removedDocIds]
+  );
 
   const q = (sp.get("docQ") || "").trim();
   const filter = ((sp.get("docStatus") || "all") as FilterKey);
@@ -217,11 +222,11 @@ export default function UnifiedDocsTableClient(props: {
   }
 
   const hasPendingScans = useMemo(() => {
-    return props.rows.some((row) => {
+    return rows.some((row) => {
       const scanState = normalizeScanState(row.scan_status, row.moderation_status);
       return scanState === "PENDING" || scanState === "RUNNING" || scanState === "NOT_SCHEDULED";
     });
-  }, [props.rows]);
+  }, [rows]);
 
   useEffect(() => {
     if (!hasPendingScans) return;
@@ -253,36 +258,36 @@ export default function UnifiedDocsTableClient(props: {
 
   const counts = useMemo(() => {
     const next: Record<FilterKey, number> = {
-      all: props.rows.length,
+      all: rows.length,
       ready: 0,
       shared: 0,
       awaiting_scan: 0,
       attention: 0,
       not_shared: 0,
     };
-    for (const row of props.rows) next[getStatusBucket(row)] += 1;
+    for (const row of rows) next[getStatusBucket(row)] += 1;
     return next;
-  }, [props.rows]);
+  }, [rows]);
 
-  const readyWithoutLinks = useMemo(() => props.rows.filter((row) => getStatusBucket(row) === "ready").slice(0, 3), [props.rows]);
-  const sharedRows = useMemo(() => props.rows.filter((row) => getStatusBucket(row) === "shared").slice(0, 2), [props.rows]);
+  const readyWithoutLinks = useMemo(() => rows.filter((row) => getStatusBucket(row) === "ready").slice(0, 3), [rows]);
+  const sharedRows = useMemo(() => rows.filter((row) => getStatusBucket(row) === "shared").slice(0, 2), [rows]);
   const awaitingScanRows = useMemo(
-    () => props.rows.filter((row) => getStatusBucket(row) === "awaiting_scan").slice(0, 3),
-    [props.rows]
+    () => rows.filter((row) => getStatusBucket(row) === "awaiting_scan").slice(0, 3),
+    [rows]
   );
 
   const totals = useMemo(() => {
-    const activeLinks = props.rows.reduce((sum, row) => sum + Math.max(0, row.active_shares || 0), 0);
+    const activeLinks = rows.reduce((sum, row) => sum + Math.max(0, row.active_shares || 0), 0);
     return {
-      documents: props.rows.length,
+      documents: rows.length,
       ready: counts.ready + counts.shared,
       activeLinks,
       awaitingScan: counts.awaiting_scan,
     };
-  }, [counts.awaiting_scan, counts.ready, counts.shared, props.rows]);
+  }, [counts.awaiting_scan, counts.ready, counts.shared, rows]);
 
   const filtered = useMemo(() => {
-    return props.rows.filter((row) => {
+    return rows.filter((row) => {
       const matchesFilter = filter === "all" ? true : getStatusBucket(row) === filter;
       if (!matchesFilter) return false;
       if (!normalizedQ) return true;
@@ -301,7 +306,7 @@ export default function UnifiedDocsTableClient(props: {
         .toLowerCase();
       return haystack.includes(normalizedQ);
     });
-  }, [filter, normalizedQ, props.rows]);
+  }, [filter, normalizedQ, rows]);
 
   const sorted = useMemo(() => {
     const direction = sortDir === "asc" ? 1 : -1;
@@ -414,7 +419,7 @@ export default function UnifiedDocsTableClient(props: {
               <div className="mt-1 text-sm text-white/60">Sharing unlocks automatically after a clean result.</div>
             </div>
           </section>
-          {props.rows.length > 0 ? (
+          {rows.length > 0 ? (
             <section className="grid gap-4 xl:grid-cols-[1.4fr_minmax(0,1fr)]">
               <div className="glass-card-strong rounded-[28px] p-5">
                 <div className="flex flex-wrap items-start justify-between gap-3">
@@ -626,7 +631,7 @@ export default function UnifiedDocsTableClient(props: {
                     fd.set("docIds", JSON.stringify(selectedIds));
                     startTransition(async () => {
                       await bulkDeleteDocsAction(fd);
-                      router.refresh();
+                      setRemovedDocIds((prev) => Array.from(new Set([...prev, ...selectedIds])));
                     });
                     setSelectedIds([]);
                   }}
@@ -872,6 +877,10 @@ export default function UnifiedDocsTableClient(props: {
                             docId={row.doc_id}
                             title={row.doc_title || row.alias || row.doc_id}
                             action={deleteDocAction}
+                            onDeleted={(docId) => {
+                              setRemovedDocIds((prev) => (prev.includes(docId) ? prev : [...prev, docId]));
+                              setSelectedIds((prev) => prev.filter((id) => id !== docId));
+                            }}
                             label="Remove"
                             variant="subtle"
                           />
