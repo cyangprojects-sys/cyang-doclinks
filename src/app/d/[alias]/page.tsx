@@ -19,8 +19,6 @@ import { detectFileFamily, fileFamilyLabel, isMicrosoftOfficeDocument } from "@/
 import { getDocumentUiStatus, getShareEligibility, normalizeScanState } from "@/lib/documentStatus";
 
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
 
 async function isOwnerEmail(): Promise<boolean> {
   const owner = (process.env.OWNER_EMAIL || "").trim().toLowerCase();

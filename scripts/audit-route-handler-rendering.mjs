@@ -22,11 +22,16 @@ const findings = [];
 
 for (const file of ROUTE_FILES) {
   const code = readFileSync(resolve(file), "utf8");
-  if (!code.includes('export const dynamic = "force-dynamic"')) continue;
-
-  findings.push(
-    `${file}: route handlers should not declare force-dynamic; request-time behavior should be expressed through method semantics, auth checks, and response cache headers instead.`
-  );
+  if (code.includes('export const dynamic = "force-dynamic"')) {
+    findings.push(
+      `${file}: route handlers should not declare force-dynamic; request-time behavior should be expressed through method semantics, auth checks, and response cache headers instead.`
+    );
+  }
+  if (/export\s+const\s+revalidate\s*=\s*0\b/.test(code)) {
+    findings.push(
+      `${file}: route handlers should not declare revalidate = 0; disable caching through response headers on sensitive responses instead.`
+    );
+  }
 }
 
 if (findings.length) {

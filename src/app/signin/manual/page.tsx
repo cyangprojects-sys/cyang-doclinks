@@ -1,7 +1,6 @@
 import ManualSignInClient from "./ManualSignInClient";
 
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
 
 export default async function ManualSignInPage(props: {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;

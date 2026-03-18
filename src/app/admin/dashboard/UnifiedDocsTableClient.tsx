@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import DeleteDocForm from "../DeleteDocForm";
 import { bulkDeleteDocsAction, deleteDocAction } from "../actions";
@@ -35,7 +35,7 @@ type SortKey = "created_at" | "doc_title" | "total_views" | "last_view" | "activ
 type SortDir = "asc" | "desc";
 type FilterKey = "all" | "ready" | "shared" | "awaiting_scan" | "attention" | "not_shared";
 // Pending scans still refresh automatically, but on a slower cadence so idle tabs do less work.
-const PENDING_SCAN_REFRESH_MS = 180_000;
+const PENDING_SCAN_REFRESH_MS = 300_000;
 
 function formatDateTime(value: string | null) {
   if (!value) return "No activity yet";
@@ -169,6 +169,7 @@ export default function UnifiedDocsTableClient(props: {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const lastPendingRefreshAtRef = useRef(0);
 
   const q = (sp.get("docQ") || "").trim();
   const filter = ((sp.get("docStatus") || "all") as FilterKey);
@@ -226,6 +227,9 @@ export default function UnifiedDocsTableClient(props: {
     if (!hasPendingScans) return;
     const refreshIfVisible = () => {
       if (document.visibilityState !== "visible") return;
+      const now = Date.now();
+      if (now - lastPendingRefreshAtRef.current < PENDING_SCAN_REFRESH_MS) return;
+      lastPendingRefreshAtRef.current = now;
       router.refresh();
     };
     const id = window.setInterval(refreshIfVisible, PENDING_SCAN_REFRESH_MS);

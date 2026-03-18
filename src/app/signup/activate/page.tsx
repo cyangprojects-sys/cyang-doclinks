@@ -2,7 +2,6 @@ import Link from "next/link";
 import { activateManualSignup, isSignupEnabled } from "@/lib/signup";
 
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
 
 export default async function SignupActivatePage(props: {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;

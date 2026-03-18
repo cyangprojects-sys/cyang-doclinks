@@ -2,7 +2,6 @@ import SignInClient from "./SignInClient";
 import { isSignupEnabled } from "@/lib/signup";
 
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
 
 function parseIntent(value: string | string[] | undefined): "admin" | "viewer" {
   const raw = Array.isArray(value) ? value[0] : value;

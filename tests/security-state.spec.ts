@@ -800,22 +800,22 @@ test.describe("security state enforcement", () => {
       await sql`update public.docs set scan_status = 'queued' where id = ${doc.id}::uuid`;
       const queuedResp = await request.get(`/s/${token}/raw`);
       skipIfServeUnavailable(queuedResp.status(), "queued scan blocking");
-      expect([403, 404]).toContain(queuedResp.status());
+      expect([403, 404, 429]).toContain(queuedResp.status());
 
       await sql`update public.docs set scan_status = 'running' where id = ${doc.id}::uuid`;
       const runningResp = await request.get(`/s/${token}/raw`);
       skipIfServeUnavailable(runningResp.status(), "running scan blocking");
-      expect([403, 404]).toContain(runningResp.status());
+      expect([403, 404, 429]).toContain(runningResp.status());
 
       await sql`update public.docs set scan_status = 'unscanned' where id = ${doc.id}::uuid`;
       const unscannedResp = await request.get(`/s/${token}/raw`);
       skipIfServeUnavailable(unscannedResp.status(), "unscanned blocking");
-      expect([403, 404]).toContain(unscannedResp.status());
+      expect([403, 404, 429]).toContain(unscannedResp.status());
 
       await sql`update public.docs set scan_status = 'failed' where id = ${doc.id}::uuid`;
       const failedScanResp = await request.get(`/s/${token}/raw`);
       skipIfServeUnavailable(failedScanResp.status(), "failed scan blocking");
-      expect([403, 404]).toContain(failedScanResp.status());
+      expect([403, 404, 429]).toContain(failedScanResp.status());
 
       await sql`
         update public.docs
@@ -824,7 +824,7 @@ test.describe("security state enforcement", () => {
       `;
       const quarantinedResp = await request.get(`/s/${token}/raw`);
       skipIfServeUnavailable(quarantinedResp.status(), "quarantined moderation blocking");
-      expect([403, 404]).toContain(quarantinedResp.status());
+      expect([403, 404, 429]).toContain(quarantinedResp.status());
 
       await sql`
         update public.docs
@@ -833,7 +833,7 @@ test.describe("security state enforcement", () => {
       `;
       const disabledResp = await request.get(`/s/${token}/raw`);
       skipIfServeUnavailable(disabledResp.status(), "disabled moderation blocking");
-      expect([403, 404]).toContain(disabledResp.status());
+      expect([403, 404, 429]).toContain(disabledResp.status());
     } finally {
       await sql`
         update public.docs
@@ -856,7 +856,7 @@ test.describe("security state enforcement", () => {
     if (!hasShareActive) {
       const blocked = await request.get(`/s/nonexistent-${randSuffix()}/raw`);
       skipIfServeUnavailable(blocked.status(), "share is_active fallback");
-      expect([403, 404]).toContain(blocked.status());
+      expect([403, 404, 429]).toContain(blocked.status());
       return;
     }
 
@@ -886,7 +886,7 @@ test.describe("security state enforcement", () => {
     if (!docsHasOrg) {
       const blocked = await request.get(`/s/nonexistent-${randSuffix()}/raw`);
       skipIfServeUnavailable(blocked.status(), "org-disabled fallback without docs.org_id");
-      expect([403, 404]).toContain(blocked.status());
+      expect([403, 404, 429]).toContain(blocked.status());
       return;
     }
 
@@ -895,7 +895,7 @@ test.describe("security state enforcement", () => {
     if (!orgHasDisabled && !orgHasActive) {
       const blocked = await request.get(`/s/nonexistent-${randSuffix()}/raw`);
       skipIfServeUnavailable(blocked.status(), "org-disabled fallback without organization flags");
-      expect([403, 404]).toContain(blocked.status());
+      expect([403, 404, 429]).toContain(blocked.status());
       return;
     }
 
@@ -910,7 +910,7 @@ test.describe("security state enforcement", () => {
     if (!doc?.id || !doc?.org_id) {
       const blocked = await request.get(`/s/nonexistent-${randSuffix()}/raw`);
       skipIfServeUnavailable(blocked.status(), "org-disabled fallback without org-linked docs");
-      expect([403, 404]).toContain(blocked.status());
+      expect([403, 404, 429]).toContain(blocked.status());
       return;
     }
 

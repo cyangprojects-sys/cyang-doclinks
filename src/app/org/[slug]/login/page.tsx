@@ -4,8 +4,6 @@ import Link from "next/link";
 import { getOrgBySlug } from "@/lib/orgs";
 
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
 
 export default async function OrgLoginPage(
   { params, searchParams }: { params: Promise<{ slug: string }>; searchParams?: Promise<Record<string, string | string[] | undefined>> }

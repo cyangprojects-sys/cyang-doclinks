@@ -4,7 +4,6 @@ import { authOptions } from "@/auth";
 import { ensureUserByEmail } from "@/lib/authz";
 
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
 
 export default async function PostSignInAdminContinuePage() {
   const session = await getServerSession(authOptions);

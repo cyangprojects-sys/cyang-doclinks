@@ -6,7 +6,6 @@ import ViewerShell from "./_components/ViewerShell";
 import { getViewerShellContext } from "./_components/viewerShellData";
 
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
 
 export default async function ViewerLayout({
   children,

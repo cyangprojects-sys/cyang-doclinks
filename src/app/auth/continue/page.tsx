@@ -4,7 +4,6 @@ import { authOptions } from "@/auth";
 import { ensureUserByEmail } from "@/lib/authz";
 
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
 
 const ADMIN_HOME_PATH = "/admin";
 const VIEWER_HOME_PATH = "/viewer";

@@ -9,7 +9,6 @@ import { getPackById } from "@/lib/packs";
 import { getDocumentUiStatus, getShareEligibility } from "@/lib/documentStatus";
 
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
 
 function isExpired(expiresAt: string | null) {
   if (!expiresAt) return false;

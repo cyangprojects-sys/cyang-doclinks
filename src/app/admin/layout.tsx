@@ -8,7 +8,6 @@ import { ensureUserByEmail } from "@/lib/authz";
 import { getAdminShellContext } from "./_components/adminShellData";
 
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
 
 type AdminRole = "admin" | "owner";
 

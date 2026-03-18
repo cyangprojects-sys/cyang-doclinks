@@ -22,7 +22,6 @@ import {
 import { sanitizeInternalRedirectPath } from "@/lib/redirects";
 
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 

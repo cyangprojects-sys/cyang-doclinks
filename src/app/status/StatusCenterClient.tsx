@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { deriveStatusPageScenario, type PlatformState, type StatusSnapshot } from "@/lib/statusPageScenario";
 
 type ServiceState = PlatformState;
@@ -58,6 +58,7 @@ const PREVIEW_VALUES = new Set<StatusPreview>([
 ]);
 
 const AUTO_REFRESH_MS = 600_000;
+const VISIBILITY_REFRESH_STALE_MS = 300_000;
 const STATUS_SUBSCRIBE_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const STATUS_SUBSCRIBE_STORAGE_KEY = "cyang_status_subscription_email";
 
@@ -433,6 +434,7 @@ export default function StatusCenterClient({ preview }: { preview?: StatusPrevie
   const [subscriptionEmail, setSubscriptionEmail] = useState("");
   const [subscriptionBusy, setSubscriptionBusy] = useState(false);
   const [subscriptionFeedback, setSubscriptionFeedback] = useState<{ tone: "success" | "error"; message: string } | null>(null);
+  const lastRefreshAtRef = useRef<number | null>(null);
 
   useEffect(() => {
     const nextPreview = preview ?? readPreviewFromLocation();
@@ -466,7 +468,9 @@ export default function StatusCenterClient({ preview }: { preview?: StatusPrevie
     } finally {
       setLoading(false);
       setRefreshing(false);
-      setLastRefreshAt(Date.now());
+      const refreshedAt = Date.now();
+      lastRefreshAtRef.current = refreshedAt;
+      setLastRefreshAt(refreshedAt);
     }
   }, [previewMode]);
 
@@ -483,6 +487,8 @@ export default function StatusCenterClient({ preview }: { preview?: StatusPrevie
     }, AUTO_REFRESH_MS);
     const onVisibilityChange = () => {
       if (document.visibilityState === "visible") {
+        const lastRefresh = lastRefreshAtRef.current;
+        if (lastRefresh && Date.now() - lastRefresh < VISIBILITY_REFRESH_STALE_MS) return;
         void refreshSnapshot(true);
       }
     };

@@ -192,6 +192,7 @@ export default function UploadPanel({
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const didAutoOpenRef = useRef(false);
   const statusPollInFlightRef = useRef(false);
+  const lastPendingCountRef = useRef(0);
 
   const [items, setItems] = useState<UploadItem[]>([]);
   const [busy, setBusy] = useState(false);
@@ -323,7 +324,6 @@ export default function UploadPanel({
             };
           })
         );
-        if (changed) router.refresh();
       } catch {
         // Best-effort status polling.
       } finally {
@@ -348,6 +348,15 @@ export default function UploadPanel({
       document.removeEventListener("visibilitychange", onVisibilityChange);
     };
   }, [pendingDocIds, pendingDocIdsKey, router]);
+
+  useEffect(() => {
+    const previousPendingCount = lastPendingCountRef.current;
+    const nextPendingCount = pendingDocIds.length;
+    lastPendingCountRef.current = nextPendingCount;
+    if (previousPendingCount > nextPendingCount) {
+      router.refresh();
+    }
+  }, [pendingDocIds.length, router]);
 
   function addFiles(files: FileList | File[]) {
     const arr = Array.from(files || []);

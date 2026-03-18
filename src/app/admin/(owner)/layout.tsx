@@ -5,7 +5,6 @@ import { ensureUserByEmail } from "@/lib/authz";
 import { hasValidMfaCookie, roleRequiresMfa } from "@/lib/mfa";
 
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
 
 export default async function OwnerAdminLayout({
   children,

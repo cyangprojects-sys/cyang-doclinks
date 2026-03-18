@@ -66,6 +66,7 @@ type BillingFlagsResult =
 
 type BillingFlagsCacheEntry = {
   expiresAt: number;
+  envSignature: string;
   value: BillingFlagsResult;
 };
 
@@ -85,6 +86,14 @@ let securityFreezeInFlight: Promise<SecurityFreezeResult> | null = null;
 
 function getBillingFlagsCacheMs() {
   return readEnvInt("BILLING_FLAGS_CACHE_MS", 120_000, { min: 5_000, max: 10 * 60_000 });
+}
+
+function getBillingFlagsEnvSignature() {
+  return [
+    process.env.ENFORCE_PLAN_LIMITS ?? "",
+    process.env.PRO_PLAN_ENABLED ?? "",
+    process.env.PRICING_UI_ENABLED ?? "",
+  ].join("::");
 }
 
 function clearBillingFlagsCache() {
@@ -250,6 +259,7 @@ function envBool(name: string): boolean | null {
  * 3) defaults (fail-closed)
  */
 export async function getBillingFlags(): Promise<BillingFlagsResult> {
+  const envSignature = getBillingFlagsEnvSignature();
   const envDefaults: BillingFlags = {
     enforcePlanLimits: envBool("ENFORCE_PLAN_LIMITS") ?? DEFAULT_BILLING_FLAGS.enforcePlanLimits,
     proPlanEnabled: envBool("PRO_PLAN_ENABLED") ?? DEFAULT_BILLING_FLAGS.proPlanEnabled,
@@ -257,7 +267,7 @@ export async function getBillingFlags(): Promise<BillingFlagsResult> {
   };
 
   const now = Date.now();
-  if (billingFlagsCache && billingFlagsCache.expiresAt > now) {
+  if (billingFlagsCache && billingFlagsCache.expiresAt > now && billingFlagsCache.envSignature === envSignature) {
     return billingFlagsCache.value;
   }
 
@@ -284,6 +294,7 @@ export async function getBillingFlags(): Promise<BillingFlagsResult> {
             };
 
         billingFlagsCache = {
+          envSignature,
           value: result,
           expiresAt: Date.now() + getBillingFlagsCacheMs(),
         };
@@ -291,6 +302,7 @@ export async function getBillingFlags(): Promise<BillingFlagsResult> {
       } catch (e) {
         const result: BillingFlagsResult = { ok: false, error: settingsErrorCode(e), flags: { ...envDefaults } };
         billingFlagsCache = {
+          envSignature,
           value: result,
           expiresAt: Date.now() + getBillingFlagsCacheMs(),
         };

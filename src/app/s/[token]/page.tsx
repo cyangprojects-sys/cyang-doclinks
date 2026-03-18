@@ -7,7 +7,6 @@ import { ShareBadge, ShareShell } from "./ShareShell";
 import { getPackById } from "@/lib/packs";
 
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
 
 function fmtDate(s: string | null) {
   if (!s) return null;

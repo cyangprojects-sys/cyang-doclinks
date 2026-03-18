@@ -12,7 +12,7 @@
     "build": "next build",
     "start": "next start",
     "test:playwright": "playwright test",
-    "test": "start-server-and-test \"npm run dev\" http://127.0.0.1:3000 \"npm run test:playwright\"",
+    "test": "node scripts/run-test-suite.mjs",
     "lint": "eslint",
     "typecheck": "node scripts/typecheck.mjs",
     "db:migrate": "node scripts/migrate.mjs",
