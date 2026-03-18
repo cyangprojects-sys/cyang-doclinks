@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useConditionalPolling } from "@/hooks/useConditionalPolling";
 import { deriveStatusPageScenario, type PlatformState, type StatusSnapshot } from "@/lib/statusPageScenario";
 
 type ServiceState = PlatformState;
@@ -57,8 +58,12 @@ const PREVIEW_VALUES = new Set<StatusPreview>([
   "loading",
 ]);
 
-const AUTO_REFRESH_MS = 600_000;
-const VISIBILITY_REFRESH_STALE_MS = 300_000;
+const STATUS_POLL_HEALTHY_MS = 15 * 60_000;
+const STATUS_POLL_DEGRADED_MS = 3 * 60_000;
+const STATUS_POLL_UNHEALTHY_MS = 60_000;
+const STATUS_RESUME_STALE_HEALTHY_MS = 10 * 60_000;
+const STATUS_RESUME_STALE_DEGRADED_MS = 2 * 60_000;
+const STATUS_RESUME_STALE_UNHEALTHY_MS = 45_000;
 const STATUS_SUBSCRIBE_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const STATUS_SUBSCRIBE_STORAGE_KEY = "cyang_status_subscription_email";
 
@@ -424,6 +429,68 @@ function readPreviewFromLocation(): StatusPreview {
   return PREVIEW_VALUES.has(preview) ? preview : "live";
 }
 
+function normalizeLiveSnapshot(args: {
+  ok: boolean;
+  payload: Partial<StatusSnapshot> | null;
+  statusCode?: number;
+}): { snapshot: StatusSnapshot; errorMsg: string | null } {
+  if (!args.ok) {
+    return {
+      snapshot: {
+        ok: false,
+        service: "cyang.io",
+        ts: Date.now(),
+        error:
+          typeof args.payload?.error === "string"
+            ? args.payload.error
+            : `HTTP_${args.statusCode || 500}`,
+      },
+      errorMsg: "Live telemetry is temporarily unavailable. Showing fallback service posture.",
+    };
+  }
+
+  return {
+    snapshot: {
+      ok: Boolean(args.payload?.ok),
+      service: typeof args.payload?.service === "string" ? args.payload.service : "cyang.io",
+      ts: Number(args.payload?.ts || Date.now()),
+      status:
+        args.payload?.status === "ok" ||
+        args.payload?.status === "degraded" ||
+        args.payload?.status === "down"
+          ? args.payload.status
+          : undefined,
+      error: typeof args.payload?.error === "string" ? args.payload.error : undefined,
+    },
+    errorMsg: null,
+  };
+}
+
+function statusSnapshotSignature(snapshot: StatusSnapshot | null): string {
+  if (!snapshot) return "";
+  return [
+    snapshot.ok ? "1" : "0",
+    snapshot.service || "cyang.io",
+    snapshot.status || "",
+    snapshot.error || "",
+    String(Number(snapshot.ts || 0)),
+  ].join(":");
+}
+
+function statusPollDelayMs(snapshot: StatusSnapshot | null): number {
+  if (!snapshot) return STATUS_POLL_UNHEALTHY_MS;
+  if (snapshot.ok && snapshot.status === "ok") return STATUS_POLL_HEALTHY_MS;
+  if (snapshot.status === "degraded") return STATUS_POLL_DEGRADED_MS;
+  return STATUS_POLL_UNHEALTHY_MS;
+}
+
+function statusResumeStaleMs(snapshot: StatusSnapshot | null): number {
+  if (!snapshot) return STATUS_RESUME_STALE_UNHEALTHY_MS;
+  if (snapshot.ok && snapshot.status === "ok") return STATUS_RESUME_STALE_HEALTHY_MS;
+  if (snapshot.status === "degraded") return STATUS_RESUME_STALE_DEGRADED_MS;
+  return STATUS_RESUME_STALE_UNHEALTHY_MS;
+}
+
 export default function StatusCenterClient({ preview }: { preview?: StatusPreview }) {
   const [previewMode, setPreviewMode] = useState<StatusPreview>(preview ?? "live");
   const [loading, setLoading] = useState((preview ?? "live") === "loading");
@@ -435,6 +502,7 @@ export default function StatusCenterClient({ preview }: { preview?: StatusPrevie
   const [subscriptionBusy, setSubscriptionBusy] = useState(false);
   const [subscriptionFeedback, setSubscriptionFeedback] = useState<{ tone: "success" | "error"; message: string } | null>(null);
   const lastRefreshAtRef = useRef<number | null>(null);
+  const liveMode = previewMode === "live";
 
   useEffect(() => {
     const nextPreview = preview ?? readPreviewFromLocation();
@@ -442,62 +510,61 @@ export default function StatusCenterClient({ preview }: { preview?: StatusPrevie
     setLoading(nextPreview === "loading");
   }, [preview]);
 
+  const applyLiveSnapshot = useCallback((nextSnapshot: StatusSnapshot, nextErrorMsg: string | null) => {
+    const nextSignature = statusSnapshotSignature(nextSnapshot);
+    setSnapshot((prev) => (statusSnapshotSignature(prev) === nextSignature ? prev : nextSnapshot));
+    setErrorMsg((prev) => (prev === nextErrorMsg ? prev : nextErrorMsg));
+    const refreshedAt = Date.now();
+    lastRefreshAtRef.current = refreshedAt;
+    setLastRefreshAt(refreshedAt);
+  }, []);
+
   const refreshSnapshot = useCallback(async (silent = false) => {
-    if (previewMode === "loading") return;
+    if (!liveMode) return null;
     if (!silent) setLoading(true);
     setRefreshing(silent);
     try {
       const res = await fetch("/api/health/public", { headers: { Accept: "application/json" } });
-      const payload = (await res.json()) as Partial<StatusSnapshot>;
-      if (!res.ok) {
-        setSnapshot({ ok: false, service: "cyang.io", ts: Date.now(), error: typeof payload.error === "string" ? payload.error : `HTTP_${res.status}` });
-        setErrorMsg("Live telemetry is temporarily unavailable. Showing fallback service posture.");
-      } else {
-        setSnapshot({
-          ok: Boolean(payload.ok),
-          service: typeof payload.service === "string" ? payload.service : "cyang.io",
-          ts: Number(payload.ts || Date.now()),
-          status: payload.status === "ok" || payload.status === "degraded" || payload.status === "down" ? payload.status : undefined,
-          error: typeof payload.error === "string" ? payload.error : undefined,
-        });
-        setErrorMsg(null);
-      }
+      const payload = (await res.json().catch(() => null)) as Partial<StatusSnapshot> | null;
+      const next = normalizeLiveSnapshot({ ok: res.ok, payload, statusCode: res.status });
+      applyLiveSnapshot(next.snapshot, next.errorMsg);
+      return next.snapshot;
     } catch {
-      setSnapshot({ ok: false, service: "cyang.io", ts: Date.now(), error: "NETWORK" });
-      setErrorMsg("Unable to reach live telemetry right now. Showing fallback service posture.");
+      const nextSnapshot = { ok: false, service: "cyang.io", ts: Date.now(), error: "NETWORK" } satisfies StatusSnapshot;
+      applyLiveSnapshot(nextSnapshot, "Unable to reach live telemetry right now. Showing fallback service posture.");
+      return nextSnapshot;
     } finally {
       setLoading(false);
       setRefreshing(false);
-      const refreshedAt = Date.now();
-      lastRefreshAtRef.current = refreshedAt;
-      setLastRefreshAt(refreshedAt);
     }
-  }, [previewMode]);
+  }, [applyLiveSnapshot, liveMode]);
 
   useEffect(() => {
-    if (previewMode === "loading") return;
+    if (!liveMode) {
+      setRefreshing(false);
+      setLoading(previewMode === "loading");
+      return;
+    }
     void refreshSnapshot(false);
-  }, [previewMode, refreshSnapshot]);
+  }, [liveMode, previewMode, refreshSnapshot]);
 
-  useEffect(() => {
-    if (previewMode === "loading") return;
-    const id = window.setInterval(() => {
-      if (document.visibilityState !== "visible") return;
-      void refreshSnapshot(true);
-    }, AUTO_REFRESH_MS);
-    const onVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
-        const lastRefresh = lastRefreshAtRef.current;
-        if (lastRefresh && Date.now() - lastRefresh < VISIBILITY_REFRESH_STALE_MS) return;
-        void refreshSnapshot(true);
-      }
-    };
-    document.addEventListener("visibilitychange", onVisibilityChange);
-    return () => {
-      window.clearInterval(id);
-      document.removeEventListener("visibilitychange", onVisibilityChange);
-    };
-  }, [previewMode, refreshSnapshot]);
+  useConditionalPolling({
+    enabled: liveMode,
+    getDelayMs: () => statusPollDelayMs(snapshot),
+    getResumeDelayMs: () => {
+      const lastRefresh = lastRefreshAtRef.current;
+      if (!lastRefresh) return 0;
+      const staleMs = statusResumeStaleMs(snapshot);
+      const ageMs = Date.now() - lastRefresh;
+      return ageMs >= staleMs ? 0 : staleMs - ageMs;
+    },
+    poll: async () => {
+      await refreshSnapshot(true);
+      return {
+        shouldContinue: true,
+      };
+    },
+  });
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -600,7 +667,13 @@ export default function StatusCenterClient({ preview }: { preview?: StatusPrevie
             </span>
             <div className="text-xs text-white/55">Last updated {fmtDateTime(snapshot?.ts ?? null)} ({fmtRelative(snapshot?.ts ?? null)})</div>
             <div className="flex items-center gap-2">
-              <span className="rounded-full border border-white/12 bg-white/[0.04] px-2.5 py-1 text-[11px] text-white/58">Auto-refresh every 10m while visible</span>
+              <span className="rounded-full border border-white/12 bg-white/[0.04] px-2.5 py-1 text-[11px] text-white/58">
+                {liveMode
+                  ? snapshot?.ok && snapshot.status === "ok"
+                    ? "Auto-refresh slows while healthy"
+                    : "Auto-refresh accelerates while degraded"
+                  : "Preview mode disables live polling"}
+              </span>
               <button type="button" onClick={() => void refreshSnapshot(true)} disabled={refreshing} className="btn-base rounded-xl border border-white/14 bg-white/[0.04] px-3 py-1.5 text-xs text-white/82 hover:border-white/24 hover:bg-white/[0.08] disabled:opacity-60">
                 {refreshing ? "Refreshing..." : "Refresh now"}
               </button>
@@ -770,7 +843,7 @@ export default function StatusCenterClient({ preview }: { preview?: StatusPrevie
             <div className="rounded-2xl border border-white/12 bg-white/[0.03] p-4">
               <div className="text-xs uppercase tracking-[0.16em] text-white/45">Refresh policy</div>
               <div className="mt-2 text-lg font-semibold text-white">Manual plus slow auto-refresh</div>
-              <div className="mt-1 text-sm text-white/63">The page refreshes while visible every 10 minutes and immediately when you reopen the tab.</div>
+              <div className="mt-1 text-sm text-white/63">Live mode only polls while visible, backs off when healthy, and resumes immediately only once the cached snapshot is stale.</div>
             </div>
             <div className="rounded-2xl border border-white/12 bg-white/[0.03] p-4">
               <div className="text-xs uppercase tracking-[0.16em] text-white/45">Historical reporting</div>

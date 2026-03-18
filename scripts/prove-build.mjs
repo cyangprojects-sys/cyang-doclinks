@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { spawnSync } from "node:child_process";
-import { copyFileSync, existsSync } from "node:fs";
+import { copyFileSync, existsSync, rmSync } from "node:fs";
 
 const REQUIRED_NODE = "22.16.0";
 const REQUIRED_NPM = "10.9.2";
@@ -24,7 +24,15 @@ function run(command, args) {
     shell: false,
     env: process.env,
   });
-  if (result.error) throw result.error;
+  if (result.error) {
+    if (process.platform === "win32" && result.error.code === "EPERM") {
+      fail(
+        `could not spawn "${command} ${args.join(" ")}" in the current Windows sandbox. ` +
+          "Rerun prove:build outside the sandbox or grant broader process-spawn permissions."
+      );
+    }
+    throw result.error;
+  }
   if (result.status !== 0) process.exit(result.status ?? 1);
 }
 
@@ -46,6 +54,9 @@ function ensureBaselineVersions() {
     encoding: "utf8",
   });
   if (npmVersionResult.error || npmVersionResult.status !== 0) {
+    if (process.platform === "win32" && npmVersionResult.error?.code === "EPERM") {
+      fail("npm --version could not be spawned in the current Windows sandbox. Rerun prove:build outside the sandbox or grant broader process-spawn permissions.");
+    }
     fail("npm --version could not be resolved. Install npm 10.9.2 and rerun the proof command.");
   }
 
@@ -64,7 +75,14 @@ function ensureProofEnv() {
   console.log("Prepared .env.local from .env.example for this proof run.");
 }
 
+function cleanProofArtifacts() {
+  if (!existsSync(".next")) return;
+  rmSync(".next", { recursive: true, force: true });
+  console.log("Removed existing .next so prove:build runs from a clean production build.");
+}
+
 ensureBaselineVersions();
+cleanProofArtifacts();
 ensureProofEnv();
 
 const commands = [

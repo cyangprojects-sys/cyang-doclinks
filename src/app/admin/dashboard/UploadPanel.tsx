@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import { useAdminDocumentStatusPolling } from "@/hooks/useAdminDocumentStatusPolling";
+import { useVisibilityAwareRouterRefresh } from "@/hooks/useVisibilityAwareRouterRefresh";
 import { getUploadUiStatus, type StatusTone } from "@/lib/documentStatus";
 import {
   getActiveDocumentIds,
@@ -286,7 +286,7 @@ export default function UploadPanel({
   onDocumentsCreated?: (docs: UploadedDocumentRecord[]) => void;
   externalStatusSnapshots?: ReadonlyMap<string, DocumentStatusSnapshot>;
 }) {
-  const router = useRouter();
+  const requestRefresh = useVisibilityAwareRouterRefresh({ minIntervalMs: 15_000 });
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const didAutoOpenRef = useRef(false);
   const shouldRefreshOnNextSignatureRef = useRef(false);
@@ -399,7 +399,7 @@ export default function UploadPanel({
       });
       if (!onDocumentsCreated && ctx.signatureChanged && shouldRefreshOnNextSignatureRef.current && transitionedToTerminal.length > 0) {
         shouldRefreshOnNextSignatureRef.current = false;
-        router.refresh();
+        requestRefresh();
       }
       return {
         shouldContinue: payload.has_active_docs,
@@ -562,7 +562,7 @@ export default function UploadPanel({
         onDocumentsCreated?.(createdDocs);
         if (!onDocumentsCreated) {
           shouldRefreshOnNextSignatureRef.current = true;
-          router.refresh();
+          requestRefresh();
         }
       }
     } catch (e: unknown) {

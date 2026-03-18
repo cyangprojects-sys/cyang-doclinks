@@ -28,6 +28,7 @@ npm run prove:build
 
 Notes:
 - `npm run prove:build` now fails fast if the runtime is not exactly Node `22.16.0` and npm `10.9.2`.
+- The wrapper removes any existing `.next` directory first so the proof always rebuilds from a clean production artifact state.
 - If `.env.local` is missing, the wrapper prepares it from the committed `.env.example`.
 - Real production secrets are not required for the proof sequence.
 - `production-readiness` and `release:gate` already degrade safely when real deployment infrastructure is not configured.
@@ -82,6 +83,12 @@ What this does:
 - runs the same `npm run prove:build` wrapper used for local proof
 
 A successful image build is a self-contained proof that the repo can pass its release-proof path in an isolated environment.
+
+## Windows Sandbox Note
+
+If you run the proof or Playwright wrapper inside a restricted Windows sandbox, you may hit `spawn EPERM` before app code runs.
+That is an environment/process-permission limitation, not a repository build failure.
+The proof and test wrappers now surface that case explicitly so reviewers know to rerun outside the restricted sandbox.
 
 ## Known Non-Blocking Caveats
 

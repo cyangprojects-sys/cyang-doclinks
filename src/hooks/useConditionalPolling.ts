@@ -15,17 +15,22 @@ export function useConditionalPolling({
   enabled,
   poll,
   getDelayMs,
+  getResumeDelayMs,
   maxAttempts,
   resumeImmediately = true,
 }: {
   enabled: boolean;
   poll: (ctx: { attempt: number }) => Promise<PollResult> | PollResult;
   getDelayMs: (ctx: { attempt: number }) => number;
+  getResumeDelayMs?: (ctx: { attempt: number }) => number | null | undefined;
   maxAttempts?: number;
   resumeImmediately?: boolean;
 }) {
   const pollEvent = useEffectEvent(poll);
   const getDelayMsEvent = useEffectEvent(getDelayMs);
+  const getResumeDelayMsEvent = useEffectEvent(
+    getResumeDelayMs ?? (() => undefined)
+  );
 
   useEffect(() => {
     if (!enabled) return;
@@ -69,7 +74,11 @@ export function useConditionalPolling({
 
     const onVisibilityChange = () => {
       if (document.visibilityState === "visible") {
-        scheduleNext(resumeImmediately ? 0 : undefined);
+        const resumeDelay =
+          getResumeDelayMsEvent({ attempt }) ??
+          (resumeImmediately ? 0 : undefined);
+        if (resumeDelay === null) return;
+        scheduleNext(resumeDelay);
       } else {
         clearTimer();
       }

@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import { useStatusSignaturePolling } from "@/hooks/useStatusSignaturePolling";
+import { useVisibilityAwareRouterRefresh } from "@/hooks/useVisibilityAwareRouterRefresh";
 import {
   DEFAULT_SECURITY_REFRESH_WATCH_MS,
   SECURITY_REFRESH_WATCH_EVENT,
@@ -29,7 +29,7 @@ export default function SecurityTablesAutoRefresh({
 }: {
   initialActiveWork?: boolean;
 }) {
-  const router = useRouter();
+  const requestRefresh = useVisibilityAwareRouterRefresh({ minIntervalMs: 15_000 });
   const watchUntilRef = useRef(0);
   const [watchEnabled, setWatchEnabled] = useState(initialActiveWork);
 
@@ -63,7 +63,7 @@ export default function SecurityTablesAutoRefresh({
     evaluate: (snapshot, ctx) => {
       if (ctx.signatureChanged) {
         watchUntilRef.current = Date.now() + DEFAULT_SECURITY_REFRESH_WATCH_MS;
-        router.refresh();
+        requestRefresh();
       }
 
       const keepWatching = snapshot.has_active_work || Date.now() < watchUntilRef.current;

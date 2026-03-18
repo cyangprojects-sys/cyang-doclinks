@@ -1,7 +1,7 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useStatusSignaturePolling } from "@/hooks/useStatusSignaturePolling";
+import { useVisibilityAwareRouterRefresh } from "@/hooks/useVisibilityAwareRouterRefresh";
 
 const REFRESH_DELAY_MS = 5_000;
 const MAX_SCAN_REFRESH_MS = 60_000;
@@ -25,7 +25,7 @@ export default function ScanAutoRefresh({
   alias: string;
   initialSignature?: string | null;
 }) {
-  const router = useRouter();
+  const requestRefresh = useVisibilityAwareRouterRefresh({ minIntervalMs: REFRESH_DELAY_MS });
 
   useStatusSignaturePolling<Extract<AliasAvailabilityResponse, { ok: true }>>({
     enabled: true,
@@ -44,7 +44,7 @@ export default function ScanAutoRefresh({
     getSignature: (snapshot) => snapshot.status_signature,
     evaluate: (snapshot, ctx) => {
       if (ctx.signatureChanged) {
-        router.refresh();
+        requestRefresh();
       }
       return {
         shouldContinue: snapshot.should_auto_refresh,

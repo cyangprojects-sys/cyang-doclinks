@@ -42,6 +42,17 @@ function hasUsableProductionBuild() {
   ].every((file) => existsSync(file));
 }
 
+function failSpawn(error, command, args) {
+  if (process.platform === "win32" && error && typeof error === "object" && "code" in error && error.code === "EPERM") {
+    console.error(
+      `Unable to spawn "${command} ${args.join(" ")}" on Windows in the current sandboxed environment. ` +
+        "Rerun the command outside the sandbox or grant broader process-spawn permissions."
+    );
+    process.exit(1);
+  }
+  throw error;
+}
+
 function run(command, args) {
   const resolved = resolveSpawn(command, args);
   const result = spawnSync(resolved.command, resolved.args, {
@@ -49,7 +60,7 @@ function run(command, args) {
     shell: false,
     env: process.env,
   });
-  if (result.error) throw result.error;
+  if (result.error) failSpawn(result.error, command, args);
   if (result.status !== 0) process.exit(result.status ?? 1);
 }
 
