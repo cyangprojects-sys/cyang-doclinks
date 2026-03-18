@@ -59,6 +59,10 @@ export async function POST(req: NextRequest) {
   try {
     return await withRouteTimeout(
       (async () => {
+        if (parseJsonBodyLength(req) > MAX_ABUSE_REPORT_BODY_BYTES) {
+          return NextResponse.json({ ok: false, error: "PAYLOAD_TOO_LARGE" }, { status: 413 });
+        }
+
         const ipInfo = clientIpKey(req);
 
         // Rate limit: abuse report submission per IP
@@ -74,9 +78,6 @@ export async function POST(req: NextRequest) {
             { ok: false, error: "RATE_LIMIT", message: "Too many reports. Try again later." },
             { status: rl.status, headers: { "Retry-After": String(rl.retryAfterSeconds) } }
           );
-        }
-        if (parseJsonBodyLength(req) > MAX_ABUSE_REPORT_BODY_BYTES) {
-          return NextResponse.json({ ok: false, error: "PAYLOAD_TOO_LARGE" }, { status: 413 });
         }
 
         let body: Body | null;

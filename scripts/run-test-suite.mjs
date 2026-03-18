@@ -33,6 +33,15 @@ const playwrightCommand =
     ? `npm run test:playwright -- ${forwardedArgs.map(quoteArg).join(" ")}`
     : "npm run test:playwright";
 
+function hasUsableProductionBuild() {
+  return [
+    ".next/BUILD_ID",
+    ".next/build-manifest.json",
+    ".next/server/app-paths-manifest.json",
+    ".next/server/pages-manifest.json",
+  ].every((file) => existsSync(file));
+}
+
 function run(command, args) {
   const resolved = resolveSpawn(command, args);
   const result = spawnSync(resolved.command, resolved.args, {
@@ -44,7 +53,7 @@ function run(command, args) {
   if (result.status !== 0) process.exit(result.status ?? 1);
 }
 
-if (!existsSync(".next/BUILD_ID")) {
+if (!hasUsableProductionBuild()) {
   run("npm", ["run", "build"]);
 }
 

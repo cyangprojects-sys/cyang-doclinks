@@ -74,6 +74,10 @@ export async function POST(req: NextRequest) {
   try {
     return await withRouteTimeout(
       (async () => {
+        if (parseJsonBodyLength(req) > MAX_TAKEDOWN_BODY_BYTES) {
+          return NextResponse.json({ ok: false, error: "PAYLOAD_TOO_LARGE" }, { status: 413 });
+        }
+
         // Basic global throttle
         const globalRl = await enforceGlobalApiRateLimit({
           req,
@@ -84,9 +88,6 @@ export async function POST(req: NextRequest) {
         });
         if (!globalRl.ok) {
           return NextResponse.json({ ok: false, error: "RATE_LIMITED" }, { status: 429 });
-        }
-        if (parseJsonBodyLength(req) > MAX_TAKEDOWN_BODY_BYTES) {
-          return NextResponse.json({ ok: false, error: "PAYLOAD_TOO_LARGE" }, { status: 413 });
         }
 
         const ipInfo = clientIpKey(req);

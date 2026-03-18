@@ -82,10 +82,10 @@ No screenshots are included here because this repo does not ship a maintained pu
 
 ### Prerequisites
 
-- Preferred baseline: Node.js `22.16.0`
-- Preferred baseline: npm `10.9.2`
+- Proof baseline: Node.js `22.16.0`
+- Proof baseline: npm `10.9.2`
 - Supported range: Node.js `>=22.16.0 <25`, npm `>=10.9.2 <12`
-- configured app environment variables
+- copyable proof/local environment from `.env.example`
 
 Preferred local pins are included in:
 - `.nvmrc`
@@ -95,6 +95,7 @@ Preferred local pins are included in:
 ### Local development
 
 ```bash
+cp .env.example .env.local
 npm ci
 npm run dev
 ```
@@ -103,7 +104,9 @@ Open `http://localhost:3000`.
 
 ### Environment setup
 
-Use `.env.example` as the starting point for local configuration. The repo includes env and release validation so missing or unsafe settings are caught early:
+Use `.env.example` as the starting point for both local work and clean proof runs. The template uses safe placeholder values so reviewers do not need production secrets just to validate the repo.
+
+The repo includes env and release validation so missing or unsafe settings are caught early:
 
 ```bash
 npm run audit:env-example
@@ -115,10 +118,37 @@ npm run release:gate
 ```bash
 npm run lint
 npm run typecheck
-npm test
+npm test -- --runInBand
 npm run build
+npm run audit:bundle-budgets
 npm run production-readiness
 ```
+
+### Release proof sequence
+
+For an external proof run from a clean checkout:
+
+```bash
+cp .env.example .env.local
+npm ci
+npx playwright install --with-deps chromium
+npm run lint
+npm run typecheck
+npm test -- --runInBand
+npm run build
+npm run audit:bundle-budgets
+npm run production-readiness
+```
+
+If you want the repo to run the post-install proof steps for you:
+
+```bash
+npm run prove:build
+```
+
+See [PROVE_BUILD.md](PROVE_BUILD.md) for the container proof path and command-by-command rationale.
+
+`npm run typecheck` is the canonical proof command for this repo because Next App Router route validators are generated into `.next/types` on demand in a clean checkout.
 
 ## Quality and Operations
 
@@ -142,7 +172,7 @@ npm run fire-drill:staging
 
 ## Reproducible Build and Test Paths
 
-This repo does not commit `node_modules` or `.next`. Reproducibility comes from the lockfile, pinned runtime metadata, CI validation, and the container paths below.
+This repo does not commit `node_modules` or `.next`. Reproducibility comes from the lockfile, pinned runtime metadata, CI validation, and the container proof paths below.
 
 ### Production image
 
@@ -158,11 +188,20 @@ docker build -f Dockerfile.test -t cyang-doclinks-test .
 docker run --rm --env-file .env.local cyang-doclinks-test
 ```
 
+### Proof image
+
+```bash
+docker build --no-cache -f Dockerfile.proof -t cyang-doclinks-proof .
+```
+
+That image copies `.env.example` into a local proof env and runs the full release-proof sequence in isolation.
+
 Convenience scripts:
 
 ```bash
 npm run docker:build
 npm run docker:test:image
+npm run docker:proof:image
 ```
 
 ## Project Status

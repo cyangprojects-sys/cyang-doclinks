@@ -79,6 +79,20 @@ export async function POST(req: NextRequest) {
   try {
     return await withRouteTimeout(
       (async () => {
+        const maxBodyBytes = getMaxWebhookBodyBytes();
+        const contentLength = parseContentLength(req.headers.get("content-length"));
+        if (contentLength != null && contentLength > maxBodyBytes) {
+          await logSecurityEvent({
+            type: "stripe_webhook_payload_too_large",
+            severity: "medium",
+            ip: requestIp,
+            scope: "billing_webhook",
+            message: "Stripe webhook content-length exceeds max body size",
+            meta: { contentLength, maxBodyBytes },
+          });
+          return NextResponse.json({ ok: false, error: "PAYLOAD_TOO_LARGE" }, { status: 413 });
+        }
+
         assertRuntimeEnv("stripe_webhook");
         const abuseBlock = await enforceIpAbuseBlock({ req, scope: "billing_webhook" });
         if (!abuseBlock.ok) {
@@ -99,20 +113,6 @@ export async function POST(req: NextRequest) {
             { ok: false, error: "RATE_LIMIT" },
             { status: webhookRl.status, headers: { "Retry-After": String(webhookRl.retryAfterSeconds) } }
           );
-        }
-
-        const maxBodyBytes = getMaxWebhookBodyBytes();
-        const contentLength = parseContentLength(req.headers.get("content-length"));
-        if (contentLength != null && contentLength > maxBodyBytes) {
-          await logSecurityEvent({
-            type: "stripe_webhook_payload_too_large",
-            severity: "medium",
-            ip: requestIp,
-            scope: "billing_webhook",
-            message: "Stripe webhook content-length exceeds max body size",
-            meta: { contentLength, maxBodyBytes },
-          });
-          return NextResponse.json({ ok: false, error: "PAYLOAD_TOO_LARGE" }, { status: 413 });
         }
 
         const rawBody = await req.text();

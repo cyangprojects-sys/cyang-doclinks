@@ -64,6 +64,10 @@ export async function POST(req: NextRequest) {
       req,
       () => withRouteTimeout(
         (async () => {
+        if (parseJsonBodyLength(req) > MAX_SHARE_BODY_BYTES) {
+          return NextResponse.json({ ok: false, error: "PAYLOAD_TOO_LARGE" }, { status: 413 });
+        }
+
         const rl = await enforceGlobalApiRateLimit({
           req,
           scope: "ip:api",
@@ -76,9 +80,6 @@ export async function POST(req: NextRequest) {
             { ok: false, error: "RATE_LIMIT" },
             { status: rl.status, headers: { "Retry-After": String(rl.retryAfterSeconds) } }
           );
-        }
-        if (parseJsonBodyLength(req) > MAX_SHARE_BODY_BYTES) {
-          return NextResponse.json({ ok: false, error: "PAYLOAD_TOO_LARGE" }, { status: 413 });
         }
 
         const auth = await verifyApiKeyFromRequest(req);

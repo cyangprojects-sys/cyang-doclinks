@@ -2,6 +2,9 @@ import { sql } from "@/lib/db";
 
 export async function revokeExpiredSharesBatch(limit: number = 1000): Promise<{ revoked: number }> {
   const raw = Number(limit);
+  if (!Number.isFinite(raw)) {
+    return { revoked: 0 };
+  }
   const n = Number.isFinite(raw)
     ? Math.max(1, Math.min(5000, Math.floor(raw)))
     : 1000;

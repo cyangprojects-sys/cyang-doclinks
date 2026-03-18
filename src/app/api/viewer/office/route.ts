@@ -43,6 +43,9 @@ function parseJsonBodyLength(req: NextRequest): number {
 
 export async function POST(req: NextRequest) {
   try {
+    if (parseJsonBodyLength(req) > MAX_VIEWER_OFFICE_BODY_BYTES) {
+      return NextResponse.json({ ok: false, error: "PAYLOAD_TOO_LARGE" }, { status: 413 });
+    }
     const rl = await enforceGlobalApiRateLimit({
       req,
       scope: "ip:viewer_office_preview",
@@ -55,9 +58,6 @@ export async function POST(req: NextRequest) {
         { ok: false, error: "RATE_LIMIT", message: "Too many preview attempts. Try again shortly." },
         { status: rl.status, headers: { "Retry-After": String(rl.retryAfterSeconds) } }
       );
-    }
-    if (parseJsonBodyLength(req) > MAX_VIEWER_OFFICE_BODY_BYTES) {
-      return NextResponse.json({ ok: false, error: "PAYLOAD_TOO_LARGE" }, { status: 413 });
     }
 
     const body = await req.json().catch(() => null);
