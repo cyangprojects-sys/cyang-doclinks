@@ -10,5 +10,4 @@ RUN npm ci
 RUN npx playwright install --with-deps chromium
 
 COPY . .
-RUN cp .env.example .env.local
 RUN npm run prove:build

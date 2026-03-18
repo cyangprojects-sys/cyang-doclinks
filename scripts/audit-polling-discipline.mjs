@@ -28,6 +28,15 @@ const ALLOWLIST = new Set([
   "src/app/status/StatusCenterClient.tsx",
 ]);
 
+const TARGETED_CHECKS = [
+  {
+    file: "src/app/d/[alias]/ScanAutoRefresh.tsx",
+    forbidden: ["useConditionalPolling(", "window.setInterval(", "setInterval("],
+    required: ["useStatusSignaturePolling", "status_signature", "/availability"],
+    message: "alias preview refresh must be signature-driven and avoid raw polling loops",
+  },
+];
+
 const findings = [];
 
 for (const file of AUDITED_FILES) {
@@ -38,6 +47,20 @@ for (const file of AUDITED_FILES) {
     code.includes("router.refresh(");
   if (hasPolling && !ALLOWLIST.has(file)) {
     findings.push(`${file}: hidden polling or refresh loop is not allowed on public surfaces`);
+  }
+}
+
+for (const check of TARGETED_CHECKS) {
+  const code = readFileSync(resolve(check.file), "utf8");
+  for (const token of check.forbidden) {
+    if (code.includes(token)) {
+      findings.push(`${check.file}: ${check.message}; forbidden token "${token}" found`);
+    }
+  }
+  for (const token of check.required) {
+    if (!code.includes(token)) {
+      findings.push(`${check.file}: ${check.message}; required token "${token}" missing`);
+    }
   }
 }
 

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import DeleteDocForm from "../DeleteDocForm";
 import { bulkDeleteDocsAction, deleteDocAction } from "../actions";
@@ -34,8 +34,6 @@ export type UnifiedDocRow = {
 type SortKey = "created_at" | "doc_title" | "total_views" | "last_view" | "active_shares" | "status";
 type SortDir = "asc" | "desc";
 type FilterKey = "all" | "ready" | "shared" | "awaiting_scan" | "attention" | "not_shared";
-// Pending scans still refresh automatically, but on a slower cadence so idle tabs do less work.
-const PENDING_SCAN_REFRESH_MS = 300_000;
 
 function formatDateTime(value: string | null) {
   if (!value) return "No activity yet";
@@ -157,6 +155,8 @@ export default function UnifiedDocsTableClient(props: {
   layout?: "embedded" | "full";
   shareBaseUrl?: string;
   basePath?: string;
+  onDocDeleted?: (docId: string) => void;
+  onDocsDeleted?: (docIds: string[]) => void;
 }) {
   const sp = useSearchParams();
   const router = useRouter();
@@ -167,14 +167,9 @@ export default function UnifiedDocsTableClient(props: {
   const documentsPath = `${basePath}/documents`;
   const linksPath = `${basePath}/links`;
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [removedDocIds, setRemovedDocIds] = useState<string[]>([]);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
-  const lastPendingRefreshAtRef = useRef(0);
-  const rows = useMemo(
-    () => props.rows.filter((row) => !removedDocIds.includes(row.doc_id)),
-    [props.rows, removedDocIds]
-  );
+  const rows = props.rows;
 
   const q = (sp.get("docQ") || "").trim();
   const filter = ((sp.get("docStatus") || "all") as FilterKey);
@@ -220,33 +215,6 @@ export default function UnifiedDocsTableClient(props: {
     const qs = params.toString();
     router.replace(`${pathname}${qs ? `?${qs}` : ""}`, { scroll: false });
   }
-
-  const hasPendingScans = useMemo(() => {
-    return rows.some((row) => {
-      const scanState = normalizeScanState(row.scan_status, row.moderation_status);
-      return scanState === "PENDING" || scanState === "RUNNING" || scanState === "NOT_SCHEDULED";
-    });
-  }, [rows]);
-
-  useEffect(() => {
-    if (!hasPendingScans) return;
-    const refreshIfVisible = () => {
-      if (document.visibilityState !== "visible") return;
-      const now = Date.now();
-      if (now - lastPendingRefreshAtRef.current < PENDING_SCAN_REFRESH_MS) return;
-      lastPendingRefreshAtRef.current = now;
-      router.refresh();
-    };
-    const id = window.setInterval(refreshIfVisible, PENDING_SCAN_REFRESH_MS);
-    const onVisibilityChange = () => {
-      if (document.visibilityState === "visible") refreshIfVisible();
-    };
-    document.addEventListener("visibilitychange", onVisibilityChange);
-    return () => {
-      window.clearInterval(id);
-      document.removeEventListener("visibilitychange", onVisibilityChange);
-    };
-  }, [hasPendingScans, router]);
 
   useEffect(() => {
     if (!copiedId) return;
@@ -631,7 +599,7 @@ export default function UnifiedDocsTableClient(props: {
                     fd.set("docIds", JSON.stringify(selectedIds));
                     startTransition(async () => {
                       await bulkDeleteDocsAction(fd);
-                      setRemovedDocIds((prev) => Array.from(new Set([...prev, ...selectedIds])));
+                      props.onDocsDeleted?.(selectedIds);
                     });
                     setSelectedIds([]);
                   }}
@@ -878,7 +846,7 @@ export default function UnifiedDocsTableClient(props: {
                             title={row.doc_title || row.alias || row.doc_id}
                             action={deleteDocAction}
                             onDeleted={(docId) => {
-                              setRemovedDocIds((prev) => (prev.includes(docId) ? prev : [...prev, docId]));
+                              props.onDocDeleted?.(docId);
                               setSelectedIds((prev) => prev.filter((id) => id !== docId));
                             }}
                             label="Remove"

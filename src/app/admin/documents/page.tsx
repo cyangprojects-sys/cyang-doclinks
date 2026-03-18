@@ -2,8 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireRole } from "@/lib/authz";
 import DashboardHeaderActions from "@/app/admin/dashboard/DashboardHeaderActions";
-import UploadPanel from "@/app/admin/dashboard/UploadPanel";
-import UnifiedDocsTableClient from "@/app/admin/dashboard/UnifiedDocsTableClient";
+import DocumentsWorkspaceClient from "@/app/admin/dashboard/DocumentsWorkspaceClient";
 import { getDashboardDocumentsData } from "@/app/admin/dashboard/data";
 import { resolveConfiguredPublicAppBaseUrl } from "@/lib/publicBaseUrl";
 
@@ -120,33 +119,15 @@ export default async function AdminDocumentsPage({
           <div className="mt-1 text-neutral-400">The `public.docs` table is missing.</div>
         </div>
       ) : (
-        <>
-          <section className="rounded-[30px] border border-white/10 bg-white/[0.03] p-4 sm:p-5">
-            <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <div className="text-xs uppercase tracking-[0.18em] text-white/45">Step 1</div>
-                <h2 className="mt-2 text-xl font-semibold text-white">Upload file</h2>
-                <p className="mt-2 max-w-2xl text-sm text-white/65">
-                  Start here. When a file is clean, the library below will guide you to create its protected link.
-                </p>
-              </div>
-              {fromCreateLink ? (
-                <div className="rounded-2xl border border-cyan-400/25 bg-cyan-400/10 px-4 py-3 text-sm text-cyan-100">
-                  Upload a file first, then create its protected link from the file list.
-                </div>
-              ) : null}
-            </div>
-            <UploadPanel canCheckEncryptionStatus={data.canCheckEncryptionStatus} autoOpenPicker={autoOpenPicker} />
-          </section>
-
-          <UnifiedDocsTableClient
-            rows={data.unifiedRows}
-            defaultPageSize={25}
-            showDelete={data.showDelete}
-            layout="full"
-            shareBaseUrl={shareBaseUrl}
-          />
-        </>
+        <DocumentsWorkspaceClient
+          initialRows={data.unifiedRows}
+          defaultPageSize={25}
+          showDelete={data.showDelete}
+          shareBaseUrl={shareBaseUrl}
+          canCheckEncryptionStatus={data.canCheckEncryptionStatus}
+          autoOpenPicker={autoOpenPicker}
+          fromCreateLink={fromCreateLink}
+        />
       )}
     </div>
   );

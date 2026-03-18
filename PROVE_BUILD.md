@@ -17,37 +17,26 @@ The repo also declares:
 
 Use the exact baseline above for the cleanest proof result.
 
-## Proof Environment Setup
+## Primary Proof Path
 
-1. Copy the committed env template:
-
-```bash
-cp .env.example .env.local
-```
-
-2. Install dependencies from the lockfile:
+Run the pinned baseline, install from the lockfile, then use the single proof wrapper:
 
 ```bash
 npm ci
-```
-
-3. Install the Playwright browser used by the repo test suite:
-
-```bash
-npx playwright install --with-deps chromium
+npm run prove:build
 ```
 
 Notes:
-- `.env.example` contains safe placeholder values intended for proof runs.
+- `npm run prove:build` now fails fast if the runtime is not exactly Node `22.16.0` and npm `10.9.2`.
+- If `.env.local` is missing, the wrapper prepares it from the committed `.env.example`.
 - Real production secrets are not required for the proof sequence.
 - `production-readiness` and `release:gate` already degrade safely when real deployment infrastructure is not configured.
 
-## Mandatory Release-Proof Sequence
+## Exact Wrapped Sequence
 
-Run these commands in this exact order:
+`npm run prove:build` runs these checks in order:
 
 ```bash
-npm ci
 npm run lint
 npm run typecheck
 npm test -- --runInBand
@@ -55,6 +44,8 @@ npm run build
 npm run audit:bundle-budgets
 npm run production-readiness
 ```
+
+If you want to inspect the wrapper step-by-step, this is the same sequence after `npm ci`.
 
 What each command verifies:
 - `npm ci`
@@ -70,15 +61,7 @@ What each command verifies:
 - `npm run audit:bundle-budgets`
   - route-level client bundle budget checks
 - `npm run production-readiness`
-  - env-template audit, migration manifest verification, route/polling/render audits, lint, typecheck, build, bundle budgets, and release gate checks
-
-If you prefer a single wrapper after install:
-
-```bash
-npm run prove:build
-```
-
-That wrapper runs the same mandatory proof steps except for `npm ci`, which should still be run first in a fresh environment.
+  - env-template audit, migration manifest verification, route-handler/polling/render audits, lint, typecheck, build, bundle budgets, and release gate checks
 
 Why not raw `npx tsc --noEmit -p tsconfig.json` here:
 - This App Router repo relies on Next-generated route validator types under `.next/types`.
@@ -96,8 +79,7 @@ docker build --no-cache -f Dockerfile.proof -t cyang-doclinks-proof .
 What this does:
 - installs dependencies from `package-lock.json`
 - installs the local Playwright Chromium runtime
-- copies `.env.example` to `.env.local`
-- runs the full proof sequence inside the container
+- runs the same `npm run prove:build` wrapper used for local proof
 
 A successful image build is a self-contained proof that the repo can pass its release-proof path in an isolated environment.
 

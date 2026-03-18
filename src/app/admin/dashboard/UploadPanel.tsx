@@ -2,7 +2,15 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getUploadUiStatus, normalizeDocState, normalizeScanState, type StatusTone } from "@/lib/documentStatus";
+import { useAdminDocumentStatusPolling } from "@/hooks/useAdminDocumentStatusPolling";
+import { getUploadUiStatus, type StatusTone } from "@/lib/documentStatus";
+import {
+  getActiveDocumentIds,
+  getDocumentCollectionSignature,
+  reconcileDocumentStatusRows,
+  toDocumentStatusSnapshot,
+  type DocumentStatusSnapshot,
+} from "@/lib/documentTransientState";
 
 type PresignResponse =
   | {
@@ -33,17 +41,23 @@ type KeyStatusResponse =
   | { ok: true; configured: boolean; active_key_id: string | null; revoked_active: boolean }
   | { ok: false; error: string; message?: string };
 
-type UploadStatusResponse =
-  | {
-      ok: true;
-      docs: Array<{
-        doc_id: string;
-        doc_state: string;
-        scan_state: string;
-        moderation_status: string;
-      }>;
-    }
-  | { ok: false; error: string; message?: string };
+export type UploadedDocumentRecord = {
+  doc_id: string;
+  doc_title: string;
+  doc_state: string;
+  created_at: string;
+  alias: string | null;
+  scan_status: string;
+  moderation_status: string;
+  total_views: number;
+  last_view: string | null;
+  active_shares: number;
+  latest_share_token: string | null;
+  latest_share_created_at: string | null;
+  alias_expires_at: string | null;
+  alias_is_active: boolean | null;
+  alias_revoked_at: string | null;
+};
 
 type UploadItem = {
   id: string;
@@ -127,7 +141,6 @@ const EXECUTABLE_EXTS = new Set([
 
 const ACCEPT_ATTR =
   ".pdf,.doc,.docx,.txt,.rtf,.odt,.xls,.xlsx,.csv,.ppt,.pptx,.jpg,.jpeg,.png,.gif,.bmp,.heic,.zip,.rar,.mp3,.wav,.mp4,.mov,.avi";
-// Keep active upload status fresh without turning a hidden tab into a steady DB heartbeat.
 const PENDING_UPLOAD_STATUS_POLL_MS = 45_000;
 
 function extOf(name: string): string {
@@ -181,18 +194,102 @@ function errorMessage(e: unknown): string {
   return "Upload failed.";
 }
 
+function buildUploadedDocumentRecord(file: File, completeJson: Extract<CompleteResponse, { ok: true }>): UploadedDocumentRecord {
+  return {
+    doc_id: completeJson.doc_id,
+    doc_title: file.name,
+    doc_state: completeJson.doc_state || "ready",
+    created_at: new Date().toISOString(),
+    alias: completeJson.alias || null,
+    scan_status: completeJson.scan_state || "pending",
+    moderation_status: completeJson.moderation_status || "active",
+    total_views: 0,
+    last_view: null,
+    active_shares: 0,
+    latest_share_token: null,
+    latest_share_created_at: null,
+    alias_expires_at: null,
+    alias_is_active: null,
+    alias_revoked_at: null,
+  };
+}
+
+function reconcileUploadItems(
+  items: UploadItem[],
+  snapshots: ReadonlyArray<DocumentStatusSnapshot>
+): {
+  items: UploadItem[];
+  transitionedToTerminal: string[];
+} {
+  const rows = items
+    .filter((item) => item.status === "done" && item.docId)
+    .map((item) => ({
+      doc_id: String(item.docId || "").trim(),
+      doc_state: item.docState ?? null,
+      scan_status: item.scanState ?? null,
+      moderation_status: item.moderationStatus ?? null,
+    }));
+  const previousByDocId = new Map(
+    rows.map((row) => [
+      row.doc_id,
+      toDocumentStatusSnapshot({
+        doc_id: row.doc_id,
+        doc_state: row.doc_state,
+        scan_state: row.scan_status,
+        moderation_status: row.moderation_status,
+      }),
+    ])
+  );
+  const reconciled = reconcileDocumentStatusRows(rows, snapshots);
+  const nextByDocId = new Map(
+    reconciled.rows.map((row) => [row.doc_id, row] as const)
+  );
+  const transitionedToTerminal = snapshots
+    .filter((snapshot) => {
+      const previous = previousByDocId.get(snapshot.doc_id);
+      return previous?.is_active === true && snapshot.is_terminal;
+    })
+    .map((snapshot) => snapshot.doc_id);
+
+  return {
+    items: items.map((item) => {
+      const docId = String(item.docId || "").trim();
+      if (!docId) return item;
+      const next = nextByDocId.get(docId);
+      if (!next) return item;
+      if (
+        String(item.docState || "") === String(next.doc_state || "") &&
+        String(item.scanState || "") === String(next.scan_status || "") &&
+        String(item.moderationStatus || "") === String(next.moderation_status || "")
+      ) {
+        return item;
+      }
+      return {
+        ...item,
+        docState: next.doc_state ?? undefined,
+        scanState: next.scan_status ?? undefined,
+        moderationStatus: next.moderation_status ?? undefined,
+      };
+    }),
+    transitionedToTerminal,
+  };
+}
+
 export default function UploadPanel({
   canCheckEncryptionStatus,
   autoOpenPicker = false,
+  onDocumentsCreated,
+  externalStatusSnapshots,
 }: {
   canCheckEncryptionStatus: boolean;
   autoOpenPicker?: boolean;
+  onDocumentsCreated?: (docs: UploadedDocumentRecord[]) => void;
+  externalStatusSnapshots?: ReadonlyMap<string, DocumentStatusSnapshot>;
 }) {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const didAutoOpenRef = useRef(false);
-  const statusPollInFlightRef = useRef(false);
-  const lastPendingCountRef = useRef(0);
+  const shouldRefreshOnNextSignatureRef = useRef(false);
 
   const [items, setItems] = useState<UploadItem[]>([]);
   const [busy, setBusy] = useState(false);
@@ -206,22 +303,28 @@ export default function UploadPanel({
   const queuedCount = useMemo(() => items.filter((i) => i.status === "queued").length, [items]);
   const doneCount = useMemo(() => items.filter((i) => i.status === "done").length, [items]);
   const errorCount = useMemo(() => items.filter((i) => i.status === "error").length, [items]);
-  const pendingDocIds = useMemo(
+  const trackedSnapshots = useMemo(
     () =>
       items
-        .filter((item) => {
-          if (item.status !== "done") return false;
-          if (!item.docId) return false;
-          const docState = normalizeDocState(item.docState);
-          const scanState = normalizeScanState(item.scanState, item.moderationStatus);
-          if (docState === "UPLOADING" || docState === "PROCESSING") return true;
-          return scanState === "PENDING" || scanState === "RUNNING" || scanState === "NOT_SCHEDULED" || scanState === "SKIPPED";
-        })
-        .map((item) => String(item.docId || "").trim())
-        .filter(Boolean),
+        .filter((item) => item.status === "done" && item.docId)
+        .map((item) =>
+          toDocumentStatusSnapshot({
+            doc_id: String(item.docId || "").trim(),
+            doc_state: item.docState ?? null,
+            scan_state: item.scanState ?? null,
+            moderation_status: item.moderationStatus ?? null,
+          })
+        ),
     [items]
   );
-  const pendingDocIdsKey = useMemo(() => pendingDocIds.slice().sort().join(","), [pendingDocIds]);
+  const pendingDocIds = useMemo(() => getActiveDocumentIds(trackedSnapshots), [trackedSnapshots]);
+  const pendingSignature = useMemo(
+    () =>
+      getDocumentCollectionSignature(
+        trackedSnapshots.filter((snapshot) => pendingDocIds.includes(snapshot.doc_id))
+      ),
+    [pendingDocIds, trackedSnapshots]
+  );
   const allowedTypeSummary =
     "Documents: .pdf, .doc, .docx, .txt, .rtf, .odt | Spreadsheets: .xls, .xlsx, .csv | Presentations: .ppt, .pptx | Images: .jpg, .jpeg, .png, .gif, .bmp, .heic | Archives: .zip, .rar | Audio/Video: .mp3, .wav, .mp4, .mov, .avi";
 
@@ -278,85 +381,31 @@ export default function UploadPanel({
   }, [canCheckEncryptionStatus]);
 
   useEffect(() => {
-    if (!pendingDocIds.length) return;
-    let cancelled = false;
+    if (!externalStatusSnapshots || externalStatusSnapshots.size === 0) return;
+    setItems((prev) => reconcileUploadItems(prev, Array.from(externalStatusSnapshots.values())).items);
+  }, [externalStatusSnapshots]);
 
-    async function pollStatus() {
-      if (document.visibilityState !== "visible") return;
-      if (statusPollInFlightRef.current) return;
-      statusPollInFlightRef.current = true;
-      try {
-        const res = await fetch("/api/admin/upload/status", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ docIds: pendingDocIds }),
-          cache: "no-store",
-        });
-        const payload = (await res.json().catch(() => null)) as UploadStatusResponse | null;
-        if (!res.ok || !payload || payload.ok !== true || cancelled) return;
-
-        const byDocId = new Map(
-          payload.docs.map((d) => [
-            String(d.doc_id || "").trim(),
-            { docState: d.doc_state, scanState: d.scan_state, moderationStatus: d.moderation_status },
-          ])
-        );
-        let changed = false;
-        setItems((prev) =>
-          prev.map((item) => {
-            const docId = String(item.docId || "").trim();
-            if (!docId) return item;
-            const next = byDocId.get(docId);
-            if (!next) return item;
-            if (
-              String(item.docState || "") === String(next.docState || "") &&
-              String(item.scanState || "") === String(next.scanState || "") &&
-              String(item.moderationStatus || "") === String(next.moderationStatus || "")
-            ) {
-              return item;
-            }
-            changed = true;
-            return {
-              ...item,
-              docState: next.docState,
-              scanState: next.scanState,
-              moderationStatus: next.moderationStatus,
-            };
-          })
-        );
-      } catch {
-        // Best-effort status polling.
-      } finally {
-        statusPollInFlightRef.current = false;
+  useAdminDocumentStatusPolling({
+    docIds: pendingDocIds,
+    pollMs: PENDING_UPLOAD_STATUS_POLL_MS,
+    enabled: !externalStatusSnapshots,
+    initialSignature: pendingSignature || null,
+    onSnapshot: (payload, ctx) => {
+      let transitionedToTerminal: string[] = [];
+      setItems((prev) => {
+        const reconciled = reconcileUploadItems(prev, payload.docs);
+        transitionedToTerminal = reconciled.transitionedToTerminal;
+        return reconciled.items;
+      });
+      if (!onDocumentsCreated && ctx.signatureChanged && shouldRefreshOnNextSignatureRef.current && transitionedToTerminal.length > 0) {
+        shouldRefreshOnNextSignatureRef.current = false;
+        router.refresh();
       }
-    }
-
-    void pollStatus();
-    const timer = window.setInterval(() => {
-      void pollStatus();
-    }, PENDING_UPLOAD_STATUS_POLL_MS);
-    const onVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
-        void pollStatus();
-      }
-    };
-    document.addEventListener("visibilitychange", onVisibilityChange);
-
-    return () => {
-      cancelled = true;
-      window.clearInterval(timer);
-      document.removeEventListener("visibilitychange", onVisibilityChange);
-    };
-  }, [pendingDocIds, pendingDocIdsKey, router]);
-
-  useEffect(() => {
-    const previousPendingCount = lastPendingCountRef.current;
-    const nextPendingCount = pendingDocIds.length;
-    lastPendingCountRef.current = nextPendingCount;
-    if (previousPendingCount > nextPendingCount) {
-      router.refresh();
-    }
-  }, [pendingDocIds.length, router]);
+      return {
+        shouldContinue: payload.has_active_docs,
+      };
+    },
+  });
 
   function addFiles(files: FileList | File[]) {
     const arr = Array.from(files || []);
@@ -479,6 +528,7 @@ export default function UploadPanel({
       scanState: completeJson.scan_state || "pending",
       moderationStatus: completeJson.moderation_status || "active",
     });
+    return buildUploadedDocumentRecord(file, completeJson);
     } catch (e) {
       await abortIfStaged();
       throw e;
@@ -499,14 +549,22 @@ export default function UploadPanel({
     setBusy(true);
     try {
       const queue = items.filter((i) => i.status === "queued");
+      const createdDocs: UploadedDocumentRecord[] = [];
       for (const item of queue) {
         try {
-          await uploadOne(item);
+          const created = await uploadOne(item);
+          createdDocs.push(created);
         } catch (e: unknown) {
           updateItem(item.id, { status: "error", message: errorMessage(e) || "Upload failed." });
         }
       }
-      router.refresh();
+      if (createdDocs.length > 0) {
+        onDocumentsCreated?.(createdDocs);
+        if (!onDocumentsCreated) {
+          shouldRefreshOnNextSignatureRef.current = true;
+          router.refresh();
+        }
+      }
     } catch (e: unknown) {
       setError(errorMessage(e) || "Upload failed.");
     } finally {

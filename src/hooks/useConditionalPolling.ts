@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useEffectEvent } from "react";
 
 type PollResult =
   | boolean
@@ -24,6 +24,9 @@ export function useConditionalPolling({
   maxAttempts?: number;
   resumeImmediately?: boolean;
 }) {
+  const pollEvent = useEffectEvent(poll);
+  const getDelayMsEvent = useEffectEvent(getDelayMs);
+
   useEffect(() => {
     if (!enabled) return;
 
@@ -43,11 +46,11 @@ export function useConditionalPolling({
       clearTimer();
       if (document.visibilityState !== "visible") return;
 
-      const nextDelay = Math.max(0, Math.floor(delayMs ?? getDelayMs({ attempt })));
+      const nextDelay = Math.max(0, Math.floor(delayMs ?? getDelayMsEvent({ attempt })));
       timer = window.setTimeout(async () => {
         if (cancelled || document.visibilityState !== "visible") return;
 
-        const result = await poll({ attempt });
+        const result = await pollEvent({ attempt });
         if (cancelled) return;
 
         const normalized =
@@ -80,5 +83,5 @@ export function useConditionalPolling({
       clearTimer();
       document.removeEventListener("visibilitychange", onVisibilityChange);
     };
-  }, [enabled, getDelayMs, maxAttempts, poll, resumeImmediately]);
+  }, [enabled, maxAttempts, resumeImmediately]);
 }

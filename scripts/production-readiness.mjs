@@ -18,7 +18,7 @@ const commands = [
   ["npm", ["run", "audit:admin-routes"]],
   ["npm", ["run", "audit:admin-polling"]],
   ["npm", ["run", "audit:public-rendering"]],
-  ["npm", ["run", "audit:route-rendering"]],
+  ["npm", ["run", "audit:route-handlers"]],
   ["npm", ["run", "audit:polling"]],
   ["npm", ["run", "lint"]],
   ["npm", ["run", "typecheck"]],

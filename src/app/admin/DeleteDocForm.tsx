@@ -2,7 +2,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 
 export default function DeleteDocForm({
   docId,
@@ -15,12 +14,11 @@ export default function DeleteDocForm({
   docId: string;
   title: string;
   action: (formData: FormData) => Promise<void>;
-  onDeleted?: (docId: string) => void;
+  onDeleted: (docId: string) => void;
   label?: string;
   variant?: "danger" | "subtle";
 }) {
   const [pending, setPending] = useState(false);
-  const router = useRouter();
   const buttonClass =
     variant === "subtle"
       ? "rounded-lg border border-white/10 bg-transparent px-3 py-1.5 text-xs text-white/55 hover:border-white/20 hover:bg-white/5 hover:text-white"
@@ -36,8 +34,7 @@ export default function DeleteDocForm({
         setPending(true);
         try {
           await action(fd);
-          if (onDeleted) onDeleted(docId);
-          else router.refresh();
+          onDeleted(docId);
         } finally {
           setPending(false);
         }

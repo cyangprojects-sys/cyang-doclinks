@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { spawnSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { copyFileSync, existsSync } from "node:fs";
 
 function resolveSpawn(command, args) {
   if (process.platform === "win32" && (command === "npm" || command === "npx")) {
@@ -53,7 +53,13 @@ function run(command, args) {
   if (result.status !== 0) process.exit(result.status ?? 1);
 }
 
+if (!existsSync(".env.local") && existsSync(".env.example")) {
+  copyFileSync(".env.example", ".env.local");
+  console.log("Prepared .env.local from .env.example for the test run.");
+}
+
 if (!hasUsableProductionBuild()) {
+  console.log("No reusable production build detected. Running `npm run build` before Playwright.");
   run("npm", ["run", "build"]);
 }
 

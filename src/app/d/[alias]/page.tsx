@@ -7,250 +7,20 @@ import BackButton from "./BackButton";
 import ScanAutoRefresh from "./ScanAutoRefresh";
 import { resolveDoc } from "@/lib/resolveDoc";
 
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/auth";
 import { sql } from "@/lib/db";
 import { isAliasUnlockedAction } from "./unlockActions";
 import { getAuthedUser, roleAtLeast } from "@/lib/authz";
 import { getPlanForUser } from "@/lib/monetization";
-import { allowUnencryptedServing } from "@/lib/securityPolicy";
 import SecurePdfCanvasViewer from "@/app/components/SecurePdfCanvasViewer";
 import { detectFileFamily, fileFamilyLabel, isMicrosoftOfficeDocument } from "@/lib/fileFamily";
-import { getDocumentUiStatus, getShareEligibility, normalizeScanState } from "@/lib/documentStatus";
+import { getDocAvailabilityHint, isOwnerEmail, resolveAliasDocIdBypass, userOwnsDoc } from "@/lib/aliasPreview";
 
 export const runtime = "nodejs";
-
-async function isOwnerEmail(): Promise<boolean> {
-  const owner = (process.env.OWNER_EMAIL || "").trim().toLowerCase();
-  if (!owner) return false;
-
-  const session = await getServerSession(authOptions);
-  const email = (session?.user?.email || "").trim().toLowerCase();
-
-  return !!email && email === owner;
-}
 
 function isExpired(expiresAt: string | null): boolean {
   if (!expiresAt) return false;
   const t = new Date(expiresAt).getTime();
   return Number.isFinite(t) && t <= Date.now();
-}
-
-/**
- * Privileged-bypass alias resolution (gets doc_id without enforcing password).
- * Supports both `doc_aliases` (new) and `document_aliases` (legacy).
- */
-async function resolveAliasDocIdBypass(alias: string): Promise<
-  | { ok: true; docId: string; revokedAt: string | null; expiresAt: string | null }
-  | { ok: false }
-> {
-  // New table: doc_aliases
-  try {
-    const rows = (await sql`
-      select
-        a.doc_id::text as doc_id,
-        a.revoked_at::text as revoked_at,
-        a.expires_at::text as expires_at,
-        coalesce(a.is_active, true) as is_active
-      from public.doc_aliases a
-      where lower(a.alias) = ${alias}
-      limit 1
-    `) as unknown as Array<{
-      doc_id: string;
-      revoked_at: string | null;
-      expires_at: string | null;
-      is_active: boolean;
-    }>;
-
-    if (rows?.length) {
-      if (!rows[0].is_active) return { ok: false };
-      return {
-        ok: true,
-        docId: rows[0].doc_id,
-        revokedAt: rows[0].revoked_at ?? null,
-        expiresAt: rows[0].expires_at ?? null,
-      };
-    }
-  } catch {
-    // ignore; fall through to legacy table
-  }
-
-  // Legacy table: document_aliases
-  try {
-    const rows = (await sql`
-      select
-        a.doc_id::text as doc_id,
-        null::text as revoked_at,
-        a.expires_at::text as expires_at,
-        true as is_active
-      from public.document_aliases a
-      where lower(a.alias) = ${alias}
-      limit 1
-    `) as unknown as Array<{
-      doc_id: string;
-      revoked_at: string | null;
-      expires_at: string | null;
-      is_active: boolean;
-    }>;
-
-    if (rows?.length) {
-      if (!rows[0].is_active) return { ok: false };
-      return {
-        ok: true,
-        docId: rows[0].doc_id,
-        revokedAt: rows[0].revoked_at ?? null,
-        expiresAt: rows[0].expires_at ?? null,
-      };
-    }
-  } catch {
-    // ignore
-  }
-
-  return { ok: false };
-}
-
-async function userOwnsDoc(userId: string, docId: string): Promise<boolean> {
-  try {
-    const rows = (await sql`
-      select 1
-      from public.docs
-      where id = ${docId}::uuid
-        and owner_id = ${userId}::uuid
-      limit 1
-    `) as unknown as Array<{ "?column?": number }>;
-
-    return rows.length > 0;
-  } catch {
-    return false;
-  }
-}
-
-async function getDocAvailabilityHint(docId: string): Promise<{ hint: string | null; shouldAutoRefresh: boolean }> {
-  async function fromRows(rows: Array<{
-    encryption_enabled: boolean;
-    moderation_status: string;
-    scan_status: string;
-    status: string;
-    r2_key: string | null;
-    org_disabled?: boolean;
-    org_active?: boolean;
-  }>) {
-    const r = rows?.[0];
-    if (!r) return { hint: null, shouldAutoRefresh: false };
-
-    if ((r.status || "").toLowerCase() === "deleted") {
-      return { hint: "This document is deleted and unavailable.", shouldAutoRefresh: false };
-    }
-    if (r.org_disabled === true || r.org_active === false) {
-      return { hint: "This organization is disabled, so document serving is unavailable.", shouldAutoRefresh: false };
-    }
-    if (!r.r2_key) {
-      return { hint: "Document storage pointer is missing. Re-upload this document.", shouldAutoRefresh: false };
-    }
-
-    if (!r.encryption_enabled && !allowUnencryptedServing()) {
-      return {
-        hint: "This is a legacy unencrypted upload. Serving is blocked by policy. Re-upload or migrate this document to encrypted storage.",
-        shouldAutoRefresh: false,
-      };
-    }
-
-    const moderation = String(r.moderation_status || "active").toLowerCase();
-    const scanRaw = String(r.scan_status || "unscanned").toLowerCase();
-    if (moderation === "quarantined") {
-      const rescanInProgress =
-        scanRaw === "pending" ||
-        scanRaw === "queued" ||
-        scanRaw === "running" ||
-        scanRaw === "unscanned" ||
-        scanRaw === "not_scheduled";
-      if (rescanInProgress) {
-        return { hint: "Security rescan in progress. Available after scan completes.", shouldAutoRefresh: true };
-      }
-      return { hint: "This document is quarantined and cannot be served.", shouldAutoRefresh: false };
-    }
-    if (moderation === "disabled" || moderation === "deleted") {
-      return { hint: `This document is ${moderation} and unavailable.`, shouldAutoRefresh: false };
-    }
-
-    const eligibility = getShareEligibility({
-      docStateRaw: r.status || "ready",
-      scanStateRaw: r.scan_status || "unscanned",
-      moderationStatusRaw: r.moderation_status || "active",
-    });
-    if (!eligibility.canCreateLink) {
-      return {
-        hint: eligibility.blockedReason || "This document cannot be shared right now.",
-        shouldAutoRefresh: false,
-      };
-    }
-    const scanState = normalizeScanState(r.scan_status || "unscanned", r.moderation_status || "active");
-    const shouldAutoRefresh = scanState === "PENDING" || scanState === "RUNNING" || scanState === "NOT_SCHEDULED";
-
-    if (eligibility.warning) {
-      const ui = getDocumentUiStatus({
-        docStateRaw: r.status || "ready",
-        scanStateRaw: r.scan_status || "unscanned",
-        moderationStatusRaw: r.moderation_status || "active",
-      });
-      return {
-        hint: `${ui.label}: ${ui.subtext}.`,
-        shouldAutoRefresh,
-      };
-    }
-    return { hint: null, shouldAutoRefresh: false };
-  }
-
-  try {
-    const rows = (await sql`
-      select
-        coalesce(encryption_enabled, false) as encryption_enabled,
-        coalesce(moderation_status::text, 'active') as moderation_status,
-        coalesce(scan_status::text, 'unscanned') as scan_status,
-        coalesce(status::text, 'ready') as status,
-        nullif(coalesce(r2_key::text, ''), '') as r2_key,
-        coalesce(o.disabled, false) as org_disabled,
-        coalesce(o.is_active, true) as org_active
-      from public.docs
-      left join public.organizations o on o.id = public.docs.org_id
-      where id = ${docId}::uuid
-      limit 1
-    `) as unknown as Array<{
-      encryption_enabled: boolean;
-      moderation_status: string;
-      scan_status: string;
-      status: string;
-      r2_key: string | null;
-      org_disabled: boolean;
-      org_active: boolean;
-    }>;
-    return await fromRows(rows);
-  } catch {
-    // Compatibility fallback when organizations columns/table differ across envs.
-    try {
-      const rows = (await sql`
-        select
-          coalesce(encryption_enabled, false) as encryption_enabled,
-          coalesce(moderation_status::text, 'active') as moderation_status,
-          coalesce(scan_status::text, 'unscanned') as scan_status,
-          coalesce(status::text, 'ready') as status,
-          nullif(coalesce(r2_key::text, ''), '') as r2_key
-        from public.docs
-        where id = ${docId}::uuid
-        limit 1
-      `) as unknown as Array<{
-        encryption_enabled: boolean;
-        moderation_status: string;
-        scan_status: string;
-        status: string;
-        r2_key: string | null;
-      }>;
-      return await fromRows(rows);
-  } catch {
-      // ignore
-    }
-  }
-  return { hint: null, shouldAutoRefresh: false };
 }
 
 async function getDocViewMeta(docId: string): Promise<{ contentType: string | null; filename: string | null }> {
@@ -427,6 +197,7 @@ export default async function SharePage({
               filename={viewMeta.filename}
               availabilityHint={availability.hint}
               shouldAutoRefresh={availability.shouldAutoRefresh}
+              availabilityStatusSignature={availability.statusSignature}
             />
           </aside>
         </div>
@@ -480,12 +251,14 @@ function DocumentViewer({
   filename,
   availabilityHint,
   shouldAutoRefresh = false,
+  availabilityStatusSignature,
 }: {
   alias: string;
   contentType?: string | null;
   filename?: string | null;
   availabilityHint?: string | null;
   shouldAutoRefresh?: boolean;
+  availabilityStatusSignature?: string | null;
 }) {
   const viewerUrl = `/d/${encodeURIComponent(alias)}/raw`;
   const downloadUrl = `/d/${encodeURIComponent(alias)}/raw?disposition=attachment`;
@@ -497,7 +270,7 @@ function DocumentViewer({
 
   return (
     <div className="mt-3 lg:mt-0">
-      {shouldAutoRefresh ? <ScanAutoRefresh /> : null}
+      {shouldAutoRefresh ? <ScanAutoRefresh alias={alias} initialSignature={availabilityStatusSignature ?? null} /> : null}
       <div className="mb-3 flex flex-wrap items-center gap-2 text-xs text-white/80">
         <span className="rounded-full border border-white/20 bg-white/10 px-2.5 py-1 font-semibold tracking-wide">
           {typeLabel}

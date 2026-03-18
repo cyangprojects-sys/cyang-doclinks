@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useConditionalPolling } from "@/hooks/useConditionalPolling";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useStatusSignaturePolling } from "@/hooks/useStatusSignaturePolling";
 import { dispatchSecurityRefreshWatch } from "./securityRefreshWatch";
 
 type MasterKeyRow = { id: string; active: boolean; revoked: boolean };
@@ -91,7 +91,6 @@ export default function KeyManagementPanel() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [watchJobs, setWatchJobs] = useState(false);
-  const signatureRef = useRef<string>("");
 
   const keys = useMemo(() => (data && data.ok ? data.keys : []), [data]);
   const activeId = data && data.ok ? data.active_key_id : null;
@@ -115,10 +114,10 @@ export default function KeyManagementPanel() {
       return null;
     }
     const nextSignature = keysSignature(j);
-    if (!signatureRef.current || (nextSignature && nextSignature !== signatureRef.current)) {
-      signatureRef.current = nextSignature;
-      setData(j);
-    }
+    setData((prev) => {
+      const previousSignature = keysSignature(prev);
+      return previousSignature === nextSignature ? prev : j;
+    });
     if ((!r.ok || !j.ok) && !opts?.silent) {
       setError(j.ok ? "Failed to load keys." : (j.error || "Failed to load keys."));
     }
@@ -130,12 +129,20 @@ export default function KeyManagementPanel() {
     void refresh();
   }, [refresh]);
 
-  useConditionalPolling({
+  useStatusSignaturePolling<KeysResponse>({
     enabled: !busy && (hasActiveJobs || watchJobs),
+    initialSignature: keysSignature(data),
     getDelayMs: ({ attempt }) => Math.min(KEY_PANEL_POLL_START_MS * 2 ** attempt, KEY_PANEL_POLL_MAX_MS),
-    poll: async () => {
+    fetchSnapshot: async () => {
       const next = await refresh({ silent: true });
-      return hasRunningJobs(next) || watchJobs;
+      return next;
+    },
+    getSignature: (snapshot) => keysSignature(snapshot),
+    evaluate: (snapshot) => {
+      const keepWatching = hasRunningJobs(snapshot) || watchJobs;
+      return {
+        shouldContinue: keepWatching,
+      };
     },
   });
 
