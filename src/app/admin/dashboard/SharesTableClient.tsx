@@ -31,7 +31,8 @@ export type ShareRow = {
   has_password: boolean;
 };
 
-type ShareUpdater = (rows: ShareRow[]) => ShareRow[];
+type SharePatch = Partial<ShareRow>;
+type SharePatchInput = SharePatch | ((row: ShareRow) => SharePatch);
 
 type Status = "all" | "active" | "maxed";
 type StatusFilter = Status | "expiring";
@@ -100,7 +101,7 @@ export default function SharesTableClient(props: {
 
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
-  const [shares, setShares] = useState(props.shares);
+  const [shareOverrides, setShareOverrides] = useState<Record<string, SharePatch>>({});
 
   const q = (sp.get("shareQ") || "").trim();
   const statusRaw = (sp.get("shareStatus") || "all").trim().toLowerCase();
@@ -116,9 +117,14 @@ export default function SharesTableClient(props: {
     return () => window.clearTimeout(id);
   }, [copiedToken]);
 
-  useEffect(() => {
-    setShares(props.shares);
-  }, [props.shares]);
+  const shares = useMemo(
+    () =>
+      props.shares.map((share) => ({
+        ...share,
+        ...(shareOverrides[share.token] ?? {}),
+      })),
+    [props.shares, shareOverrides]
+  );
 
   const reusableShares = useMemo(() => {
     return shares.filter((share) => {
@@ -194,9 +200,22 @@ export default function SharesTableClient(props: {
     return new Date(baseTs + days * 24 * 60 * 60 * 1000).toISOString();
   }
 
-  async function runAction(fn: (fd: FormData) => Promise<void>, fd: FormData, updater?: ShareUpdater) {
+  function applySharePatch(tokens: string[], patchInput: SharePatchInput) {
+    setShareOverrides((current) => {
+      const next = { ...current };
+      for (const token of tokens) {
+        const source = shares.find((row) => row.token === token);
+        if (!source) continue;
+        const patch = typeof patchInput === "function" ? patchInput(source) : patchInput;
+        next[token] = { ...(next[token] ?? {}), ...patch };
+      }
+      return next;
+    });
+  }
+
+  async function runAction(fn: (fd: FormData) => Promise<void>, fd: FormData, patcher?: () => void) {
     await fn(fd);
-    if (updater) setShares((current) => updater(current));
+    if (patcher) patcher();
   }
 
   function downloadCsvForSelected() {
@@ -372,22 +391,22 @@ export default function SharesTableClient(props: {
                             token={share.token}
                             hasPassword={Boolean(share.has_password)}
                             setAction={async (fd) =>
-                              runAction(setSharePasswordAction, fd, (current) =>
-                                current.map((row) => (row.token === share.token ? { ...row, has_password: true } : row))
+                              runAction(setSharePasswordAction, fd, () =>
+                                applySharePatch([share.token], { has_password: true })
                               )}
                             clearAction={async (fd) =>
-                              runAction(clearSharePasswordAction, fd, (current) =>
-                                current.map((row) => (row.token === share.token ? { ...row, has_password: false } : row))
+                              runAction(clearSharePasswordAction, fd, () =>
+                                applySharePatch([share.token], { has_password: false })
                               )}
                           />
 
                           <div className="flex flex-wrap gap-2">
                             <form
                               action={async (fd) =>
-                                runAction(extendShareExpirationAction, fd, (current) =>
-                                  current.map((row) =>
-                                    row.token === share.token ? { ...row, expires_at: extendExpiry(row.expires_at, 7) } : row
-                                  )
+                                runAction(extendShareExpirationAction, fd, () =>
+                                  applySharePatch([share.token], (row) => ({
+                                    expires_at: extendExpiry(row.expires_at, 7),
+                                  }))
                                 )}
                             >
                               <input type="hidden" name="token" value={share.token} />
@@ -398,10 +417,10 @@ export default function SharesTableClient(props: {
                             </form>
                             <form
                               action={async (fd) =>
-                                runAction(extendShareExpirationAction, fd, (current) =>
-                                  current.map((row) =>
-                                    row.token === share.token ? { ...row, expires_at: extendExpiry(row.expires_at, 30) } : row
-                                  )
+                                runAction(extendShareExpirationAction, fd, () =>
+                                  applySharePatch([share.token], (row) => ({
+                                    expires_at: extendExpiry(row.expires_at, 30),
+                                  }))
                                 )}
                             >
                               <input type="hidden" name="token" value={share.token} />
@@ -412,17 +431,12 @@ export default function SharesTableClient(props: {
                             </form>
                             <form
                               action={async (fd) =>
-                                runAction(setShareMaxViewsAction, fd, (current) => {
+                                runAction(setShareMaxViewsAction, fd, () => {
                                   const nextMaxViewsRaw = String(fd.get("maxViews") || "").trim();
                                   const nextMaxViews = Number(nextMaxViewsRaw);
-                                  return current.map((row) =>
-                                    row.token === share.token
-                                      ? {
-                                          ...row,
-                                          max_views: Number.isFinite(nextMaxViews) ? nextMaxViews : row.max_views,
-                                        }
-                                      : row
-                                  );
+                                  if (Number.isFinite(nextMaxViews)) {
+                                    applySharePatch([share.token], { max_views: nextMaxViews });
+                                  }
                                 })}
                               onSubmit={(event) => {
                                 const input = event.currentTarget.querySelector('input[name="maxViews"]') as HTMLInputElement | null;
@@ -442,8 +456,8 @@ export default function SharesTableClient(props: {
                             </form>
                             <form
                               action={async (fd) =>
-                                runAction(resetShareViewsCountAction, fd, (current) =>
-                                  current.map((row) => (row.token === share.token ? { ...row, view_count: 0 } : row))
+                                runAction(resetShareViewsCountAction, fd, () =>
+                                  applySharePatch([share.token], { view_count: 0 })
                                 )}
                             >
                               <input type="hidden" name="token" value={share.token} />
@@ -485,10 +499,8 @@ export default function SharesTableClient(props: {
                         token={share.token}
                         revoked={Boolean(share.revoked_at)}
                         action={async (fd) =>
-                          runAction(revokeDocShareAction, fd, (current) =>
-                            current.map((row) =>
-                              row.token === share.token ? { ...row, revoked_at: new Date().toISOString() } : row
-                            )
+                          runAction(revokeDocShareAction, fd, () =>
+                            applySharePatch([share.token], { revoked_at: new Date().toISOString() })
                           )}
                       />
                       <div className="pt-1 text-[11px] text-white/40">
@@ -511,10 +523,8 @@ export default function SharesTableClient(props: {
               <>
                 <form
                   action={async (fd) =>
-                    runAction(bulkRevokeSharesAction, fd, (current) =>
-                      current.map((row) =>
-                        selectedTokens.includes(row.token) ? { ...row, revoked_at: new Date().toISOString() } : row
-                      )
+                    runAction(bulkRevokeSharesAction, fd, () =>
+                      applySharePatch(selectedTokens, { revoked_at: new Date().toISOString() })
                     )}
                   onSubmit={(e) => { if (!anySelected) e.preventDefault(); }}
                 >
@@ -525,13 +535,13 @@ export default function SharesTableClient(props: {
                 </form>
                 <form
                   action={async (fd) =>
-                    runAction(bulkExtendSharesAction, fd, (current) => {
+                    runAction(bulkExtendSharesAction, fd, () => {
                       const days = Number(fd.get("days") || 0);
-                      return current.map((row) =>
-                        selectedTokens.includes(row.token) && Number.isFinite(days) && days > 0
-                          ? { ...row, expires_at: extendExpiry(row.expires_at, days) }
-                          : row
-                      );
+                      if (Number.isFinite(days) && days > 0) {
+                        applySharePatch(selectedTokens, (row) => ({
+                          expires_at: extendExpiry(row.expires_at, days),
+                        }));
+                      }
                     })}
                   onSubmit={(event) => {
                     if (!anySelected) {

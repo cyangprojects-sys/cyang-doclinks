@@ -22,7 +22,8 @@ export type ViewsByDocRow = {
   last_view: string | null;
 };
 
-type ViewsRowUpdater = (rows: ViewsByDocRow[]) => ViewsByDocRow[];
+type ViewsRowPatch = Partial<ViewsByDocRow>;
+type ViewsRowPatchInput = ViewsRowPatch | ((row: ViewsByDocRow) => ViewsRowPatch);
 
 type FilterKey = "all" | "engaged" | "recent" | "quiet" | "blocked";
 
@@ -120,7 +121,7 @@ export default function ViewsByDocTableClient(props: {
   const [limit, setLimit] = useState(initialLimit);
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [rows, setRows] = useState(props.rows);
+  const [rowOverrides, setRowOverrides] = useState<Record<string, ViewsRowPatch>>({});
 
   const filter: FilterKey =
     filterFromUrl === "engaged" || filterFromUrl === "recent" || filterFromUrl === "quiet" || filterFromUrl === "blocked"
@@ -133,9 +134,14 @@ export default function ViewsByDocTableClient(props: {
     return () => window.clearTimeout(id);
   }, [copiedId]);
 
-  useEffect(() => {
-    setRows(props.rows);
-  }, [props.rows]);
+  const rows = useMemo(
+    () =>
+      props.rows.map((row) => ({
+        ...row,
+        ...(rowOverrides[row.doc_id] ?? {}),
+      })),
+    [props.rows, rowOverrides]
+  );
 
   function syncUrl(next: { viewQ?: string; viewFilter?: FilterKey; viewLimit?: number }) {
     const params = new URLSearchParams(sp.toString());
@@ -237,10 +243,23 @@ export default function ViewsByDocTableClient(props: {
     URL.revokeObjectURL(url);
   }
 
-  function runAction(action: (fd: FormData) => Promise<void>, fd: FormData, updater?: ViewsRowUpdater) {
+  function applyRowPatch(docIds: string[], patchInput: ViewsRowPatchInput) {
+    setRowOverrides((current) => {
+      const next = { ...current };
+      for (const docId of docIds) {
+        const source = rows.find((row) => row.doc_id === docId);
+        if (!source) continue;
+        const patch = typeof patchInput === "function" ? patchInput(source) : patchInput;
+        next[docId] = { ...(next[docId] ?? {}), ...patch };
+      }
+      return next;
+    });
+  }
+
+  function runAction(action: (fd: FormData) => Promise<void>, fd: FormData, patcher?: () => void) {
     startTransition(async () => {
       await action(fd);
-      if (updater) setRows((current) => updater(current));
+      if (patcher) patcher();
     });
   }
 
@@ -555,8 +574,8 @@ export default function ViewsByDocTableClient(props: {
                             onClick={() => {
                               const fd = new FormData();
                               fd.set("docId", row.doc_id);
-                              runAction(disableAliasForDocAction, fd, (current) =>
-                                current.map((item) => (item.doc_id === row.doc_id ? { ...item, alias: null } : item))
+                              runAction(disableAliasForDocAction, fd, () =>
+                                applyRowPatch([row.doc_id], { alias: null })
                               );
                             }}
                             disabled={isPending}
@@ -601,10 +620,8 @@ export default function ViewsByDocTableClient(props: {
                   onClick={() => {
                     const fd = new FormData();
                     fd.set("docIds", JSON.stringify(selectedIds));
-                    runAction(bulkDisableAliasesForDocsAction, fd, (current) =>
-                      current.map((item) =>
-                        selectedIds.includes(item.doc_id) ? { ...item, alias: null } : item
-                      )
+                    runAction(bulkDisableAliasesForDocsAction, fd, () =>
+                      applyRowPatch(selectedIds, { alias: null })
                     );
                   }}
                   className="btn-base rounded-xl border border-white/12 bg-white/[0.04] px-3 py-2 text-sm text-white/75 hover:border-white/20 hover:bg-white/[0.08] hover:text-white disabled:opacity-40"
