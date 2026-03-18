@@ -58,7 +58,7 @@ function encryptForUpload(plain: Buffer, keyB64: string, ivB64: string): Buffer 
 async function presignUpload(
   request: APIRequestContext,
   headers: Record<string, string>,
-  args: { filename: string; sizeBytes: number }
+  args: { filename: string; sizeBytes: number; forwardedFor?: string }
 ): Promise<{
   forbidden?: boolean;
   doc_id: string;
@@ -68,7 +68,11 @@ async function presignUpload(
   encryption: { enabled: true; alg: string | null; iv_b64: string | null; data_key_b64: string | null };
 }> {
   const res = await request.post("/api/admin/upload/presign", {
-    headers: { "content-type": "application/json", ...headers },
+    headers: {
+      "content-type": "application/json",
+      ...(args.forwardedFor ? { "x-forwarded-for": args.forwardedFor } : {}),
+      ...headers,
+    },
     data: {
       title: args.filename,
       filename: args.filename,
@@ -417,11 +421,12 @@ test.describe("attack simulation", () => {
 
   test("upload presign rejects absolute oversize payloads (>25MB)", async ({ request }) => {
     const auth = authHeadersFromEnv();
+    const ip = isolatedIp("upload-oversize");
 
     const absMax = Number(process.env.UPLOAD_ABSOLUTE_MAX_BYTES || 104_857_600);
     const tooLarge = absMax + 1;
     const res = await request.post("/api/admin/upload/presign", {
-      headers: { "content-type": "application/json", ...(auth || {}) },
+      headers: { "content-type": "application/json", "x-forwarded-for": ip, ...(auth || {}) },
       data: {
         title: "oversize.pdf",
         filename: "oversize.pdf",
@@ -432,8 +437,8 @@ test.describe("attack simulation", () => {
     });
 
     const status = res.status();
-    if (status === 401 || status === 403 || status === 500) {
-      expect([401, 403, 500]).toContain(status);
+    if (status === 401 || status === 403 || status === 429 || status === 500) {
+      expect([401, 403, 429, 500]).toContain(status);
       return;
     }
     expect(status).toBe(413);
@@ -444,9 +449,10 @@ test.describe("attack simulation", () => {
 
   test("upload complete rejects malformed PDF after decrypt", async ({ request }) => {
     const auth = authHeadersFromEnv();
+    const ip = isolatedIp("upload-malformed-pdf");
     if (!auth) {
       const blocked = await request.post("/api/admin/upload/presign", {
-        headers: { "content-type": "application/json" },
+        headers: { "content-type": "application/json", "x-forwarded-for": ip },
         data: {
           title: "blocked.pdf",
           filename: "blocked.pdf",
@@ -455,7 +461,7 @@ test.describe("attack simulation", () => {
           encrypt: true,
         },
       });
-      expect([401, 403, 500]).toContain(blocked.status());
+      expect([401, 403, 429, 500]).toContain(blocked.status());
       return;
     }
 
@@ -465,6 +471,7 @@ test.describe("attack simulation", () => {
     const p = await presignUpload(request, auth, {
       filename: fakePdfName,
       sizeBytes: badPlain.length,
+      forwardedFor: ip,
     });
     if (p.forbidden) {
       expect(p.forbidden).toBeTruthy();
@@ -494,7 +501,7 @@ test.describe("attack simulation", () => {
     expect(put.status()).toBeLessThan(300);
 
     const complete = await request.post("/api/admin/upload/complete", {
-      headers: { "content-type": "application/json", ...auth },
+      headers: { "content-type": "application/json", "x-forwarded-for": ip, ...auth },
       data: {
         doc_id: p.doc_id,
         title: fakePdfName,
@@ -512,9 +519,10 @@ test.describe("attack simulation", () => {
 
   test("upload complete rejects PDFs that exceed max page policy", async ({ request }) => {
     const auth = authHeadersFromEnv();
+    const ip = isolatedIp("upload-too-many-pages");
     if (!auth) {
       const blocked = await request.post("/api/admin/upload/presign", {
-        headers: { "content-type": "application/json" },
+        headers: { "content-type": "application/json", "x-forwarded-for": ip },
         data: {
           title: "blocked.pdf",
           filename: "blocked.pdf",
@@ -523,7 +531,7 @@ test.describe("attack simulation", () => {
           encrypt: true,
         },
       });
-      expect([401, 403, 500]).toContain(blocked.status());
+      expect([401, 403, 429, 500]).toContain(blocked.status());
       return;
     }
 
@@ -536,6 +544,7 @@ test.describe("attack simulation", () => {
     const p = await presignUpload(request, auth, {
       filename: fakePdfName,
       sizeBytes: pseudoPdf.length,
+      forwardedFor: ip,
     });
     if (p.forbidden) {
       expect(p.forbidden).toBeTruthy();
@@ -561,7 +570,7 @@ test.describe("attack simulation", () => {
     expect(put.status()).toBeLessThan(300);
 
     const complete = await request.post("/api/admin/upload/complete", {
-      headers: { "content-type": "application/json", ...auth },
+      headers: { "content-type": "application/json", "x-forwarded-for": ip, ...auth },
       data: {
         doc_id: p.doc_id,
         title: fakePdfName,
