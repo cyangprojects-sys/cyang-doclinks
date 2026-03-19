@@ -1,425 +1,160 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import {
+  CTAGroup,
+  Eyebrow,
+  Lead,
+  MaturityBadge,
+  PremiumCard,
+  PrinciplesGrid,
+  Section,
+  SectionHeader,
+} from "../components/PublicPrimitives";
 import { SiteShell } from "../components/SiteShell";
-import { getPublicRuntimeConfig } from "@/lib/publicRuntimeConfig";
 
 export const revalidate = 900;
 
 export const metadata: Metadata = {
   title: "About - cyang.io",
   description:
-    "About cyang.io and Chang Yang: founder-led, security-first product systems with enforced controls, operational clarity, and customer-ready software.",
+    "A disciplined home for practical software: founder-led products, systems thinking, and security-conscious engineering by cyang.io.",
 };
 
-type Item = {
-  title: string;
-  body: string;
-};
-
-type FocusItem = {
-  title: string;
-  status: "Live" | "Shipping" | "Hardening";
-  body: string;
-};
-
-const HERO_CHIPS = [
-  "Security-first architecture",
-  "Enforcement in code",
-  "Operational clarity",
-  "Audit-minded systems",
-];
-
-const WHAT_IS_ITEMS: Item[] = [
+const WHAT_IS = [
   {
-    title: "Product portfolio",
-    body: "cyang.io is a focused portfolio of products and systems built for practical, real-world workflows.",
+    title: "Products",
+    body: "Software with a clear operating job, flagship-level focus, and room to mature without sprawl.",
+    microcopy: "Built to stay useful.",
   },
   {
-    title: "Build surface",
-    body: "It is where new software is designed, pressure-tested, and hardened for customer trust.",
+    title: "Systems",
+    body: "Operational layers for trust, governance, and public clarity that support the products around them.",
+    microcopy: "Structure matters.",
   },
   {
-    title: "Portfolio strategy",
-    body: "Doclinks is the first flagship product, with additional systems expanding from the same standards.",
+    title: "Security-first engineering",
+    body: "Important controls live in architecture and policy, not as optional afterthoughts.",
+    microcopy: "Boundaries stay enforceable.",
   },
 ];
 
-const BUILD_PRINCIPLES: Item[] = [
-  {
-    title: "Enforce policy server-side",
-    body: "Access decisions and lifecycle controls are enforced by architecture, not left to client behavior.",
-  },
-  {
-    title: "Encrypt by default",
-    body: "Sensitive data paths are protected by default rather than treated as optional configuration.",
-  },
-  {
-    title: "Block risky delivery states",
-    body: "Failed, infected, and quarantined states are blocked from external delivery.",
-  },
-  {
-    title: "Make operations reviewable",
-    body: "Systems are designed with clear states, deterministic policy behavior, and auditable event trails.",
-  },
+const PRINCIPLES = [
+  { title: "Practical software over hype", body: "The point is durable usefulness, not noise.", microcopy: "Signal before spectacle." },
+  { title: "Architecture-level controls", body: "Critical rules are enforced by the system.", microcopy: "Policy holds under pressure." },
+  { title: "Long-term stewardship", body: "Products are built to remain coherent as they grow.", microcopy: "Steady, not frantic." },
+  { title: "Calm execution", body: "A tighter roadmap leaves more room for quality.", microcopy: "Discipline compounds." },
+  { title: "Customer clarity", body: "People should understand what the system does and what it does not.", microcopy: "Readable by design." },
 ];
 
-const OPTIMIZE_FOR: Item[] = [
-  {
-    title: "Access boundaries",
-    body: "Reliable control over who can access what, when, and under which policy rules.",
-  },
-  {
-    title: "Visibility without leakage",
-    body: "Operational visibility should help teams review behavior without exposing sensitive data unnecessarily.",
-  },
-  {
-    title: "Fast, predictable UX",
-    body: "Security controls and usability should work together, not force tradeoffs in daily workflows.",
-  },
-  {
-    title: "Auditability and recovery",
-    body: "Systems should be straightforward to review, troubleshoot, and recover under pressure.",
-  },
-];
-
-const CURRENT_FOCUS: FocusItem[] = [
-  {
-    title: "Doclinks",
-    status: "Live",
-    body: "Scaling controlled external document delivery with stronger policy clarity and conversion paths.",
-  },
-  {
-    title: "Upload hardening",
-    status: "Hardening",
-    body: "Tightening file validation and delivery guardrails so risky states never become accidental exposure.",
-  },
-  {
-    title: "Operations and observability",
-    status: "Shipping",
-    body: "Improving governance and operational visibility to keep security posture clear and manageable.",
-  },
-];
-
-const ENFORCEMENTS: Item[] = [
-  {
-    title: "No unencrypted serve path",
-    body: "Public delivery does not bypass encrypted handling paths.",
-  },
-  {
-    title: "Blocked risky file states",
-    body: "Failed, infected, or quarantined files are blocked from delivery.",
-  },
-  {
-    title: "Server-side plan limits",
-    body: "Usage boundaries are enforced by the backend rather than UI hints.",
-  },
-  {
-    title: "Rate limits and abuse protection",
-    body: "Upload and access paths are guarded to reduce misuse and brute-force behavior.",
-  },
+const ROADMAP = [
+  { title: "Flagship products", body: "Doclinks leads today, with future products earning their place through the same standard.", tone: "live" as const },
+  { title: "Trust systems", body: "Public status, policy, legal, and procurement pathways continue to tighten as a unified shell.", tone: "build" as const },
+  { title: "Adjacent workflow tools", body: "Expansion stays focused on practical, high-trust workflow software.", tone: "lab" as const },
 ];
 
 export default function AboutPage() {
-  const publicConfig = getPublicRuntimeConfig();
-  const showPricingUi = publicConfig.showPricingUi;
-
   return (
-    <SiteShell maxWidth="full" publicConfig={publicConfig}>
-      <section className="relative mt-10 grid gap-6 lg:grid-cols-12 lg:items-end">
-        <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
-          <div className="absolute -left-16 top-0 h-72 w-72 rounded-full bg-sky-400/12 blur-3xl" />
-          <div className="absolute right-0 top-8 h-80 w-80 rounded-full bg-teal-300/12 blur-3xl" />
-        </div>
+    <SiteShell maxWidth="full">
+      <Section className="pt-8 sm:pt-12">
+        <SectionHeader
+          eyebrow="About cyang.io"
+          title="A disciplined home for practical software."
+          body="cyang.io is a founder-led product studio for secure workflows, operational clarity, and systems that stay legible as they grow."
+        />
+      </Section>
 
-        <div className="lg:col-span-7">
-          <span className="ui-badge inline-flex rounded-full px-3 py-1 text-xs uppercase tracking-[0.16em]">About cyang.io</span>
-          <h1 className="font-editorial mt-5 max-w-4xl text-4xl leading-[1.04] tracking-tight text-white sm:text-5xl lg:text-6xl">
-            Founder-led systems and products
-            <span className="block text-white/72">built for trust under real usage.</span>
-          </h1>
-          <p className="mt-7 max-w-3xl text-base leading-relaxed text-white/72 sm:text-lg">
-            I am Chang Yang. cyang.io is the software brand I lead for security-first products and operational systems.
-            The goal is simple: build useful software with strict defaults, clear control surfaces, and dependable user experience.
-          </p>
-
-          <div className="mt-7 flex flex-wrap gap-2">
-            {HERO_CHIPS.map((chip) => (
-              <span key={chip} className="ui-badge rounded-full px-3 py-1.5 text-xs">
-                {chip}
-              </span>
-            ))}
-          </div>
-
-          <div className="mt-9 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-            <Link href="/projects" className="btn-base btn-primary rounded-xl px-6 py-3 text-sm font-semibold">
-              Explore projects
-            </Link>
-            <Link href="/projects/doclinks" className="btn-base btn-secondary rounded-xl px-6 py-3 text-sm">
-              See Doclinks
-            </Link>
-            <Link href="/contact" className="btn-base btn-secondary rounded-xl px-6 py-3 text-sm">
-              Get in touch
-            </Link>
-          </div>
-        </div>
-
-        <div className="lg:col-span-5">
-          <div className="glass-card-strong rounded-3xl p-6">
-            <div className="text-xs uppercase tracking-[0.14em] text-white/55">Founder snapshot</div>
-            <h2 className="mt-2 text-2xl font-semibold tracking-tight text-white">Chang Yang</h2>
-            <p className="mt-3 text-sm leading-relaxed text-white/70">
-              Building with a high-conviction standard: if controls are critical, they should be enforced in code.
-            </p>
-
-            <div className="mt-5 space-y-3">
-              <StackCard title="Secure delivery" body="Policy-enforced access paths, not trust-by-URL." />
-              <StackCard title="Operational controls" body="Clear limits, deterministic states, and audit-minded workflows." />
-              <StackCard title="Product quality" body="Fast UX, practical defaults, and maintainable architecture." />
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section id="what-is" className="mt-16 md:mt-20">
-        <SectionIntro
+      <Section>
+        <SectionHeader
           eyebrow="What cyang.io is"
-          title="A focused portfolio for serious product systems"
-          body="cyang.io is a portfolio and build surface for practical software. It is intentionally compact, actively maintained, and designed to scale quality before scope."
+          title="A portfolio built around products, systems, and engineering discipline."
+          body="The company structure is simple on purpose: a flagship product, a visible trust architecture, and room for adjacent tools to emerge without clutter."
         />
+        <div className="mt-8">
+          <PrinciplesGrid items={WHAT_IS} />
+        </div>
+      </Section>
 
-        <div className="mt-8 grid gap-4 md:grid-cols-3">
-          {WHAT_IS_ITEMS.map((item) => (
-            <FeatureCard key={item.title} title={item.title} body={item.body} />
+      <Section>
+        <SectionHeader
+          eyebrow="Operating principles"
+          title="The working philosophy behind the site and the products."
+          body="These are the standards that shape public copy, interface decisions, and product architecture."
+        />
+        <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+          {PRINCIPLES.map((item) => (
+            <PremiumCard key={item.title} className="h-full">
+              <div className="text-2xl font-semibold tracking-tight text-white">{item.title}</div>
+              <Lead className="mt-4 text-base">{item.body}</Lead>
+              <div className="mt-6 text-xs uppercase tracking-[0.18em] text-white/38">{item.microcopy}</div>
+            </PremiumCard>
           ))}
         </div>
-      </section>
+      </Section>
 
-      <section id="why-exists" className="mt-16 md:mt-20">
-        <SectionIntro
-          eyebrow="Why this exists"
-          title="A response to weak defaults around sensitive sharing"
-          body="Sensitive documents are often shared in workflows that assume good behavior instead of enforcing safe behavior. cyang.io exists to replace that fragility with deliberate system controls."
-        />
+      <Section>
+        <div className="grid gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
+          <PremiumCard strong className="flex flex-col items-center justify-center text-center">
+            <div className="grid h-28 w-28 place-items-center rounded-[2rem] border border-white/12 bg-white/[0.05] text-3xl font-semibold tracking-[0.08em] text-white">
+              CY
+            </div>
+            <div className="mt-5 text-xl font-semibold text-white">Chang Yang</div>
+            <div className="mt-2 text-sm text-white/58">Founder and builder</div>
+          </PremiumCard>
 
-        <div className="mt-8 grid gap-4 lg:grid-cols-12">
-          <div className="glass-card rounded-3xl p-6 lg:col-span-7">
-            <h3 className="text-lg font-semibold tracking-tight text-white">Founder rationale</h3>
-            <p className="mt-3 text-sm leading-relaxed text-white/70">
-              I kept seeing critical files handled with broad-access links, unclear ownership, and limited accountability.
-              That pattern is fast in the short term, but risky in the long term.
+          <PremiumCard>
+            <Eyebrow>Founder band</Eyebrow>
+            <h2 className="mt-4 text-3xl font-semibold tracking-[-0.03em] text-white sm:text-4xl">
+              Building software that stays clear under operational pressure.
+            </h2>
+            <Lead className="mt-4 max-w-2xl">
+              The cyang.io direction is deliberately narrow: build useful products, enforce important boundaries at the
+              system layer, and make trust easy to review from the public site down.
+            </Lead>
+            <p className="mt-6 max-w-2xl text-sm leading-7 text-white/64">
+              Doclinks is the flagship proof of that approach. More products can grow from this foundation, but only if
+              the site, the trust posture, and the product system remain coherent.
             </p>
-            <p className="mt-3 text-sm leading-relaxed text-white/70">
-              cyang.io is built around a different posture: enforce policy at the system layer, keep operation legible,
-              and give teams practical tools that still feel fast and human.
+          </PremiumCard>
+        </div>
+      </Section>
+
+      <Section>
+        <SectionHeader
+          eyebrow="Future direction"
+          title="A high-level roadmap with room to stay disciplined."
+          body="The next stage is not about breadth for its own sake. It is about extending a strong foundation into adjacent practical tools."
+        />
+        <div className="mt-8 grid gap-4 md:grid-cols-3">
+          {ROADMAP.map((item) => (
+            <PremiumCard key={item.title} className="h-full">
+              <div className="flex items-center justify-between gap-4">
+                <div className="text-xl font-semibold text-white">{item.title}</div>
+                <MaturityBadge tone={item.tone}>{item.tone === "live" ? "Active" : item.tone === "build" ? "Growing" : "Future"}</MaturityBadge>
+              </div>
+              <Lead className="mt-4 text-base">{item.body}</Lead>
+            </PremiumCard>
+          ))}
+        </div>
+      </Section>
+
+      <Section>
+        <PremiumCard strong className="grid gap-6 lg:grid-cols-[1fr_auto] lg:items-center">
+          <div>
+            <h2 className="text-3xl font-semibold tracking-[-0.03em] text-white sm:text-4xl">
+              Explore the portfolio or get in touch.
+            </h2>
+            <p className="mt-4 max-w-2xl text-base leading-8 text-white/66">
+              The public site is built to make the structure clear quickly: flagship product, trust-first platform, and
+              a company that intends to keep both coherent.
             </p>
           </div>
-
-          <div className="glass-card-strong rounded-3xl p-6 lg:col-span-5">
-            <h3 className="text-lg font-semibold tracking-tight text-white">Design response</h3>
-            <ul className="mt-4 space-y-2">
-              <Bullet>Security defaults are non-negotiable.</Bullet>
-              <Bullet>Ambiguous features ship with guardrails or do not ship.</Bullet>
-              <Bullet>Operational clarity is treated as a product requirement.</Bullet>
-              <Bullet>Trust is built through deterministic behavior, not claims.</Bullet>
-            </ul>
-          </div>
-        </div>
-      </section>
-
-      <section id="how-i-build" className="mt-16 md:mt-20">
-        <SectionIntro
-          eyebrow="How I build"
-          title="Core engineering principles"
-          body="These principles are applied in production decisions, not kept as abstract guidelines."
-        />
-
-        <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {BUILD_PRINCIPLES.map((item) => (
-            <FeatureCard key={item.title} title={item.title} body={item.body} />
-          ))}
-        </div>
-      </section>
-
-      <section id="optimize-for" className="mt-16 md:mt-20">
-        <SectionIntro
-          eyebrow="What I optimize for"
-          title="Product priorities that affect customers directly"
-          body="Every architecture decision is evaluated against operational reliability and day-to-day user outcomes."
-        />
-
-        <div className="mt-8 grid gap-4 sm:grid-cols-2">
-          {OPTIMIZE_FOR.map((item) => (
-            <FeatureCard key={item.title} title={item.title} body={item.body} />
-          ))}
-        </div>
-      </section>
-
-      <section id="current-focus" className="mt-16 md:mt-20">
-        <SectionIntro
-          eyebrow="Current focus"
-          title="What is actively being built"
-          body="The current roadmap is compact and deliberate, with Doclinks as the flagship proof of the cyang.io build philosophy."
-        />
-
-        <div className="mt-8 grid gap-4 md:grid-cols-3">
-          {CURRENT_FOCUS.map((item) => (
-            <FocusCard key={item.title} title={item.title} status={item.status} body={item.body} />
-          ))}
-        </div>
-      </section>
-
-      <section id="enforced-controls" className="mt-16 md:mt-20">
-        <SectionIntro
-          eyebrow="What this platform enforces"
-          title="Production controls that build trust"
-          body="These are active controls in the product, designed to reduce risk and make behavior predictable."
-        />
-
-        <div className="mt-8 grid gap-4 sm:grid-cols-2">
-          {ENFORCEMENTS.map((item) => (
-            <ControlCard key={item.title} title={item.title} body={item.body} />
-          ))}
-        </div>
-      </section>
-
-      <section id="flagship" className="mt-16 md:mt-20">
-        <div className="glass-card-strong ui-enterprise-grid rounded-3xl p-7 sm:p-8">
-          <SectionIntro
-            eyebrow="Flagship project"
-            title="Doclinks is the clearest example of this build standard"
-            body="Doclinks puts the cyang.io philosophy into production: controlled external delivery, policy enforcement, audit visibility, and practical UX."
+          <CTAGroup
+            actions={[
+              { href: "/products", label: "Explore products", tone: "primary" },
+              { href: "/contact", label: "Contact", tone: "secondary" },
+            ]}
           />
-
-          <div className="mt-7 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <MiniPill label="Controlled sharing" />
-            <MiniPill label="Server-side policy checks" />
-            <MiniPill label="Scan-gated delivery" />
-            <MiniPill label="Audit-minded workflow" />
-          </div>
-
-          <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-            <Link href="/projects/doclinks" className="btn-base btn-primary rounded-xl px-6 py-3 text-sm font-semibold">
-              Explore Doclinks
-            </Link>
-            <Link href="/projects" className="btn-base btn-secondary rounded-xl px-6 py-3 text-sm">
-              Browse all projects
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      <section id="built-deliberately" className="mt-16 md:mt-20">
-        <div className="glass-card rounded-3xl p-7">
-          <SectionIntro
-            eyebrow="Built deliberately"
-            title="Clear systems, enforceable policy, and no ambiguous defaults"
-            body="If a feature changes risk posture, it should be explicit, reviewable, and bounded by guardrails. That standard is how cyang.io products are designed and shipped."
-          />
-        </div>
-      </section>
-
-      <section className="mt-16 mb-2 md:mt-20">
-        <div className="glass-card-strong ui-sheen rounded-3xl p-7 sm:p-8">
-          <h2 className="text-3xl font-semibold tracking-tight text-white sm:text-4xl">Explore what cyang.io is building</h2>
-          <p className="mt-3 max-w-3xl text-sm leading-relaxed text-white/72">
-            Start with the project portfolio, review the Doclinks flagship, and follow the same standards through pricing and support paths.
-          </p>
-
-          <div className="mt-7 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <CtaTile href="/projects" title="Browse projects" body="See the current product portfolio." />
-            <CtaTile href="/projects/doclinks" title="Explore Doclinks" body="Review the flagship product in depth." />
-            {showPricingUi ? (
-              <CtaTile href="/pricing" title="View pricing" body="Compare plans and capability levels." />
-            ) : (
-              <CtaTile href="/status" title="View status" body="Check service health and operations." />
-            )}
-            <CtaTile href="/contact" title="Get in touch" body="Contact for product, business, or support questions." />
-          </div>
-        </div>
-      </section>
+        </PremiumCard>
+      </Section>
     </SiteShell>
-  );
-}
-
-function SectionIntro(props: { eyebrow: string; title: string; body: string }) {
-  return (
-    <div className="max-w-4xl">
-      <span className="ui-badge inline-flex rounded-full px-3 py-1 text-xs uppercase tracking-[0.15em]">{props.eyebrow}</span>
-      <h2 className="mt-4 text-3xl font-semibold tracking-tight text-white sm:text-4xl">{props.title}</h2>
-      <p className="mt-3 text-sm leading-relaxed text-white/72 sm:text-base">{props.body}</p>
-    </div>
-  );
-}
-
-function StackCard(props: { title: string; body: string }) {
-  return (
-    <div className="rounded-2xl border border-white/12 bg-black/25 p-4">
-      <div className="text-xs uppercase tracking-[0.1em] text-white/55">{props.title}</div>
-      <div className="mt-1 text-sm text-white/82">{props.body}</div>
-    </div>
-  );
-}
-
-function FeatureCard(props: { title: string; body: string }) {
-  return (
-    <div className="glass-card rounded-3xl p-6">
-      <h3 className="text-lg font-semibold tracking-tight text-white">{props.title}</h3>
-      <p className="mt-2 text-sm leading-relaxed text-white/70">{props.body}</p>
-    </div>
-  );
-}
-
-function Bullet({ children }: { children: React.ReactNode }) {
-  return (
-    <li className="flex gap-2 text-sm leading-relaxed text-white/70">
-      <span className="mt-2 h-1.5 w-1.5 flex-none rounded-full bg-sky-200/70" />
-      <span>{children}</span>
-    </li>
-  );
-}
-
-function FocusCard(props: { title: string; status: FocusItem["status"]; body: string }) {
-  const statusTone: Record<FocusItem["status"], string> = {
-    Live: "border-emerald-200/30 bg-emerald-300/10 text-emerald-100",
-    Shipping: "border-sky-200/30 bg-sky-300/10 text-sky-100",
-    Hardening: "border-amber-200/30 bg-amber-300/10 text-amber-100",
-  };
-
-  return (
-    <div className="glass-card rounded-3xl p-6">
-      <div className="flex items-start justify-between gap-3">
-        <h3 className="text-lg font-semibold tracking-tight text-white">{props.title}</h3>
-        <span className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-medium ${statusTone[props.status]}`}>
-          {props.status}
-        </span>
-      </div>
-      <p className="mt-3 text-sm leading-relaxed text-white/70">{props.body}</p>
-    </div>
-  );
-}
-
-function ControlCard(props: { title: string; body: string }) {
-  return (
-    <div className="glass-card-strong rounded-3xl p-6">
-      <h3 className="text-lg font-semibold tracking-tight text-white">{props.title}</h3>
-      <p className="mt-2 text-sm leading-relaxed text-white/70">{props.body}</p>
-    </div>
-  );
-}
-
-function MiniPill({ label }: { label: string }) {
-  return (
-    <div className="rounded-2xl border border-white/12 bg-black/25 p-4 text-sm font-medium text-white/90">
-      {label}
-    </div>
-  );
-}
-
-function CtaTile(props: { href: string; title: string; body: string }) {
-  return (
-    <Link href={props.href} className="rounded-2xl border border-white/14 bg-white/8 p-4 transition-colors hover:bg-white/14">
-      <div className="text-sm font-medium text-white/92">{props.title}</div>
-      <p className="mt-1 text-xs leading-relaxed text-white/67">{props.body}</p>
-    </Link>
   );
 }

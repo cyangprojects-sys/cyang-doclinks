@@ -1,42 +1,67 @@
 @import "tailwindcss";
 
 :root {
-  --background: #06080f;
-  --foreground: #edf2ff;
-  --muted: #95a1b8;
-  --card: rgba(13, 18, 31, 0.78);
-  --card-strong: rgba(13, 18, 31, 0.9);
-  --line: rgba(159, 175, 208, 0.19);
-  --line-strong: rgba(168, 186, 223, 0.35);
-  --shadow-soft: 0 20px 54px rgba(0, 0, 0, 0.46);
-  --accent: #6fa7ff;
-  --accent-2: #4fd5cb;
-  --premium: #e8c27a;
-  --premium-2: #f3d7a1;
+  --background-primary: #05070b;
+  --background-secondary: #0b1017;
+  --background-tertiary: #101720;
+  --surface-elevated: rgba(17, 23, 33, 0.72);
+  --surface-strong: rgba(13, 18, 26, 0.9);
+  --surface-soft: rgba(255, 255, 255, 0.04);
+  --text-primary: #f4f2ee;
+  --text-secondary: #aab3c0;
+  --text-muted: #7e8795;
+  --accent-primary: #7ec2ff;
+  --accent-secondary: #8fe2d9;
+  --accent-warm: #d3b57b;
+  --accent-glow: rgba(126, 194, 255, 0.18);
+  --border-subtle: rgba(170, 186, 209, 0.14);
+  --border-strong: rgba(192, 210, 232, 0.23);
+  --shadow-soft: 0 30px 80px rgba(0, 0, 0, 0.38);
+  --shadow-strong: 0 40px 120px rgba(0, 0, 0, 0.48);
   --font-geist-sans: "Avenir Next", "Segoe UI", "Helvetica Neue", Arial, ui-sans-serif, system-ui, sans-serif;
   --font-geist-mono: "JetBrains Mono", "SFMono-Regular", Menlo, Consolas, ui-monospace, monospace;
   --font-editorial: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, "Times New Roman", serif;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-background: var(--background-primary);
+  --color-foreground: var(--text-primary);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
+* {
+  box-sizing: border-box;
+}
+
+html {
+  color-scheme: dark;
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
+  margin: 0;
+  min-height: 100vh;
+  background:
+    radial-gradient(72rem 30rem at 12% -8%, rgba(78, 132, 198, 0.15), transparent 60%),
+    radial-gradient(66rem 26rem at 88% 0%, rgba(74, 177, 167, 0.11), transparent 58%),
+    linear-gradient(180deg, #0a0f16 0%, #070a11 32%, #05070b 100%);
+  color: var(--text-primary);
   font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-image:
-    radial-gradient(72rem 36rem at -2% -6%, rgba(84, 132, 220, 0.14), transparent 62%),
-    radial-gradient(68rem 34rem at 104% -10%, rgba(90, 210, 198, 0.11), transparent 64%),
-    linear-gradient(180deg, #090d18 0%, #060910 38%, #05070c 100%);
-  background-attachment: fixed;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
 }
 
 code,
@@ -46,108 +71,162 @@ samp {
   font-family: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
-.app-shell {
-  position: relative;
-}
-
-.app-shell::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  background: radial-gradient(70rem 22rem at 50% -6%, rgba(112, 152, 238, 0.08), transparent 72%);
-}
-
-.marketing-shell {
-  position: relative;
-}
-
-.marketing-shell::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  background-image:
-    radial-gradient(50rem 20rem at 10% 0%, rgba(122, 158, 225, 0.1), transparent 72%),
-    radial-gradient(56rem 22rem at 95% 8%, rgba(86, 205, 189, 0.1), transparent 72%);
-}
-
-.glass-card {
-  border: 1px solid var(--line);
-  background: var(--card);
-  box-shadow: var(--shadow-soft), inset 0 1px 0 rgba(230, 237, 255, 0.05);
-  backdrop-filter: blur(8px);
-}
-
-.glass-card-strong {
-  border: 1px solid var(--line-strong);
-  background: var(--card-strong);
-  box-shadow: var(--shadow-soft), inset 0 1px 0 rgba(230, 237, 255, 0.06);
-  backdrop-filter: blur(10px);
-}
-
-.ui-badge {
-  border: 1px solid var(--line);
-  background: rgba(120, 142, 176, 0.12);
-  color: #d4def2;
-}
-
-.ui-premium {
-  border: 1px solid color-mix(in oklab, var(--premium), #fff 22%);
-  background: linear-gradient(130deg, color-mix(in oklab, var(--premium), #000 78%), color-mix(in oklab, var(--premium-2), #000 86%));
-  color: #1d1405;
+:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent-primary) 78%, white 22%);
+  outline-offset: 3px;
 }
 
 .font-editorial {
   font-family: var(--font-editorial), "Times New Roman", serif;
 }
 
+.app-shell,
+.marketing-shell {
+  position: relative;
+}
+
+.marketing-shell::before,
+.marketing-shell::after,
+.app-shell::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+
+.marketing-shell::before {
+  background:
+    radial-gradient(48rem 18rem at 50% -8%, rgba(126, 194, 255, 0.12), transparent 72%),
+    radial-gradient(38rem 18rem at 8% 12%, rgba(126, 194, 255, 0.08), transparent 72%),
+    radial-gradient(42rem 20rem at 92% 8%, rgba(143, 226, 217, 0.08), transparent 74%);
+}
+
+.marketing-shell::after {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.015) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.015) 1px, transparent 1px);
+  background-size: 96px 96px;
+  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.32), transparent 78%);
+}
+
+.app-shell::before {
+  background: radial-gradient(60rem 24rem at 50% -8%, rgba(126, 194, 255, 0.08), transparent 72%);
+}
+
+.surface-panel {
+  border: 1px solid var(--border-subtle);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 26%),
+    var(--surface-elevated);
+  box-shadow: var(--shadow-soft), inset 0 1px 0 rgba(255, 255, 255, 0.035);
+  backdrop-filter: blur(18px) saturate(140%);
+}
+
+.surface-panel-strong {
+  border: 1px solid var(--border-strong);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.045), transparent 24%),
+    var(--surface-strong);
+  box-shadow: var(--shadow-strong), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(20px) saturate(140%);
+}
+
+.surface-panel-soft {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--surface-soft);
+}
+
+.glass-card {
+  border: 1px solid var(--border-subtle);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 26%),
+    var(--surface-elevated);
+  box-shadow: var(--shadow-soft), inset 0 1px 0 rgba(255, 255, 255, 0.035);
+  backdrop-filter: blur(18px) saturate(140%);
+}
+
+.glass-card-strong {
+  border: 1px solid var(--border-strong);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.045), transparent 24%),
+    var(--surface-strong);
+  box-shadow: var(--shadow-strong), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(20px) saturate(140%);
+}
+
+.ui-badge {
+  border: 1px solid rgba(173, 189, 214, 0.16);
+  background: rgba(111, 138, 174, 0.1);
+  color: rgba(235, 241, 250, 0.86);
+}
+
 .btn-base {
-  transition: background-color 180ms ease, border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease, color 180ms ease;
+  transition:
+    transform 180ms ease,
+    background-color 180ms ease,
+    border-color 180ms ease,
+    color 180ms ease,
+    box-shadow 180ms ease;
 }
 
 .btn-base:hover {
   transform: translateY(-1px);
 }
 
+.btn-base:active {
+  transform: translateY(0);
+}
+
 .btn-primary {
-  border: 1px solid rgba(145, 186, 250, 0.45);
-  background: linear-gradient(138deg, rgba(96, 141, 240, 0.94), rgba(78, 197, 189, 0.9));
-  color: #061120;
-  box-shadow: 0 10px 30px rgba(39, 98, 194, 0.35);
+  border: 1px solid rgba(141, 203, 255, 0.48);
+  background: linear-gradient(135deg, rgba(126, 194, 255, 0.92), rgba(143, 226, 217, 0.86));
+  color: #06131d;
+  box-shadow: 0 18px 46px rgba(70, 138, 216, 0.28);
 }
 
 .btn-primary:hover {
-  box-shadow: 0 14px 34px rgba(37, 106, 201, 0.42);
+  box-shadow: 0 22px 54px rgba(70, 138, 216, 0.34);
 }
 
 .btn-secondary {
-  border: 1px solid var(--line);
-  background: rgba(123, 145, 189, 0.1);
-  color: #e8efff;
+  border: 1px solid var(--border-subtle);
+  background: rgba(255, 255, 255, 0.035);
+  color: var(--text-primary);
 }
 
 .btn-secondary:hover {
-  border-color: var(--line-strong);
-  background: rgba(127, 149, 190, 0.18);
+  border-color: var(--border-strong);
+  background: rgba(255, 255, 255, 0.07);
 }
 
-.btn-danger {
-  border: 1px solid rgba(248, 113, 113, 0.35);
-  background: rgba(127, 29, 29, 0.35);
-  color: #fecaca;
+.btn-ghost {
+  border: 1px solid transparent;
+  background: transparent;
+  color: rgba(244, 242, 238, 0.76);
 }
 
-.btn-danger:hover {
-  border-color: rgba(252, 165, 165, 0.5);
-  background: rgba(153, 27, 27, 0.5);
+.btn-ghost:hover {
+  border-color: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-primary);
+}
+
+.text-balance {
+  text-wrap: balance;
+}
+
+.hero-grid {
+  background-image:
+    linear-gradient(to right, rgba(255, 255, 255, 0.045) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+  background-size: 42px 42px;
 }
 
 .ui-enterprise-grid {
   background-image:
-    linear-gradient(to right, rgba(171, 192, 233, 0.08) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(171, 192, 233, 0.07) 1px, transparent 1px);
-  background-size: 28px 28px;
+    linear-gradient(to right, rgba(255, 255, 255, 0.045) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+  background-size: 34px 34px;
 }
 
 .ui-sheen {
@@ -160,13 +239,38 @@ samp {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background: linear-gradient(108deg, transparent 36%, rgba(233, 243, 255, 0.08) 50%, transparent 66%);
+  background: linear-gradient(108deg, transparent 34%, rgba(255, 255, 255, 0.06) 50%, transparent 67%);
+}
+
+.premium-divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(173, 189, 214, 0.28), transparent);
+}
+
+.policy-prose {
+  color: rgba(244, 242, 238, 0.84);
+}
+
+.policy-prose a {
+  color: rgba(226, 236, 249, 0.94);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.policy-prose strong {
+  color: var(--text-primary);
+}
+
+.policy-prose hr {
+  margin-block: 2rem;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .btn-base,
-  .ui-sheen::after {
-    transition: none !important;
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
     animation: none !important;
+    transition-duration: 0ms !important;
   }
 }
