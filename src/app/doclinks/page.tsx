@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
-import { DoclinksPageView } from "../../components/DoclinksPageView";
-import { SiteShell } from "../../components/SiteShell";
+import { DoclinksPageView } from "../components/DoclinksPageView";
+import { SiteShell } from "../components/SiteShell";
 import { getPublicRuntimeConfig } from "@/lib/publicRuntimeConfig";
 
 export const revalidate = 900;
@@ -14,7 +14,7 @@ export const metadata: Metadata = {
   },
 };
 
-export default function LegacyDoclinksPage() {
+export default function DoclinksPage() {
   const publicConfig = getPublicRuntimeConfig();
 
   return (

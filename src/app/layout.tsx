@@ -8,12 +8,12 @@ export const metadata: Metadata = {
     template: "%s · cyang.io",
   },
   description:
-    "Security-first document delivery and practical software systems by cyang.io.",
+    "Premium secure workflow software by cyang.io, with Doclinks as the flagship and trust built into the public operating shell.",
   metadataBase: new URL("https://cyang.io"),
   openGraph: {
     title: "cyang.io",
     description:
-      "Security-first document sharing infrastructure and practical systems design.",
+      "Premium secure workflow software, disciplined product systems, and trust-centered public architecture.",
     url: "https://cyang.io",
     siteName: "cyang.io",
     type: "website",
@@ -22,7 +22,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "cyang.io",
     description:
-      "Security-first document sharing infrastructure by cyang.io.",
+      "Premium secure workflow software by cyang.io.",
   },
 };
 

@@ -1,187 +1,234 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { ScrollRevealFrame } from "@/app/components/CinematicClient";
+import { AmbientScene, SectionTransition, StoryBand, VisualSignalCluster } from "@/app/components/CinematicScene";
+import {
+  CTAGroup,
+  ContentRail,
+  DocumentIndexList,
+  Eyebrow,
+  LinkTile,
+  PremiumCard,
+  Section,
+} from "@/app/components/PublicPrimitives";
 import { SiteShell } from "@/app/components/SiteShell";
 
 export const metadata: Metadata = {
-  title: "Trust Center - cyang.io",
+  title: "Trust - cyang.io",
   description:
-    "Security, privacy, legal, reliability, and reporting resources for cyang.io and Doclinks.",
+    "Trust, made reviewable: security, privacy, legal, status, procurement, and disclosure surfaces for cyang.io and Doclinks.",
 };
 
-const TRUST_FACTS = [
-  "Security controls are enforced server-side.",
-  "Files are delivered only after security checks pass.",
-  "Legal and policy documents are publicly available.",
-  "Status and incident communication are transparent.",
+const PILLARS = [
+  {
+    href: "/legal/security-policy",
+    title: "Security",
+    body: "Customer-facing controls, operating posture, and security review context.",
+    meta: "Controls",
+  },
+  {
+    href: "/privacy",
+    title: "Privacy",
+    body: "Data handling, retention expectations, and how privacy requests are routed.",
+    meta: "Data handling",
+  },
+  {
+    href: "/legal",
+    title: "Legal",
+    body: "Terms, processor commitments, acceptable use boundaries, and supporting policy references.",
+    meta: "Policies",
+  },
+  {
+    href: "/status",
+    title: "Status",
+    body: "Operational health, public incident visibility, and service continuity signals.",
+    meta: "Operations",
+  },
+  {
+    href: "/trust/procurement",
+    title: "Procurement",
+    body: "A buyer-ready route into review materials, diligence context, and follow-up paths.",
+    meta: "Buyer review",
+  },
+  {
+    href: "/security-disclosure",
+    title: "Responsible Disclosure",
+    body: "Clear expectations for vulnerability reporting and private coordination.",
+    meta: "Disclosure",
+  },
 ];
 
-const TRUST_LINKS = [
-  {
-    title: "Security overview",
-    body: "Platform security posture, controls, and disclosure expectations.",
-    href: "/legal/security-policy",
-  },
-  {
-    title: "Legal Center",
-    body: "Terms, privacy, data processing, and platform policy documentation.",
-    href: "/legal",
-  },
-  {
-    title: "Privacy Policy",
-    body: "How personal data is collected, used, and protected.",
-    href: "/privacy",
-  },
-  {
-    title: "Data Processing Addendum",
-    body: "Controller/processor terms for business and procurement review.",
-    href: "/legal/data-processing-addendum",
-  },
-  {
-    title: "Service Level Agreement",
-    body: "Paid-plan uptime commitment and service credit process.",
-    href: "/legal/service-level-agreement",
-  },
-  {
-    title: "Subprocessors",
-    body: "Current vendors and processing purposes for service operations.",
-    href: "/legal/subprocessors",
-  },
-  {
-    title: "Status",
-    body: "Live service health, incident updates, and reliability signals.",
-    href: "/status",
-  },
-  {
-    title: "Report abuse",
-    body: "Report malware, phishing, policy abuse, or suspicious sharing behavior.",
-    href: "/report",
-  },
-  {
-    title: "Security disclosure",
-    body: "Responsible vulnerability reporting and response expectations.",
-    href: "/security-disclosure",
-  },
-  {
-    title: "Procurement trust package",
-    body: "Fast path for security, legal, and procurement document review.",
-    href: "/trust/procurement",
-  },
-  {
-    title: "Contact",
-    body: "Get in touch for support, procurement, and trust questions.",
-    href: "/contact",
-  },
+const PRINCIPLES = [
+  "Controls are enforced server-side rather than left to recipient behavior.",
+  "Scan-gated delivery blocks unsafe file states before public serving.",
+  "Bounded access and lifecycle constraints reduce stale exposure.",
+  "Public operating surfaces stay reviewable enough for serious diligence.",
+];
+
+const DOCUMENTS = [
+  { href: "/terms", title: "Terms", body: "Service agreement, account obligations, and commercial baseline." },
+  { href: "/privacy", title: "Privacy", body: "Data collection, usage, rights, and safeguards." },
+  { href: "/acceptable-use", title: "Acceptable Use", body: "Platform safety rules and abuse boundaries." },
+  { href: "/legal/data-processing-addendum", title: "DPA", body: "Controller and processor terms for business review." },
+  { href: "/legal/service-level-agreement", title: "SLA", body: "Availability commitments and service credit process." },
+  { href: "/legal/subprocessors", title: "Subprocessors", body: "Third-party processing transparency." },
+  { href: "/data-retention", title: "Data Retention", body: "Lifecycle and retention expectations." },
+  { href: "/legal/security-policy", title: "Security Policy", body: "Control summary and response posture." },
+  { href: "/security-disclosure", title: "Security Disclosure", body: "Responsible disclosure workflow." },
+  { href: "/report", title: "Abuse reporting", body: "Report malware, policy abuse, or suspicious sharing." },
 ];
 
 export default function TrustPage() {
   return (
     <SiteShell maxWidth="full">
-      <section className="relative mt-10 grid gap-6 lg:grid-cols-12 lg:items-end">
-        <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
-          <div className="absolute -left-16 top-0 h-72 w-72 rounded-full bg-sky-400/12 blur-3xl" />
-          <div className="absolute right-0 top-8 h-80 w-80 rounded-full bg-teal-300/10 blur-3xl" />
-        </div>
+      <section className="cinematic-bleed relative overflow-hidden pt-10 sm:pt-16 lg:pt-20">
+        <AmbientScene tone="steel" className="opacity-90" />
+        <ContentRail className="relative">
+          <div className="grid gap-8 lg:grid-cols-[minmax(0,1.06fr)_360px] lg:items-end">
+            <ScrollRevealFrame>
+              <div className="max-w-4xl">
+                <Eyebrow>Trust hub</Eyebrow>
+                <h1 className="mt-6 max-w-4xl text-balance font-editorial text-5xl leading-[0.95] tracking-[-0.05em] text-white sm:text-6xl lg:text-[5.4rem]">
+                  Trust, made reviewable.
+                </h1>
+                <p className="mt-6 max-w-2xl text-base leading-8 text-white/68 sm:text-lg">
+                  cyang.io makes its security, legal, privacy, status, and procurement surfaces legible enough for real
+                  evaluation instead of hiding them behind a sales process.
+                </p>
+                <CTAGroup
+                  className="mt-8"
+                  actions={[
+                    { href: "/status", label: "View Status", tone: "secondary" },
+                    { href: "/contact", label: "Contact", tone: "primary" },
+                  ]}
+                />
+              </div>
+            </ScrollRevealFrame>
 
-        <div className="lg:col-span-8">
-          <span className="ui-badge inline-flex rounded-full px-3 py-1 text-xs uppercase tracking-[0.16em]">
-            Trust Center
-          </span>
-          <h1 className="font-editorial mt-5 max-w-5xl text-4xl leading-[1.04] tracking-tight text-white sm:text-5xl lg:text-6xl">
-            Security, policy, and operational trust in one place.
-          </h1>
-          <p className="mt-7 max-w-3xl text-base leading-relaxed text-white/72 sm:text-lg">
-            Review the controls, commitments, and reporting routes behind cyang.io and Doclinks.
-            This center is designed for customers, buyers, and security evaluators who need clear trust evidence quickly.
-          </p>
-          <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-            <Link href="/legal" className="btn-base btn-primary rounded-xl px-6 py-3 text-sm font-semibold">
-              Open Legal Center
-            </Link>
-            <Link href="/status" className="btn-base btn-secondary rounded-xl px-6 py-3 text-sm">
-              View status
-            </Link>
-            <Link href="/trust/procurement" className="btn-base btn-secondary rounded-xl px-6 py-3 text-sm">
-              Procurement package
-            </Link>
-            <Link href="/contact" className="btn-base btn-secondary rounded-xl px-6 py-3 text-sm">
-              Contact
-            </Link>
-            <Link href="/report" className="btn-base btn-secondary rounded-xl px-6 py-3 text-sm">
-              Report abuse
-            </Link>
+            <ScrollRevealFrame delay={140}>
+              <VisualSignalCluster
+                title="Review posture"
+                items={[
+                  { label: "Security", value: "Server-enforced controls and public disclosure routing." },
+                  { label: "Legal", value: "Core policy surfaces preserved as first-class public references." },
+                  { label: "Operations", value: "Status, reporting, and procurement paths remain discoverable." },
+                ]}
+                className="min-h-[320px]"
+              />
+            </ScrollRevealFrame>
           </div>
-        </div>
-
-        <div className="lg:col-span-4">
-          <div className="glass-card-strong rounded-3xl p-6">
-            <div className="text-xs uppercase tracking-[0.14em] text-white/55">Trust highlights</div>
-            <ul className="mt-4 space-y-2">
-              {TRUST_FACTS.map((fact) => (
-                <li key={fact} className="flex gap-2 text-sm leading-relaxed text-white/72">
-                  <span className="mt-2 h-1.5 w-1.5 flex-none rounded-full bg-sky-200/70" />
-                  <span>{fact}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
+        </ContentRail>
       </section>
 
-      <section className="mt-16 md:mt-20">
-        <div className="max-w-4xl">
-          <span className="ui-badge inline-flex rounded-full px-3 py-1 text-xs uppercase tracking-[0.15em]">
-            Trust resources
-          </span>
-          <h2 className="mt-4 text-3xl font-semibold tracking-tight text-white sm:text-4xl">
-            Find the right trust document or workflow quickly.
-          </h2>
-          <p className="mt-3 text-sm leading-relaxed text-white/72 sm:text-base">
-            Use these customer-facing resources to review legal terms, evaluate security posture, monitor reliability, or escalate issues.
-          </p>
-        </div>
+      <SectionTransition label="Trust pillars" />
 
-        <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {TRUST_LINKS.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className="glass-card rounded-3xl p-6 transition-colors hover:bg-white/12"
-            >
-              <h3 className="text-lg font-semibold tracking-tight text-white">{item.title}</h3>
-              <p className="mt-2 text-sm leading-relaxed text-white/70">{item.body}</p>
-              <div className="mt-4 text-sm text-white/84">Open</div>
-            </Link>
-          ))}
-        </div>
-      </section>
+      <Section className="pt-4 sm:pt-8">
+        <ScrollRevealFrame>
+          <StoryBand
+            eyebrow="Six pillars"
+            title="Organized around the questions serious reviewers actually ask."
+            body="Each pillar leads to a concrete operating surface. The trust hub is not a brochure. It is a route map into the evidence, obligations, and current posture behind the product."
+            aside={
+              <div className="floating-stage relative min-h-[280px] overflow-hidden rounded-[2.4rem] border border-white/10 bg-white/[0.03] p-6">
+                <AmbientScene tone="signal" className="opacity-80" />
+                <div className="relative space-y-4">
+                  {["Security", "Privacy", "Legal", "Status", "Procurement", "Disclosure"].map((item, index) => (
+                    <div key={item} className="signal-row">
+                      <div className="signal-index">{String(index + 1).padStart(2, "0")}</div>
+                      <div className="text-sm text-white/78">{item}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            }
+          />
+        </ScrollRevealFrame>
 
-      <section className="mt-16 mb-2 md:mt-20">
-        <div className="glass-card rounded-3xl p-7 sm:p-8">
-          <h2 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">
-            Evaluating Doclinks for business use?
-          </h2>
-          <p className="mt-3 max-w-3xl text-sm leading-relaxed text-white/72">
-            Start with the procurement package, then review Security Policy, DPA, SLA, and Subprocessors for compliance review.
-          </p>
-          <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-            <Link href="/legal/security-policy" className="btn-base btn-secondary rounded-xl px-5 py-3 text-sm">
-              Security Policy
-            </Link>
-            <Link href="/legal/data-processing-addendum" className="btn-base btn-secondary rounded-xl px-5 py-3 text-sm">
-              DPA
-            </Link>
-            <Link href="/legal/service-level-agreement" className="btn-base btn-secondary rounded-xl px-5 py-3 text-sm">
-              SLA
-            </Link>
-            <Link href="/legal/subprocessors" className="btn-base btn-secondary rounded-xl px-5 py-3 text-sm">
-              Subprocessors
-            </Link>
-            <Link href="/trust/procurement" className="btn-base btn-secondary rounded-xl px-5 py-3 text-sm">
-              Procurement package
-            </Link>
+        <ScrollRevealFrame delay={120} className="mt-10">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {PILLARS.map((item) => (
+              <LinkTile key={item.href} href={item.href} title={item.title} body={item.body} meta={item.meta} />
+            ))}
           </div>
-        </div>
-      </section>
+        </ScrollRevealFrame>
+      </Section>
+
+      <Section className="py-16 sm:py-20">
+        <ScrollRevealFrame>
+          <div className="floating-stage relative overflow-hidden rounded-[2.8rem] border border-white/10 bg-white/[0.03] px-6 py-10 sm:px-8 sm:py-14 lg:px-12">
+            <AmbientScene tone="cool" className="opacity-85" />
+            <div className="relative grid gap-8 lg:grid-cols-[minmax(0,0.86fr)_minmax(0,1.14fr)] lg:items-start">
+              <div className="max-w-2xl">
+                <Eyebrow>Operating principles</Eyebrow>
+                <h2 className="mt-5 text-balance text-4xl font-semibold tracking-[-0.04em] text-white sm:text-5xl lg:text-6xl">
+                  Trust is anchored in visible operating behavior.
+                </h2>
+                <p className="mt-5 max-w-xl text-base leading-8 text-white/64 sm:text-lg">
+                  The underlying ideas are straightforward: enforce the important controls centrally, limit document
+                  lifetime and exposure, and keep public trust surfaces current enough to review with confidence.
+                </p>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                {PRINCIPLES.map((item, index) => (
+                  <PremiumCard key={item} className="min-h-[184px] bg-black/22">
+                    <div className="text-[11px] uppercase tracking-[0.24em] text-white/58">
+                      {String(index + 1).padStart(2, "0")}
+                    </div>
+                    <p className="mt-7 text-lg leading-8 text-white/78">{item}</p>
+                  </PremiumCard>
+                ))}
+              </div>
+            </div>
+          </div>
+        </ScrollRevealFrame>
+      </Section>
+
+      <SectionTransition label="Documents" />
+
+      <Section className="pt-4 sm:pt-8">
+        <ScrollRevealFrame>
+          <div className="grid gap-8 lg:grid-cols-[minmax(0,0.72fr)_minmax(0,1.28fr)] lg:items-start">
+            <div className="max-w-2xl">
+              <Eyebrow>Policy and document index</Eyebrow>
+              <h2 className="mt-5 text-balance text-4xl font-semibold tracking-[-0.04em] text-white sm:text-5xl">
+                The core review set, kept in one place.
+              </h2>
+              <p className="mt-5 text-base leading-8 text-white/64 sm:text-lg">
+                Use this as the fast route into the legal, privacy, security, and reporting documents most often needed
+                during diligence, procurement, or support review.
+              </p>
+            </div>
+
+            <DocumentIndexList items={DOCUMENTS} />
+          </div>
+        </ScrollRevealFrame>
+      </Section>
+
+      <Section className="pb-18 pt-16 sm:pb-24 sm:pt-20">
+        <ScrollRevealFrame>
+          <div className="floating-stage relative overflow-hidden rounded-[2.8rem] border border-white/10 bg-white/[0.03] px-6 py-10 sm:px-8 sm:py-14 lg:px-12">
+            <AmbientScene tone="steel" className="opacity-80" />
+            <div className="relative grid gap-8 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+              <div className="max-w-3xl">
+                <Eyebrow>Next step</Eyebrow>
+                <h2 className="mt-5 text-balance text-4xl font-semibold tracking-[-0.04em] text-white sm:text-5xl lg:text-6xl">
+                  Need procurement help, support context, or follow-up on the current posture?
+                </h2>
+                <p className="mt-5 max-w-2xl text-base leading-8 text-white/64 sm:text-lg">
+                  The public trust shell is designed to answer most questions quickly. For anything specific, route
+                  directly into contact or live operational status.
+                </p>
+              </div>
+              <CTAGroup
+                actions={[
+                  { href: "/contact", label: "Contact", tone: "primary" },
+                  { href: "/status", label: "View Status", tone: "secondary" },
+                ]}
+              />
+            </div>
+          </div>
+        </ScrollRevealFrame>
+      </Section>
     </SiteShell>
   );
 }

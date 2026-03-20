@@ -1,5 +1,14 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { ScrollRevealFrame } from "@/app/components/CinematicClient";
+import { AmbientScene, SectionTransition, StoryBand, VisualSignalCluster } from "@/app/components/CinematicScene";
+import {
+  CTAGroup,
+  ContentRail,
+  Eyebrow,
+  LinkTile,
+  PremiumCard,
+  Section,
+} from "@/app/components/PublicPrimitives";
 import { SiteShell } from "@/app/components/SiteShell";
 import { getPublicRuntimeConfig } from "@/lib/publicRuntimeConfig";
 
@@ -9,154 +18,189 @@ export const revalidate = 900;
 export const metadata: Metadata = {
   title: "Contact - cyang.io",
   description:
-    "Contact cyang.io for product support, business questions, privacy requests, and security reporting.",
+    "Premium contact routing for product support, security disclosures, privacy requests, legal inquiries, and general questions.",
 };
 
 export default function ContactPage() {
   const publicConfig = getPublicRuntimeConfig();
-  const supportEmail = publicConfig.supportEmail;
-  const securityEmail = publicConfig.securityEmail;
-  const privacyEmail = publicConfig.privacyEmail;
-  const legalEmail = publicConfig.legalEmail;
-  const showPricingUi = publicConfig.showPricingUi;
 
   return (
     <SiteShell maxWidth="full" publicConfig={publicConfig}>
-      <section className="relative mt-10 grid gap-6 lg:grid-cols-12 lg:items-end">
-        <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
-          <div className="absolute -left-16 top-0 h-72 w-72 rounded-full bg-sky-400/12 blur-3xl" />
-          <div className="absolute right-0 top-8 h-80 w-80 rounded-full bg-teal-300/10 blur-3xl" />
-        </div>
+      <section className="cinematic-bleed relative overflow-hidden pt-10 sm:pt-16 lg:pt-20">
+        <AmbientScene tone="cool" className="opacity-90" />
+        <ContentRail className="relative">
+          <div className="grid gap-8 lg:grid-cols-[minmax(0,1.04fr)_360px] lg:items-end">
+            <ScrollRevealFrame>
+              <div className="max-w-4xl">
+                <Eyebrow>Contact</Eyebrow>
+                <h1 className="mt-6 max-w-4xl text-balance font-editorial text-5xl leading-[0.95] tracking-[-0.05em] text-white sm:text-6xl lg:text-[5.2rem]">
+                  Get in touch.
+                </h1>
+                <p className="mt-6 max-w-2xl text-base leading-8 text-white/68 sm:text-lg">
+                  Route directly into the right channel so product, security, privacy, legal, and company questions
+                  land with less delay and less friction.
+                </p>
+                <CTAGroup
+                  className="mt-8"
+                  actions={[
+                    {
+                      href: `mailto:${publicConfig.supportEmail}`,
+                      label: "Email support",
+                      tone: "primary",
+                      external: true,
+                    },
+                    { href: "/trust", label: "Review Trust", tone: "secondary" },
+                    { href: "/status", label: "View Status", tone: "secondary" },
+                  ]}
+                />
+              </div>
+            </ScrollRevealFrame>
 
-        <div className="lg:col-span-8">
-          <span className="ui-badge inline-flex rounded-full px-3 py-1 text-xs uppercase tracking-[0.16em]">
-            Contact
-          </span>
-          <h1 className="font-editorial mt-5 max-w-5xl text-4xl leading-[1.04] tracking-tight text-white sm:text-5xl lg:text-6xl">
-            Reach the right team quickly.
-          </h1>
-          <p className="mt-7 max-w-3xl text-base leading-relaxed text-white/72 sm:text-lg">
-            Use this page for product support, business and procurement questions, privacy requests, and security
-            reporting routes.
-          </p>
-
-          <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-            <a href={`mailto:${supportEmail}`} className="btn-base btn-primary rounded-xl px-6 py-3 text-sm font-semibold">
-              Email support
-            </a>
-            <Link href="/trust" className="btn-base btn-secondary rounded-xl px-6 py-3 text-sm">
-              Trust Center
-            </Link>
-            <Link href="/status" className="btn-base btn-secondary rounded-xl px-6 py-3 text-sm">
-              View status
-            </Link>
+            <ScrollRevealFrame delay={140}>
+              <VisualSignalCluster
+                title="Routing"
+                items={[
+                  { label: "Support", value: publicConfig.supportEmail },
+                  { label: "Security", value: publicConfig.securityEmail },
+                  { label: "Privacy", value: publicConfig.privacyEmail },
+                  { label: "Legal", value: publicConfig.legalEmail },
+                ]}
+                className="min-h-[320px]"
+              />
+            </ScrollRevealFrame>
           </div>
-        </div>
-
-        <div className="lg:col-span-4">
-          <div className="glass-card-strong rounded-3xl p-6">
-            <div className="text-xs uppercase tracking-[0.14em] text-white/55">Response posture</div>
-            <ul className="mt-4 space-y-2 text-sm text-white/72">
-              <li className="flex gap-2">
-                <span className="mt-2 h-1.5 w-1.5 flex-none rounded-full bg-sky-200/70" />
-                <span>General support reviewed on business days.</span>
-              </li>
-              <li className="flex gap-2">
-                <span className="mt-2 h-1.5 w-1.5 flex-none rounded-full bg-sky-200/70" />
-                <span>Security disclosures are triaged with priority.</span>
-              </li>
-              <li className="flex gap-2">
-                <span className="mt-2 h-1.5 w-1.5 flex-none rounded-full bg-sky-200/70" />
-                <span>Privacy and legal requests are routed to dedicated channels.</span>
-              </li>
-            </ul>
-          </div>
-        </div>
+        </ContentRail>
       </section>
 
-      <section className="mt-16 md:mt-20 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <ContactCard
-          title="Product and account support"
-          body="Questions about onboarding, access, or product usage."
-          actionLabel={supportEmail}
-          actionHref={`mailto:${supportEmail}`}
-        />
-        <ContactCard
-          title="Security reporting"
-          body="Responsible disclosure for vulnerabilities or security concerns."
-          actionLabel={securityEmail}
-          actionHref={`mailto:${securityEmail}`}
-          secondaryHref="/security-disclosure"
-          secondaryLabel="Disclosure policy"
-        />
-        <ContactCard
-          title="Privacy and data requests"
-          body="Privacy questions, data handling inquiries, and request routing."
-          actionLabel={privacyEmail}
-          actionHref={`mailto:${privacyEmail}`}
-          secondaryHref="/privacy"
-          secondaryLabel="Privacy Policy"
-        />
-        <ContactCard
-          title="Legal and procurement"
-          body="Commercial review and legal documentation questions."
-          actionLabel={legalEmail}
-          actionHref={`mailto:${legalEmail}`}
-          secondaryHref="/legal"
-          secondaryLabel="Legal Center"
-        />
-      </section>
+      <SectionTransition label="Contact routes" />
 
-      <section className="mt-16 mb-2 md:mt-20">
-        <div className="glass-card rounded-3xl p-7 sm:p-8">
-          <h2 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">Related trust and support resources</h2>
-          <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
-            <QuickLink href="/projects/doclinks" label="Doclinks" />
-            {showPricingUi ? <QuickLink href="/pricing" label="Pricing" /> : null}
-            <QuickLink href="/trust" label="Trust Center" />
-            <QuickLink href="/trust/procurement" label="Procurement Package" />
-            <QuickLink href="/report" label="Report abuse" />
-            <QuickLink href="/status" label="Status" />
+      <Section className="pt-4 sm:pt-8">
+        <ScrollRevealFrame>
+          <StoryBand
+            eyebrow="Clear paths"
+            title="The contact surface is designed for accurate routing, not friction."
+            body="If you already know the topic, go straight to the right address. If you need public context first, the trust hub and status surface stay close by."
+            aside={
+              <div className="floating-stage relative min-h-[280px] overflow-hidden rounded-[2.4rem] border border-white/10 bg-white/[0.03] p-6">
+                <AmbientScene tone="steel" className="opacity-80" />
+                <div className="relative">
+                  <div className="text-[11px] uppercase tracking-[0.24em] text-white/58">Expectation</div>
+                  <div className="mt-5 space-y-4 text-sm leading-7 text-white/68">
+                    <p>Direct routes for product support, security reporting, privacy and legal, and general company questions.</p>
+                    <p>No heavy intake form if email routing is the faster path.</p>
+                    <p>Trust and status remain visible for review before outreach.</p>
+                  </div>
+                </div>
+              </div>
+            }
+          />
+        </ScrollRevealFrame>
+
+        <ScrollRevealFrame delay={120} className="mt-10">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <LinkTile
+              href={`mailto:${publicConfig.supportEmail}`}
+              title="Product and support"
+              body="Accounts, onboarding, active product usage, and customer support questions."
+              meta={publicConfig.supportEmail}
+            />
+            <LinkTile
+              href={`mailto:${publicConfig.securityEmail}`}
+              title="Security disclosures"
+              body="Private vulnerability reporting and security review follow-up."
+              meta={publicConfig.securityEmail}
+            />
+            <LinkTile
+              href={`mailto:${publicConfig.privacyEmail}`}
+              title="Privacy and legal"
+              body="Privacy requests, DPA questions, subprocessors, retention, and legal routing."
+              meta={publicConfig.privacyEmail}
+            />
+            <LinkTile
+              href={`mailto:${publicConfig.legalEmail}`}
+              title="General inquiries"
+              body="Commercial conversations, partnerships, company questions, and broader outreach."
+              meta={publicConfig.legalEmail}
+            />
           </div>
-        </div>
-      </section>
+        </ScrollRevealFrame>
+      </Section>
+
+      <Section className="py-16 sm:py-20">
+        <ScrollRevealFrame>
+          <div className="floating-stage relative overflow-hidden rounded-[2.8rem] border border-white/10 bg-white/[0.03] px-6 py-10 sm:px-8 sm:py-14 lg:px-12">
+            <AmbientScene tone="signal" className="opacity-84" />
+            <div className="relative grid gap-10 lg:grid-cols-[minmax(0,0.82fr)_minmax(0,1.18fr)] lg:items-start">
+              <div className="max-w-2xl">
+                <Eyebrow>Guidance</Eyebrow>
+                <h2 className="mt-5 text-balance text-4xl font-semibold tracking-[-0.04em] text-white sm:text-5xl lg:text-6xl">
+                  Pick the route that matches the real need.
+                </h2>
+                <p className="mt-5 max-w-xl text-base leading-8 text-white/64 sm:text-lg">
+                  The fastest path is usually the most specific one. Product support belongs with support. Security
+                  reports belong with security. Privacy and legal questions should arrive with the right context.
+                </p>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                {[
+                  ["Product / support", "Best for active customer questions, account help, and onboarding."],
+                  ["Security disclosures", "Best for responsible disclosure and product security follow-up."],
+                  ["Privacy / legal", "Best for DPA, subprocessors, retention, and privacy requests."],
+                  ["General inquiries", "Best for broader commercial or company questions."],
+                ].map(([title, body], index) => (
+                  <PremiumCard key={title} className="min-h-[180px] bg-black/22">
+                    <div className="text-[11px] uppercase tracking-[0.24em] text-white/58">
+                      {String(index + 1).padStart(2, "0")}
+                    </div>
+                    <div className="mt-7 text-xl font-semibold tracking-tight text-white">{title}</div>
+                    <p className="mt-3 text-sm leading-7 text-white/62">{body}</p>
+                  </PremiumCard>
+                ))}
+              </div>
+            </div>
+          </div>
+        </ScrollRevealFrame>
+      </Section>
+
+      <Section className="pb-18 pt-4 sm:pb-24 sm:pt-8">
+        <ScrollRevealFrame>
+          <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(320px,0.72fr)] lg:items-stretch">
+            <div className="floating-stage relative overflow-hidden rounded-[2.6rem] border border-white/10 bg-white/[0.03] px-6 py-10 sm:px-8 sm:py-12">
+              <AmbientScene tone="steel" className="opacity-82" />
+              <div className="relative max-w-3xl">
+                <Eyebrow>Trust reinforcement</Eyebrow>
+                <h2 className="mt-5 text-balance text-4xl font-semibold tracking-[-0.04em] text-white sm:text-5xl">
+                  Need public context before you reach out?
+                </h2>
+                <p className="mt-5 max-w-2xl text-base leading-8 text-white/64 sm:text-lg">
+                  Review the trust hub and live status first if the question depends on current operating posture,
+                  disclosure expectations, procurement evidence, or incident visibility.
+                </p>
+                <CTAGroup
+                  className="mt-8"
+                  actions={[
+                    { href: "/trust", label: "Trust Center", tone: "primary" },
+                    { href: "/status", label: "Status", tone: "secondary" },
+                  ]}
+                />
+              </div>
+            </div>
+
+            <ScrollRevealFrame delay={100}>
+              <VisualSignalCluster
+                title="Public surfaces"
+                items={[
+                  { label: "Trust center", value: "Security, privacy, legal, procurement, and reporting." },
+                  { label: "Status", value: "Live operational health and incident communication." },
+                  { label: "Disclosure", value: "Private vulnerability reporting with clear expectations." },
+                ]}
+                className="h-full min-h-[280px]"
+              />
+            </ScrollRevealFrame>
+          </div>
+        </ScrollRevealFrame>
+      </Section>
     </SiteShell>
-  );
-}
-
-function ContactCard(props: {
-  title: string;
-  body: string;
-  actionLabel: string;
-  actionHref: string;
-  secondaryHref?: string;
-  secondaryLabel?: string;
-}) {
-  return (
-    <article className="glass-card rounded-3xl p-6">
-      <h2 className="text-lg font-semibold tracking-tight text-white">{props.title}</h2>
-      <p className="mt-2 text-sm leading-relaxed text-white/70">{props.body}</p>
-      <a
-        href={props.actionHref}
-        className="mt-4 inline-flex text-sm text-white/85 underline underline-offset-4 hover:text-white"
-      >
-        {props.actionLabel}
-      </a>
-      {props.secondaryHref && props.secondaryLabel ? (
-        <div className="mt-3">
-          <Link href={props.secondaryHref} className="text-xs text-white/68 underline underline-offset-4 hover:text-white">
-            {props.secondaryLabel}
-          </Link>
-        </div>
-      ) : null}
-    </article>
-  );
-}
-
-function QuickLink(props: { href: string; label: string }) {
-  return (
-    <Link href={props.href} className="rounded-2xl border border-white/12 bg-black/25 p-4 text-sm text-white/86 transition-colors hover:bg-white/12">
-      {props.label}
-    </Link>
   );
 }

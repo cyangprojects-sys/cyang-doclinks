@@ -1,7 +1,22 @@
-import { permanentRedirect } from "next/navigation";
+import type { Metadata } from "next";
+import { ProductsPageView } from "../components/ProductsPageView";
+import { SiteShell } from "../components/SiteShell";
 
-export const runtime = "nodejs";
+export const revalidate = 900;
 
-export default function ProductsAliasPage() {
-  permanentRedirect("/projects");
+export const metadata: Metadata = {
+  title: "Products - cyang.io",
+  description:
+    "Products and systems built by cyang.io, with Doclinks as the flagship and trust-centered software growth as the operating model.",
+  alternates: {
+    canonical: "/products",
+  },
+};
+
+export default function ProductsPage() {
+  return (
+    <SiteShell maxWidth="full">
+      <ProductsPageView />
+    </SiteShell>
+  );
 }

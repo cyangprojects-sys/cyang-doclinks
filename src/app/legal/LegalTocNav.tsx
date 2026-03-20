@@ -62,14 +62,15 @@ export default function LegalTocNav({ headings }: Props) {
     event.preventDefault();
     const target = document.getElementById(id);
     if (!target) return;
-    target.scrollIntoView({ behavior: "smooth", block: "start" });
+    const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    target.scrollIntoView({ behavior: prefersReducedMotion ? "auto" : "smooth", block: "start" });
     window.history.replaceState(null, "", `#${id}`);
     setActiveId(id);
   };
 
   return (
     <>
-      <details className="glass-card rounded-2xl p-4 lg:hidden" open>
+      <details className="surface-panel rounded-[1.5rem] p-4 lg:hidden" open>
         <summary className="cursor-pointer list-none text-sm font-medium text-white/90">On this page</summary>
         <nav className="mt-3 space-y-1" aria-label="Legal document table of contents">
           {headings.map((heading) => {
@@ -92,7 +93,7 @@ export default function LegalTocNav({ headings }: Props) {
         </nav>
       </details>
 
-      <aside className="glass-card sticky top-24 hidden rounded-2xl p-4 lg:block">
+      <aside className="surface-panel sticky top-24 hidden rounded-[1.5rem] p-4 lg:block">
         <div className="text-xs uppercase tracking-[0.14em] text-white/55">On this page</div>
         <nav className="mt-3 space-y-1" aria-label="Legal document table of contents">
           {headings.map((heading) => {

@@ -1,7 +1,7 @@
+import type { Metadata } from "next";
 import { SiteShell } from "@/app/components/SiteShell";
 import StatusCenterClient from "./StatusCenterClient";
 import { StatusPageIntro, StatusPageResources } from "./StatusPageChrome";
-import type { Metadata } from "next";
 
 export const runtime = "nodejs";
 export const dynamic = "force-static";
@@ -16,11 +16,11 @@ export const metadata: Metadata = {
 export default function StatusPage() {
   return (
     <SiteShell maxWidth="full">
-      <div className="mx-auto flex w-full max-w-[1700px] flex-col gap-6 px-3 py-8 sm:px-4 lg:px-6">
-        <StatusPageIntro />
+      <StatusPageIntro />
+      <div className="mx-auto w-full max-w-[1220px] px-4 pb-10 sm:px-6 lg:px-8">
         <StatusCenterClient />
-        <StatusPageResources />
       </div>
+      <StatusPageResources />
     </SiteShell>
   );
 }

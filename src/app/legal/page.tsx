@@ -1,5 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { PolicyPageShell } from "@/app/components/PolicyPageShell";
+import { PremiumCard, Section, SectionHeader } from "@/app/components/PublicPrimitives";
 import { SiteShell } from "@/app/components/SiteShell";
 import LegalCenterClient from "@/app/legal/LegalCenterClient";
 import { LEGAL_DOCS } from "@/lib/legalDocs";
@@ -8,95 +10,68 @@ export const runtime = "nodejs";
 export const revalidate = 3600;
 
 export const metadata: Metadata = {
-  title: "Legal and Trust Center - cyang.io",
+  title: "Legal Center - cyang.io",
   description:
-    "Customer-facing legal, privacy, security, and reliability documentation for cyang.io and Doclinks.",
+    "Elegant, readable legal and policy center for cyang.io and Doclinks, covering terms, privacy, security, DPA, SLA, subprocessors, and related trust documents.",
 };
 
 export default function LegalIndexPage() {
   return (
     <SiteShell maxWidth="full">
-      <section className="relative mt-10">
-        <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
-          <div className="absolute -left-16 top-0 h-72 w-72 rounded-full bg-sky-400/12 blur-3xl" />
-          <div className="absolute right-0 top-8 h-80 w-80 rounded-full bg-teal-300/10 blur-3xl" />
-        </div>
-
-        <div className="grid gap-6 lg:grid-cols-12 lg:items-end">
-          <div className="lg:col-span-7">
-            <span className="ui-badge inline-flex rounded-full px-3 py-1 text-xs uppercase tracking-[0.16em]">
-              Legal and Trust Center
-            </span>
-            <h1 className="font-editorial mt-5 max-w-4xl text-4xl leading-[1.04] tracking-tight text-white sm:text-5xl lg:text-6xl">
-              Policies built for
-              <span className="block text-white/72">clarity, trust, and serious operations.</span>
-            </h1>
-            <p className="mt-7 max-w-3xl text-base leading-relaxed text-white/72 sm:text-lg">
-              Review legal terms, privacy commitments, data-processing documentation, security posture, reliability commitments,
-              and vendor transparency in one unified legal and trust experience.
-            </p>
-
-            <div className="mt-7 flex flex-wrap gap-2">
-              <span className="ui-badge rounded-full px-3 py-1.5 text-xs">Clear policies</span>
-              <span className="ui-badge rounded-full px-3 py-1.5 text-xs">Security-minded operations</span>
-              <span className="ui-badge rounded-full px-3 py-1.5 text-xs">Transparent data practices</span>
-              <span className="ui-badge rounded-full px-3 py-1.5 text-xs">Business-ready documentation</span>
+      <PolicyPageShell
+        breadcrumbs={[{ label: "cyang.io", href: "/" }, { label: "Legal Center" }]}
+        eyebrow="Legal Center"
+        title="Policies, terms, and review documents built to stay readable."
+        body="The legal center is organized for serious review: clear typography, predictable metadata, and a public index of the documents customers, buyers, and counsel usually need."
+        actions={[
+          { href: "/trust", label: "Review Trust", tone: "secondary" },
+          { href: "/trust/procurement", label: "Procurement Package", tone: "primary" },
+        ]}
+        meta={[
+          { label: "Coverage", value: "Terms, privacy, security, DPA, SLA, subprocessors, and policy surfaces" },
+          { label: "Format", value: "Readable public pages with source-backed markdown content" },
+        ]}
+        aside={
+          <div className="space-y-3 text-sm text-white/62">
+            <div>
+              Start with <Link href="/terms" className="underline underline-offset-4 hover:text-white">Terms</Link>,{" "}
+              <Link href="/privacy" className="underline underline-offset-4 hover:text-white">Privacy</Link>, and{" "}
+              <Link href="/legal/security-policy" className="underline underline-offset-4 hover:text-white">Security Policy</Link>.
+            </div>
+            <div>
+              For business review, move next to <Link href="/legal/data-processing-addendum" className="underline underline-offset-4 hover:text-white">DPA</Link>,{" "}
+              <Link href="/legal/service-level-agreement" className="underline underline-offset-4 hover:text-white">SLA</Link>, and{" "}
+              <Link href="/legal/subprocessors" className="underline underline-offset-4 hover:text-white">Subprocessors</Link>.
             </div>
           </div>
+        }
+      />
 
-          <div className="lg:col-span-5">
-            <div className="glass-card-strong rounded-3xl p-6">
-              <div className="text-xs uppercase tracking-[0.14em] text-white/55">Start here</div>
-              <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                <div className="rounded-2xl border border-white/12 bg-black/25 p-4">
-                  <div className="text-sm font-medium text-white/90">New to cyang.io?</div>
-                  <p className="mt-1 text-xs leading-relaxed text-white/64">Start with Terms, Privacy, and Security.</p>
-                  <div className="mt-3 flex flex-wrap gap-2 text-xs">
-                    <Link href="/legal/terms-of-service" className="text-white/80 underline hover:text-white">Terms</Link>
-                    <Link href="/legal/privacy-policy" className="text-white/80 underline hover:text-white">Privacy</Link>
-                    <Link href="/legal/security-policy" className="text-white/80 underline hover:text-white">Security</Link>
-                  </div>
-                </div>
-                <div className="rounded-2xl border border-white/12 bg-black/25 p-4">
-                  <div className="text-sm font-medium text-white/90">Evaluating for business?</div>
-                  <p className="mt-1 text-xs leading-relaxed text-white/64">Review DPA, SLA, Security, and Subprocessors.</p>
-                  <div className="mt-3 flex flex-wrap gap-2 text-xs">
-                    <Link href="/legal/data-processing-addendum" className="text-white/80 underline hover:text-white">DPA</Link>
-                    <Link href="/legal/service-level-agreement" className="text-white/80 underline hover:text-white">SLA</Link>
-                    <Link href="/legal/subprocessors" className="text-white/80 underline hover:text-white">Subprocessors</Link>
-                    <Link href="/trust/procurement" className="text-white/80 underline hover:text-white">Procurement pack</Link>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+      <Section>
+        <SectionHeader
+          eyebrow="Trust continuity"
+          title="Legal pages are part of the public trust shell."
+          body="They carry the same design discipline as the product site, but stay restrained enough to preserve legal clarity."
+        />
+        <div className="mt-8 grid gap-4 md:grid-cols-3">
+          <PremiumCard>
+            <div className="text-xl font-semibold text-white">Readable structure</div>
+            <p className="mt-3 text-sm leading-7 text-white/62">Narrower line lengths, stronger heading rhythm, and calmer chrome.</p>
+          </PremiumCard>
+          <PremiumCard>
+            <div className="text-xl font-semibold text-white">Reviewable metadata</div>
+            <p className="mt-3 text-sm leading-7 text-white/62">Dates, applicability, and document relationships stay visible without clutter.</p>
+          </PremiumCard>
+          <PremiumCard>
+            <div className="text-xl font-semibold text-white">Connected surfaces</div>
+            <p className="mt-3 text-sm leading-7 text-white/62">Trust, procurement, disclosure, and status are one system rather than disconnected pages.</p>
+          </PremiumCard>
         </div>
-      </section>
+      </Section>
 
-      <section className="mt-12">
-        <div className="glass-card rounded-3xl p-5 sm:p-6">
-          <h2 className="text-lg font-semibold tracking-tight text-white">Trust highlights</h2>
-          <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-            <TrustStrip text="We do not sell customer data." />
-            <TrustStrip text="Uploaded documents are encrypted and policy-gated." />
-            <TrustStrip text="Security issues can be reported directly." />
-            <TrustStrip text="Paid plans include service-level commitments." />
-            <TrustStrip text="Subprocessors are disclosed transparently." />
-          </div>
-        </div>
-      </section>
-
-      <section className="mt-12">
+      <Section>
         <LegalCenterClient docs={LEGAL_DOCS} />
-      </section>
+      </Section>
     </SiteShell>
-  );
-}
-
-function TrustStrip({ text }: { text: string }) {
-  return (
-    <div className="rounded-2xl border border-white/12 bg-black/25 p-4 text-sm leading-relaxed text-white/72">
-      {text}
-    </div>
   );
 }

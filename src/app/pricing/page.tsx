@@ -200,7 +200,7 @@ export default function PricingPage() {
             <Link href="/signin?intent=admin" className="btn-base btn-secondary rounded-xl px-6 py-3 text-sm">
               Upgrade existing workspace
             </Link>
-            <Link href="/projects/doclinks" className="btn-base btn-secondary rounded-xl px-6 py-3 text-sm">
+            <Link href="/doclinks" className="btn-base btn-secondary rounded-xl px-6 py-3 text-sm">
               View Doclinks
             </Link>
           </div>
@@ -353,7 +353,7 @@ export default function PricingPage() {
               body="Open your account and validate your workflow."
             />
             <CtaTile href="/signin?intent=admin" title="Upgrade to Pro" body="Existing workspace owners can upgrade instantly." />
-            <CtaTile href="/projects/doclinks" title="Learn about Doclinks" body="Review product capabilities and security model." />
+            <CtaTile href="/doclinks" title="Learn about Doclinks" body="Review product capabilities and security model." />
             <CtaTile href="/contact" title="Contact" body="Ask product, pricing, or procurement questions." />
           </div>
         </div>
