@@ -98,7 +98,7 @@ export function SiteFooter({ config }: { config: PublicRuntimeConfig }) {
 
           {groups.map((group) => (
             <div key={group.title}>
-              <div className="text-[11px] uppercase tracking-[0.22em] text-white/38">{group.title}</div>
+              <div className="text-[11px] uppercase tracking-[0.22em] text-white/58">{group.title}</div>
               <div className="mt-4 grid gap-2">
                 {group.links.map((link) => (
                   <Link key={`${group.title}-${link.href}`} href={link.href} className="text-sm text-white/66 transition-colors hover:text-white">

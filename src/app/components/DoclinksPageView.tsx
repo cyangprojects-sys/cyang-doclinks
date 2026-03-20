@@ -1,320 +1,319 @@
+import { BackgroundVideoSection, ScrollRevealFrame } from "./CinematicClient";
+import { AmbientScene, SectionTransition, StoryBand, VisualSignalCluster } from "./CinematicScene";
 import {
   CTAGroup,
+  ContentRail,
+  DocumentIndexList,
   DocumentVisual,
   Eyebrow,
-  FeatureBand,
-  Lead,
-  LinkTile,
-  MaturityBadge,
   PremiumCard,
   Section,
-  SectionHeader,
-  TimelineSteps,
 } from "./PublicPrimitives";
 import type { PublicRuntimeConfig } from "@/lib/publicRuntimeConfig";
 
 const OUTCOMES = [
-  {
-    title: "Send with control",
-    body: "Share sensitive files without leaving access behavior to guesswork.",
-  },
-  {
-    title: "Enforce at serve time",
-    body: "Authorization, lifecycle, and file-state checks run when access is requested.",
-  },
-  {
-    title: "See what happened",
-    body: "Review access activity with audit-friendly visibility instead of vague link assumptions.",
-  },
-  {
-    title: "Block unsafe delivery",
-    body: "Failed, infected, or quarantined states stop delivery before exposure happens.",
-  },
+  "Send with control",
+  "Enforce at serve time",
+  "See what happened",
+  "Block unsafe delivery",
 ];
 
 const TIMELINE = [
-  { id: "01", title: "Upload through secure paths", body: "Documents enter protected paths with validation and storage boundaries." },
-  { id: "02", title: "Validate and scan", body: "Files are checked before public delivery becomes eligible." },
-  { id: "03", title: "Set policy rules", body: "Expiration, revocation, view bounds, and delivery posture are configured per share." },
-  { id: "04", title: "Deliver through controlled serving", body: "Serve-time checks enforce policy every time a recipient requests access." },
+  {
+    id: "01",
+    title: "Upload through secure paths",
+    body: "Documents enter protected paths with validation, private storage boundaries, and known workflow states.",
+  },
+  {
+    id: "02",
+    title: "Validate and scan",
+    body: "Files are checked before the system ever allows public delivery to become eligible.",
+  },
+  {
+    id: "03",
+    title: "Set policy rules",
+    body: "Expiration, revocation, view bounds, and download posture are attached at the share layer.",
+  },
+  {
+    id: "04",
+    title: "Deliver through controlled serving",
+    body: "Every access request passes through serve-time policy enforcement instead of relying on URL secrecy.",
+  },
 ];
 
-const FEATURE_BANDS = [
+const FEATURES = [
   {
     eyebrow: "Tokenized access",
-    title: "Links are delivery handles, not blanket permission.",
-    body: "Doclinks treats every access request as an authorization decision backed by server-side rules.",
-    points: [
-      "Tokenized links map to bounded share state.",
-      "Serve requests are checked against active policy and file state.",
-      "Delivery does not rely on secrecy alone.",
+    title: "Links act as controlled delivery handles.",
+    body: "Doclinks treats every request as an authorization event backed by current policy state.",
+    signal: [
+      { label: "Token", value: "Maps to bounded share state" },
+      { label: "Serve check", value: "Evaluated on every request" },
+      { label: "Assumption", value: "No blanket permission by possession" },
     ],
   },
   {
     eyebrow: "Expiration and revocation",
     title: "Access can end when the workflow ends.",
-    body: "Time-box links, revoke access quickly, and avoid indefinite document exposure after a task is complete.",
-    points: [
-      "Expiration is explicit and visible.",
-      "Revocation is immediate from the server side.",
-      "Lifecycle controls reduce stale sharing risk.",
+    body: "Time-box exposure, revoke immediately, and avoid endless link residue after a task is complete.",
+    signal: [
+      { label: "Expiry", value: "Explicit and visible" },
+      { label: "Revocation", value: "Immediate from the server side" },
+      { label: "Fallback", value: "Access closes instead of lingering" },
     ],
   },
   {
     eyebrow: "View limits and download controls",
-    title: "Bound the recipient experience to fit the document.",
-    body: "Not every file should behave the same way. Doclinks lets teams set more deliberate delivery boundaries.",
-    points: [
-      "Cap repeated opens where appropriate.",
-      "Control download posture by share.",
-      "Match delivery behavior to sensitivity.",
+    title: "Delivery posture changes to fit the document.",
+    body: "Not every file deserves the same recipient experience. Doclinks supports a more deliberate delivery shape.",
+    signal: [
+      { label: "Views", value: "Bound repeated opens" },
+      { label: "Download", value: "Configured per share" },
+      { label: "Recipient path", value: "Aligned to sensitivity" },
     ],
   },
   {
     eyebrow: "Audit visibility",
-    title: "Review what happened without creating noise.",
-    body: "Access behavior is legible enough for operational review, support, and follow-up without overwhelming teams.",
-    points: [
-      "Delivery activity is observable.",
-      "Events support internal review and customer confidence.",
-      "Operational clarity improves incident response.",
+    title: "See enough to support trust and follow-up.",
+    body: "Access behavior is legible enough for real operational review without turning the product into a noisy monitoring console.",
+    signal: [
+      { label: "Reviewability", value: "Delivery activity is visible" },
+      { label: "Support", value: "Clear states support response" },
+      { label: "Confidence", value: "Evidence instead of guesswork" },
     ],
   },
   {
     eyebrow: "Scan-gated delivery",
-    title: "Unsafe file states do not get a public path.",
-    body: "Delivery is conditioned on scan posture so risky states fail closed instead of leaking through convenience.",
-    points: [
-      "Validation precedes public serving.",
-      "Failed or quarantined states block delivery.",
-      "Protective defaults stay active under pressure.",
+    title: "Unsafe file states fail closed.",
+    body: "Delivery is conditioned on scan posture, so files in risky states never become casual public links.",
+    signal: [
+      { label: "Validation", value: "Before public eligibility" },
+      { label: "Blocked states", value: "Failed, infected, quarantined" },
+      { label: "Default", value: "Protective by design" },
     ],
   },
   {
     eyebrow: "Professional recipient UX",
-    title: "Security controls do not have to feel chaotic.",
-    body: "Recipients get a calm, professional experience while teams retain the control surface behind it.",
-    points: [
-      "Clean receiving flow with clear expectations.",
-      "Operational controls stay with the sender.",
-      "Professional delivery supports trust at the edge.",
+    title: "Security can still feel calm at the edge.",
+    body: "Recipients get a composed experience while teams keep the real control surface behind the scenes.",
+    signal: [
+      { label: "Recipient view", value: "Clear and professional" },
+      { label: "Sender control", value: "Retained at the policy layer" },
+      { label: "Trust effect", value: "Stronger delivery confidence" },
     ],
   },
 ];
 
-const USE_CASES = [
-  "Operations teams sending time-bound external documents.",
-  "Compliance workflows that need bounded access and reviewable delivery behavior.",
-  "Sensitive external sharing for finance, HR, and legal workflows.",
-  "Small businesses that need stronger trust posture without enterprise complexity.",
+const TRUST_DOCUMENTS = [
+  { href: "/legal/security-policy", title: "Security Policy", body: "Public control posture and response model." },
+  { href: "/status", title: "Status", body: "Operational health and reliability signals." },
+  { href: "/privacy", title: "Privacy and Terms", body: "Legal and data-handling surfaces for customer review." },
+  { href: "/trust/procurement", title: "Procurement Package", body: "Business-ready documentation gathered into one path." },
+  { href: "/security-disclosure", title: "Security Disclosure", body: "Responsible reporting expectations and security route." },
 ];
-
-const TRUST_ITEMS = [
-  { href: "/legal/security-policy", title: "Security Policy", body: "Review the product security model and public controls.", meta: "Security" },
-  { href: "/status", title: "Status", body: "Operational health and public reliability surfaces.", meta: "Operations" },
-  { href: "/privacy", title: "Privacy and Terms", body: "Legal and data-handling surfaces for customer review.", meta: "Legal" },
-  { href: "/trust/procurement", title: "Procurement Package", body: "Business-ready trust documents gathered into one path.", meta: "Procurement" },
-  { href: "/security-disclosure", title: "Security Disclosure", body: "Responsible disclosure route and testing expectations.", meta: "Disclosure" },
-];
-
-function visualRows(index: number) {
-  if (index === 0) {
-    return [
-      { label: "Policy check", value: "Required", tone: "accent" as const },
-      { label: "Recipient state", value: "Unverified until serve", tone: "neutral" as const },
-      { label: "Exposure", value: "Bounded", tone: "warm" as const },
-    ];
-  }
-
-  if (index === 1) {
-    return [
-      { label: "Link expiry", value: "7 days", tone: "accent" as const },
-      { label: "Revocation", value: "Instant", tone: "neutral" as const },
-      { label: "Fallback", value: "Access closed", tone: "warm" as const },
-    ];
-  }
-
-  if (index === 2) {
-    return [
-      { label: "Views", value: "5 remaining", tone: "accent" as const },
-      { label: "Download", value: "Blocked", tone: "neutral" as const },
-      { label: "Recipient path", value: "Viewer only", tone: "warm" as const },
-    ];
-  }
-
-  if (index === 3) {
-    return [
-      { label: "Open", value: "Logged", tone: "accent" as const },
-      { label: "Location", value: "Reviewable", tone: "neutral" as const },
-      { label: "Workflow", value: "Traceable", tone: "warm" as const },
-    ];
-  }
-
-  if (index === 4) {
-    return [
-      { label: "Scan result", value: "Pending / required", tone: "accent" as const },
-      { label: "Unsafe state", value: "Blocked", tone: "neutral" as const },
-      { label: "Serve posture", value: "Fail closed", tone: "warm" as const },
-    ];
-  }
-
-  return [
-    { label: "Recipient view", value: "Calm", tone: "accent" as const },
-    { label: "Sender controls", value: "Visible", tone: "neutral" as const },
-    { label: "Trust signal", value: "Professional", tone: "warm" as const },
-  ];
-}
 
 export function DoclinksPageView({ publicConfig }: { publicConfig: PublicRuntimeConfig }) {
   const primaryAccessHref = publicConfig.signupEnabled ? "/signup" : "/signin?intent=admin";
 
   return (
     <>
-      <Section className="pt-8 sm:pt-12">
-        <div className="grid gap-8 lg:grid-cols-[minmax(0,1.04fr)_minmax(320px,0.96fr)] lg:items-end">
-          <div className="max-w-4xl">
-            <Eyebrow>Flagship product</Eyebrow>
-            <h1 className="font-editorial mt-6 text-balance text-4xl leading-[0.98] tracking-[-0.03em] text-white sm:text-5xl lg:text-7xl">
-              Secure document delivery with enforced controls.
-            </h1>
-            <Lead className="mt-6 max-w-2xl">
-              Share sensitive files with a professional recipient experience while policy, validation, and access
-              controls stay enforced behind the scenes.
-            </Lead>
-            <CTAGroup
-              className="mt-8"
-              actions={[
-                { href: primaryAccessHref, label: publicConfig.signupEnabled ? "Get started" : "Sign in", tone: "primary" },
-                { href: "/trust", label: "Review Trust", tone: "secondary" },
-              ]}
-            />
+      <BackgroundVideoSection
+        src="/media/cyang-doclinks-signal.mp4"
+        poster="/media/cyang-doclinks-signal.jpg"
+        priority
+        className="mt-3 min-h-[92svh] border-b border-white/8"
+        contentClassName="min-h-[92svh]"
+      >
+        <AmbientScene tone="steel" />
+        <div className="mx-auto flex min-h-[92svh] w-full max-w-[1600px] flex-col justify-between px-4 pb-10 pt-18 sm:px-6 sm:pb-12 lg:px-8 lg:pt-24">
+          <div className="grid gap-10 lg:grid-cols-[minmax(0,1.06fr)_390px] lg:items-end">
+            <ScrollRevealFrame className="max-w-5xl">
+              <Eyebrow>Flagship product</Eyebrow>
+              <h1 className="font-editorial mt-6 text-balance text-[3.15rem] leading-[0.9] tracking-[-0.06em] text-white sm:text-[4.75rem] lg:text-[7rem]">
+                Secure document delivery
+                <span className="block text-white/62">with enforced controls.</span>
+              </h1>
+              <p className="mt-6 max-w-2xl text-base leading-8 text-white/64 sm:text-xl">
+                Share sensitive files with a professional recipient experience while serve-time enforcement,
+                lifecycle control, and audit visibility stay intact.
+              </p>
+              <CTAGroup
+                className="mt-8"
+                actions={[
+                  { href: primaryAccessHref, label: publicConfig.signupEnabled ? "Get started" : "Sign in", tone: "primary" },
+                  { href: "/trust", label: "Review Trust", tone: "secondary" },
+                ]}
+              />
+            </ScrollRevealFrame>
+
+            <ScrollRevealFrame delay={120} className="floating-stage p-6 sm:p-7">
+              <DocumentVisual
+                rows={[
+                  { label: "Upload path", value: "Validated", tone: "accent" },
+                  { label: "Serve posture", value: "Policy checked in real time", tone: "neutral" },
+                  { label: "Lifecycle", value: "Expiry and revocation active", tone: "warm" },
+                  { label: "Recipient flow", value: "Professional by default", tone: "neutral" },
+                ]}
+                footer="Doclinks is built for controlled external delivery rather than generic cloud storage sharing."
+              />
+            </ScrollRevealFrame>
           </div>
 
-          <PremiumCard strong className="min-h-[420px]">
-            <DocumentVisual
-              rows={[
-                { label: "Upload path", value: "Validated", tone: "accent" },
-                { label: "Scan posture", value: "Required before serve", tone: "neutral" },
-                { label: "Lifecycle", value: "Expiry and revocation active", tone: "warm" },
-                { label: "Recipient path", value: "Professional access flow", tone: "neutral" },
-              ]}
-              footer="Doclinks is built for controlled external sharing, not casual file exposure."
-            />
-          </PremiumCard>
-        </div>
-      </Section>
-
-      <Section>
-        <SectionHeader
-          eyebrow="Outcome band"
-          title="Built around the outcomes teams actually need."
-          body="Control, enforcement, visibility, and safety are first-class parts of the product story."
-        />
-        <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {OUTCOMES.map((item) => (
-            <PremiumCard key={item.title} className="h-full">
-              <h3 className="text-2xl font-semibold tracking-tight text-white">{item.title}</h3>
-              <Lead className="mt-4 text-base">{item.body}</Lead>
-            </PremiumCard>
-          ))}
-        </div>
-      </Section>
-
-      <Section>
-        <SectionHeader
-          eyebrow="How it works"
-          title="A four-step flow from upload to controlled serving."
-          body="The product stays easy to operate while enforcement stays server-side."
-        />
-        <div className="mt-8">
-          <TimelineSteps steps={TIMELINE} />
-        </div>
-      </Section>
-
-      <Section>
-        <SectionHeader
-          eyebrow="Feature storytelling"
-          title="Controls designed for real external workflows."
-          body="Each part of the product exists to reduce ambiguity after a file leaves your team."
-        />
-        <div className="mt-8 space-y-4">
-          {FEATURE_BANDS.map((band, index) => (
-            <FeatureBand
-              key={band.title}
-              eyebrow={band.eyebrow}
-              title={band.title}
-              body={band.body}
-              points={band.points}
-              reverse={index % 2 === 1}
-              visual={<DocumentVisual rows={visualRows(index)} footer={band.eyebrow} />}
-            />
-          ))}
-        </div>
-      </Section>
-
-      <Section>
-        <div className="grid gap-4 lg:grid-cols-12">
-          <PremiumCard strong className="lg:col-span-7">
-            <Eyebrow>Audience and use cases</Eyebrow>
-            <h2 className="mt-4 text-3xl font-semibold tracking-[-0.03em] text-white sm:text-4xl">
-              Built for workflows where external sharing still needs discipline.
-            </h2>
-            <ul className="mt-6 space-y-3">
-              {USE_CASES.map((item) => (
-                <li key={item} className="flex gap-3 text-sm leading-7 text-white/68">
-                  <span className="mt-3 h-1.5 w-1.5 flex-none rounded-full bg-sky-300/90" />
-                  <span>{item}</span>
-                </li>
+          <ScrollRevealFrame delay={220} className="mt-10">
+            <div className="grid gap-4 border-t border-white/10 pt-5 sm:grid-cols-4">
+              {OUTCOMES.map((item) => (
+                <div key={item}>
+                  <div className="text-[11px] uppercase tracking-[0.22em] text-white/58">Outcome</div>
+                  <div className="mt-2 text-lg text-white/86">{item}</div>
+                </div>
               ))}
-            </ul>
-          </PremiumCard>
-
-          <PremiumCard className="lg:col-span-5">
-            <Eyebrow>Live posture</Eyebrow>
-            <div className="mt-5 flex items-center justify-between gap-4">
-              <div className="text-xl font-semibold text-white">Doclinks</div>
-              <MaturityBadge tone="live">Live</MaturityBadge>
             </div>
-            <Lead className="mt-4 text-base">
-              The flagship product is already anchored in public trust surfaces, policy documentation, and operational
-              discoverability.
-            </Lead>
-          </PremiumCard>
+          </ScrollRevealFrame>
         </div>
+      </BackgroundVideoSection>
+
+      <SectionTransition label="Outcome band" />
+
+      <Section className="py-18 sm:py-24">
+        <ContentRail>
+          <ScrollRevealFrame>
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              {OUTCOMES.map((item, index) => (
+                <div key={item} className="floating-stage p-6 sm:p-7">
+                  <div className="text-[11px] uppercase tracking-[0.22em] text-white/58">{String(index + 1).padStart(2, "0")}</div>
+                  <div className="mt-5 text-3xl font-semibold tracking-[-0.04em] text-white">{item}</div>
+                </div>
+              ))}
+            </div>
+          </ScrollRevealFrame>
+        </ContentRail>
       </Section>
 
-      <Section>
-        <SectionHeader
-          eyebrow="Trust architecture"
-          title="Everything needed for product review is already connected."
-          body="Doclinks inherits the same trust shell as the broader cyang.io platform."
-        />
-        <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {TRUST_ITEMS.map((item) => (
-            <LinkTile key={item.href} href={item.href} title={item.title} body={item.body} meta={item.meta} />
+      <SectionTransition label="Delivery flow" />
+
+      <Section className="py-18 sm:py-24">
+        <ContentRail>
+          <ScrollRevealFrame>
+            <div className="grid gap-8 lg:grid-cols-[320px_minmax(0,1fr)] lg:items-start">
+              <div className="lg:sticky lg:top-28">
+                <div className="text-[11px] uppercase tracking-[0.24em] text-white/58">How it works</div>
+                <h2 className="mt-4 text-balance text-4xl font-semibold tracking-[-0.05em] text-white sm:text-5xl">
+                  A secure serving flow in four deliberate steps.
+                </h2>
+              </div>
+              <div className="relative border-l border-white/10 pl-6 sm:pl-8">
+                {TIMELINE.map((step, index) => (
+                  <div key={step.id} className={index === TIMELINE.length - 1 ? "" : "pb-10"}>
+                    <div className="absolute -left-[9px] mt-1 h-4 w-4 rounded-full border border-white/16 bg-black/70" />
+                    <div className="text-[11px] uppercase tracking-[0.24em] text-white/58">{step.id}</div>
+                    <div className="mt-2 text-2xl font-semibold tracking-[-0.04em] text-white">{step.title}</div>
+                    <p className="mt-3 max-w-xl text-base leading-8 text-white/64">{step.body}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </ScrollRevealFrame>
+        </ContentRail>
+      </Section>
+
+      <SectionTransition label="Feature storytelling" />
+
+      <Section className="py-18 sm:py-24">
+        <ContentRail className="space-y-10">
+          {FEATURES.map((feature, index) => (
+            <ScrollRevealFrame key={feature.title} delay={index * 70}>
+              <div className="floating-stage p-6 sm:p-8 lg:p-10">
+                <AmbientScene tone={index % 2 === 0 ? "cool" : "steel"} className="opacity-70" />
+                <div className="relative">
+                  <StoryBand
+                    eyebrow={feature.eyebrow}
+                    title={feature.title}
+                    body={feature.body}
+                    reverse={index % 2 === 1}
+                    aside={<VisualSignalCluster title={feature.eyebrow} items={feature.signal} />}
+                  />
+                </div>
+              </div>
+            </ScrollRevealFrame>
           ))}
-        </div>
+        </ContentRail>
       </Section>
 
-      <Section>
-        <PremiumCard strong className="grid gap-6 lg:grid-cols-[1fr_auto] lg:items-center">
-          <div>
-            <Eyebrow>Final call</Eyebrow>
-            <h2 className="mt-4 text-3xl font-semibold tracking-[-0.03em] text-white sm:text-4xl">
-              Start with Doclinks when document delivery needs to stay controlled.
-            </h2>
-            <Lead className="mt-4 max-w-2xl">
-              It is the clearest expression of the cyang.io approach: calm UX, bounded exposure, and trust surfaces
-              that are easy to review.
-            </Lead>
+      <SectionTransition label="Audience and trust" />
+
+      <Section className="py-18 sm:py-24">
+        <ContentRail>
+          <div className="grid gap-8 lg:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)]">
+            <ScrollRevealFrame>
+              <PremiumCard strong className="h-full">
+                <div className="text-[11px] uppercase tracking-[0.24em] text-white/58">Audience and use cases</div>
+                <h2 className="mt-4 text-balance text-4xl font-semibold tracking-[-0.05em] text-white sm:text-5xl">
+                  Built for workflows where external sharing still needs discipline.
+                </h2>
+                <ul className="mt-6 space-y-4">
+                  {[
+                    "Operations teams sending time-bound external documents.",
+                    "Compliance workflows that need bounded access and reviewable delivery behavior.",
+                    "Sensitive external sharing for finance, HR, and legal workflows.",
+                    "Small businesses that need stronger trust posture without enterprise complexity.",
+                  ].map((item) => (
+                    <li key={item} className="flex gap-3 text-sm leading-7 text-white/68">
+                      <span className="mt-3 h-1.5 w-1.5 flex-none rounded-full bg-sky-300/90" />
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              </PremiumCard>
+            </ScrollRevealFrame>
+
+            <ScrollRevealFrame delay={120}>
+              <div className="floating-stage p-6 sm:p-8">
+                <AmbientScene tone="signal" className="opacity-75" />
+                <div className="relative">
+                  <div className="text-[11px] uppercase tracking-[0.24em] text-white/58">Trust architecture</div>
+                  <h2 className="mt-4 text-balance text-4xl font-semibold tracking-[-0.05em] text-white sm:text-5xl">
+                    Reviewable trust continuity for the flagship product.
+                  </h2>
+                  <p className="mt-5 max-w-xl text-base leading-8 text-white/64">
+                    Doclinks inherits the same public trust shell as the wider cyang.io platform, so product review is
+                    already connected to policy, status, and procurement routes.
+                  </p>
+                  <div className="mt-8">
+                    <DocumentIndexList items={TRUST_DOCUMENTS} />
+                  </div>
+                </div>
+              </div>
+            </ScrollRevealFrame>
           </div>
-          <CTAGroup
-            actions={[
-              { href: primaryAccessHref, label: publicConfig.signupEnabled ? "Start with Doclinks" : "Sign in", tone: "primary" },
-              { href: "/contact", label: "Contact", tone: "secondary" },
-            ]}
-          />
-        </PremiumCard>
+        </ContentRail>
+      </Section>
+
+      <Section className="py-18 sm:py-24">
+        <ContentRail>
+          <ScrollRevealFrame>
+            <div className="floating-stage overflow-hidden px-6 py-10 sm:px-8 sm:py-12 lg:px-10">
+              <AmbientScene tone="steel" />
+              <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+                <div className="max-w-3xl">
+                  <div className="text-[11px] uppercase tracking-[0.24em] text-white/58">Final CTA</div>
+                  <h2 className="mt-4 text-balance text-4xl font-semibold tracking-[-0.05em] text-white sm:text-5xl lg:text-6xl">
+                    Start with Doclinks when delivery needs to stay controlled.
+                  </h2>
+                  <p className="mt-5 text-base leading-8 text-white/64 sm:text-lg">
+                    It is the clearest expression of the cyang.io approach: calm UX, bounded exposure, and trust
+                    surfaces that are easy to review.
+                  </p>
+                </div>
+                <CTAGroup
+                  actions={[
+                    { href: primaryAccessHref, label: publicConfig.signupEnabled ? "Start with Doclinks" : "Sign in", tone: "primary" },
+                    { href: "/contact", label: "Contact", tone: "secondary" },
+                  ]}
+                />
+              </div>
+            </div>
+          </ScrollRevealFrame>
+        </ContentRail>
       </Section>
     </>
   );

@@ -1,159 +1,234 @@
 import type { Metadata } from "next";
+import { ScrollRevealFrame } from "@/app/components/CinematicClient";
+import { AmbientScene, SectionTransition, StoryBand, VisualSignalCluster } from "@/app/components/CinematicScene";
 import {
   CTAGroup,
+  ContentRail,
   Eyebrow,
-  Lead,
   MaturityBadge,
   PremiumCard,
-  PrinciplesGrid,
   Section,
-  SectionHeader,
-} from "../components/PublicPrimitives";
-import { SiteShell } from "../components/SiteShell";
-
-export const revalidate = 900;
+} from "@/app/components/PublicPrimitives";
+import { SiteShell } from "@/app/components/SiteShell";
 
 export const metadata: Metadata = {
   title: "About - cyang.io",
   description:
-    "A disciplined home for practical software: founder-led products, systems thinking, and security-conscious engineering by cyang.io.",
+    "cyang.io builds practical software with disciplined product thinking, clear trust surfaces, and long-term technical stewardship.",
 };
 
-const WHAT_IS = [
-  {
-    title: "Products",
-    body: "Software with a clear operating job, flagship-level focus, and room to mature without sprawl.",
-    microcopy: "Built to stay useful.",
-  },
-  {
-    title: "Systems",
-    body: "Operational layers for trust, governance, and public clarity that support the products around them.",
-    microcopy: "Structure matters.",
-  },
-  {
-    title: "Security-first engineering",
-    body: "Important controls live in architecture and policy, not as optional afterthoughts.",
-    microcopy: "Boundaries stay enforceable.",
-  },
-];
-
 const PRINCIPLES = [
-  { title: "Practical software over hype", body: "The point is durable usefulness, not noise.", microcopy: "Signal before spectacle." },
-  { title: "Architecture-level controls", body: "Critical rules are enforced by the system.", microcopy: "Policy holds under pressure." },
-  { title: "Long-term stewardship", body: "Products are built to remain coherent as they grow.", microcopy: "Steady, not frantic." },
-  { title: "Calm execution", body: "A tighter roadmap leaves more room for quality.", microcopy: "Discipline compounds." },
-  { title: "Customer clarity", body: "People should understand what the system does and what it does not.", microcopy: "Readable by design." },
+  "Practical software over hype",
+  "Architecture-level controls",
+  "Long-term stewardship",
+  "Calm execution",
+  "Customer clarity",
 ];
 
 const ROADMAP = [
-  { title: "Flagship products", body: "Doclinks leads today, with future products earning their place through the same standard.", tone: "live" as const },
-  { title: "Trust systems", body: "Public status, policy, legal, and procurement pathways continue to tighten as a unified shell.", tone: "build" as const },
-  { title: "Adjacent workflow tools", body: "Expansion stays focused on practical, high-trust workflow software.", tone: "lab" as const },
+  {
+    title: "Flagship products",
+    body: "Doclinks sets the benchmark: controlled delivery, visible posture, and a product surface that rewards precision.",
+    tone: "live" as const,
+  },
+  {
+    title: "Trust systems",
+    body: "The public shell, policy surfaces, procurement materials, and operational signals are treated as product work.",
+    tone: "build" as const,
+  },
+  {
+    title: "Adjacent workflow tools",
+    body: "Future products will stay close to workflow integrity, operational clarity, and high-trust external delivery.",
+    tone: "lab" as const,
+  },
 ];
 
 export default function AboutPage() {
   return (
     <SiteShell maxWidth="full">
-      <Section className="pt-8 sm:pt-12">
-        <SectionHeader
-          eyebrow="About cyang.io"
-          title="A disciplined home for practical software."
-          body="cyang.io is a founder-led product studio for secure workflows, operational clarity, and systems that stay legible as they grow."
-        />
-      </Section>
-
-      <Section>
-        <SectionHeader
-          eyebrow="What cyang.io is"
-          title="A portfolio built around products, systems, and engineering discipline."
-          body="The company structure is simple on purpose: a flagship product, a visible trust architecture, and room for adjacent tools to emerge without clutter."
-        />
-        <div className="mt-8">
-          <PrinciplesGrid items={WHAT_IS} />
-        </div>
-      </Section>
-
-      <Section>
-        <SectionHeader
-          eyebrow="Operating principles"
-          title="The working philosophy behind the site and the products."
-          body="These are the standards that shape public copy, interface decisions, and product architecture."
-        />
-        <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-          {PRINCIPLES.map((item) => (
-            <PremiumCard key={item.title} className="h-full">
-              <div className="text-2xl font-semibold tracking-tight text-white">{item.title}</div>
-              <Lead className="mt-4 text-base">{item.body}</Lead>
-              <div className="mt-6 text-xs uppercase tracking-[0.18em] text-white/38">{item.microcopy}</div>
-            </PremiumCard>
-          ))}
-        </div>
-      </Section>
-
-      <Section>
-        <div className="grid gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
-          <PremiumCard strong className="flex flex-col items-center justify-center text-center">
-            <div className="grid h-28 w-28 place-items-center rounded-[2rem] border border-white/12 bg-white/[0.05] text-3xl font-semibold tracking-[0.08em] text-white">
-              CY
-            </div>
-            <div className="mt-5 text-xl font-semibold text-white">Chang Yang</div>
-            <div className="mt-2 text-sm text-white/58">Founder and builder</div>
-          </PremiumCard>
-
-          <PremiumCard>
-            <Eyebrow>Founder band</Eyebrow>
-            <h2 className="mt-4 text-3xl font-semibold tracking-[-0.03em] text-white sm:text-4xl">
-              Building software that stays clear under operational pressure.
-            </h2>
-            <Lead className="mt-4 max-w-2xl">
-              The cyang.io direction is deliberately narrow: build useful products, enforce important boundaries at the
-              system layer, and make trust easy to review from the public site down.
-            </Lead>
-            <p className="mt-6 max-w-2xl text-sm leading-7 text-white/64">
-              Doclinks is the flagship proof of that approach. More products can grow from this foundation, but only if
-              the site, the trust posture, and the product system remain coherent.
-            </p>
-          </PremiumCard>
-        </div>
-      </Section>
-
-      <Section>
-        <SectionHeader
-          eyebrow="Future direction"
-          title="A high-level roadmap with room to stay disciplined."
-          body="The next stage is not about breadth for its own sake. It is about extending a strong foundation into adjacent practical tools."
-        />
-        <div className="mt-8 grid gap-4 md:grid-cols-3">
-          {ROADMAP.map((item) => (
-            <PremiumCard key={item.title} className="h-full">
-              <div className="flex items-center justify-between gap-4">
-                <div className="text-xl font-semibold text-white">{item.title}</div>
-                <MaturityBadge tone={item.tone}>{item.tone === "live" ? "Active" : item.tone === "build" ? "Growing" : "Future"}</MaturityBadge>
+      <section className="cinematic-bleed relative overflow-hidden pt-10 sm:pt-16 lg:pt-20">
+        <AmbientScene tone="steel" className="opacity-90" />
+        <ContentRail className="relative">
+          <div className="grid gap-8 lg:grid-cols-[minmax(260px,0.6fr)_minmax(0,1.15fr)] lg:items-end">
+            <ScrollRevealFrame>
+              <div className="floating-stage relative min-h-[320px] overflow-hidden rounded-[2.6rem] border border-white/10 bg-white/[0.03] p-8 sm:p-10">
+                <AmbientScene tone="cool" className="opacity-75" />
+                <div className="relative flex h-full flex-col justify-between">
+                  <Eyebrow className="self-start">Company</Eyebrow>
+                  <div className="editorial-kicker">CY</div>
+                  <div className="max-w-xs text-sm leading-7 text-white/56">
+                    Product work, trust systems, and a quieter standard for how secure workflow software should feel.
+                  </div>
+                </div>
               </div>
-              <Lead className="mt-4 text-base">{item.body}</Lead>
-            </PremiumCard>
-          ))}
-        </div>
+            </ScrollRevealFrame>
+
+            <ScrollRevealFrame delay={120}>
+              <div className="max-w-4xl pb-2">
+                <Eyebrow>About cyang.io</Eyebrow>
+                <h1 className="mt-6 max-w-4xl text-balance font-editorial text-5xl leading-[0.95] tracking-[-0.05em] text-white sm:text-6xl lg:text-[5.6rem]">
+                  A disciplined home for practical software.
+                </h1>
+                <p className="mt-6 max-w-2xl text-base leading-8 text-white/68 sm:text-lg">
+                  cyang.io builds products that make control, reviewability, and operational clarity feel native instead
+                  of bolted on afterward.
+                </p>
+                <CTAGroup
+                  className="mt-8"
+                  actions={[
+                    { href: "/products", label: "Explore products", tone: "primary" },
+                    { href: "/contact", label: "Contact", tone: "secondary" },
+                  ]}
+                />
+              </div>
+            </ScrollRevealFrame>
+          </div>
+        </ContentRail>
+      </section>
+
+      <SectionTransition label="Manifesto" />
+
+      <Section className="pt-4 sm:pt-8">
+        <ScrollRevealFrame>
+          <StoryBand
+            eyebrow="What cyang.io is"
+            title="A product studio built around control surfaces, clear systems, and software that ages well."
+            body="The company is intentionally narrow in taste and broad in discipline. Products need to solve a real workflow problem, carry their trust posture in public, and remain understandable long after launch."
+            aside={
+              <VisualSignalCluster
+                title="Studio focus"
+                items={[
+                  { label: "Products", value: "Flagship tools with opinionated workflow controls." },
+                  { label: "Systems", value: "Public trust, legal, and operational layers treated as first-class product surfaces." },
+                  { label: "Engineering", value: "Security-aware implementation that stays calm under scrutiny." },
+                ]}
+              />
+            }
+          />
+        </ScrollRevealFrame>
       </Section>
 
-      <Section>
-        <PremiumCard strong className="grid gap-6 lg:grid-cols-[1fr_auto] lg:items-center">
-          <div>
-            <h2 className="text-3xl font-semibold tracking-[-0.03em] text-white sm:text-4xl">
-              Explore the portfolio or get in touch.
-            </h2>
-            <p className="mt-4 max-w-2xl text-base leading-8 text-white/66">
-              The public site is built to make the structure clear quickly: flagship product, trust-first platform, and
-              a company that intends to keep both coherent.
-            </p>
+      <Section className="py-16 sm:py-20">
+        <ScrollRevealFrame>
+          <div className="floating-stage relative overflow-hidden rounded-[2.8rem] border border-white/10 bg-white/[0.03] px-6 py-10 sm:px-8 sm:py-14 lg:px-12">
+            <AmbientScene tone="signal" className="opacity-85" />
+            <div className="relative grid gap-10 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:items-start">
+              <div className="max-w-2xl">
+                <Eyebrow>Operating principles</Eyebrow>
+                <h2 className="mt-5 text-balance text-4xl font-semibold tracking-[-0.04em] text-white sm:text-5xl lg:text-6xl">
+                  Calm execution backed by hard edges where they matter.
+                </h2>
+                <p className="mt-5 max-w-xl text-base leading-8 text-white/64 sm:text-lg">
+                  The posture is simple: avoid noise, make the important controls explicit, and keep the product honest
+                  enough to withstand real review.
+                </p>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                {PRINCIPLES.map((principle, index) => (
+                  <PremiumCard key={principle} className="min-h-[168px] bg-black/22">
+                    <div className="text-[11px] uppercase tracking-[0.24em] text-white/58">
+                      {String(index + 1).padStart(2, "0")}
+                    </div>
+                    <div className="mt-8 text-xl font-semibold tracking-tight text-white">{principle}</div>
+                  </PremiumCard>
+                ))}
+              </div>
+            </div>
           </div>
-          <CTAGroup
-            actions={[
-              { href: "/products", label: "Explore products", tone: "primary" },
-              { href: "/contact", label: "Contact", tone: "secondary" },
-            ]}
-          />
-        </PremiumCard>
+        </ScrollRevealFrame>
+      </Section>
+
+      <SectionTransition label="Founder" />
+
+      <Section className="pt-4 sm:pt-8">
+        <ScrollRevealFrame>
+          <div className="grid gap-6 lg:grid-cols-[minmax(280px,0.62fr)_minmax(0,1fr)] lg:items-center">
+            <div className="floating-stage relative min-h-[360px] overflow-hidden rounded-[2.5rem] border border-white/10 bg-white/[0.03] p-8">
+              <AmbientScene tone="steel" className="opacity-80" />
+              <div className="relative flex h-full flex-col justify-between">
+                <Eyebrow className="self-start">Built by Chang Yang</Eyebrow>
+                <div className="editorial-kicker text-[clamp(5rem,12vw,8.5rem)]">CY</div>
+                <div className="max-w-xs text-sm leading-7 text-white/56">
+                  Founder-led product work with taste for restraint, trust architecture, and software that earns review.
+                </div>
+              </div>
+            </div>
+
+            <div className="max-w-3xl">
+              <div className="text-[11px] uppercase tracking-[0.24em] text-white/58">Founder statement</div>
+              <h2 className="mt-4 text-balance text-4xl font-semibold tracking-[-0.04em] text-white sm:text-5xl">
+                Build fewer things. Make them sharper, steadier, and easier to trust.
+              </h2>
+              <p className="mt-5 max-w-2xl text-base leading-8 text-white/66 sm:text-lg">
+                cyang.io was built to house products that feel composed under pressure. That means customer-facing
+                controls, legible policy surfaces, and design decisions that support credibility instead of competing
+                with it.
+              </p>
+              <p className="mt-5 max-w-2xl text-base leading-8 text-white/60">
+                The goal is not a sprawling product catalog. It is a durable portfolio of practical systems that solve
+                meaningful workflow problems and present themselves with confidence.
+              </p>
+            </div>
+          </div>
+        </ScrollRevealFrame>
+      </Section>
+
+      <SectionTransition label="Future direction" />
+
+      <Section className="pt-4 sm:pt-8">
+        <ScrollRevealFrame>
+          <div className="grid gap-5 lg:grid-cols-[minmax(0,0.78fr)_minmax(0,1.22fr)]">
+            <div className="max-w-2xl">
+              <Eyebrow>Roadmap</Eyebrow>
+              <h2 className="mt-5 text-balance text-4xl font-semibold tracking-[-0.04em] text-white sm:text-5xl">
+                A focused path, not a sprawling menu.
+              </h2>
+              <p className="mt-5 text-base leading-8 text-white/64 sm:text-lg">
+                Growth will stay close to the company&apos;s center of gravity: secure delivery, trust infrastructure,
+                and workflow tools that benefit from tighter operational discipline.
+              </p>
+            </div>
+
+            <div className="grid gap-4 lg:grid-cols-3">
+              {ROADMAP.map((item) => (
+                <PremiumCard key={item.title} className="h-full">
+                  <MaturityBadge tone={item.tone}>
+                    {item.tone === "live" ? "Live now" : item.tone === "build" ? "In development" : "Systems lab"}
+                  </MaturityBadge>
+                  <h3 className="mt-5 text-2xl font-semibold tracking-tight text-white">{item.title}</h3>
+                  <p className="mt-3 text-sm leading-7 text-white/64">{item.body}</p>
+                </PremiumCard>
+              ))}
+            </div>
+          </div>
+        </ScrollRevealFrame>
+      </Section>
+
+      <Section className="pb-18 pt-16 sm:pb-24 sm:pt-20">
+        <ScrollRevealFrame>
+          <div className="floating-stage relative overflow-hidden rounded-[2.8rem] border border-white/10 bg-white/[0.03] px-6 py-10 sm:px-8 sm:py-14 lg:px-12">
+            <AmbientScene tone="cool" className="opacity-85" />
+            <div className="relative grid gap-8 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+              <div className="max-w-3xl">
+                <Eyebrow>Next step</Eyebrow>
+                <h2 className="mt-5 text-balance text-4xl font-semibold tracking-[-0.04em] text-white sm:text-5xl lg:text-6xl">
+                  Explore the portfolio or start a direct conversation.
+                </h2>
+                <p className="mt-5 max-w-2xl text-base leading-8 text-white/64 sm:text-lg">
+                  The public site is designed to make the company legible quickly. The next move depends on whether
+                  you want product detail, trust detail, or a conversation.
+                </p>
+              </div>
+              <CTAGroup
+                actions={[
+                  { href: "/products", label: "Explore products", tone: "primary" },
+                  { href: "/contact", label: "Contact", tone: "secondary" },
+                ]}
+              />
+            </div>
+          </div>
+        </ScrollRevealFrame>
       </Section>
     </SiteShell>
   );

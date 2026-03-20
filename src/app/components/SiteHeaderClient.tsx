@@ -60,7 +60,7 @@ export default function SiteHeaderClient({ config }: { config: PublicRuntimeConf
             </div>
             <div className="min-w-0">
               <div className="truncate text-sm font-semibold tracking-tight text-white sm:text-base">cyang.io</div>
-              <div className="truncate text-[10px] uppercase tracking-[0.24em] text-white/38 sm:text-[11px]">
+              <div className="truncate text-[10px] uppercase tracking-[0.24em] text-white/60 sm:text-[11px]">
                 Secure workflow software
               </div>
             </div>

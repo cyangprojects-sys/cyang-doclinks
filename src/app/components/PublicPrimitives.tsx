@@ -75,7 +75,7 @@ export function BodyMuted({ children, className }: { children: ReactNode; classN
 
 export function MetaLabel({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <div className={cn("text-[11px] font-medium uppercase tracking-[0.22em] text-white/42", className)}>{children}</div>
+    <div className={cn("text-[11px] font-medium uppercase tracking-[0.22em] text-white/60", className)}>{children}</div>
   );
 }
 
@@ -270,7 +270,7 @@ export function PillarCard({
     <div className="group h-full rounded-[2rem] border border-white/8 bg-white/[0.025] p-6 transition-colors hover:border-white/18 hover:bg-white/[0.045] focus-within:border-white/18">
       <div className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">{title}</div>
       <BodyMuted className="mt-3 max-w-sm">{body}</BodyMuted>
-      {microcopy ? <div className="mt-6 text-xs uppercase tracking-[0.18em] text-white/38">{microcopy}</div> : null}
+      {microcopy ? <div className="mt-6 text-xs uppercase tracking-[0.18em] text-white/58">{microcopy}</div> : null}
     </div>
   );
 }
@@ -561,7 +561,7 @@ export function Breadcrumbs({
   items: Array<{ label: string; href?: string }>;
 }) {
   return (
-    <nav aria-label="Breadcrumb" className="flex flex-wrap items-center gap-2 text-xs uppercase tracking-[0.16em] text-white/42">
+    <nav aria-label="Breadcrumb" className="flex flex-wrap items-center gap-2 text-xs uppercase tracking-[0.16em] text-white/58">
       {items.map((item, index) => (
         <span key={`${item.label}-${index}`} className="inline-flex items-center gap-2">
           {item.href ? <Link href={item.href} className="transition-colors hover:text-white/72">{item.label}</Link> : <span className="text-white/58">{item.label}</span>}
@@ -581,7 +581,7 @@ export function PolicyMeta({
     <dl className="grid gap-4 sm:grid-cols-2">
       {items.map((item) => (
         <div key={item.label}>
-          <dt className="text-[11px] uppercase tracking-[0.22em] text-white/38">{item.label}</dt>
+          <dt className="text-[11px] uppercase tracking-[0.22em] text-white/58">{item.label}</dt>
           <dd className="mt-2 text-sm text-white/78">{item.value}</dd>
         </div>
       ))}
@@ -630,7 +630,7 @@ export function DocumentVisual({
           {rows.map((row) => (
             <div key={row.label} className="rounded-2xl border border-white/8 bg-white/[0.03] p-4">
               <div className="flex items-center justify-between gap-3">
-                <span className="text-xs uppercase tracking-[0.18em] text-white/40">{row.label}</span>
+                <span className="text-xs uppercase tracking-[0.18em] text-white/60">{row.label}</span>
                 <span
                   className={cn(
                     "inline-flex rounded-full px-2.5 py-1 text-[11px]",
@@ -647,7 +647,7 @@ export function DocumentVisual({
             </div>
           ))}
         </div>
-        {footer ? <div className="mt-4 rounded-2xl border border-white/8 bg-black/30 p-4 text-xs text-white/58">{footer}</div> : null}
+        {footer ? <div className="mt-4 rounded-2xl border border-white/8 bg-black/30 p-4 text-xs text-white/72">{footer}</div> : null}
       </div>
     </div>
   );
