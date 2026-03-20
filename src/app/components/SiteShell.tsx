@@ -24,7 +24,7 @@ export function SiteShell({
   const config = publicConfig ?? getPublicRuntimeConfig();
 
   return (
-    <main className="marketing-shell min-h-screen text-white">
+    <main className="marketing-shell min-h-screen text-[var(--text-primary)]">
       <PublicFunnelTrackerDeferred />
       <div className={`relative mx-auto w-full ${shellWidth} px-3 py-3 sm:px-4 sm:py-4 lg:px-6`}>
         <SiteHeader config={config} />

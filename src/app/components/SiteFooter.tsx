@@ -69,11 +69,11 @@ export function SiteFooter({ config }: { config: PublicRuntimeConfig }) {
 
   return (
     <footer className="mt-20 pb-10 sm:mt-24">
-      <div className="surface-panel rounded-[2rem] px-5 py-8 sm:px-6 lg:px-8">
+      <div className="surface-panel rounded-sm px-5 py-8 sm:px-6 lg:px-8">
         <div className="grid gap-10 lg:grid-cols-[1.4fr_repeat(6,minmax(0,1fr))]">
           <div>
             <div className="flex items-center gap-3">
-              <div className="grid h-12 w-12 place-items-center rounded-2xl border border-white/12 bg-white/[0.05] p-2">
+              <div className="grid h-12 w-12 place-items-center rounded-sm border border-white/12 bg-white/[0.05] p-2">
                 <img src="/branding/cyang_primary.svg" alt="cyang.io" className="h-full w-full object-contain" />
               </div>
               <div>
@@ -87,10 +87,10 @@ export function SiteFooter({ config }: { config: PublicRuntimeConfig }) {
             </p>
 
             <div className="mt-6 flex flex-wrap gap-2">
-              <a href={`mailto:${config.supportEmail}`} className="btn-base btn-secondary inline-flex rounded-full px-3 py-2 text-xs">
+              <a href={`mailto:${config.supportEmail}`} className="btn-base btn-secondary inline-flex rounded-sm px-3 py-2 text-xs">
                 {config.supportEmail}
               </a>
-              <a href={`mailto:${config.securityEmail}`} className="btn-base btn-secondary inline-flex rounded-full px-3 py-2 text-xs">
+              <a href={`mailto:${config.securityEmail}`} className="btn-base btn-secondary inline-flex rounded-sm px-3 py-2 text-xs">
                 Security
               </a>
             </div>

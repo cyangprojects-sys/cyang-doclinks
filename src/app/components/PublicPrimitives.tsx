@@ -37,7 +37,7 @@ export function Eyebrow({ children, className }: { children: ReactNode; classNam
   return (
     <span
       className={cn(
-        "ui-badge inline-flex rounded-full px-3 py-1 text-[11px] font-medium uppercase tracking-[0.22em]",
+        "ui-badge inline-flex rounded-sm px-3 py-1 text-[11px] font-medium uppercase tracking-[0.22em]",
         className
       )}
     >
@@ -115,7 +115,7 @@ export function CTAGroup({
             key={`${action.href}-${action.label}`}
             href={action.href}
             className={cn(
-              "btn-base inline-flex items-center justify-center rounded-full px-5 py-3 text-sm font-medium",
+              "btn-base inline-flex items-center justify-center rounded-sm px-5 py-3 text-sm font-medium",
               action.tone === "primary" ? "btn-primary" : "btn-secondary"
             )}
           >
@@ -126,7 +126,7 @@ export function CTAGroup({
             key={`${action.href}-${action.label}`}
             href={action.href}
             className={cn(
-              "btn-base inline-flex items-center justify-center rounded-full px-5 py-3 text-sm font-medium",
+              "btn-base inline-flex items-center justify-center rounded-sm px-5 py-3 text-sm font-medium",
               action.tone === "primary" ? "btn-primary" : "btn-secondary"
             )}
           >
@@ -154,7 +154,7 @@ export function MaturityBadge({
           ? "border-amber-200/28 bg-amber-300/10 text-amber-100/90"
           : "border-white/14 bg-white/6 text-white/72";
 
-  return <span className={cn("inline-flex rounded-full border px-2.5 py-1 text-[11px] font-medium", toneClass)}>{children}</span>;
+  return <span className={cn("inline-flex rounded-sm border px-2.5 py-1 text-[11px] font-medium", toneClass)}>{children}</span>;
 }
 
 export function StatusPill({
@@ -173,7 +173,7 @@ export function StatusPill({
 
   return (
     <span className="inline-flex items-center gap-2 text-xs text-white/72">
-      <span className={cn("h-2 w-2 rounded-full", toneClass)} />
+      <span className={cn("h-2 w-2 rounded-[2px]", toneClass)} />
       <span>{label}</span>
     </span>
   );
@@ -196,7 +196,7 @@ export function PremiumCard({
 }) {
   const Component = as;
   return (
-    <Component className={cn(strong ? "surface-panel-strong" : "surface-panel", "rounded-[2rem] p-6 sm:p-7", className)}>
+    <Component className={cn(strong ? "surface-panel-strong" : "surface-panel", "rounded-sm p-6 sm:p-7", className)}>
       {children}
     </Component>
   );
@@ -267,7 +267,7 @@ export function PillarCard({
   microcopy?: string;
 }) {
   return (
-    <div className="group h-full rounded-[2rem] border border-white/8 bg-white/[0.025] p-6 transition-colors hover:border-white/18 hover:bg-white/[0.045] focus-within:border-white/18">
+    <div className="group h-full rounded-sm border border-white/8 bg-white/[0.025] p-6 transition-colors hover:border-white/18 hover:bg-white/[0.045] focus-within:border-white/18">
       <div className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">{title}</div>
       <BodyMuted className="mt-3 max-w-sm">{body}</BodyMuted>
       {microcopy ? <div className="mt-6 text-xs uppercase tracking-[0.18em] text-white/58">{microcopy}</div> : null}
@@ -346,7 +346,7 @@ export function AmbientGradient({ className }: { className?: string }) {
     <div
       aria-hidden="true"
       className={cn(
-        "pointer-events-none absolute inset-0 -z-10 overflow-hidden rounded-[2.5rem]",
+        "pointer-events-none absolute inset-0 -z-10 overflow-hidden rounded-sm",
         className
       )}
     >
@@ -365,7 +365,7 @@ export function LayeredBackdrop({
   children?: ReactNode;
 }) {
   return (
-    <div className={cn("hero-grid surface-panel-strong relative overflow-hidden rounded-[2.5rem] p-6 sm:p-8", className)}>
+    <div className={cn("hero-grid surface-panel-strong relative overflow-hidden rounded-sm p-6 sm:p-8", className)}>
       <AmbientGradient />
       <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/30 to-transparent" />
       <div className="absolute inset-y-0 left-[42%] hidden w-px bg-white/8 lg:block" />
@@ -492,7 +492,7 @@ export function TimelineSteps({
     <div className="grid gap-4 lg:grid-cols-4">
       {steps.map((step) => (
         <PremiumCard key={step.id} className="h-full">
-          <div className="inline-flex rounded-full border border-sky-200/25 bg-sky-300/10 px-2.5 py-1 text-[11px] uppercase tracking-[0.18em] text-sky-100/88">
+          <div className="inline-flex rounded-sm border border-sky-200/25 bg-sky-300/10 px-2.5 py-1 text-[11px] uppercase tracking-[0.18em] text-sky-100/88">
             {step.id}
           </div>
           <h3 className="mt-5 text-xl font-semibold tracking-tight text-white">{step.title}</h3>
@@ -531,7 +531,7 @@ export function DocumentIndexList({
   items: Array<{ href: string; title: string; body: string; meta?: ReactNode }>;
 }) {
   return (
-    <div className="overflow-hidden rounded-[2rem] border border-white/8">
+    <div className="overflow-hidden rounded-sm border border-white/8">
       {items.map((item, index) => (
         <Link
           key={item.href}
@@ -596,11 +596,11 @@ export function StickySubnav({
 }) {
   return (
     <div className="sticky top-22 z-20 hidden lg:block">
-      <div className="surface-panel rounded-[1.75rem] p-4">
+      <div className="surface-panel rounded-sm p-4">
         <MetaLabel>On this page</MetaLabel>
         <div className="mt-4 grid gap-2">
           {items.map((item) => (
-            <a key={item.href} href={item.href} className="rounded-xl px-3 py-2 text-sm text-white/68 transition-colors hover:bg-white/6 hover:text-white">
+            <a key={item.href} href={item.href} className="rounded-sm px-3 py-2 text-sm text-white/68 transition-colors hover:bg-white/6 hover:text-white">
               {item.label}
             </a>
           ))}
@@ -618,8 +618,8 @@ export function DocumentVisual({
   footer?: ReactNode;
 }) {
   return (
-    <div className="relative h-full overflow-hidden rounded-[1.75rem] border border-white/10 bg-[#090d13] p-5">
-      <AmbientGradient className="rounded-[1.75rem]" />
+    <div className="relative h-full overflow-hidden rounded-sm border border-white/10 bg-[#090d13] p-5">
+      <AmbientGradient className="rounded-sm" />
       <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/30 to-transparent" />
       <div className="relative">
         <div className="flex items-center justify-between">
@@ -628,12 +628,12 @@ export function DocumentVisual({
         </div>
         <div className="mt-5 space-y-3">
           {rows.map((row) => (
-            <div key={row.label} className="rounded-2xl border border-white/8 bg-white/[0.03] p-4">
+            <div key={row.label} className="rounded-sm border border-white/8 bg-white/[0.03] p-4">
               <div className="flex items-center justify-between gap-3">
                 <span className="text-xs uppercase tracking-[0.18em] text-white/60">{row.label}</span>
                 <span
                   className={cn(
-                    "inline-flex rounded-full px-2.5 py-1 text-[11px]",
+                    "inline-flex rounded-sm px-2.5 py-1 text-[11px]",
                     row.tone === "accent"
                       ? "bg-sky-300/12 text-sky-100/90"
                       : row.tone === "warm"
@@ -647,7 +647,7 @@ export function DocumentVisual({
             </div>
           ))}
         </div>
-        {footer ? <div className="mt-4 rounded-2xl border border-white/8 bg-black/30 p-4 text-xs text-white/72">{footer}</div> : null}
+        {footer ? <div className="mt-4 rounded-sm border border-white/8 bg-black/30 p-4 text-xs text-white/72">{footer}</div> : null}
       </div>
     </div>
   );

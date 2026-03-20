@@ -52,10 +52,10 @@ export default function SiteHeaderClient({ config }: { config: PublicRuntimeConf
         hidden ? "-translate-y-[120%]" : "translate-y-0",
       ].join(" ")}
     >
-      <header className="surface-panel-strong rounded-[1.75rem] px-4 py-3 sm:px-5">
+      <header className="surface-panel-strong nav-satin rounded-sm px-4 py-3 sm:px-5">
         <div className="flex items-center justify-between gap-4">
           <Link href="/" className="flex min-w-0 items-center gap-3">
-            <div className="grid h-11 w-11 place-items-center rounded-2xl border border-white/12 bg-white/[0.045] p-2 shadow-[0_16px_36px_rgba(0,0,0,0.28)]">
+            <div className="grid h-11 w-11 place-items-center rounded-sm border border-white/12 bg-white/[0.045] p-2 shadow-[0_10px_24px_rgba(25,38,52,0.12)]">
               <img src="/branding/cyang_primary.svg" alt="cyang.io" className="h-full w-full object-contain" />
             </div>
             <div className="min-w-0">
@@ -72,7 +72,7 @@ export default function SiteHeaderClient({ config }: { config: PublicRuntimeConf
                 key={item.href}
                 href={item.href}
                 className={[
-                  "btn-base rounded-full px-3.5 py-2 text-sm",
+                  "btn-base rounded-sm px-3.5 py-2 text-sm",
                   isCurrent(pathname, item.href) ? "bg-white/10 text-white" : "btn-ghost",
                 ].join(" ")}
                 aria-current={isCurrent(pathname, item.href) ? "page" : undefined}
@@ -83,11 +83,11 @@ export default function SiteHeaderClient({ config }: { config: PublicRuntimeConf
           </nav>
 
           <div className="flex items-center gap-2">
-            <Link href="/signin" className="btn-base btn-secondary inline-flex rounded-full px-4 py-2.5 text-sm font-medium">
+            <Link href="/signin" className="btn-base btn-secondary inline-flex rounded-sm px-4 py-2.5 text-sm font-medium">
               Sign in
             </Link>
             {config.signupEnabled ? (
-              <Link href="/signup" className="btn-base btn-primary inline-flex rounded-full px-4 py-2.5 text-sm font-medium">
+              <Link href="/signup" className="btn-base btn-primary inline-flex rounded-sm px-4 py-2.5 text-sm font-medium">
                 Get started
               </Link>
             ) : null}
@@ -100,7 +100,7 @@ export default function SiteHeaderClient({ config }: { config: PublicRuntimeConf
               key={item.href}
               href={item.href}
               className={[
-                "btn-base rounded-full px-3 py-1.5 text-xs whitespace-nowrap",
+                "btn-base rounded-sm px-3 py-1.5 text-xs whitespace-nowrap",
                 isCurrent(pathname, item.href) ? "bg-white/10 text-white" : "btn-ghost",
               ].join(" ")}
               aria-current={isCurrent(pathname, item.href) ? "page" : undefined}

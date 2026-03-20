@@ -52,7 +52,7 @@ export function VisualSignalCluster({
   className?: string;
 }) {
   return (
-    <div className={cn("signal-cluster relative overflow-hidden rounded-[2rem] border border-white/10 bg-black/20 p-5 sm:p-6", className)}>
+    <div className={cn("signal-cluster relative overflow-hidden rounded-sm border border-white/10 bg-black/20 p-5 sm:p-6", className)}>
       <AmbientScene tone="signal" className="opacity-80" />
       {title ? <div className="relative text-[11px] uppercase tracking-[0.24em] text-white/58">{title}</div> : null}
       <div className="relative mt-4 space-y-3">

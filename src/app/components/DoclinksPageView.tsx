@@ -204,7 +204,7 @@ export function DoclinksPageView({ publicConfig }: { publicConfig: PublicRuntime
               <div className="relative border-l border-white/10 pl-6 sm:pl-8">
                 {TIMELINE.map((step, index) => (
                   <div key={step.id} className={index === TIMELINE.length - 1 ? "" : "pb-10"}>
-                    <div className="absolute -left-[9px] mt-1 h-4 w-4 rounded-full border border-white/16 bg-black/70" />
+                    <div className="absolute -left-[9px] mt-1 h-4 w-4 rounded-[2px] border border-white/16 bg-black/70" />
                     <div className="text-[11px] uppercase tracking-[0.24em] text-white/58">{step.id}</div>
                     <div className="mt-2 text-2xl font-semibold tracking-[-0.04em] text-white">{step.title}</div>
                     <p className="mt-3 max-w-xl text-base leading-8 text-white/64">{step.body}</p>

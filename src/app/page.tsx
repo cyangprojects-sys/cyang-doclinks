@@ -131,7 +131,7 @@ export default function HomePage() {
                 cyang.io is positioned as a serious software studio: flagship product first, trust architecture
                 visible, and room to grow without losing discipline.
               </p>
-              <div className="story-seam mt-6 h-28 rounded-[1.5rem]" />
+              <div className="story-seam mt-6 h-28" />
               <VisualSignalCluster
                 className="mt-4"
                 title="Immediate signals"
@@ -296,7 +296,7 @@ export default function HomePage() {
           <div className="grid gap-6 lg:grid-cols-[280px_minmax(0,1fr)] lg:items-center">
             <ScrollRevealFrame>
               <div className="floating-stage flex min-h-[320px] flex-col items-center justify-center text-center p-8">
-                <div className="grid h-28 w-28 place-items-center rounded-[2rem] border border-white/12 bg-white/[0.05] text-3xl font-semibold tracking-[0.08em] text-white">
+                <div className="grid h-28 w-28 place-items-center rounded-sm border border-white/12 bg-white/[0.05] text-3xl font-semibold tracking-[0.08em] text-white">
                   CY
                 </div>
                 <div className="mt-6 text-lg font-semibold text-white">Built by Chang Yang</div>
