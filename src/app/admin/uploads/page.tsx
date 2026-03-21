@@ -66,32 +66,32 @@ export default async function AdminUploadsPage({
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold">Uploads</h1>
-          <div className="mt-1 text-sm text-white/65">Upload files, then move them into protected sharing.</div>
+          <div className="mt-1 text-sm text-[var(--text-secondary)]">Upload files, then move them into protected sharing.</div>
         </div>
         <DashboardHeaderActions docs={headerDocs} planId={data.planId} />
       </div>
 
-      <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+      <div className="surface-panel rounded-sm p-4">
         {fromCreateLink ? (
-          <div className="mb-3 rounded-lg border border-cyan-400/30 bg-cyan-500/10 px-3 py-2 text-sm text-cyan-100">
+          <div className="mb-3 rounded-sm border border-[var(--border-accent)] bg-[var(--surface-selected)] px-3 py-2 text-sm text-[var(--accent-primary)]">
             Upload a file to create your first protected link.
           </div>
         ) : null}
         {showFailed ? (
-          <div className="mb-3 rounded-lg border border-rose-400/35 bg-rose-500/10 px-3 py-2 text-sm text-rose-100">
+          <div className="mb-3 rounded-sm border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
             Viewing upload failures.
             {failedRows.length ? (
-              <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-rose-100/90">
+              <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-rose-700">
                 {failedRows.slice(0, 8).map((r) => (
                   <li key={r.doc_id}>
-                    <Link href={`/admin/documents/${encodeURIComponent(r.doc_id)}`} className="underline hover:text-white">
+                    <Link href={`/admin/documents/${encodeURIComponent(r.doc_id)}`} className="underline hover:text-[var(--text-primary)]">
                       {r.doc_title || "Untitled file"}
                     </Link>
                   </li>
                 ))}
               </ul>
             ) : failedStartEvents.length ? (
-              <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-rose-100/90">
+              <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-rose-700">
                 {failedStartEvents.map((e, idx) => (
                   <li key={`${e.created_at || "unknown"}-${idx}`}>
                     {e.created_at ? `${new Date(e.created_at).toLocaleString()}: ` : ""}
@@ -100,16 +100,16 @@ export default async function AdminUploadsPage({
                 ))}
               </ul>
             ) : reportedFailureCount > 0 ? (
-              <div className="mt-1 text-xs text-rose-100/85">
+              <div className="mt-1 text-xs text-rose-700">
                 Detected {reportedFailureCount} failed upload start event{reportedFailureCount === 1 ? "" : "s"} in the last 24h.
                 These can fail before a document record is created.
               </div>
             ) : (
-              <div className="mt-1 text-xs text-rose-100/85">No recent failed uploads found.</div>
+              <div className="mt-1 text-xs text-rose-700">No recent failed uploads found.</div>
             )}
           </div>
         ) : null}
-        <div className="mb-3 text-sm text-white/75">Upload a file, then create a protected link in one flow.</div>
+        <div className="mb-3 text-sm text-[var(--text-secondary)]">Upload a file, then create a protected link in one flow.</div>
         <UploadPanel canCheckEncryptionStatus={data.canCheckEncryptionStatus} autoOpenPicker={autoOpenPicker} />
       </div>
     </div>

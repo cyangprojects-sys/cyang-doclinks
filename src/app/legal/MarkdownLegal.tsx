@@ -38,7 +38,7 @@ export function MarkdownLegal({ markdown }: { markdown: string }) {
     blocks.push(
       <pre
         key={`code-${blocks.length}`}
-        className="overflow-x-auto rounded-[1.5rem] border border-white/10 bg-black/35 p-4 text-xs leading-7 text-white/82"
+        className="overflow-x-auto rounded-sm border border-[var(--border-subtle)] bg-[var(--surface-soft)] p-4 text-xs leading-7 text-[var(--text-secondary)]"
       >
         <code data-lang={codeLang || undefined}>{codeBuffer.join("\n")}</code>
       </pre>
@@ -75,7 +75,7 @@ export function MarkdownLegal({ markdown }: { markdown: string }) {
     }
 
     if (/^---+$/.test(line)) {
-      blocks.push(<hr key={`hr-${blocks.length}`} className="border-white/10" />);
+      blocks.push(<hr key={`hr-${blocks.length}`} className="border-[var(--border-subtle)]" />);
       index += 1;
       continue;
     }
@@ -84,7 +84,7 @@ export function MarkdownLegal({ markdown }: { markdown: string }) {
     if (h3) {
       const id = headingIdWithCounter(h3[1], seenHeadingIds);
       blocks.push(
-        <h3 id={id} key={`h3-${blocks.length}`} className="scroll-mt-28 text-xl font-semibold tracking-tight text-white">
+        <h3 id={id} key={`h3-${blocks.length}`} className="scroll-mt-28 text-xl font-semibold tracking-tight text-slate-950">
           <a href={`#${id}`}>{h3[1]}</a>
         </h3>
       );
@@ -96,7 +96,7 @@ export function MarkdownLegal({ markdown }: { markdown: string }) {
     if (h2) {
       const id = headingIdWithCounter(h2[1], seenHeadingIds);
       blocks.push(
-        <h2 id={id} key={`h2-${blocks.length}`} className="scroll-mt-28 text-3xl font-semibold tracking-[-0.03em] text-white">
+        <h2 id={id} key={`h2-${blocks.length}`} className="scroll-mt-28 text-3xl font-semibold tracking-[-0.03em] text-slate-950">
           <a href={`#${id}`}>{h2[1]}</a>
         </h2>
       );
@@ -108,7 +108,7 @@ export function MarkdownLegal({ markdown }: { markdown: string }) {
     if (h1) {
       const id = headingIdWithCounter(h1[1], seenHeadingIds);
       blocks.push(
-        <h1 id={id} key={`h1-${blocks.length}`} className="scroll-mt-28 text-4xl font-semibold tracking-[-0.03em] text-white">
+        <h1 id={id} key={`h1-${blocks.length}`} className="scroll-mt-28 text-4xl font-semibold tracking-[-0.03em] text-slate-950">
           <a href={`#${id}`}>{h1[1]}</a>
         </h1>
       );
@@ -127,9 +127,9 @@ export function MarkdownLegal({ markdown }: { markdown: string }) {
       }
 
       blocks.push(
-        <div key={`table-${blocks.length}`} className="overflow-x-auto rounded-[1.5rem] border border-white/10">
+        <div key={`table-${blocks.length}`} className="overflow-x-auto rounded-sm border border-[var(--border-subtle)] bg-white">
           <table className="w-full border-collapse text-left text-sm">
-            <thead className="bg-white/[0.04] text-white/88">
+            <thead className="bg-[var(--surface-soft)] text-[var(--text-primary)]">
               <tr>
                 {headers.map((header, cellIndex) => (
                   <th key={`${header}-${cellIndex}`} className="px-4 py-3 font-semibold">
@@ -140,9 +140,9 @@ export function MarkdownLegal({ markdown }: { markdown: string }) {
             </thead>
             <tbody>
               {rows.map((row, rowIndex) => (
-                <tr key={rowIndex} className="border-t border-white/8">
+                <tr key={rowIndex} className="border-t border-[var(--border-subtle)]">
                   {headers.map((_, colIndex) => (
-                    <td key={`${rowIndex}-${colIndex}`} className="px-4 py-3 text-white/72">
+                    <td key={`${rowIndex}-${colIndex}`} className="px-4 py-3 text-[var(--text-secondary)]">
                       {row[colIndex] || "-"}
                     </td>
                   ))}
@@ -162,7 +162,7 @@ export function MarkdownLegal({ markdown }: { markdown: string }) {
         index += 1;
       }
       blocks.push(
-        <ol key={`ol-${blocks.length}`} className="list-decimal space-y-2 pl-6 text-sm leading-8 text-white/76">
+        <ol key={`ol-${blocks.length}`} className="list-decimal space-y-2 pl-6 text-sm leading-8 text-[var(--text-secondary)]">
           {items.map((item, itemIndex) => (
             <li key={itemIndex}>{item}</li>
           ))}
@@ -178,7 +178,7 @@ export function MarkdownLegal({ markdown }: { markdown: string }) {
         index += 1;
       }
       blocks.push(
-        <ul key={`ul-${blocks.length}`} className="list-disc space-y-2 pl-6 text-sm leading-8 text-white/76">
+        <ul key={`ul-${blocks.length}`} className="list-disc space-y-2 pl-6 text-sm leading-8 text-[var(--text-secondary)]">
           {items.map((item, itemIndex) => (
             <li key={itemIndex}>{item}</li>
           ))}
@@ -196,7 +196,7 @@ export function MarkdownLegal({ markdown }: { markdown: string }) {
       blocks.push(
         <blockquote
           key={`quote-${blocks.length}`}
-          className="rounded-[1.5rem] border border-white/10 bg-white/[0.03] px-4 py-4 text-sm leading-7 text-white/70"
+          className="rounded-sm border border-[var(--border-subtle)] bg-[var(--surface-soft)] px-4 py-4 text-sm leading-7 text-[var(--text-secondary)]"
         >
           {quoteLines.join(" ")}
         </blockquote>
@@ -225,7 +225,7 @@ export function MarkdownLegal({ markdown }: { markdown: string }) {
     }
 
     blocks.push(
-      <p key={`p-${blocks.length}`} className="text-sm leading-8 text-white/78">
+      <p key={`p-${blocks.length}`} className="text-sm leading-8 text-[var(--text-secondary)]">
         {paragraphLines.join(" ")}
       </p>
     );

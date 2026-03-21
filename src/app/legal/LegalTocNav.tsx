@@ -70,8 +70,8 @@ export default function LegalTocNav({ headings }: Props) {
 
   return (
     <>
-      <details className="surface-panel rounded-[1.5rem] p-4 lg:hidden" open>
-        <summary className="cursor-pointer list-none text-sm font-medium text-white/90">On this page</summary>
+      <details className="surface-panel rounded-sm p-4 lg:hidden" open>
+        <summary className="cursor-pointer list-none text-sm font-medium text-slate-950">On this page</summary>
         <nav className="mt-3 space-y-1" aria-label="Legal document table of contents">
           {headings.map((heading) => {
             const isActive = activeId === heading.id;
@@ -81,9 +81,11 @@ export default function LegalTocNav({ headings }: Props) {
                 href={`#${heading.id}`}
                 onClick={(event) => onJump(event, heading.id)}
                 className={[
-                  "block rounded-lg px-2.5 py-1.5 text-xs transition-colors",
+                  "block rounded-sm px-2.5 py-1.5 text-xs transition-colors",
                   heading.level === 3 ? "ml-3" : "",
-                  isActive ? "bg-sky-300/12 text-sky-100" : "text-white/68 hover:bg-white/10 hover:text-white",
+                  isActive
+                    ? "bg-[var(--surface-selected)] text-[var(--accent-primary)]"
+                    : "text-[var(--text-secondary)] hover:bg-[var(--surface-soft)] hover:text-[var(--text-primary)]",
                 ].join(" ")}
               >
                 {heading.text}
@@ -93,8 +95,8 @@ export default function LegalTocNav({ headings }: Props) {
         </nav>
       </details>
 
-      <aside className="surface-panel sticky top-24 hidden rounded-[1.5rem] p-4 lg:block">
-        <div className="text-xs uppercase tracking-[0.14em] text-white/55">On this page</div>
+      <aside className="surface-panel sticky top-24 hidden rounded-sm p-4 lg:block">
+        <div className="text-xs uppercase tracking-[0.14em] text-[var(--text-faint)]">On this page</div>
         <nav className="mt-3 space-y-1" aria-label="Legal document table of contents">
           {headings.map((heading) => {
             const isActive = activeId === heading.id;
@@ -104,9 +106,11 @@ export default function LegalTocNav({ headings }: Props) {
                 href={`#${heading.id}`}
                 onClick={(event) => onJump(event, heading.id)}
                 className={[
-                  "block rounded-lg px-2.5 py-1.5 text-xs transition-colors",
+                  "block rounded-sm px-2.5 py-1.5 text-xs transition-colors",
                   heading.level === 3 ? "ml-3" : "",
-                  isActive ? "bg-sky-300/12 text-sky-100" : "text-white/68 hover:bg-white/10 hover:text-white",
+                  isActive
+                    ? "bg-[var(--surface-selected)] text-[var(--accent-primary)]"
+                    : "text-[var(--text-secondary)] hover:bg-[var(--surface-soft)] hover:text-[var(--text-primary)]",
                 ].join(" ")}
               >
                 {heading.text}

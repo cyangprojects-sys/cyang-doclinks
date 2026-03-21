@@ -48,18 +48,18 @@ type DeliveryRow = {
 };
 
 function Pill({ children }: { children: React.ReactNode }) {
-  return <span className="ui-badge inline-flex items-center rounded-full px-2 py-0.5 text-[11px]">{children}</span>;
+  return <span className="selection-pill inline-flex items-center rounded-full px-2 py-0.5 text-[11px]">{children}</span>;
 }
 
 function FieldLabel({ children, htmlFor }: { children: React.ReactNode; htmlFor: string }) {
-  return <label htmlFor={htmlFor} className="text-xs text-white/65">{children}</label>;
+  return <label htmlFor={htmlFor} className="text-xs text-[var(--text-secondary)]">{children}</label>;
 }
 
 function TextInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
   return (
     <input
       {...props}
-      className={`mt-1 w-full rounded-xl border border-white/20 bg-black/20 px-3 py-2 text-sm text-white placeholder:text-white/45 focus:border-cyan-300/55 focus:outline-none ${props.className || ""}`}
+      className={`field-input mt-1 w-full px-3 py-2 text-sm ${props.className || ""}`}
     />
   );
 }
@@ -68,8 +68,8 @@ function EventCheckboxes({ defaultEvents, namePrefix }: { defaultEvents: string[
   return (
     <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
       {ALL_EVENTS.map((e) => (
-        <label key={`${namePrefix}-${e}`} className="flex items-center gap-2 text-xs text-white/75">
-          <input aria-label={`Webhook event ${e}`} type="checkbox" name="events" value={e} defaultChecked={defaultEvents.includes(e)} className="h-4 w-4 rounded border-white/20 bg-black/30" />
+        <label key={`${namePrefix}-${e}`} className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
+          <input aria-label={`Webhook event ${e}`} type="checkbox" name="events" value={e} defaultChecked={defaultEvents.includes(e)} className="h-4 w-4 rounded border-[var(--border-subtle)] bg-white" />
           <span className="font-mono text-[11px]">{e}</span>
         </label>
       ))}
@@ -126,20 +126,20 @@ export default async function WebhooksPage() {
   }
 
   return (
-    <div className="w-full p-4 text-white md:p-6">
+    <div className="w-full p-4 text-[var(--text-primary)] md:p-6">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold tracking-tight">Webhooks</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-slate-950">Webhooks</h1>
       </div>
 
-      <section className="glass-card-strong rounded-2xl p-4">
-        <div className="text-sm text-white/70">
+      <section className="surface-panel-strong p-4">
+        <div className="text-sm text-[var(--text-secondary)]">
           Webhooks are outbound HTTP POSTs. If you set a secret, the JSON body is signed with HMAC-SHA256 and sent in
-          <span className="ml-1 font-mono text-xs text-white/65">x-cyang-signature</span>.
+          <span className="ml-1 font-mono text-xs text-[var(--text-secondary)]">x-cyang-signature</span>.
         </div>
 
         <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
-          <div className="glass-card rounded-xl p-4">
-            <h2 className="text-base font-medium">Create webhook</h2>
+          <div className="surface-panel-soft p-4">
+            <h2 className="text-base font-medium text-slate-950">Create webhook</h2>
             <form action={createWebhookAction} className="mt-3 space-y-3">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
@@ -147,8 +147,8 @@ export default async function WebhooksPage() {
                   <TextInput id="create-webhook-name" aria-label="Webhook name" name="name" placeholder="Production" />
                 </div>
                 <div className="flex items-end gap-2">
-                  <label className="flex items-center gap-2 text-xs text-white/75">
-                    <input aria-label="Webhook enabled" type="checkbox" name="enabled" defaultChecked className="h-4 w-4 rounded border-white/20 bg-black/30" />
+                  <label className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
+                    <input aria-label="Webhook enabled" type="checkbox" name="enabled" defaultChecked className="h-4 w-4 rounded border-[var(--border-subtle)] bg-white" />
                     Enabled
                   </label>
                 </div>
@@ -165,27 +165,27 @@ export default async function WebhooksPage() {
               </div>
 
               <div>
-                <div className="text-xs text-white/65">Events</div>
+                <div className="text-xs text-[var(--text-secondary)]">Events</div>
                 <EventCheckboxes defaultEvents={["share.created", "share.revoked"]} namePrefix="create" />
               </div>
 
-              <button className="btn-base btn-primary rounded-xl px-3 py-2 text-sm font-medium">Create</button>
+              <button className="btn-base btn-primary rounded-sm px-3 py-2 text-sm font-medium">Create</button>
             </form>
           </div>
 
-          <div className="glass-card rounded-xl p-4">
-            <h3 className="text-sm font-medium">Delivery model</h3>
-            <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-white/70">
+          <div className="surface-panel-soft p-4">
+            <h3 className="text-sm font-medium text-slate-950">Delivery model</h3>
+            <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-[var(--text-secondary)]">
               <li>
                 Preferred: queued deliveries with retry and backoff via cron worker
-                <span className="ml-2 font-mono text-xs text-white/60">/api/cron/webhooks</span>
+                <span className="ml-2 font-mono text-xs text-[var(--text-secondary)]">/api/cron/webhooks</span>
               </li>
               <li>Fallback: synchronous best-effort if the queue table is not installed yet</li>
               <li>
                 Dead-letter: deliveries become <Pill>dead</Pill> after max attempts (default 8)
               </li>
             </ul>
-            <div className="mt-3 text-xs text-white/60">
+            <div className="mt-3 text-xs text-[var(--text-secondary)]">
               Tip: run <span className="font-mono">scripts/sql/webhooks.sql</span> to add the queue table.
             </div>
           </div>
@@ -193,18 +193,18 @@ export default async function WebhooksPage() {
       </section>
 
       <section className="mt-8">
-        <h2 className="text-lg font-medium">Your webhooks</h2>
+        <h2 className="text-lg font-medium text-slate-950">Your webhooks</h2>
 
         <div className="mt-3 max-h-[920px] space-y-3 overflow-auto pr-1">
           {hooks.map((h) => (
-            <div key={h.id} className="glass-card-strong rounded-2xl p-4">
+            <div key={h.id} className="surface-panel-strong p-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <div className="flex items-center gap-2">
-                    <div className="text-base font-semibold">{h.name}</div>
-                    {h.enabled ? <Pill>enabled</Pill> : <Pill>disabled</Pill>}
+                    <div className="text-base font-semibold text-slate-950">{h.name}</div>
+                    {h.enabled ? <span className="selection-pill-active inline-flex items-center rounded-full px-2 py-0.5 text-[11px]">enabled</span> : <Pill>disabled</Pill>}
                   </div>
-                  <div className="mt-1 text-xs text-white/60">{h.url}</div>
+                  <div className="mt-1 text-xs text-[var(--text-secondary)]">{h.url}</div>
                   <div className="mt-2 flex flex-wrap gap-2">
                     {(h.events?.length ? h.events : ["(all events)"]).map((e) => (
                       <Pill key={`${h.id}-${e}`}>{e}</Pill>
@@ -212,7 +212,7 @@ export default async function WebhooksPage() {
                   </div>
                 </div>
 
-                <div className="text-right text-xs text-white/60">
+                <div className="text-right text-xs text-[var(--text-secondary)]">
                   <div>Last sent: {h.last_sent_at ?? "-"}</div>
                   <div>Last status: {h.last_status ?? "-"}</div>
                   <div className="max-w-[380px] truncate">Last error: {h.last_error ?? "-"}</div>
@@ -220,7 +220,7 @@ export default async function WebhooksPage() {
               </div>
 
               <details className="mt-4">
-                <summary className="cursor-pointer text-sm text-white/80 hover:text-white">Edit</summary>
+                <summary className="cursor-pointer text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)]">Edit</summary>
                 <form action={updateWebhookAction} className="mt-3 space-y-3">
                   <input type="hidden" name="id" value={h.id} />
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -229,8 +229,8 @@ export default async function WebhooksPage() {
                       <TextInput id={`webhook-name-${h.id}`} aria-label={`Webhook name ${h.name}`} name="name" defaultValue={h.name} />
                     </div>
                     <div className="flex items-end gap-2">
-                      <label className="flex items-center gap-2 text-xs text-white/75">
-                        <input aria-label={`Enabled ${h.name}`} type="checkbox" name="enabled" defaultChecked={h.enabled} className="h-4 w-4 rounded border-white/20 bg-black/30" />
+                      <label className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
+                        <input aria-label={`Enabled ${h.name}`} type="checkbox" name="enabled" defaultChecked={h.enabled} className="h-4 w-4 rounded border-[var(--border-subtle)] bg-white" />
                         Enabled
                       </label>
                     </div>
@@ -247,24 +247,24 @@ export default async function WebhooksPage() {
                       name="secret"
                       placeholder={h.has_secret ? "Leave blank to keep current secret" : "shared secret"}
                     />
-                    <label className="mt-2 flex items-center gap-2 text-xs text-white/65">
+                    <label className="mt-2 flex items-center gap-2 text-xs text-[var(--text-secondary)]">
                       <input
                         aria-label={`Clear webhook secret ${h.name}`}
                         type="checkbox"
                         name="clear_secret"
-                        className="h-4 w-4 rounded border-white/20 bg-black/30"
+                        className="h-4 w-4 rounded border-[var(--border-subtle)] bg-white"
                       />
                       Clear stored secret
                     </label>
                   </div>
                   <div>
-                    <div className="text-xs text-white/65">Events</div>
+                    <div className="text-xs text-[var(--text-secondary)]">Events</div>
                     <EventCheckboxes defaultEvents={h.events || []} namePrefix={h.id} />
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2">
-                    <button className="btn-base btn-primary rounded-xl px-3 py-2 text-sm font-medium">Save</button>
-                    <button formAction={testWebhookAction} className="btn-base btn-secondary rounded-xl px-3 py-2 text-sm">
+                    <button className="btn-base btn-primary rounded-sm px-3 py-2 text-sm font-medium">Save</button>
+                    <button formAction={testWebhookAction} className="btn-base btn-secondary rounded-sm px-3 py-2 text-sm">
                       Test
                     </button>
                   </div>
@@ -272,24 +272,24 @@ export default async function WebhooksPage() {
 
                 <form action={deleteWebhookAction} className="mt-2">
                   <input type="hidden" name="id" value={h.id} />
-                  <button className="btn-base btn-danger rounded-xl px-3 py-2 text-sm">Delete</button>
+                  <button className="btn-base btn-danger rounded-sm px-3 py-2 text-sm">Delete</button>
                 </form>
               </details>
             </div>
           ))}
 
           {!hooks.length ? (
-            <div className="glass-card-strong rounded-2xl p-6 text-white/60">No webhooks yet.</div>
+            <div className="surface-panel-strong p-6 text-[var(--text-secondary)]">No webhooks yet.</div>
           ) : null}
         </div>
       </section>
 
       <section className="mt-10">
-        <h2 className="text-lg font-medium">Recent deliveries</h2>
-        <div className="glass-card-strong mt-3 overflow-hidden rounded-2xl border border-white/10">
+        <h2 className="text-lg font-medium text-slate-950">Recent deliveries</h2>
+        <div className="surface-panel-strong mt-3 overflow-hidden rounded-sm border border-[var(--border-subtle)]">
           <div className="max-h-[560px] overflow-auto">
           <table className="min-w-[1100px] text-sm">
-            <thead className="sticky top-0 bg-[#10192b]/95 text-white/75 backdrop-blur">
+            <thead className="sticky top-0 bg-[var(--surface-soft)] text-[var(--text-secondary)] backdrop-blur">
               <tr>
                 <th className="px-4 py-3 text-left">Created</th>
                 <th className="px-4 py-3 text-left">Webhook</th>
@@ -303,28 +303,28 @@ export default async function WebhooksPage() {
             </thead>
             <tbody>
               {deliveries.map((d) => (
-                <tr key={d.id} className="border-t border-white/10 hover:bg-white/[0.03]">
-                  <td className="whitespace-nowrap px-4 py-3 text-white/70">{d.created_at}</td>
-                  <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-white/75">{d.webhook_id}</td>
-                  <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-white/90">{d.event}</td>
+                <tr key={d.id} className="border-t border-[var(--border-subtle)] hover:bg-[var(--surface-soft)]">
+                  <td className="whitespace-nowrap px-4 py-3 text-[var(--text-secondary)]">{d.created_at}</td>
+                  <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-[var(--text-secondary)]">{d.webhook_id}</td>
+                  <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-slate-950">{d.event}</td>
                   <td className="whitespace-nowrap px-4 py-3">
                     {d.status === "succeeded" ? (
-                      <span className="text-emerald-100">succeeded</span>
+                      <span className="text-[var(--success)]">succeeded</span>
                     ) : d.status === "dead" ? (
-                      <span className="text-rose-100">dead</span>
+                      <span className="text-[var(--danger)]">dead</span>
                     ) : (
-                      <span className="text-white/80">{d.status}</span>
+                      <span className="text-[var(--text-secondary)]">{d.status}</span>
                     )}
                   </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-white/75">{d.attempt_count}</td>
-                  <td className="whitespace-nowrap px-4 py-3 text-white/75">{d.next_attempt_at}</td>
-                  <td className="whitespace-nowrap px-4 py-3 text-white/75">{d.last_status ?? "-"}</td>
-                  <td className="max-w-[420px] truncate px-4 py-3 text-white/60">{d.last_error ?? "-"}</td>
+                  <td className="whitespace-nowrap px-4 py-3 text-[var(--text-secondary)]">{d.attempt_count}</td>
+                  <td className="whitespace-nowrap px-4 py-3 text-[var(--text-secondary)]">{d.next_attempt_at}</td>
+                  <td className="whitespace-nowrap px-4 py-3 text-[var(--text-secondary)]">{d.last_status ?? "-"}</td>
+                  <td className="max-w-[420px] truncate px-4 py-3 text-[var(--text-secondary)]">{d.last_error ?? "-"}</td>
                 </tr>
               ))}
               {!deliveries.length ? (
                 <tr>
-                  <td className="px-4 py-6 text-white/60" colSpan={8}>
+                  <td className="px-4 py-6 text-[var(--text-secondary)]" colSpan={8}>
                     No deliveries yet (or queue table not installed).
                   </td>
                 </tr>

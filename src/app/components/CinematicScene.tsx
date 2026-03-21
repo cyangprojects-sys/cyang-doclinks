@@ -34,9 +34,9 @@ export function SectionTransition({
   return (
     <div className={cn("cinematic-bleed relative py-8 sm:py-12", className)} aria-hidden="true">
       <div className="mx-auto flex w-full max-w-[1600px] items-center gap-4 px-4 sm:px-6 lg:px-8">
-        <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/18 to-transparent" />
-        {label ? <div className="text-[10px] uppercase tracking-[0.34em] text-white/26">{label}</div> : null}
-        <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/18 to-transparent" />
+        <div className="h-px flex-1 bg-gradient-to-r from-transparent via-slate-300 to-transparent" />
+        {label ? <div className="text-[10px] uppercase tracking-[0.34em] text-[var(--text-faint)]">{label}</div> : null}
+        <div className="h-px flex-1 bg-gradient-to-r from-transparent via-slate-300 to-transparent" />
       </div>
     </div>
   );
@@ -52,16 +52,16 @@ export function VisualSignalCluster({
   className?: string;
 }) {
   return (
-    <div className={cn("signal-cluster relative overflow-hidden rounded-sm border border-white/10 bg-black/20 p-5 sm:p-6", className)}>
+    <div className={cn("signal-cluster surface-panel relative overflow-hidden rounded-sm p-5 sm:p-6", className)}>
       <AmbientScene tone="signal" className="opacity-80" />
-      {title ? <div className="relative text-[11px] uppercase tracking-[0.24em] text-white/58">{title}</div> : null}
+      {title ? <div className="relative text-[11px] uppercase tracking-[0.24em] text-[var(--text-faint)]">{title}</div> : null}
       <div className="relative mt-4 space-y-3">
         {items.map((item, index) => (
           <div key={item.label} className="signal-row">
             <div className="signal-index">{String(index + 1).padStart(2, "0")}</div>
             <div className="min-w-0 flex-1">
-              <div className="text-xs uppercase tracking-[0.18em] text-white/58">{item.label}</div>
-              <div className="mt-1 text-sm text-white/80">{item.value}</div>
+              <div className="text-xs uppercase tracking-[0.18em] text-[var(--text-faint)]">{item.label}</div>
+              <div className="mt-1 text-sm text-[var(--text-secondary)]">{item.value}</div>
             </div>
           </div>
         ))}
@@ -88,11 +88,11 @@ export function StoryBand({
   return (
     <div className={cn("grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(300px,0.8fr)] lg:items-end", reverse && "lg:[&>*:first-child]:order-2 lg:[&>*:last-child]:order-1")}>
       <div>
-        <div className="text-[11px] uppercase tracking-[0.24em] text-white/58">{eyebrow}</div>
-        <h2 className="mt-4 text-balance text-4xl font-semibold tracking-[-0.04em] text-white sm:text-5xl lg:text-6xl">
+        <div className="text-[11px] uppercase tracking-[0.24em] text-[var(--text-faint)]">{eyebrow}</div>
+        <h2 className="mt-4 text-balance text-4xl font-semibold tracking-[-0.04em] text-slate-950 sm:text-5xl lg:text-6xl">
           {title}
         </h2>
-        <p className="mt-5 max-w-2xl text-base leading-8 text-white/66 sm:text-lg">{body}</p>
+        <p className="mt-5 max-w-2xl text-base leading-8 text-[var(--text-secondary)] sm:text-lg">{body}</p>
         {children ? <div className="mt-8">{children}</div> : null}
       </div>
       {aside ? <div>{aside}</div> : null}

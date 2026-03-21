@@ -52,9 +52,9 @@ export default async function DmcaPage() {
     <main className="w-full px-4 py-8">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <div className="text-xs text-white/60">Owner</div>
-          <h1 className="mt-1 text-xl font-semibold text-white">DMCA / takedown notices</h1>
-          <div className="mt-1 text-sm text-white/60">
+          <div className="text-xs text-[var(--text-secondary)]">Owner</div>
+          <h1 className="mt-1 text-xl font-semibold text-slate-950">DMCA / takedown notices</h1>
+          <div className="mt-1 text-sm text-[var(--text-secondary)]">
             New notices disable the referenced doc while pending review (if resolvable). High-risk docs can still be
             quarantined automatically by scan policy.
           </div>
@@ -63,31 +63,31 @@ export default async function DmcaPage() {
 
       <div className="mt-6 space-y-3">
         {rows.length === 0 ? (
-          <div className="glass-card-strong rounded-2xl p-5 text-sm text-white/60">No notices yet.</div>
+          <div className="surface-panel-strong p-5 text-sm text-[var(--text-secondary)]">No notices yet.</div>
         ) : null}
 
         <div className="max-h-[920px] space-y-3 overflow-auto pr-1">
         {rows.map((r) => (
-          <div key={r.id} className="glass-card-strong rounded-2xl p-5">
+          <div key={r.id} className="surface-panel-strong p-5">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div className="min-w-[260px]">
-                <div className="text-xs text-white/50">{r.created_at}</div>
-                <div className="mt-1 text-sm font-medium text-white">
+                <div className="text-xs text-[var(--text-faint)]">{r.created_at}</div>
+                <div className="mt-1 text-sm font-medium text-slate-950">
                   {r.doc_title || r.doc_id || r.share_token || "Unresolved notice"}
                 </div>
-                <div className="mt-1 text-xs text-white/50">
+                <div className="mt-1 text-xs text-[var(--text-faint)]">
                   dmca_status: {r.dmca_status || "n/a"} · moderation: {r.moderation_status || "n/a"} · scan:{" "}
                   {r.scan_status || "n/a"} · risk: {r.risk_level || "n/a"}
                 </div>
-                <div className="mt-2 text-xs text-white/60">
+                <div className="mt-2 text-xs text-[var(--text-secondary)]">
                   From: {r.requester_name || "Unknown"} {r.requester_email ? `(${r.requester_email})` : ""}
                   {r.claimant_company ? ` · ${r.claimant_company}` : ""}
                 </div>
               </div>
 
               <div className="flex-1">
-                <div className="text-xs text-white/40">Message</div>
-                <div className="mt-1 whitespace-pre-wrap text-sm text-white/80">{r.message || "(no message)"}</div>
+                <div className="text-xs text-[var(--text-faint)]">Message</div>
+                <div className="mt-1 whitespace-pre-wrap text-sm text-[var(--text-secondary)]">{r.message || "(no message)"}</div>
 
                 <div className="mt-4">
                   <DmcaActionsClient noticeId={r.id} docId={r.doc_id} status={r.status} />
@@ -99,13 +99,13 @@ export default async function DmcaPage() {
         </div>
       </div>
 
-      <div className="glass-card-strong mt-10 rounded-2xl p-5">
-        <div className="text-sm font-medium text-white">Public endpoint</div>
-        <div className="mt-1 text-sm text-white/60">
-          Accepts JSON POST to <code className="rounded bg-black/30 px-1 py-0.5">/api/v1/takedown</code> with{" "}
-          <code className="rounded bg-black/30 px-1 py-0.5">token</code>,{" "}
-          <code className="rounded bg-black/30 px-1 py-0.5">alias</code>, or{" "}
-          <code className="rounded bg-black/30 px-1 py-0.5">doc_id</code>.
+      <div className="surface-panel-strong mt-10 p-5">
+        <div className="text-sm font-medium text-slate-950">Public endpoint</div>
+        <div className="mt-1 text-sm text-[var(--text-secondary)]">
+          Accepts JSON POST to <code className="rounded-sm bg-[var(--surface-soft)] px-1 py-0.5 text-slate-950">/api/v1/takedown</code> with{" "}
+          <code className="rounded-sm bg-[var(--surface-soft)] px-1 py-0.5 text-slate-950">token</code>,{" "}
+          <code className="rounded-sm bg-[var(--surface-soft)] px-1 py-0.5 text-slate-950">alias</code>, or{" "}
+          <code className="rounded-sm bg-[var(--surface-soft)] px-1 py-0.5 text-slate-950">doc_id</code>.
         </div>
       </div>
     </main>

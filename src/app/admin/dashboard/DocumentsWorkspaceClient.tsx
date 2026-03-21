@@ -95,17 +95,17 @@ export default function DocumentsWorkspaceClient({
 
   return (
     <>
-      <section className="rounded-[30px] border border-white/10 bg-white/[0.03] p-4 sm:p-5">
+      <section className="surface-panel p-4 sm:p-5">
         <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
           <div>
-            <div className="text-xs uppercase tracking-[0.18em] text-white/45">Step 1</div>
-            <h2 className="mt-2 text-xl font-semibold text-white">Upload file</h2>
-            <p className="mt-2 max-w-2xl text-sm text-white/65">
+            <div className="text-xs uppercase tracking-[0.18em] text-[var(--text-faint)]">Step 1</div>
+            <h2 className="mt-2 text-xl font-semibold text-[var(--text-primary)]">Upload file</h2>
+            <p className="mt-2 max-w-2xl text-sm text-[var(--text-secondary)]">
               Start here. When a file is clean, the library below will guide you to create its protected link.
             </p>
           </div>
           {fromCreateLink ? (
-            <div className="rounded-2xl border border-cyan-400/25 bg-cyan-400/10 px-4 py-3 text-sm text-cyan-100">
+            <div className="rounded-sm border border-[var(--border-accent)] bg-[var(--surface-selected)] px-4 py-3 text-sm text-[var(--accent-primary)]">
               Upload a file first, then create its protected link from the file list.
             </div>
           ) : null}

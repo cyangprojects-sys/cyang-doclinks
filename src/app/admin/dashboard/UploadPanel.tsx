@@ -573,17 +573,17 @@ export default function UploadPanel({
   }
 
   return (
-    <div className="rounded-xl border border-white/10 bg-white/5 p-5">
+    <div className="surface-panel rounded-sm p-5">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold">Upload files</h2>
-          <p className="mt-1 text-sm text-white/60">
+          <p className="mt-1 text-sm text-[var(--text-secondary)]">
             Drag and drop one or more supported files. File names are used as titles by default.
           </p>
-          <p className="mt-2 text-xs leading-relaxed text-white/60">
+          <p className="mt-2 text-xs leading-relaxed text-[var(--text-muted)]">
             Allowed types: {allowedTypeSummary}
           </p>
-          <p className="mt-1 text-xs leading-relaxed text-amber-200/80">
+          <p className="mt-1 text-xs leading-relaxed text-amber-700">
             Blocked: executable, script, shortcut, and macro-enabled file types (for example .exe, .js, .ps1, .lnk, .docm).
           </p>
         </div>
@@ -591,7 +591,7 @@ export default function UploadPanel({
         <button
           onClick={onUploadAll}
           disabled={busy || queuedCount === 0 || encryptionReady === false}
-          className="rounded-lg border border-sky-300/40 bg-gradient-to-r from-sky-500/45 via-cyan-400/40 to-sky-500/45 px-4 py-2 text-sm font-semibold text-white shadow-[0_0_0_1px_rgba(56,189,248,0.25),0_0_24px_rgba(14,165,233,0.45)] transition hover:brightness-110 hover:shadow-[0_0_0_1px_rgba(103,232,249,0.45),0_0_32px_rgba(34,211,238,0.55)] disabled:border-white/15 disabled:bg-white/10 disabled:text-white/60 disabled:shadow-none disabled:opacity-60"
+          className="btn-base btn-primary rounded-sm px-4 py-2 text-sm font-semibold disabled:opacity-60"
         >
           {busy ? "Uploading..." : `Upload now${queuedCount > 0 ? ` (${queuedCount})` : ""}`}
         </button>
@@ -620,12 +620,12 @@ export default function UploadPanel({
               fileInputRef.current?.click();
             }
           }}
-          className={`cursor-pointer rounded-xl border-2 border-dashed px-4 py-8 text-center transition ${
-            dragOver ? "border-sky-300 bg-sky-500/10" : "border-white/20 bg-black/30 hover:border-white/40"
+          className={`cursor-pointer rounded-sm border-2 border-dashed px-4 py-8 text-center transition ${
+            dragOver ? "border-[var(--accent-primary)] bg-[var(--surface-selected)]" : "border-[var(--border-strong)] bg-[var(--surface-soft)] hover:border-[var(--border-accent)]"
           }`}
         >
-          <div className="text-sm font-medium text-white">Drop files here</div>
-          <div id="upload-dropzone-help" className="mt-1 text-xs text-white/60">or click to select files</div>
+          <div className="text-sm font-medium text-[var(--text-primary)]">Drop files here</div>
+          <div id="upload-dropzone-help" className="mt-1 text-xs text-[var(--text-muted)]">or click to select files</div>
           <input
             id={inputId}
             ref={fileInputRef}
@@ -642,26 +642,26 @@ export default function UploadPanel({
         </div>
       </div>
 
-      <div className="mt-3 rounded-lg border border-emerald-400/10 bg-emerald-400/5 px-3 py-2 text-xs text-emerald-200/90">
+      <div className="mt-3 rounded-sm border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
         Files are encrypted at rest and served only through controlled delivery paths.
       </div>
 
       {canCheckEncryptionStatus && encryptionReady === false && (
-        <div role="status" aria-live="polite" className="mt-2 text-sm text-red-300">{encryptionMsg ?? "Encryption configuration unavailable."}</div>
+        <div role="status" aria-live="polite" className="mt-2 text-sm text-rose-700">{encryptionMsg ?? "Encryption configuration unavailable."}</div>
       )}
 
-      {error && <div role="alert" aria-live="assertive" className="mt-3 text-sm text-red-300">{error}</div>}
+      {error && <div role="alert" aria-live="assertive" className="mt-3 text-sm text-rose-700">{error}</div>}
 
       {items.length > 0 ? (
-        <div className="mt-4 rounded-lg border border-white/10 bg-black/30 p-3 text-sm">
-          <div className="mb-2 flex flex-wrap items-center gap-3 text-xs text-white/60">
+        <div className="surface-panel-soft mt-4 rounded-sm p-3 text-sm">
+          <div className="mb-2 flex flex-wrap items-center gap-3 text-xs text-[var(--text-muted)]">
             <span>Total: {items.length}</span>
             <span>Done: {doneCount}</span>
             <span>Errors: {errorCount}</span>
           </div>
           <div className="max-h-72 overflow-auto">
             <table className="w-full text-left text-xs">
-              <thead className="text-white/50">
+              <thead className="text-[var(--text-faint)]">
                 <tr>
                   <th className="py-1 pr-2">File</th>
                   <th className="py-1 pr-2">Size</th>
@@ -671,9 +671,9 @@ export default function UploadPanel({
               </thead>
               <tbody>
                 {items.map((item) => (
-                  <tr key={item.id} className="border-t border-white/10">
-                    <td className="py-2 pr-2 text-white/85">{item.file.name}</td>
-                    <td className="py-2 pr-2 text-white/60">{fmtBytes(item.file.size)}</td>
+                  <tr key={item.id} className="border-t border-[var(--border-subtle)]">
+                    <td className="py-2 pr-2 text-[var(--text-primary)]">{item.file.name}</td>
+                    <td className="py-2 pr-2 text-[var(--text-muted)]">{fmtBytes(item.file.size)}</td>
                     <td className="py-2 pr-2">
                       {(() => {
                         const ui = getUploadUiStatus({
@@ -690,12 +690,12 @@ export default function UploadPanel({
                         );
                       })()}
                     </td>
-                    <td className="py-2 pr-2 text-white/70">
+                    <td className="py-2 pr-2 text-[var(--text-secondary)]">
                       {item.status === "error" ? (
-                        <span className="text-red-300">{item.message || "Upload failed."}</span>
+                        <span className="text-rose-700">{item.message || "Upload failed."}</span>
                       ) : item.viewUrl ? (
                         <div className="space-y-1">
-                          <div className="text-white/70">
+                          <div className="text-[var(--text-secondary)]">
                             {
                               getUploadUiStatus({
                                 uploadStatus: item.status,
@@ -706,7 +706,7 @@ export default function UploadPanel({
                               }).subtext
                             }
                           </div>
-                          <a href={item.viewUrl} className="text-sky-300 hover:underline">
+                          <a href={item.viewUrl} className="text-[var(--accent-primary)] hover:underline">
                             Open document
                           </a>
                         </div>

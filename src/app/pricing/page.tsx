@@ -170,50 +170,50 @@ export default function PricingPage() {
     <SiteShell maxWidth="full" publicConfig={publicConfig}>
       <section className="relative mt-10 grid gap-6 lg:grid-cols-12 lg:items-end">
         <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
-          <div className="absolute -left-16 top-0 h-72 w-72 rounded-full bg-sky-400/12 blur-3xl" />
-          <div className="absolute right-0 top-8 h-80 w-80 rounded-full bg-amber-300/10 blur-3xl" />
+          <div className="absolute -left-16 top-0 h-72 w-72 rounded-full bg-[rgba(70,118,194,0.12)] blur-3xl" />
+          <div className="absolute right-0 top-8 h-80 w-80 rounded-full bg-[rgba(162,178,201,0.14)] blur-3xl" />
         </div>
 
         <div className="lg:col-span-7">
-          <span className="ui-badge inline-flex rounded-full px-3 py-1 text-xs uppercase tracking-[0.16em]">Doclinks pricing</span>
-          <h1 className="font-editorial mt-5 max-w-4xl text-4xl leading-[1.04] tracking-tight text-white sm:text-5xl lg:text-6xl">
+          <span className="ui-badge inline-flex rounded-sm px-3 py-1 text-xs uppercase tracking-[0.16em]">Doclinks pricing</span>
+          <h1 className="font-editorial mt-5 max-w-4xl text-4xl leading-[1.04] tracking-tight text-slate-950 sm:text-5xl lg:text-6xl">
             Transparent pricing for
-            <span className="block text-white/72">controlled document delivery.</span>
+            <span className="block text-[var(--text-secondary)]">controlled document delivery.</span>
           </h1>
-          <p className="mt-7 max-w-3xl text-base leading-relaxed text-white/72 sm:text-lg">
+          <p className="mt-7 max-w-3xl text-base leading-relaxed text-[var(--text-secondary)] sm:text-lg">
             Free is real and usable. Pro adds room, control depth, and visibility for teams running higher-throughput
             client and operations workflows.
           </p>
 
           <div className="mt-7 flex flex-wrap gap-2">
             {TRUST_CHIPS.map((chip) => (
-              <span key={chip} className="ui-badge rounded-full px-3 py-1.5 text-xs">
+              <span key={chip} className="selection-pill rounded-sm px-3 py-1.5 text-xs">
                 {chip}
               </span>
             ))}
           </div>
 
           <div className="mt-9 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-            <Link href={primaryAccessHref} className="btn-base btn-primary rounded-xl px-6 py-3 text-sm font-semibold">
+            <Link href={primaryAccessHref} className="btn-base btn-primary rounded-sm px-6 py-3 text-sm font-semibold">
               {signupEnabled ? "Get started free" : "Sign in"}
             </Link>
-            <Link href="/signin?intent=admin" className="btn-base btn-secondary rounded-xl px-6 py-3 text-sm">
+            <Link href="/signin?intent=admin" className="btn-base btn-secondary rounded-sm px-6 py-3 text-sm">
               Upgrade existing workspace
             </Link>
-            <Link href="/doclinks" className="btn-base btn-secondary rounded-xl px-6 py-3 text-sm">
+            <Link href="/doclinks" className="btn-base btn-secondary rounded-sm px-6 py-3 text-sm">
               View Doclinks
             </Link>
           </div>
         </div>
 
         <div className="lg:col-span-5">
-          <div className="glass-card-strong rounded-3xl p-6">
-            <div className="text-xs uppercase tracking-[0.14em] text-white/55">At a glance</div>
+          <div className="surface-panel-strong p-6">
+            <div className="text-xs uppercase tracking-[0.14em] text-[var(--text-faint)]">At a glance</div>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               <SummaryCard title="Free" price="$0/mo" subtitle="Best for validating workflow" />
               <SummaryCard title="Pro" price="$12/mo" subtitle="Best for higher-volume delivery" pro />
             </div>
-            <p className="mt-4 text-xs leading-relaxed text-white/58">
+            <p className="mt-4 text-xs leading-relaxed text-[var(--text-secondary)]">
               Both plans include enforced security baseline controls. Pro adds capacity, automation, and deeper visibility.
             </p>
           </div>
@@ -275,7 +275,7 @@ export default function PricingPage() {
           ))}
         </div>
 
-        <p className="mt-4 text-xs leading-relaxed text-white/58">
+        <p className="mt-4 text-xs leading-relaxed text-[var(--text-secondary)]">
           Soft monitored and soft cap monitored mean there is no hard product cap, but usage is monitored for anti-abuse and operational health controls.
         </p>
       </section>
@@ -331,18 +331,18 @@ export default function PricingPage() {
 
         <div className="mt-8 grid gap-3 lg:grid-cols-2">
           {FAQS.map((faq) => (
-            <details key={faq.q} className="glass-card rounded-2xl p-5 open:bg-white/10">
-              <summary className="cursor-pointer list-none text-sm font-medium text-white/90">{faq.q}</summary>
-              <p className="mt-3 text-sm leading-relaxed text-white/70">{faq.a}</p>
+            <details key={faq.q} className="surface-panel rounded-sm p-5 open:bg-[var(--surface-soft)]">
+              <summary className="cursor-pointer list-none text-sm font-medium text-slate-950">{faq.q}</summary>
+              <p className="mt-3 text-sm leading-relaxed text-[var(--text-secondary)]">{faq.a}</p>
             </details>
           ))}
         </div>
       </section>
 
       <section className="mt-16 mb-2 md:mt-20">
-        <div className="glass-card-strong ui-sheen rounded-3xl p-7 sm:p-8">
-          <h2 className="text-3xl font-semibold tracking-tight text-white sm:text-4xl">Start with Free. Scale with Pro.</h2>
-          <p className="mt-3 max-w-3xl text-sm leading-relaxed text-white/72">
+        <div className="surface-panel-strong p-7 sm:p-8">
+          <h2 className="text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">Start with Free. Scale with Pro.</h2>
+          <p className="mt-3 max-w-3xl text-sm leading-relaxed text-[var(--text-secondary)]">
             Choose the plan that matches your delivery stage today, then move up as volume and control requirements grow.
           </p>
 
@@ -365,19 +365,25 @@ export default function PricingPage() {
 function SectionIntro(props: { eyebrow: string; title: string; body: string }) {
   return (
     <div className="max-w-4xl">
-      <span className="ui-badge inline-flex rounded-full px-3 py-1 text-xs uppercase tracking-[0.15em]">{props.eyebrow}</span>
-      <h2 className="mt-4 text-3xl font-semibold tracking-tight text-white sm:text-4xl">{props.title}</h2>
-      <p className="mt-3 text-sm leading-relaxed text-white/72 sm:text-base">{props.body}</p>
+      <span className="ui-badge inline-flex rounded-sm px-3 py-1 text-xs uppercase tracking-[0.15em]">{props.eyebrow}</span>
+      <h2 className="mt-4 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">{props.title}</h2>
+      <p className="mt-3 text-sm leading-relaxed text-[var(--text-secondary)] sm:text-base">{props.body}</p>
     </div>
   );
 }
 
 function SummaryCard(props: { title: string; price: string; subtitle: string; pro?: boolean }) {
   return (
-    <div className={props.pro ? "rounded-2xl border border-amber-300/35 bg-amber-300/10 p-4" : "rounded-2xl border border-white/12 bg-black/25 p-4"}>
-      <div className="text-xs uppercase tracking-[0.1em] text-white/60">{props.title}</div>
-      <div className="mt-1 text-xl font-semibold text-white">{props.price}</div>
-      <div className="mt-1 text-xs leading-relaxed text-white/65">{props.subtitle}</div>
+    <div
+      className={
+        props.pro
+          ? "rounded-sm border border-[rgba(161,109,27,0.18)] bg-[rgba(161,109,27,0.05)] p-4"
+          : "rounded-sm border border-[var(--border-subtle)] bg-[var(--surface-soft)] p-4"
+      }
+    >
+      <div className="text-xs uppercase tracking-[0.1em] text-[var(--text-faint)]">{props.title}</div>
+      <div className="mt-1 text-xl font-semibold text-slate-950">{props.price}</div>
+      <div className="mt-1 text-xs leading-relaxed text-[var(--text-secondary)]">{props.subtitle}</div>
     </div>
   );
 }
@@ -392,29 +398,29 @@ function PlanCard(props: {
   recommended?: boolean;
 }) {
   const wrapperClass = props.recommended
-    ? "rounded-3xl border border-amber-300/40 bg-white/5 p-6 ring-1 ring-amber-200/15"
-    : "glass-card rounded-3xl p-6";
+    ? "surface-panel-strong rounded-sm border-[rgba(161,109,27,0.18)] bg-[linear-gradient(180deg,rgba(255,251,243,0.98),rgba(255,255,255,0.98))] p-6"
+    : "surface-panel p-6";
 
   const badgeClass = props.recommended
-    ? "inline-flex rounded-lg border border-amber-200/70 bg-gradient-to-r from-amber-300 to-amber-200 px-3 py-1.5 text-sm font-semibold text-black shadow-[0_8px_24px_rgba(232,194,122,0.32)]"
-    : "inline-flex rounded-lg border border-sky-200/70 bg-gradient-to-r from-sky-300 to-cyan-200 px-3 py-1.5 text-sm font-semibold text-black shadow-[0_8px_24px_rgba(73,179,255,0.30)]";
+    ? "btn-base inline-flex rounded-sm border border-[rgba(161,109,27,0.22)] bg-[rgba(161,109,27,0.08)] px-3 py-1.5 text-sm font-semibold text-[var(--accent-warm)] hover:bg-[rgba(161,109,27,0.12)]"
+    : "btn-base btn-primary inline-flex rounded-sm px-3 py-1.5 text-sm font-semibold";
 
   return (
     <article className={wrapperClass}>
       <div className="flex items-start justify-between gap-4">
         <div>
-          <div className="text-xs uppercase tracking-[0.12em] text-white/58">{props.tier}</div>
-          <div className="mt-2 text-2xl font-semibold tracking-tight text-white">{props.price}</div>
+          <div className="text-xs uppercase tracking-[0.12em] text-[var(--text-faint)]">{props.tier}</div>
+          <div className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">{props.price}</div>
         </div>
-        {props.recommended ? <span className="ui-badge rounded-full px-2.5 py-1 text-[11px]">Recommended</span> : null}
+        {props.recommended ? <span className="selection-pill-active rounded-sm px-2.5 py-1 text-[11px]">Recommended</span> : null}
       </div>
 
-      <p className="mt-4 text-sm leading-relaxed text-white/72">{props.bestFor}</p>
+      <p className="mt-4 text-sm leading-relaxed text-[var(--text-secondary)]">{props.bestFor}</p>
 
-      <ul className="mt-5 space-y-2 text-sm text-white/78">
+      <ul className="mt-5 space-y-2 text-sm text-[var(--text-primary)]">
         {props.highlights.map((highlight) => (
           <li key={highlight} className="flex gap-2">
-            <span className="mt-2 h-1.5 w-1.5 flex-none rounded-full bg-white/45" />
+            <span className="mt-2 h-1.5 w-1.5 flex-none rounded-full bg-[var(--accent-primary)]" />
             <span>{highlight}</span>
           </li>
         ))}
@@ -424,7 +430,7 @@ function PlanCard(props: {
         <Link href={props.ctaHref} className={badgeClass}>
           {props.ctaLabel}
         </Link>
-        <Link href="/signin" className="btn-base btn-secondary rounded-lg px-3.5 py-2 text-sm">
+        <Link href="/signin" className="btn-base btn-secondary rounded-sm px-3.5 py-2 text-sm">
           Sign in
         </Link>
       </div>
@@ -434,22 +440,22 @@ function PlanCard(props: {
 
 function FeatureCard(props: { title: string; body: string }) {
   return (
-    <article className="glass-card rounded-3xl p-6">
-      <h3 className="text-lg font-semibold tracking-tight text-white">{props.title}</h3>
-      <p className="mt-2 text-sm leading-relaxed text-white/70">{props.body}</p>
+    <article className="surface-panel p-6">
+      <h3 className="text-lg font-semibold tracking-tight text-slate-950">{props.title}</h3>
+      <p className="mt-2 text-sm leading-relaxed text-[var(--text-secondary)]">{props.body}</p>
     </article>
   );
 }
 
 function ComparisonGroupCard(props: { group: ComparisonGroup }) {
   return (
-    <article className="glass-card rounded-3xl p-5 sm:p-6">
-      <h3 className="text-xl font-semibold tracking-tight text-white">{props.group.title}</h3>
-      <p className="mt-2 text-sm leading-relaxed text-white/67">{props.group.description}</p>
+    <article className="surface-panel p-5 sm:p-6">
+      <h3 className="text-xl font-semibold tracking-tight text-slate-950">{props.group.title}</h3>
+      <p className="mt-2 text-sm leading-relaxed text-[var(--text-secondary)]">{props.group.description}</p>
 
-      <div className="mt-5 hidden overflow-hidden rounded-2xl border border-white/10 md:block">
+      <div className="mt-5 hidden overflow-hidden rounded-sm border border-[var(--border-subtle)] md:block">
         <table className="w-full border-collapse text-left text-sm">
-          <thead className="bg-white/5 text-white/85">
+          <thead className="bg-[var(--surface-soft)] text-slate-950">
             <tr>
               <th className="px-4 py-3 font-semibold">Capability</th>
               <th className="px-4 py-3 font-semibold">Free</th>
@@ -458,10 +464,10 @@ function ComparisonGroupCard(props: { group: ComparisonGroup }) {
           </thead>
           <tbody>
             {props.group.rows.map((row) => (
-              <tr key={row.feature} className="border-t border-white/10">
-                <td className="px-4 py-3 text-white/85">{row.feature}</td>
-                <td className="px-4 py-3 text-white/70">{row.free}</td>
-                <td className="px-4 py-3 text-white/85">{row.pro}</td>
+              <tr key={row.feature} className="border-t border-[var(--border-subtle)]">
+                <td className="px-4 py-3 text-slate-950">{row.feature}</td>
+                <td className="px-4 py-3 text-[var(--text-secondary)]">{row.free}</td>
+                <td className="px-4 py-3 text-slate-950">{row.pro}</td>
               </tr>
             ))}
           </tbody>
@@ -470,14 +476,14 @@ function ComparisonGroupCard(props: { group: ComparisonGroup }) {
 
       <div className="mt-5 space-y-3 md:hidden">
         {props.group.rows.map((row) => (
-          <div key={row.feature} className="rounded-2xl border border-white/12 bg-black/25 p-4">
-            <div className="text-sm font-medium text-white/92">{row.feature}</div>
+          <div key={row.feature} className="surface-panel-soft p-4">
+            <div className="text-sm font-medium text-slate-950">{row.feature}</div>
             <div className="mt-2 grid gap-2 text-xs">
-              <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-white/75">
-                <span className="text-white/55">Free:</span> {row.free}
+              <div className="rounded-sm border border-[var(--border-subtle)] bg-white px-3 py-2 text-[var(--text-secondary)]">
+                <span className="text-[var(--text-faint)]">Free:</span> {row.free}
               </div>
-              <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-white/85">
-                <span className="text-white/55">Pro:</span> {row.pro}
+              <div className="rounded-sm border border-[var(--border-accent)] bg-[var(--surface-selected)] px-3 py-2 text-slate-950">
+                <span className="text-[var(--text-faint)]">Pro:</span> {row.pro}
               </div>
             </div>
           </div>
@@ -489,12 +495,18 @@ function ComparisonGroupCard(props: { group: ComparisonGroup }) {
 
 function FitCard(props: { title: string; points: string[]; pro?: boolean }) {
   return (
-    <article className={props.pro ? "glass-card-strong rounded-3xl p-6" : "glass-card rounded-3xl p-6"}>
-      <h3 className="text-xl font-semibold tracking-tight text-white">{props.title}</h3>
-      <ul className="mt-4 space-y-2 text-sm text-white/72">
+    <article
+      className={
+        props.pro
+          ? "surface-panel-strong border-[var(--border-accent)] bg-[linear-gradient(180deg,rgba(244,248,253,0.98),rgba(255,255,255,0.98))] p-6"
+          : "surface-panel p-6"
+      }
+    >
+      <h3 className="text-xl font-semibold tracking-tight text-slate-950">{props.title}</h3>
+      <ul className="mt-4 space-y-2 text-sm text-[var(--text-secondary)]">
         {props.points.map((point) => (
           <li key={point} className="flex gap-2">
-            <span className="mt-2 h-1.5 w-1.5 flex-none rounded-full bg-sky-200/70" />
+            <span className="mt-2 h-1.5 w-1.5 flex-none rounded-full bg-[var(--accent-primary)]" />
             <span>{point}</span>
           </li>
         ))}
@@ -505,9 +517,12 @@ function FitCard(props: { title: string; points: string[]; pro?: boolean }) {
 
 function CtaTile(props: { href: string; title: string; body: string }) {
   return (
-    <Link href={props.href} className="rounded-2xl border border-white/14 bg-white/8 p-4 transition-colors hover:bg-white/14">
-      <div className="text-sm font-medium text-white/92">{props.title}</div>
-      <p className="mt-1 text-xs leading-relaxed text-white/67">{props.body}</p>
+    <Link
+      href={props.href}
+      className="rounded-sm border border-[var(--border-subtle)] bg-white p-4 transition-colors hover:border-[var(--border-strong)] hover:bg-[var(--surface-soft)]"
+    >
+      <div className="text-sm font-medium text-slate-950">{props.title}</div>
+      <p className="mt-1 text-xs leading-relaxed text-[var(--text-secondary)]">{props.body}</p>
     </Link>
   );
 }

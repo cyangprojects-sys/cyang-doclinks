@@ -217,12 +217,12 @@ export default function SecurePdfCanvasViewer(props: {
         }}
       >
         <div className="absolute inset-0 flex items-center justify-center">
-          <div className="whitespace-pre-wrap text-center text-3xl font-semibold tracking-widest text-white/20">
+          <div className="whitespace-pre-wrap text-center text-3xl font-semibold tracking-widest text-slate-900/12">
             {text}
           </div>
         </div>
         {forensic ? (
-          <div className="absolute bottom-2 right-2 rounded border border-white/20 bg-black/55 px-2 py-1 text-[10px] leading-tight text-white/80">
+          <div className="absolute bottom-2 right-2 rounded border border-[var(--border-subtle)] bg-white/90 px-2 py-1 text-[10px] leading-tight text-[var(--text-secondary)] shadow-[var(--shadow-soft)]">
             {forensic}
           </div>
         ) : null}
@@ -236,7 +236,7 @@ export default function SecurePdfCanvasViewer(props: {
 
   return (
     <div
-      className={`relative rounded-2xl border border-white/10 bg-black/40 ${props.className || ""}`}
+      className={`relative rounded-sm border border-[var(--border-subtle)] bg-white ${props.className || ""}`}
       onContextMenu={(e) => {
         e.preventDefault();
         deter("Context actions are disabled for protected viewing.");
@@ -253,7 +253,7 @@ export default function SecurePdfCanvasViewer(props: {
       role="application"
       aria-label="Secure document viewer"
     >
-      <div className="sticky top-0 z-20 flex items-center justify-between gap-3 border-b border-white/10 bg-black/70 px-3 py-2 text-xs text-white/80 backdrop-blur">
+      <div className="sticky top-0 z-20 flex items-center justify-between gap-3 border-b border-[var(--border-subtle)] bg-white/95 px-3 py-2 text-xs text-[var(--text-secondary)] backdrop-blur">
         <div className="flex items-center gap-2">
           <span>{modeHeaderLabel}</span>
           {mode === "pdf" && !isMicrosoftOffice ? <span>{numPages > 0 ? "PDF ready" : "Preparing pages..."}</span> : null}
@@ -263,7 +263,7 @@ export default function SecurePdfCanvasViewer(props: {
             <>
               <button
                 type="button"
-                className="rounded border border-white/20 px-2 py-1 disabled:opacity-40"
+                className="selection-tile px-2 py-1 disabled:opacity-40"
                 disabled={loading || !!error}
                 onClick={() => setScale((s) => Math.max(0.6, Number((s - 0.1).toFixed(2))))}
               >
@@ -272,7 +272,7 @@ export default function SecurePdfCanvasViewer(props: {
               <span>{Math.round(scale * 100)}%</span>
               <button
                 type="button"
-                className="rounded border border-white/20 px-2 py-1 disabled:opacity-40"
+                className="selection-tile px-2 py-1 disabled:opacity-40"
                 disabled={loading || !!error}
                 onClick={() => setScale((s) => Math.min(2.2, Number((s + 0.1).toFixed(2))))}
               >
@@ -284,8 +284,8 @@ export default function SecurePdfCanvasViewer(props: {
       </div>
 
       <div ref={scrollRef} className="relative h-full overflow-auto p-3">
-        {loading ? <div className="py-16 text-center text-sm text-white/70">Loading document...</div> : null}
-        {error ? <div className="py-16 text-center text-sm text-red-200">{error}</div> : null}
+        {loading ? <div className="py-16 text-center text-sm text-[var(--text-secondary)]">Loading document...</div> : null}
+        {error ? <div className="py-16 text-center text-sm text-[var(--danger)]">{error}</div> : null}
         {!loading && !error ? (
           <div className="relative mx-auto w-fit">
             {mode === "pdf" ? (
@@ -299,7 +299,7 @@ export default function SecurePdfCanvasViewer(props: {
                         <PdfPageCanvas doc={pdfDoc} pageNo={pageNo} scale={scale} dims={dims} />
                       ) : (
                         <div
-                          className="rounded border border-white/5 bg-white/[0.03]"
+                          className="rounded border border-[var(--border-subtle)] bg-[var(--surface-soft)]"
                           style={{ width: dims.width * scale, height: dims.height * scale }}
                         />
                       )}
@@ -342,10 +342,10 @@ export default function SecurePdfCanvasViewer(props: {
                   onPlay={() => setIsPlaying(true)}
                   onPause={() => setIsPlaying(false)}
                 />
-                <div className="flex items-center gap-2 text-xs text-white/80">
+                <div className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
                   <button
                     type="button"
-                    className="rounded border border-white/20 px-2 py-1 disabled:opacity-40"
+                    className="selection-tile px-2 py-1 disabled:opacity-40"
                     disabled={!videoReady}
                     onClick={() => {
                       const v = videoRef.current;
@@ -397,15 +397,15 @@ export default function SecurePdfCanvasViewer(props: {
             ) : null}
 
             {mode === "file" ? (
-              <div className="w-[min(1100px,92vw)] rounded-xl border border-white/10 bg-black/30 p-3">
+              <div className="w-[min(1100px,92vw)] rounded-sm border border-[var(--border-subtle)] bg-[var(--surface-soft)] p-3">
                 <iframe
                   title={`${modeLabel} preview`}
                   src={props.rawUrl}
-                  className="h-[78vh] w-full rounded border border-white/10 bg-black"
+                  className="h-[78vh] w-full rounded border border-[var(--border-subtle)] bg-white"
                   referrerPolicy="no-referrer"
                   sandbox="allow-same-origin allow-scripts"
                 />
-                <div className="mt-2 text-xs text-white/60">
+                <div className="mt-2 text-xs text-[var(--text-faint)]">
                   Rendering depends on browser support for this file type.
                 </div>
               </div>
@@ -434,7 +434,7 @@ export default function SecurePdfCanvasViewer(props: {
       </div>
 
       {notice ? (
-        <div className="pointer-events-none absolute bottom-3 right-3 z-30 rounded-lg border border-red-500/30 bg-red-500/20 px-3 py-2 text-xs text-red-100">
+        <div className="pointer-events-none absolute bottom-3 right-3 z-30 rounded border border-[rgba(186,71,50,0.22)] bg-[rgba(186,71,50,0.08)] px-3 py-2 text-xs text-[var(--danger)]">
           {notice}
         </div>
       ) : null}

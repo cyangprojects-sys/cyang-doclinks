@@ -25,24 +25,24 @@ export function StatusPageResources() {
   return (
     <Section className="pt-0">
       <PremiumCard>
-        <div className="text-xl font-semibold text-white">Related trust resources</div>
+        <div className="text-xl font-semibold text-slate-950">Related trust resources</div>
         <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
-          <Link href="/trust" className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white/76 transition-colors hover:bg-white/[0.06] hover:text-white">
+          <Link href="/trust" className="selection-tile px-4 py-3 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
             Trust Center
           </Link>
-          <Link href="/trust/procurement" className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white/76 transition-colors hover:bg-white/[0.06] hover:text-white">
+          <Link href="/trust/procurement" className="selection-tile px-4 py-3 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
             Procurement package
           </Link>
-          <Link href="/legal/security-policy" className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white/76 transition-colors hover:bg-white/[0.06] hover:text-white">
+          <Link href="/legal/security-policy" className="selection-tile px-4 py-3 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
             Security Policy
           </Link>
-          <Link href="/legal/service-level-agreement" className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white/76 transition-colors hover:bg-white/[0.06] hover:text-white">
+          <Link href="/legal/service-level-agreement" className="selection-tile px-4 py-3 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
             SLA
           </Link>
-          <Link href="/report" className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white/76 transition-colors hover:bg-white/[0.06] hover:text-white">
+          <Link href="/report" className="selection-tile px-4 py-3 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
             Report abuse
           </Link>
-          <Link href="/contact" className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white/76 transition-colors hover:bg-white/[0.06] hover:text-white">
+          <Link href="/contact" className="selection-tile px-4 py-3 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
             Contact
           </Link>
         </div>

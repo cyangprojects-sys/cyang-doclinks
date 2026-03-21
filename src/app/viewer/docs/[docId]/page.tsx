@@ -52,8 +52,8 @@ function fmtDate(s: string | null) {
   return d.toLocaleString();
 }
 
-const card = "glass-card-strong rounded-2xl p-4";
-const subtle = "text-xs text-white/60";
+const card = "surface-panel rounded-sm p-5";
+const subtle = "text-xs font-medium tracking-[0.16em] uppercase text-[var(--text-faint)]";
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function isUuid(value: string): boolean {
@@ -261,19 +261,19 @@ export default async function ViewerDocDetailPage({
       <div className="flex items-center justify-between gap-3">
         <div>
           <div className={subtle}>Document</div>
-          <h1 className="text-2xl font-semibold text-white">{doc.title || doc.id}</h1>
-          <div className="mt-1 text-xs text-white/60">Created: {fmtDate(doc.created_at)}</div>
+          <h1 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-[var(--text-primary)]">{doc.title || doc.id}</h1>
+          <div className="mt-1 text-xs text-[var(--text-muted)]">Created: {fmtDate(doc.created_at)}</div>
         </div>
         <div className="flex items-center gap-2">
           <Link
-            className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-white hover:bg-white/15"
+            className="btn-base btn-secondary inline-flex rounded-sm px-3 py-2 text-sm"
             href="/viewer/documents"
           >
             ← Back
           </Link>
           {alias ? (
             <Link
-              className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-white hover:bg-white/15"
+              className="btn-base btn-secondary inline-flex rounded-sm px-3 py-2 text-sm"
               href={`/d/${encodeURIComponent(alias)}`}
             >
               Open
@@ -285,13 +285,13 @@ export default async function ViewerDocDetailPage({
       <section className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
         <div className={card}>
           <div className={subtle}>Views</div>
-          <div className="mt-1 text-2xl font-semibold text-white">{fmtInt(views30)}</div>
-          <div className={subtle}>Last 30 days</div>
+          <div className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-[var(--text-primary)]">{fmtInt(views30)}</div>
+          <div className="mt-1 text-xs text-[var(--text-muted)]">Last 30 days</div>
           <div className="mt-2 flex items-center justify-between gap-3">
-            <div className="text-sm font-medium text-white/90">
-              {fmtInt(views7)} <span className="text-xs text-white/60">/ 7d</span>
+            <div className="text-sm font-medium text-[var(--text-secondary)]">
+              {fmtInt(views7)} <span className="text-xs text-[var(--text-faint)]">/ 7d</span>
             </div>
-            <div className="text-white/60">
+            <div className="text-[var(--text-faint)]">
               <Sparkline values={sparkVals} ariaLabel="30 day views sparkline" />
             </div>
           </div>
@@ -299,24 +299,24 @@ export default async function ViewerDocDetailPage({
 
         <div className={card}>
           <div className={subtle}>Alias</div>
-          <div className="mt-1 text-sm font-medium text-white/90">{alias || "—"}</div>
-          <div className="mt-2 text-xs text-white/60">
+          <div className="mt-2 text-sm font-medium text-[var(--text-primary)]">{alias || "—"}</div>
+          <div className="mt-2 text-xs text-[var(--text-muted)]">
             Expires: {fmtDate(aliasExpires)} • Active: {String(aliasActive ?? true)} • Revoked: {fmtDate(aliasRevokedAt)}
           </div>
           {!isViewer ? (
             <div className="mt-3 space-y-2">
               <form action={createOrAssignAliasAction} className="flex flex-wrap items-end gap-2">
                 <input type="hidden" name="docId" value={docId} />
-                <label className="text-xs text-neutral-400">
+                <label className="text-xs text-[var(--text-secondary)]">
                   Create alias
                   <input
                     aria-label="Create alias"
                     name="alias"
                     placeholder="new-alias"
-                    className="mt-1 w-40 rounded-md border border-neutral-700 bg-black/40 px-2 py-1 text-xs text-neutral-100"
+                    className="field-input mt-1 w-40 rounded-sm px-2.5 py-2 text-xs"
                   />
                 </label>
-                <label className="text-xs text-neutral-400">
+                <label className="text-xs text-[var(--text-secondary)]">
                   TTL days
                   <input
                     aria-label="Alias TTL days"
@@ -325,10 +325,10 @@ export default async function ViewerDocDetailPage({
                     min={1}
                     max={365}
                     defaultValue={30}
-                    className="mt-1 w-20 rounded-md border border-neutral-700 bg-black/40 px-2 py-1 text-xs text-neutral-100"
+                    className="field-input mt-1 w-20 rounded-sm px-2.5 py-2 text-xs"
                   />
                 </label>
-                <button type="submit" className="rounded-md border border-white/20 bg-white/10 px-2 py-1 text-xs text-white">
+                <button type="submit" className="btn-base btn-primary rounded-sm px-3 py-2 text-xs font-semibold">
                   Create
                 </button>
               </form>
@@ -336,16 +336,16 @@ export default async function ViewerDocDetailPage({
               {alias ? (
                 <form action={renameDocAliasAction} className="flex flex-wrap items-end gap-2">
                   <input type="hidden" name="docId" value={docId} />
-                  <label className="text-xs text-neutral-400">
+                  <label className="text-xs text-[var(--text-secondary)]">
                     Rename alias
                     <input
                       aria-label="Rename alias"
                       name="newAlias"
                       defaultValue={alias}
-                      className="mt-1 w-44 rounded-md border border-neutral-700 bg-black/40 px-2 py-1 text-xs text-neutral-100"
+                      className="field-input mt-1 w-44 rounded-sm px-2.5 py-2 text-xs"
                     />
                   </label>
-                  <button type="submit" className="rounded-md border border-white/20 bg-white/10 px-2 py-1 text-xs text-white">
+                  <button type="submit" className="btn-base btn-secondary rounded-sm px-3 py-2 text-xs">
                     Rename
                   </button>
                 </form>
@@ -353,7 +353,7 @@ export default async function ViewerDocDetailPage({
 
               <form action={setAliasExpirationAction} className="flex flex-wrap items-end gap-2">
                 <input type="hidden" name="docId" value={docId} />
-                <label className="text-xs text-neutral-400">
+                <label className="text-xs text-[var(--text-secondary)]">
                   Set expiration (days)
                   <input
                     aria-label="Set alias expiration days"
@@ -362,10 +362,10 @@ export default async function ViewerDocDetailPage({
                     min={1}
                     max={365}
                     defaultValue={30}
-                    className="mt-1 w-20 rounded-md border border-neutral-700 bg-black/40 px-2 py-1 text-xs text-neutral-100"
+                    className="field-input mt-1 w-20 rounded-sm px-2.5 py-2 text-xs"
                   />
                 </label>
-                <button type="submit" className="rounded-md border border-white/20 bg-white/10 px-2 py-1 text-xs text-white">
+                <button type="submit" className="btn-base btn-secondary rounded-sm px-3 py-2 text-xs">
                   Apply
                 </button>
               </form>
@@ -373,7 +373,10 @@ export default async function ViewerDocDetailPage({
               {canSeeAll ? (
                 <form action={disableAliasForDocAction}>
                   <input type="hidden" name="docId" value={docId} />
-                  <button type="submit" className="rounded-md border border-red-900 bg-red-950/40 px-2 py-1 text-xs text-red-200">
+                  <button
+                    type="submit"
+                    className="inline-flex rounded-sm border border-[color:rgba(186,71,50,0.2)] bg-[color:rgba(186,71,50,0.08)] px-3 py-2 text-xs font-medium text-[var(--danger)] transition hover:bg-[color:rgba(186,71,50,0.12)]"
+                  >
                     Disable alias
                   </button>
                 </form>
@@ -384,42 +387,42 @@ export default async function ViewerDocDetailPage({
 
         <div className={card}>
           <div className={subtle}>Shares</div>
-          <div className="mt-1 text-2xl font-semibold text-white">{fmtInt(activeShares)}</div>
-          <div className={subtle}>Active (top 50 listed)</div>
+          <div className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-[var(--text-primary)]">{fmtInt(activeShares)}</div>
+          <div className="mt-1 text-xs text-[var(--text-muted)]">Active (top 50 listed)</div>
         </div>
       </section>
 
       <section className={card}>
         <div className="flex items-center justify-between">
-          <h2 className="text-base font-semibold text-white">30-day view history</h2>
+          <h2 className="text-base font-semibold text-[var(--text-primary)]">30-day view history</h2>
           <div className={subtle}>{hasDocViewDaily ? "Using doc_view_daily" : hasDocViews ? "Using doc_views" : "No view tables found"}</div>
         </div>
 
-        <div className="mt-3 overflow-hidden rounded-2xl border border-white/10">
+        <div className="mt-3 overflow-hidden rounded-sm border border-[var(--border-subtle)] bg-white/92">
           <div className="max-h-[560px] overflow-auto">
             <table className="min-w-[680px] w-full text-sm">
-              <thead className="sticky top-0 bg-[#10192b]/95 text-left text-xs text-white/60 backdrop-blur">
+              <thead className="sticky top-0 bg-[rgba(245,248,252,0.96)] text-left text-xs text-[var(--text-muted)] backdrop-blur">
                 <tr>
                   <th className="py-2 pr-4">Day</th>
                   <th className="py-2 pr-4">Views</th>
                   <th className="py-2 pr-4">Unique IPs</th>
                 </tr>
               </thead>
-              <tbody className="text-white/85">
+              <tbody className="text-[var(--text-primary)]">
                 {series30.length ? (
                   series30
                     .slice()
                     .reverse()
                     .map((r) => (
-                      <tr key={r.day} className="border-t border-white/10">
+                      <tr key={r.day} className="border-t border-[var(--border-subtle)]">
                         <td className="py-2 pr-4">{r.day}</td>
                         <td className="py-2 pr-4">{fmtInt(r.views)}</td>
                         <td className="py-2 pr-4">{fmtInt(r.unique_ips)}</td>
                       </tr>
                     ))
                 ) : (
-                  <tr className="border-t border-white/10">
-                    <td className="py-3 text-xs text-white/60" colSpan={3}>
+                  <tr className="border-t border-[var(--border-subtle)]">
+                    <td className="py-3 text-xs text-[var(--text-muted)]" colSpan={3}>
                       No data yet.
                     </td>
                   </tr>
@@ -433,11 +436,11 @@ export default async function ViewerDocDetailPage({
       {!isViewer ? (
         <section className="grid grid-cols-1 gap-3 xl:grid-cols-2">
           <div className={card}>
-            <h2 className="text-base font-semibold text-white">Share history</h2>
-            <div className="mt-3 overflow-hidden rounded-2xl border border-white/10">
+            <h2 className="text-base font-semibold text-[var(--text-primary)]">Share history</h2>
+            <div className="mt-3 overflow-hidden rounded-sm border border-[var(--border-subtle)] bg-white/92">
               <div className="max-h-[560px] overflow-auto">
                 <table className="min-w-[760px] w-full text-sm">
-                  <thead className="sticky top-0 bg-[#10192b]/95 text-left text-xs text-white/60 backdrop-blur">
+                  <thead className="sticky top-0 bg-[rgba(245,248,252,0.96)] text-left text-xs text-[var(--text-muted)] backdrop-blur">
                     <tr>
                       <th className="py-2 pr-4">Token</th>
                       <th className="py-2 pr-4">Created</th>
@@ -447,11 +450,11 @@ export default async function ViewerDocDetailPage({
                       <th className="py-2 pr-4">Revoked</th>
                     </tr>
                   </thead>
-                  <tbody className="text-white/85">
+                  <tbody className="text-[var(--text-primary)]">
                     {shares.length ? (
                       shares.map((s) => (
-                        <tr key={s.token} className="border-t border-white/10">
-                          <td className="py-2 pr-4 font-mono text-xs">{s.token.slice(0, 10)}…</td>
+                        <tr key={s.token} className="border-t border-[var(--border-subtle)]">
+                          <td className="py-2 pr-4 font-mono text-xs text-[var(--text-secondary)]">{s.token.slice(0, 10)}…</td>
                           <td className="py-2 pr-4">{fmtDate(s.created_at)}</td>
                           <td className="py-2 pr-4">{fmtDate(s.expires_at)}</td>
                           <td className="py-2 pr-4">{fmtInt(s.views_count ?? 0)}</td>
@@ -460,8 +463,8 @@ export default async function ViewerDocDetailPage({
                         </tr>
                       ))
                     ) : (
-                      <tr className="border-t border-white/10">
-                        <td className="py-3 text-xs text-white/60" colSpan={6}>
+                      <tr className="border-t border-[var(--border-subtle)]">
+                        <td className="py-3 text-xs text-[var(--text-muted)]" colSpan={6}>
                           No shares found.
                         </td>
                       </tr>
@@ -473,28 +476,28 @@ export default async function ViewerDocDetailPage({
           </div>
 
           <div className={card}>
-            <h2 className="text-base font-semibold text-white">IP breakdown (30d)</h2>
-            <div className="mt-1 text-xs text-white/60">Hashed IPs (privacy-preserving).</div>
-            <div className="mt-3 overflow-hidden rounded-2xl border border-white/10">
+            <h2 className="text-base font-semibold text-[var(--text-primary)]">IP breakdown (30d)</h2>
+            <div className="mt-1 text-xs text-[var(--text-muted)]">Hashed IPs (privacy-preserving).</div>
+            <div className="mt-3 overflow-hidden rounded-sm border border-[var(--border-subtle)] bg-white/92">
               <div className="max-h-[420px] overflow-auto">
                 <table className="min-w-[520px] w-full text-sm">
-                  <thead className="sticky top-0 bg-[#10192b]/95 text-left text-xs text-white/60 backdrop-blur">
+                  <thead className="sticky top-0 bg-[rgba(245,248,252,0.96)] text-left text-xs text-[var(--text-muted)] backdrop-blur">
                     <tr>
                       <th className="py-2 pr-4">IP hash</th>
                       <th className="py-2 pr-4">Views</th>
                     </tr>
                   </thead>
-                  <tbody className="text-white/85">
+                  <tbody className="text-[var(--text-primary)]">
                     {ipRows.length ? (
                       ipRows.map((r) => (
-                        <tr key={r.ip_hash} className="border-t border-white/10">
-                          <td className="py-2 pr-4 font-mono text-xs">{(r.ip_hash || "—").slice(0, 18)}…</td>
+                        <tr key={r.ip_hash} className="border-t border-[var(--border-subtle)]">
+                          <td className="py-2 pr-4 font-mono text-xs text-[var(--text-secondary)]">{(r.ip_hash || "—").slice(0, 18)}…</td>
                           <td className="py-2 pr-4">{fmtInt(r.views)}</td>
                         </tr>
                       ))
                     ) : (
-                      <tr className="border-t border-white/10">
-                        <td className="py-3 text-xs text-white/60" colSpan={2}>
+                      <tr className="border-t border-[var(--border-subtle)]">
+                        <td className="py-3 text-xs text-[var(--text-muted)]" colSpan={2}>
                           No data yet.
                         </td>
                       </tr>
@@ -507,7 +510,7 @@ export default async function ViewerDocDetailPage({
         </section>
       ) : null}
 
-      <div className="text-xs text-white/60">
+      <div className="text-xs text-[var(--text-muted)]">
         Note: download counts are not tracked separately yet; current page shows view/access activity only.
       </div>
     </div>

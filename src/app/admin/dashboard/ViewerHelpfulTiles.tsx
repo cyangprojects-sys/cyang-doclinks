@@ -196,11 +196,11 @@ export default async function ViewerHelpfulTiles({ userId, orgId, hasOrgId }: Pr
   const expiringSoon = expiring.slice(0, 5);
 
   return (
-    <section className="glass-card-strong rounded-2xl p-4">
+    <section className="surface-panel-strong rounded-sm p-4">
       <div className="flex items-center justify-between">
         <div>
-          <div className="text-sm font-medium text-white">Shortcuts</div>
-          <div className="mt-1 text-xs text-white/60">Common actions</div>
+          <div className="text-sm font-medium text-[var(--text-primary)]">Shortcuts</div>
+          <div className="mt-1 text-xs text-[var(--text-muted)]">Common actions</div>
         </div>
         <div className="flex gap-2">
           {!hasDocs ? chip("Tracking off") : null}
@@ -212,11 +212,11 @@ export default async function ViewerHelpfulTiles({ userId, orgId, hasOrgId }: Pr
         <Tile title="Most viewed (this month)">
           {mostViewed ? (
             <div className="min-w-0">
-              <div className="truncate text-sm text-white">{mostViewed.title ?? "Untitled"}</div>
-              <div className="mt-1 text-xs text-white/60">{mostViewed.views} views</div>
+              <div className="truncate text-sm text-[var(--text-primary)]">{mostViewed.title ?? "Untitled"}</div>
+              <div className="mt-1 text-xs text-[var(--text-muted)]">{mostViewed.views} views</div>
             </div>
           ) : (
-            <div className="text-sm text-white/60">No view activity this month.</div>
+            <div className="text-sm text-[var(--text-muted)]">No view activity this month.</div>
           )}
         </Tile>
 
@@ -225,13 +225,13 @@ export default async function ViewerHelpfulTiles({ userId, orgId, hasOrgId }: Pr
             <div className="space-y-2">
               {recentShares.map((s) => (
                 <div key={s.token} className="flex items-center justify-between gap-3">
-                  <div className="min-w-0 truncate text-sm text-white">{s.title ?? "Untitled"}</div>
-                  <div className="shrink-0 text-xs text-white/60">{fmtDate(s.created_at)}</div>
+                  <div className="min-w-0 truncate text-sm text-[var(--text-primary)]">{s.title ?? "Untitled"}</div>
+                  <div className="shrink-0 text-xs text-[var(--text-muted)]">{fmtDate(s.created_at)}</div>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="text-sm text-white/60">No recent shares.</div>
+            <div className="text-sm text-[var(--text-muted)]">No recent shares.</div>
           )}
         </Tile>
 
@@ -240,15 +240,15 @@ export default async function ViewerHelpfulTiles({ userId, orgId, hasOrgId }: Pr
             <div className="space-y-2">
               {expiringSoon.map((it) => (
                 <div key={`${it.kind}:${it.token_or_alias}`} className="flex items-center justify-between gap-3">
-                  <div className="min-w-0 truncate text-sm text-white">
-                    {it.doc_title ?? "Untitled"} <span className="text-xs text-white/55">({it.kind})</span>
+                  <div className="min-w-0 truncate text-sm text-[var(--text-primary)]">
+                    {it.doc_title ?? "Untitled"} <span className="text-xs text-[var(--text-faint)]">({it.kind})</span>
                   </div>
-                  <div className="shrink-0 text-xs text-white/60">{fmtDate(it.expires_at)}</div>
+                  <div className="shrink-0 text-xs text-[var(--text-muted)]">{fmtDate(it.expires_at)}</div>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="text-sm text-white/60">No items expiring in the next 7 days.</div>
+            <div className="text-sm text-[var(--text-muted)]">No items expiring in the next 7 days.</div>
           )}
         </Tile>
       </div>
@@ -264,8 +264,8 @@ function Tile({
   children: React.ReactNode;
 }) {
   return (
-    <div className="glass-card rounded-xl p-3">
-      <div className="mb-2 text-xs font-medium text-white/70">{title}</div>
+    <div className="selection-tile rounded-sm p-3">
+      <div className="mb-2 text-xs font-medium text-[var(--text-secondary)]">{title}</div>
       {children}
     </div>
   );

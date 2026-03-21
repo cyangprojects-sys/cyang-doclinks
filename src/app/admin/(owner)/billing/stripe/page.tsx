@@ -28,18 +28,18 @@ function errorMessage(e: unknown): string {
 
 function statusClass(status: string): string {
   const s = String(status || "").toLowerCase();
-  if (s === "active") return "border-emerald-500/40 bg-emerald-500/20 text-emerald-100";
-  if (s === "grace") return "border-amber-500/40 bg-amber-500/20 text-amber-100";
-  if (s === "downgraded" || s === "at_risk") return "border-red-500/40 bg-red-500/20 text-red-100";
-  return "border-white/20 bg-white/10 text-white/80";
+  if (s === "active") return "border-emerald-200 bg-emerald-50 text-emerald-800";
+  if (s === "grace") return "border-amber-200 bg-amber-50 text-amber-800";
+  if (s === "downgraded" || s === "at_risk") return "border-rose-200 bg-rose-50 text-rose-800";
+  return "border-[var(--border-subtle)] bg-white text-[var(--text-secondary)]";
 }
 
 function invoiceStatusClass(status: string): string {
   const s = String(status || "").toLowerCase();
-  if (s === "paid") return "border-emerald-500/40 bg-emerald-500/15 text-emerald-100";
-  if (s === "open" || s === "draft") return "border-amber-500/40 bg-amber-500/15 text-amber-100";
-  if (s === "void" || s === "uncollectible") return "border-red-500/40 bg-red-500/15 text-red-100";
-  return "border-white/20 bg-white/10 text-white/80";
+  if (s === "paid") return "border-emerald-200 bg-emerald-50 text-emerald-800";
+  if (s === "open" || s === "draft") return "border-amber-200 bg-amber-50 text-amber-800";
+  if (s === "void" || s === "uncollectible") return "border-rose-200 bg-rose-50 text-rose-800";
+  return "border-[var(--border-subtle)] bg-white text-[var(--text-secondary)]";
 }
 
 function entitlementGuidance(entitlement: string): { title: string; body: string; tone: string } {
@@ -48,34 +48,34 @@ function entitlementGuidance(entitlement: string): { title: string; body: string
     return {
       title: "Subscription healthy",
       body: "Billing is active. Plan limits should enforce as Pro entitlement.",
-      tone: "border-emerald-900/60 bg-emerald-950/30 text-emerald-200",
+      tone: "border-emerald-200 bg-emerald-50 text-emerald-800",
     };
   }
   if (e === "grace") {
     return {
       title: "In grace period",
       body: "Payment failed recently. Update payment method in Stripe Portal before grace expires to avoid downgrade.",
-      tone: "border-amber-900/60 bg-amber-950/30 text-amber-200",
+      tone: "border-amber-200 bg-amber-50 text-amber-800",
     };
   }
   if (e === "at_risk") {
     return {
       title: "At risk of downgrade",
       body: "Subscription is incomplete/unpaid. Resolve checkout or billing failure immediately.",
-      tone: "border-red-900/60 bg-red-950/30 text-red-200",
+      tone: "border-rose-200 bg-rose-50 text-rose-800",
     };
   }
   if (e === "downgraded") {
     return {
       title: "Downgraded",
       body: "Entitlement is no longer active. Account limits now follow Free-tier enforcement.",
-      tone: "border-red-900/60 bg-red-950/30 text-red-200",
+      tone: "border-rose-200 bg-rose-50 text-rose-800",
     };
   }
   return {
     title: "No active subscription",
     body: "Start checkout to provision Stripe subscription and unlock paid entitlement.",
-    tone: "border-white/20 bg-white/5 text-white/80",
+    tone: "border-[var(--border-subtle)] bg-white text-[var(--text-secondary)]",
   };
 }
 
@@ -167,22 +167,22 @@ export default async function StripeBillingPage(props: {
   }).length;
 
   return (
-    <div className="w-full p-6 text-white">
-      <div className="overflow-hidden rounded-2xl border border-white/10 bg-[radial-gradient(120%_140%_at_0%_0%,rgba(14,165,233,0.20),rgba(10,10,10,0.90)_45%,rgba(10,10,10,1)_100%)] p-6 shadow-[0_20px_60px_rgba(0,0,0,0.35)]">
+    <div className="w-full p-6">
+      <div className="surface-panel-strong overflow-hidden rounded-sm p-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <div className="inline-flex items-center rounded-full border border-sky-400/30 bg-sky-500/15 px-2.5 py-1 text-xs font-medium tracking-wide text-sky-100">
+            <div className="inline-flex items-center rounded-sm border border-[var(--border-accent)] bg-[var(--surface-selected)] px-2.5 py-1 text-xs font-medium tracking-wide text-[var(--accent-primary)]">
               Stripe Control Center
             </div>
-            <h1 className="mt-3 text-3xl font-semibold tracking-tight">Billing</h1>
-            <p className="mt-2 max-w-2xl text-sm text-neutral-300">
+            <h1 className="mt-3 text-3xl font-semibold tracking-tight text-[var(--text-primary)]">Billing</h1>
+            <p className="mt-2 max-w-2xl text-sm text-[var(--text-secondary)]">
               Track entitlement health, launch checkout and portal sessions, and review invoice outcomes from one screen.
             </p>
           </div>
           <div className="flex items-center gap-2">
             <Link
               href="/admin/billing"
-              className="rounded-md border border-white/20 bg-white/10 px-3 py-2 text-sm font-medium text-white/90 transition hover:bg-white/15"
+              className="btn-base btn-secondary rounded-sm px-3 py-2 text-sm font-medium"
             >
               Billing Settings
             </Link>
@@ -190,7 +190,7 @@ export default async function StripeBillingPage(props: {
               <button
                 type="submit"
                 disabled={!customerId}
-                className="rounded-md border border-sky-400/40 bg-sky-500/25 px-3 py-2 text-sm font-medium text-sky-100 transition hover:bg-sky-500/35 disabled:cursor-not-allowed disabled:opacity-60"
+                className="btn-base btn-primary rounded-sm px-3 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-60"
               >
                 Run Sync
               </button>
@@ -199,59 +199,59 @@ export default async function StripeBillingPage(props: {
         </div>
 
         <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <div className="rounded-xl border border-white/15 bg-black/35 p-4">
-            <div className="text-xs uppercase tracking-wide text-neutral-400">Entitlement</div>
+          <div className="selection-tile rounded-sm p-4">
+            <div className="text-xs uppercase tracking-wide text-[var(--text-faint)]">Entitlement</div>
             <div className="mt-2">
               <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold uppercase tracking-wide ${statusClass(entitlement)}`}>
                 {entitlement}
               </span>
             </div>
           </div>
-          <div className="rounded-xl border border-white/15 bg-black/35 p-4">
-            <div className="text-xs uppercase tracking-wide text-neutral-400">Invoices Loaded</div>
-            <div className="mt-2 text-2xl font-semibold text-white">{invoices.length}</div>
-            <div className="mt-1 text-xs text-neutral-400">Last 25 records from Stripe</div>
+          <div className="selection-tile rounded-sm p-4">
+            <div className="text-xs uppercase tracking-wide text-[var(--text-faint)]">Invoices Loaded</div>
+            <div className="mt-2 text-2xl font-semibold text-[var(--text-primary)]">{invoices.length}</div>
+            <div className="mt-1 text-xs text-[var(--text-muted)]">Last 25 records from Stripe</div>
           </div>
-          <div className="rounded-xl border border-white/15 bg-black/35 p-4">
-            <div className="text-xs uppercase tracking-wide text-neutral-400">Paid</div>
-            <div className="mt-2 text-2xl font-semibold text-emerald-200">{paidInvoices}</div>
-            <div className="mt-1 text-xs text-neutral-400">Successful invoices</div>
+          <div className="selection-tile rounded-sm p-4">
+            <div className="text-xs uppercase tracking-wide text-[var(--text-faint)]">Paid</div>
+            <div className="mt-2 text-2xl font-semibold text-emerald-700">{paidInvoices}</div>
+            <div className="mt-1 text-xs text-[var(--text-muted)]">Successful invoices</div>
           </div>
-          <div className="rounded-xl border border-white/15 bg-black/35 p-4">
-            <div className="text-xs uppercase tracking-wide text-neutral-400">Needs Review</div>
-            <div className="mt-2 text-2xl font-semibold text-amber-200">{failedInvoices}</div>
-            <div className="mt-1 text-xs text-neutral-400">Void or uncollectible</div>
+          <div className="selection-tile rounded-sm p-4">
+            <div className="text-xs uppercase tracking-wide text-[var(--text-faint)]">Needs Review</div>
+            <div className="mt-2 text-2xl font-semibold text-amber-800">{failedInvoices}</div>
+            <div className="mt-1 text-xs text-[var(--text-muted)]">Void or uncollectible</div>
           </div>
         </div>
       </div>
 
       <div className="mt-4 space-y-3">
         {sync === "ok" ? (
-          <div className="rounded-lg border border-emerald-900/60 bg-emerald-950/30 px-3 py-2 text-sm text-emerald-200">
+          <div className="rounded-sm border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
             Billing sync completed.
           </div>
         ) : null}
         {error ? (
-          <div className="rounded-lg border border-red-900/60 bg-red-950/30 px-3 py-2 text-sm text-red-200">
+          <div className="rounded-sm border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">
             {decodeURIComponent(String(error))}
           </div>
         ) : null}
         {stripeConfigError ? (
-          <div className="rounded-lg border border-red-900/60 bg-red-950/30 px-3 py-2 text-sm text-red-200">
+          <div className="rounded-sm border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">
             Stripe is not configured for this environment: {stripeConfigError}
           </div>
         ) : null}
-        <div className={`rounded-lg border px-3 py-2 text-sm ${guidance.tone}`}>
+        <div className={`rounded-sm border px-3 py-2 text-sm ${guidance.tone}`}>
           <div className="font-medium">{guidance.title}</div>
           <div className="mt-1 text-xs opacity-90">{guidance.body}</div>
         </div>
       </div>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-5">
-        <div className="rounded-2xl border border-neutral-800 bg-neutral-950 p-5 lg:col-span-2">
-          <div className="text-sm font-medium text-white">Customer & Actions</div>
-          <div className="mt-2 text-xs text-neutral-400">Stripe customer id</div>
-          <div className="mt-1 rounded-md border border-neutral-800 bg-black/30 px-2 py-2 font-mono text-xs text-neutral-200">
+        <div className="surface-panel-strong rounded-sm p-5 lg:col-span-2">
+          <div className="text-sm font-medium text-[var(--text-primary)]">Customer & Actions</div>
+          <div className="mt-2 text-xs text-[var(--text-muted)]">Stripe customer id</div>
+          <div className="mt-1 rounded-sm border border-[var(--border-subtle)] bg-[var(--surface-soft)] px-2 py-2 font-mono text-xs text-[var(--text-secondary)]">
             {customerId || "-"}
           </div>
           <div className="mt-4 grid gap-2 sm:grid-cols-2">
@@ -259,7 +259,7 @@ export default async function StripeBillingPage(props: {
               <button
                 type="submit"
                 disabled={!customerId}
-                className="w-full rounded-md border border-sky-500/40 bg-sky-500/20 px-3 py-2 text-sm font-medium text-sky-100 transition hover:bg-sky-500/30 disabled:cursor-not-allowed disabled:opacity-60"
+                className="btn-base btn-primary w-full rounded-sm px-3 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-60"
               >
                 Start Checkout
               </button>
@@ -268,7 +268,7 @@ export default async function StripeBillingPage(props: {
               <button
                 type="submit"
                 disabled={!customerId}
-                className="w-full rounded-md border border-white/15 bg-white/5 px-3 py-2 text-sm font-medium transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+                className="btn-base btn-secondary w-full rounded-sm px-3 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-60"
               >
                 Open Portal
               </button>
@@ -277,7 +277,7 @@ export default async function StripeBillingPage(props: {
               <button
                 type="submit"
                 disabled={!customerId}
-                className="w-full rounded-md border border-white/15 bg-white/5 px-3 py-2 text-sm font-medium transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+                className="btn-base btn-secondary w-full rounded-sm px-3 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-60"
               >
                 Run Sync Now
               </button>
@@ -285,28 +285,28 @@ export default async function StripeBillingPage(props: {
           </div>
         </div>
 
-        <div className="rounded-2xl border border-neutral-800 bg-neutral-950 p-5 lg:col-span-3">
-          <div className="text-sm font-medium text-white">Subscription Snapshot</div>
+        <div className="surface-panel-strong rounded-sm p-5 lg:col-span-3">
+          <div className="text-sm font-medium text-[var(--text-primary)]">Subscription Snapshot</div>
           {snapshot.subscription ? (
-            <div className="mt-3 grid gap-2 text-sm text-neutral-200 sm:grid-cols-2">
-              <div className="rounded-lg border border-neutral-800 bg-black/30 p-3">
-                <div className="text-xs text-neutral-400">Status</div>
+            <div className="mt-3 grid gap-2 text-sm text-[var(--text-secondary)] sm:grid-cols-2">
+              <div className="selection-tile rounded-sm p-3">
+                <div className="text-xs text-[var(--text-muted)]">Status</div>
                 <div className="mt-1 font-semibold capitalize">{snapshot.subscription.status}</div>
               </div>
-              <div className="rounded-lg border border-neutral-800 bg-black/30 p-3">
-                <div className="text-xs text-neutral-400">Plan</div>
+              <div className="selection-tile rounded-sm p-3">
+                <div className="text-xs text-[var(--text-muted)]">Plan</div>
                 <div className="mt-1 font-mono">{snapshot.subscription.planId}</div>
               </div>
-              <div className="rounded-lg border border-neutral-800 bg-black/30 p-3">
-                <div className="text-xs text-neutral-400">Current period end</div>
+              <div className="selection-tile rounded-sm p-3">
+                <div className="text-xs text-[var(--text-muted)]">Current period end</div>
                 <div className="mt-1">
                   {snapshot.subscription.currentPeriodEnd
                     ? new Date(snapshot.subscription.currentPeriodEnd).toLocaleString()
                     : "-"}
                 </div>
               </div>
-              <div className="rounded-lg border border-neutral-800 bg-black/30 p-3">
-                <div className="text-xs text-neutral-400">Grace until</div>
+              <div className="selection-tile rounded-sm p-3">
+                <div className="text-xs text-[var(--text-muted)]">Grace until</div>
                 <div className="mt-1">
                   {snapshot.subscription.graceUntil
                     ? new Date(snapshot.subscription.graceUntil).toLocaleString()
@@ -315,71 +315,71 @@ export default async function StripeBillingPage(props: {
               </div>
             </div>
           ) : (
-            <div className="mt-3 text-sm text-neutral-400">No subscription record yet.</div>
+            <div className="mt-3 text-sm text-[var(--text-muted)]">No subscription record yet.</div>
           )}
         </div>
       </div>
 
-      <div className="glass-card-strong mt-4 rounded-2xl p-5">
-        <div className="text-sm font-medium text-white">Billing debug status</div>
-        <div className="mt-3 grid gap-2 text-xs text-neutral-300 sm:grid-cols-2 lg:grid-cols-3">
-          <div className="rounded-lg border border-neutral-800 bg-black/30 p-3">
-            <div className="text-neutral-400">Billing tables ready</div>
+      <div className="surface-panel-strong mt-4 rounded-sm p-5">
+        <div className="text-sm font-medium text-[var(--text-primary)]">Billing debug status</div>
+        <div className="mt-3 grid gap-2 text-xs text-[var(--text-secondary)] sm:grid-cols-2 lg:grid-cols-3">
+          <div className="selection-tile rounded-sm p-3">
+            <div className="text-[var(--text-muted)]">Billing tables ready</div>
             <div className="mt-1 font-semibold">{billingTables ? "yes" : "no"}</div>
           </div>
-          <div className="rounded-lg border border-neutral-800 bg-black/30 p-3">
-            <div className="text-neutral-400">Plan limit enforcement</div>
+          <div className="selection-tile rounded-sm p-3">
+            <div className="text-[var(--text-muted)]">Plan limit enforcement</div>
             <div className="mt-1 font-semibold">{billingFlags.flags.enforcePlanLimits ? "enabled" : "disabled"}</div>
           </div>
-          <div className="rounded-lg border border-neutral-800 bg-black/30 p-3">
-            <div className="text-neutral-400">Stripe entitlement enforcement</div>
+          <div className="selection-tile rounded-sm p-3">
+            <div className="text-[var(--text-muted)]">Stripe entitlement enforcement</div>
             <div className="mt-1 font-semibold">{stripeEntitlementEnforced ? "enabled" : "disabled"}</div>
           </div>
-          <div className="rounded-lg border border-neutral-800 bg-black/30 p-3">
-            <div className="text-neutral-400">`billing_webhook_events` table</div>
+          <div className="selection-tile rounded-sm p-3">
+            <div className="text-[var(--text-muted)]">`billing_webhook_events` table</div>
             <div className="mt-1 font-semibold">{webhookDebug.billingWebhookEventsTable ? "present" : "missing"}</div>
           </div>
-          <div className="rounded-lg border border-neutral-800 bg-black/30 p-3">
-            <div className="text-neutral-400">`stripe_event_log` table</div>
+          <div className="selection-tile rounded-sm p-3">
+            <div className="text-[var(--text-muted)]">`stripe_event_log` table</div>
             <div className="mt-1 font-semibold">{webhookDebug.stripeEventLogTable ? "present" : "missing"}</div>
           </div>
-          <div className="rounded-lg border border-neutral-800 bg-black/30 p-3">
-            <div className="text-neutral-400">Last webhook event</div>
+          <div className="selection-tile rounded-sm p-3">
+            <div className="text-[var(--text-muted)]">Last webhook event</div>
             <div className="mt-1 font-semibold">{webhookDebug.lastEventAt ? new Date(webhookDebug.lastEventAt).toLocaleString() : "-"}</div>
           </div>
         </div>
-        <div className="mt-3 grid gap-2 text-xs text-neutral-300 sm:grid-cols-3">
-          <div className="rounded-lg border border-neutral-800 bg-black/30 p-3">
-            <div className="text-neutral-400">Total logged events</div>
+        <div className="mt-3 grid gap-2 text-xs text-[var(--text-secondary)] sm:grid-cols-3">
+          <div className="selection-tile rounded-sm p-3">
+            <div className="text-[var(--text-muted)]">Total logged events</div>
             <div className="mt-1 font-semibold">{webhookDebug.totalEvents}</div>
           </div>
-          <div className="rounded-lg border border-neutral-800 bg-black/30 p-3">
-            <div className="text-neutral-400">Duplicate-like events</div>
+          <div className="selection-tile rounded-sm p-3">
+            <div className="text-[var(--text-muted)]">Duplicate-like events</div>
             <div className="mt-1 font-semibold">{webhookDebug.duplicateLikeEvents}</div>
           </div>
-          <div className="rounded-lg border border-neutral-800 bg-black/30 p-3">
-            <div className="text-neutral-400">Failed events</div>
+          <div className="selection-tile rounded-sm p-3">
+            <div className="text-[var(--text-muted)]">Failed events</div>
             <div className="mt-1 font-semibold">{webhookDebug.failedEvents}</div>
           </div>
         </div>
       </div>
 
-      <div className="glass-card-strong mt-4 rounded-2xl p-5">
+      <div className="surface-panel-strong mt-4 rounded-sm p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <div className="text-sm font-medium text-white">Invoices</div>
-            <div className="mt-1 text-xs text-neutral-400">Recent Stripe invoices for this customer.</div>
+            <div className="text-sm font-medium text-[var(--text-primary)]">Invoices</div>
+            <div className="mt-1 text-xs text-[var(--text-muted)]">Recent Stripe invoices for this customer.</div>
           </div>
         </div>
         {invoicesError ? (
-          <div className="mt-2 rounded-md border border-red-900/50 bg-red-950/30 px-3 py-2 text-sm text-red-200">
+          <div className="mt-2 rounded-sm border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">
             {invoicesError}
           </div>
         ) : invoices.length ? (
-          <div className="mt-3 overflow-hidden rounded-lg border border-white/10">
+          <div className="mt-3 overflow-hidden rounded-sm border border-[var(--border-subtle)] bg-white/92">
             <div className="max-h-[380px] overflow-auto">
             <table className="min-w-full text-left text-xs">
-              <thead className="sticky top-0 bg-[#10192b]/95 text-neutral-400 backdrop-blur">
+              <thead className="sticky top-0 bg-[rgba(245,248,252,0.96)] text-[var(--text-muted)] backdrop-blur">
                 <tr>
                   <th className="px-3 py-2">Date</th>
                   <th className="px-3 py-2">Invoice</th>
@@ -391,27 +391,27 @@ export default async function StripeBillingPage(props: {
               </thead>
               <tbody>
                 {invoices.map((inv, idx) => (
-                    <tr key={String(inv?.id || `${inv?.number || "row"}-${idx}`)} className="border-t border-white/10">
-                    <td className="px-3 py-2 text-neutral-300">
+                    <tr key={String(inv?.id || `${inv?.number || "row"}-${idx}`)} className="border-t border-[var(--border-subtle)]">
+                    <td className="px-3 py-2 text-[var(--text-secondary)]">
                       {inv?.created ? new Date(Number(inv.created) * 1000).toLocaleString() : "-"}
                     </td>
-                    <td className="px-3 py-2 font-mono text-neutral-200">{String(inv?.number || inv?.id || "-")}</td>
-                    <td className="px-3 py-2 text-neutral-200">
+                    <td className="px-3 py-2 font-mono text-[var(--text-primary)]">{String(inv?.number || inv?.id || "-")}</td>
+                    <td className="px-3 py-2 text-[var(--text-primary)]">
                       <span className={`inline-flex rounded-full border px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide ${invoiceStatusClass(String(inv?.status || "-"))}`}>
                         {String(inv?.status || "-")}
                       </span>
                     </td>
-                    <td className="px-3 py-2 text-neutral-200">{fmtMoney(Number(inv?.amount_due || 0), String(inv?.currency || "USD"))}</td>
-                    <td className="px-3 py-2 text-neutral-200">{fmtMoney(Number(inv?.amount_paid || 0), String(inv?.currency || "USD"))}</td>
+                    <td className="px-3 py-2 text-[var(--text-primary)]">{fmtMoney(Number(inv?.amount_due || 0), String(inv?.currency || "USD"))}</td>
+                    <td className="px-3 py-2 text-[var(--text-primary)]">{fmtMoney(Number(inv?.amount_paid || 0), String(inv?.currency || "USD"))}</td>
                     <td className="px-3 py-2">
                       <div className="flex gap-2">
                         {inv?.hosted_invoice_url ? (
-                          <a className="text-sky-300 hover:underline" href={String(inv.hosted_invoice_url)} target="_blank" rel="noreferrer">
+                          <a className="text-[var(--accent-primary)] hover:underline" href={String(inv.hosted_invoice_url)} target="_blank" rel="noreferrer">
                             Hosted
                           </a>
                         ) : null}
                         {inv?.invoice_pdf ? (
-                          <a className="text-sky-300 hover:underline" href={String(inv.invoice_pdf)} target="_blank" rel="noreferrer">
+                          <a className="text-[var(--accent-primary)] hover:underline" href={String(inv.invoice_pdf)} target="_blank" rel="noreferrer">
                             PDF
                           </a>
                         ) : null}
@@ -424,7 +424,7 @@ export default async function StripeBillingPage(props: {
             </div>
           </div>
         ) : (
-          <div className="mt-2 text-sm text-neutral-400">No invoices found yet.</div>
+          <div className="mt-2 text-sm text-[var(--text-muted)]">No invoices found yet.</div>
         )}
       </div>
     </div>

@@ -104,36 +104,36 @@ export default async function AbuseReportsPage() {
     <main className="w-full px-4 py-8">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <div className="text-xs text-white/60">Owner</div>
-          <h1 className="mt-1 text-xl font-semibold text-white">Abuse reports</h1>
-          <div className="mt-1 text-sm text-white/60">
+          <div className="text-xs uppercase tracking-[0.16em] text-[var(--text-faint)]">Owner</div>
+          <h1 className="mt-1 text-xl font-semibold text-[var(--text-primary)]">Abuse reports</h1>
+          <div className="mt-1 text-sm text-[var(--text-secondary)]">
             Review viewer-submitted reports and take quick moderation actions (disable/quarantine docs, revoke shares).
           </div>
         </div>
       </div>
 
       <div className="mt-6 grid gap-3 md:grid-cols-3">
-        <div className="glass-card-strong rounded-2xl p-4">
-          <div className="text-xs text-white/60">Active blocked IPs</div>
-          <div className="mt-1 text-2xl font-semibold text-white">{Number(blockStats?.[0]?.active_blocks ?? 0)}</div>
+        <div className="selection-tile rounded-sm p-4">
+          <div className="text-xs uppercase tracking-[0.16em] text-[var(--text-faint)]">Active blocked IPs</div>
+          <div className="mt-1 text-2xl font-semibold text-[var(--text-primary)]">{Number(blockStats?.[0]?.active_blocks ?? 0)}</div>
         </div>
-        <div className="glass-card-strong rounded-2xl p-4">
-          <div className="text-xs text-white/60">Expired blocks</div>
-          <div className="mt-1 text-2xl font-semibold text-white">{Number(blockStats?.[0]?.expired_blocks ?? 0)}</div>
+        <div className="selection-tile rounded-sm p-4">
+          <div className="text-xs uppercase tracking-[0.16em] text-[var(--text-faint)]">Expired blocks</div>
+          <div className="mt-1 text-2xl font-semibold text-[var(--text-primary)]">{Number(blockStats?.[0]?.expired_blocks ?? 0)}</div>
         </div>
-        <div className="glass-card-strong rounded-2xl p-4">
-          <div className="text-xs text-white/60">Block hits (24h)</div>
-          <div className="mt-1 text-2xl font-semibold text-white">{Number(hitRows?.[0]?.hits_24h ?? 0)}</div>
+        <div className="selection-tile rounded-sm p-4">
+          <div className="text-xs uppercase tracking-[0.16em] text-[var(--text-faint)]">Block hits (24h)</div>
+          <div className="mt-1 text-2xl font-semibold text-[var(--text-primary)]">{Number(hitRows?.[0]?.hits_24h ?? 0)}</div>
         </div>
       </div>
 
-      <div className="glass-card-strong mt-6 rounded-2xl p-4">
-        <div className="text-sm font-medium text-white">Active blocked IPs</div>
-        <div className="mt-1 text-xs text-white/60">Hashed IP only. Expires automatically when TTL passes.</div>
-        <div className="mt-3 overflow-hidden rounded-2xl border border-white/10">
+      <div className="surface-panel-strong mt-6 rounded-sm p-4">
+        <div className="text-sm font-medium text-[var(--text-primary)]">Active blocked IPs</div>
+        <div className="mt-1 text-xs text-[var(--text-muted)]">Hashed IP only. Expires automatically when TTL passes.</div>
+        <div className="mt-3 overflow-hidden rounded-sm border border-[var(--border-subtle)] bg-white/92">
           <div className="max-h-[420px] overflow-auto">
           <table className="min-w-full text-left text-xs">
-            <thead className="sticky top-0 bg-[#10192b]/95 text-white/60 backdrop-blur">
+            <thead className="sticky top-0 bg-[rgba(245,248,252,0.96)] text-[var(--text-muted)] backdrop-blur">
               <tr>
                 <th className="py-2 pr-4">IP hash</th>
                 <th className="py-2 pr-4">Reason</th>
@@ -142,10 +142,10 @@ export default async function AbuseReportsPage() {
                 <th className="py-2 pr-4">Expires</th>
               </tr>
             </thead>
-            <tbody className="text-white/80">
+            <tbody className="text-[var(--text-secondary)]">
               {activeBlocks.length ? (
                 activeBlocks.map((b) => (
-                  <tr key={`${b.ip_hash}:${b.created_at}`} className="border-t border-white/10">
+                  <tr key={`${b.ip_hash}:${b.created_at}`} className="border-t border-[var(--border-subtle)]">
                     <td className="py-2 pr-4 font-mono">{b.ip_hash.slice(0, 18)}…</td>
                     <td className="py-2 pr-4">{b.reason}</td>
                     <td className="py-2 pr-4">{b.source || "—"}</td>
@@ -155,7 +155,7 @@ export default async function AbuseReportsPage() {
                 ))
               ) : (
                 <tr>
-                  <td className="py-3 text-white/60" colSpan={5}>
+                  <td className="py-3 text-[var(--text-muted)]" colSpan={5}>
                     No active blocked IPs.
                   </td>
                 </tr>
@@ -168,22 +168,22 @@ export default async function AbuseReportsPage() {
 
       <div className="mt-6 max-h-[920px] space-y-4 overflow-auto pr-1">
         {rows.length === 0 ? (
-          <div className="glass-card-strong rounded-2xl p-4 text-sm text-white/70">No reports yet.</div>
+          <div className="surface-panel rounded-sm p-4 text-sm text-[var(--text-secondary)]">No reports yet.</div>
         ) : null}
 
         {rows.map((r) => (
-          <div key={r.id} className="glass-card-strong rounded-2xl p-4">
+          <div key={r.id} className="surface-panel-strong rounded-sm p-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <div className="text-sm font-medium text-white">
+                <div className="text-sm font-medium text-[var(--text-primary)]">
                   {r.doc_title || "Unknown document"}
-                  <span className="ml-2 text-xs font-normal text-white/50">({r.status})</span>
+                  <span className="ml-2 text-xs font-normal text-[var(--text-faint)]">({r.status})</span>
                 </div>
-                <div className="mt-1 text-xs text-white/60">
+                <div className="mt-1 text-xs text-[var(--text-muted)]">
                   {new Date(r.created_at).toLocaleString()} • token: {r.share_token ? `${r.share_token.slice(0, 8)}…` : "—"} • doc:{" "}
                   {r.doc_id ? r.doc_id.slice(0, 8) + "…" : "—"}
                 </div>
-                <div className="mt-1 text-xs text-white/50">
+                <div className="mt-1 text-xs text-[var(--text-faint)]">
                   moderation: {r.moderation_status || "—"} • scan: {r.scan_status || "—"} • risk: {r.risk_level || "—"}
                 </div>
               </div>
@@ -197,16 +197,16 @@ export default async function AbuseReportsPage() {
             </div>
 
             {r.reporter_email ? (
-              <div className="mt-3 text-xs text-white/60">Reporter: {r.reporter_email}</div>
+              <div className="mt-3 text-xs text-[var(--text-muted)]">Reporter: {r.reporter_email}</div>
             ) : null}
 
             {r.message ? (
-              <div className="mt-2 whitespace-pre-wrap rounded-xl border border-white/10 bg-black/30 p-3 text-sm text-white/80">
+              <div className="mt-2 whitespace-pre-wrap rounded-sm border border-[var(--border-subtle)] bg-[var(--surface-soft)] p-3 text-sm text-[var(--text-secondary)]">
                 {r.message}
               </div>
             ) : null}
 
-            <div className="mt-3 text-xs text-white/40">
+            <div className="mt-3 text-xs text-[var(--text-faint)]">
               ip_hash: {r.ip_hash ? r.ip_hash.slice(0, 12) + "…" : "—"} • ua:{" "}
               {r.user_agent ? r.user_agent.slice(0, 80) + (r.user_agent.length > 80 ? "…" : "") : "—"}
             </div>

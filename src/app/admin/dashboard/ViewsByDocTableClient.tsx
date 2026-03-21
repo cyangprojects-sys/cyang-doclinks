@@ -264,32 +264,32 @@ export default function ViewsByDocTableClient(props: {
   }
 
   return (
-    <section className="glass-card-strong rounded-[30px] border border-white/10 bg-white/[0.03]">
-      <div className="border-b border-white/10 px-5 py-5">
+    <section className="surface-panel-strong rounded-sm">
+      <div className="border-b border-[var(--border-subtle)] px-5 py-5">
         <div className="grid gap-3 lg:grid-cols-3">
-          <div className="rounded-[24px] border border-white/10 bg-white/[0.04] p-4">
-            <div className="text-xs uppercase tracking-[0.16em] text-white/45">Most opened</div>
-            <div className="mt-2 text-base font-semibold text-white">{topViewed?.doc_title || "No file views yet"}</div>
-            <div className="mt-1 text-sm text-white/60">
+          <div className="selection-tile p-4">
+            <div className="text-xs uppercase tracking-[0.16em] text-[var(--text-faint)]">Most opened</div>
+            <div className="mt-2 text-base font-semibold text-[var(--text-primary)]">{topViewed?.doc_title || "No file views yet"}</div>
+            <div className="mt-1 text-sm text-[var(--text-muted)]">
               {topViewed ? `${formatNumber(topViewed.views)} total view${topViewed.views === 1 ? "" : "s"}` : "Share a protected link to start seeing engagement."}
             </div>
           </div>
-          <div className="rounded-[24px] border border-white/10 bg-white/[0.04] p-4">
-            <div className="text-xs uppercase tracking-[0.16em] text-white/45">Recently viewed</div>
-            <div className="mt-2 text-2xl font-semibold text-white">{formatNumber(recentlyViewed)}</div>
-            <div className="mt-1 text-sm text-white/60">Files with a recorded last view.</div>
+          <div className="selection-tile p-4">
+            <div className="text-xs uppercase tracking-[0.16em] text-[var(--text-faint)]">Recently viewed</div>
+            <div className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-[var(--text-primary)]">{formatNumber(recentlyViewed)}</div>
+            <div className="mt-1 text-sm text-[var(--text-muted)]">Files with a recorded last view.</div>
           </div>
-          <div className="rounded-[24px] border border-white/10 bg-white/[0.04] p-4">
-            <div className="text-xs uppercase tracking-[0.16em] text-white/45">Needs a follow-up</div>
-            <div className="mt-2 text-2xl font-semibold text-white">{formatNumber(quietCount)}</div>
-            <div className="mt-1 text-sm text-white/60">Files that have not been opened yet.</div>
+          <div className="selection-tile p-4">
+            <div className="text-xs uppercase tracking-[0.16em] text-[var(--text-faint)]">Needs a follow-up</div>
+            <div className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-[var(--text-primary)]">{formatNumber(quietCount)}</div>
+            <div className="mt-1 text-sm text-[var(--text-muted)]">Files that have not been opened yet.</div>
           </div>
         </div>
 
         <div className="mt-5 flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div className="flex flex-1 flex-col gap-3 md:flex-row md:items-end">
             <div className="min-w-0 flex-1">
-              <label htmlFor="view-doc-search" className="text-xs uppercase tracking-[0.14em] text-white/45">
+              <label htmlFor="view-doc-search" className="text-xs uppercase tracking-[0.14em] text-[var(--text-faint)]">
                 Search files
               </label>
               <input
@@ -302,11 +302,11 @@ export default function ViewsByDocTableClient(props: {
                   syncUrl({ viewQ: value });
                 }}
                 placeholder="Search by file name or alias"
-                className="mt-2 w-full rounded-2xl border border-white/14 bg-black/20 px-4 py-3 text-sm text-white placeholder:text-white/40 focus:border-cyan-300/45 focus:outline-none"
+                className="field-input mt-2 w-full rounded-sm px-4 py-3 text-sm"
               />
             </div>
 
-            <label className="flex items-center gap-2 text-xs text-white/55">
+            <label className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
               <span>Show</span>
               <select
                 aria-label="Insights page size"
@@ -316,7 +316,7 @@ export default function ViewsByDocTableClient(props: {
                   setLimit(nextLimit);
                   syncUrl({ viewLimit: nextLimit });
                 }}
-                className="rounded-2xl border border-white/14 bg-black/20 px-3 py-3 text-sm text-white"
+                className="field-input rounded-sm px-3 py-3 text-sm"
               >
                 {[6, 12, 24, 48].map((size) => (
                   <option key={size} value={size}>
@@ -336,10 +336,10 @@ export default function ViewsByDocTableClient(props: {
                   type="button"
                   onClick={() => syncUrl({ viewFilter: item })}
                   className={[
-                    "rounded-full border px-3 py-2 text-xs transition",
+                    "px-3 py-2 text-xs transition rounded-sm",
                     active
-                      ? "border-cyan-300/35 bg-cyan-400/12 text-cyan-100"
-                      : "border-white/12 bg-white/[0.03] text-white/65 hover:border-white/18 hover:bg-white/[0.06] hover:text-white",
+                      ? "selection-pill selection-pill-active"
+                      : "selection-pill",
                   ].join(" ")}
                 >
                   {filterLabel(item, counts[item])}
@@ -352,22 +352,22 @@ export default function ViewsByDocTableClient(props: {
 
       {filtered.length === 0 ? (
         <div className="p-8">
-          <div className="rounded-[28px] border border-dashed border-white/16 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-8 text-center">
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-cyan-300/25 bg-cyan-400/10 text-xs font-semibold tracking-[0.2em] text-cyan-100">
+          <div className="surface-panel-soft rounded-sm p-8 text-center">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-sm border border-[var(--border-accent)] bg-[var(--surface-selected)] text-xs font-semibold tracking-[0.2em] text-[var(--accent-primary)]">
               VIEWS
             </div>
-            <h2 className="mt-5 text-2xl font-semibold text-white">No file activity yet</h2>
-            <p className="mx-auto mt-3 max-w-2xl text-sm text-white/65">
+            <h2 className="mt-5 text-2xl font-semibold text-[var(--text-primary)]">No file activity yet</h2>
+            <p className="mx-auto mt-3 max-w-2xl text-sm text-[var(--text-secondary)]">
               Once you share a protected link, this page will show which files people opened and when they came back.
             </p>
             <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
               <Link
                 href={overviewUploadPath}
-                className="btn-base rounded-2xl border border-cyan-300/45 bg-cyan-300 px-5 py-3 text-sm font-semibold text-[#07131f] shadow-[0_14px_32px_rgba(34,211,238,0.18)] hover:bg-cyan-200"
+                className="btn-base btn-primary rounded-sm px-5 py-3 text-sm font-semibold"
               >
                 Upload file
               </Link>
-              <Link href={linksPath} className="btn-base btn-secondary rounded-2xl px-4 py-3 text-sm">
+              <Link href={linksPath} className="btn-base btn-secondary rounded-sm px-4 py-3 text-sm">
                 Open shared links
               </Link>
             </div>
@@ -376,7 +376,7 @@ export default function ViewsByDocTableClient(props: {
       ) : (
         <div className="space-y-3 p-5">
           {canManageShares ? (
-            <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white/65">
+            <div className="surface-panel-soft flex items-center justify-between rounded-sm px-4 py-3 text-sm text-[var(--text-secondary)]">
               <label className="flex items-center gap-3">
                 <input
                   type="checkbox"
@@ -386,7 +386,7 @@ export default function ViewsByDocTableClient(props: {
                 />
                 <span>Select visible files</span>
               </label>
-              <span>{selectedIds.length} selected</span>
+                <span>{selectedIds.length} selected</span>
             </div>
           ) : null}
 
@@ -402,10 +402,10 @@ export default function ViewsByDocTableClient(props: {
                   : "Blocked for safety";
             const statusToneClass =
               scanState === "CLEAN"
-                ? "border-emerald-400/30 bg-emerald-400/12 text-emerald-100"
+                ? "border-emerald-200 bg-emerald-50 text-emerald-800"
                 : scanState === "MALICIOUS" || scanState === "NEEDS_REVIEW"
-                  ? "border-rose-400/30 bg-rose-400/12 text-rose-100"
-                  : "border-amber-400/30 bg-amber-400/12 text-amber-100";
+                  ? "border-rose-200 bg-rose-50 text-rose-800"
+                  : "border-amber-200 bg-amber-50 text-amber-800";
             const engagementMessage =
               row.views > 0
                 ? `${formatNumber(row.views)} total view${row.views === 1 ? "" : "s"} and ${formatNumber(row.unique_ips)} unique visit${row.unique_ips === 1 ? "" : "s"}.`
@@ -420,7 +420,7 @@ export default function ViewsByDocTableClient(props: {
             return (
               <article
                 key={row.doc_id}
-                className="rounded-[28px] border border-white/12 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]"
+                className="surface-panel rounded-sm p-5"
               >
                 <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
                   <div className="min-w-0 flex-1">
@@ -435,54 +435,54 @@ export default function ViewsByDocTableClient(props: {
                         />
                       ) : null}
 
-                      <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-white/12 bg-white/[0.06] text-xs font-semibold tracking-[0.16em] text-white/75">
+                      <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-sm border border-[var(--border-subtle)] bg-[var(--surface-soft)] text-xs font-semibold tracking-[0.16em] text-[var(--text-muted)]">
                         {getExtension(row.doc_title)}
                       </div>
 
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
-                          <Link href={`${documentsPath}/${row.doc_id}`} className="truncate text-lg font-semibold text-white hover:text-cyan-100">
+                          <Link href={`${documentsPath}/${row.doc_id}`} className="truncate text-lg font-semibold text-[var(--text-primary)] hover:text-[var(--accent-primary)]">
                             {row.doc_title || "Untitled file"}
                           </Link>
                           <span className={`rounded-full border px-2.5 py-1 text-[11px] ${statusToneClass}`}>{statusLabel}</span>
                           {row.alias ? (
-                            <span className="rounded-full border border-cyan-300/25 bg-cyan-400/10 px-2.5 py-1 text-[11px] text-cyan-100">
+                            <span className="rounded-sm border border-[var(--border-accent)] bg-[var(--surface-selected)] px-2.5 py-1 text-[11px] text-[var(--accent-primary)]">
                               Protected link active
                             </span>
                           ) : null}
                         </div>
 
-                        <p className="mt-3 max-w-3xl text-sm text-white/68">{engagementMessage}</p>
+                        <p className="mt-3 max-w-3xl text-sm text-[var(--text-secondary)]">{engagementMessage}</p>
 
-                        <div className="mt-4 flex flex-wrap gap-2 text-xs text-white/55">
-                          <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5">
+                        <div className="mt-4 flex flex-wrap gap-2 text-xs text-[var(--text-muted)]">
+                          <span className="rounded-sm border border-[var(--border-subtle)] bg-[var(--surface-soft)] px-3 py-1.5">
                             Last viewed {formatRelativeTime(row.last_view)}
                           </span>
-                          <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5">
+                          <span className="rounded-sm border border-[var(--border-subtle)] bg-[var(--surface-soft)] px-3 py-1.5">
                             {formatNumber(row.views)} total views
                           </span>
-                          <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5">
+                          <span className="rounded-sm border border-[var(--border-subtle)] bg-[var(--surface-soft)] px-3 py-1.5">
                             {formatNumber(row.unique_ips)} unique visits
                           </span>
                         </div>
 
                         <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                          <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-                            <div className="text-xs uppercase tracking-[0.16em] text-white/45">Engagement</div>
-                            <div className="mt-2 text-sm font-medium text-white">{row.views > 0 ? "People are opening this file" : "Waiting for the first view"}</div>
-                            <div className="mt-1 text-xs text-white/55">Latest activity {formatDateTime(row.last_view)}</div>
+                          <div className="selection-tile rounded-sm p-4">
+                            <div className="text-xs uppercase tracking-[0.16em] text-[var(--text-faint)]">Engagement</div>
+                            <div className="mt-2 text-sm font-medium text-[var(--text-primary)]">{row.views > 0 ? "People are opening this file" : "Waiting for the first view"}</div>
+                            <div className="mt-1 text-xs text-[var(--text-muted)]">Latest activity {formatDateTime(row.last_view)}</div>
                           </div>
-                          <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-                            <div className="text-xs uppercase tracking-[0.16em] text-white/45">Security</div>
-                            <div className="mt-2 text-sm font-medium text-white">{statusLabel}</div>
-                            <div className="mt-1 text-xs text-white/55">{securityMessage}</div>
+                          <div className="selection-tile rounded-sm p-4">
+                            <div className="text-xs uppercase tracking-[0.16em] text-[var(--text-faint)]">Security</div>
+                            <div className="mt-2 text-sm font-medium text-[var(--text-primary)]">{statusLabel}</div>
+                            <div className="mt-1 text-xs text-[var(--text-muted)]">{securityMessage}</div>
                           </div>
-                          <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-                            <div className="text-xs uppercase tracking-[0.16em] text-white/45">Next step</div>
-                            <div className="mt-2 text-sm font-medium text-white">
+                          <div className="selection-tile rounded-sm p-4">
+                            <div className="text-xs uppercase tracking-[0.16em] text-[var(--text-faint)]">Next step</div>
+                            <div className="mt-2 text-sm font-medium text-[var(--text-primary)]">
                               {row.alias ? "Share or manage the link" : scanState === "CLEAN" ? "Create a protected link" : "Wait for the scan"}
                             </div>
-                            <div className="mt-1 text-xs text-white/55">
+                            <div className="mt-1 text-xs text-[var(--text-muted)]">
                               {row.alias ? "Copy the live link or open it to review the recipient view." : securityMessage}
                             </div>
                           </div>
@@ -497,7 +497,7 @@ export default function ViewsByDocTableClient(props: {
                         <button
                           type="button"
                           onClick={() => copyLink(row)}
-                          className="btn-base rounded-2xl border border-cyan-300/35 bg-cyan-400/14 px-4 py-3 text-sm font-medium text-cyan-100 hover:bg-cyan-400/22"
+                          className="btn-base btn-primary rounded-sm px-4 py-3 text-sm font-medium"
                         >
                           {copiedId === row.doc_id ? "Link copied" : "Copy protected link"}
                         </button>
@@ -505,7 +505,7 @@ export default function ViewsByDocTableClient(props: {
                           href={shareHref}
                           target="_blank"
                           rel="noreferrer"
-                          className="btn-base btn-secondary rounded-2xl px-4 py-3 text-center text-sm"
+                          className="btn-base btn-secondary rounded-sm px-4 py-3 text-center text-sm"
                         >
                           Open shared link
                         </Link>
@@ -513,7 +513,7 @@ export default function ViewsByDocTableClient(props: {
                     ) : scanState === "CLEAN" ? (
                       <Link
                         href={`${documentsPath}?createLink=1&docId=${encodeURIComponent(row.doc_id)}`}
-                        className="btn-base rounded-2xl border border-cyan-300/40 bg-cyan-300 px-4 py-3 text-center text-sm font-semibold text-[#07131f] shadow-[0_14px_36px_rgba(34,211,238,0.18)] hover:bg-cyan-200"
+                        className="btn-base btn-primary rounded-sm px-4 py-3 text-center text-sm font-semibold"
                       >
                         Create protected link
                       </Link>
@@ -521,7 +521,7 @@ export default function ViewsByDocTableClient(props: {
                       <button
                         type="button"
                         disabled
-                        className="cursor-not-allowed rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white/45"
+                        className="cursor-not-allowed rounded-sm border border-[var(--border-subtle)] bg-[var(--surface-soft)] px-4 py-3 text-sm text-[var(--text-faint)]"
                       >
                         Sharing unavailable
                       </button>
@@ -529,20 +529,20 @@ export default function ViewsByDocTableClient(props: {
 
                     <Link
                       href={`${documentsPath}?docQ=${encodeURIComponent(row.doc_title || row.doc_id)}`}
-                      className="btn-base btn-secondary rounded-2xl px-4 py-3 text-center text-sm"
+                      className="btn-base btn-secondary rounded-sm px-4 py-3 text-center text-sm"
                     >
                       Open file
                     </Link>
                     <Link
                       href={`${linksPath}?shareQ=${encodeURIComponent(row.alias || row.doc_title || row.doc_id)}`}
-                      className="btn-base btn-secondary rounded-2xl px-4 py-3 text-center text-sm"
+                      className="btn-base btn-secondary rounded-sm px-4 py-3 text-center text-sm"
                     >
                       Manage links
                     </Link>
 
                     {canManageShares && row.alias ? (
-                      <details className="rounded-2xl border border-white/10 bg-white/[0.03] p-3">
-                        <summary className="cursor-pointer text-sm font-medium text-white">Advanced controls</summary>
+                      <details className="selection-tile rounded-sm p-3">
+                        <summary className="cursor-pointer text-sm font-medium text-[var(--text-primary)]">Advanced controls</summary>
                         <div className="mt-3 space-y-2">
                           <button
                             type="button"
@@ -552,7 +552,7 @@ export default function ViewsByDocTableClient(props: {
                               runAction(revokeAllSharesForDocAction, fd);
                             }}
                             disabled={isPending}
-                            className="btn-base btn-secondary w-full rounded-xl px-3 py-2 text-sm disabled:opacity-40"
+                            className="btn-base btn-secondary w-full rounded-sm px-3 py-2 text-sm disabled:opacity-40"
                           >
                             Revoke all links
                           </button>
@@ -565,7 +565,7 @@ export default function ViewsByDocTableClient(props: {
                               runAction(extendAliasExpirationAction, fd);
                             }}
                             disabled={isPending}
-                            className="btn-base btn-secondary w-full rounded-xl px-3 py-2 text-sm disabled:opacity-40"
+                            className="btn-base btn-secondary w-full rounded-sm px-3 py-2 text-sm disabled:opacity-40"
                           >
                             Extend alias 7 days
                           </button>
@@ -579,7 +579,7 @@ export default function ViewsByDocTableClient(props: {
                               );
                             }}
                             disabled={isPending}
-                            className="btn-base w-full rounded-xl border border-white/12 bg-white/[0.04] px-3 py-2 text-sm text-white/75 hover:border-white/20 hover:bg-white/[0.08] hover:text-white disabled:opacity-40"
+                            className="btn-base btn-secondary w-full rounded-sm px-3 py-2 text-sm disabled:opacity-40"
                           >
                             Disable alias
                           </button>
@@ -594,10 +594,10 @@ export default function ViewsByDocTableClient(props: {
         </div>
       )}
 
-      <div className="border-t border-white/10 px-5 py-4">
+      <div className="border-t border-[var(--border-subtle)] px-5 py-4">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div className="text-sm text-white/60">
-            Showing <span className="text-white">{filtered.length}</span> of <span className="text-white">{rows.length}</span> files
+          <div className="text-sm text-[var(--text-muted)]">
+            Showing <span className="text-[var(--text-primary)]">{filtered.length}</span> of <span className="text-[var(--text-primary)]">{rows.length}</span> files
           </div>
           <div className="flex flex-wrap gap-2">
             {canManageShares ? (
@@ -610,7 +610,7 @@ export default function ViewsByDocTableClient(props: {
                     fd.set("docIds", JSON.stringify(selectedIds));
                     runAction(bulkRevokeAllSharesForDocsAction, fd);
                   }}
-                  className="btn-base btn-secondary rounded-xl px-3 py-2 text-sm disabled:opacity-40"
+                  className="btn-base btn-secondary rounded-sm px-3 py-2 text-sm disabled:opacity-40"
                 >
                   Revoke selected links
                 </button>
@@ -624,7 +624,7 @@ export default function ViewsByDocTableClient(props: {
                       applyRowPatch(selectedIds, { alias: null })
                     );
                   }}
-                  className="btn-base rounded-xl border border-white/12 bg-white/[0.04] px-3 py-2 text-sm text-white/75 hover:border-white/20 hover:bg-white/[0.08] hover:text-white disabled:opacity-40"
+                  className="btn-base btn-secondary rounded-sm px-3 py-2 text-sm disabled:opacity-40"
                 >
                   Disable selected aliases
                 </button>
@@ -636,14 +636,14 @@ export default function ViewsByDocTableClient(props: {
               onClick={() => {
                 if (anySelected) downloadCsvForSelected();
               }}
-              className="btn-base btn-secondary rounded-xl px-3 py-2 text-sm disabled:opacity-40"
+              className="btn-base btn-secondary rounded-sm px-3 py-2 text-sm disabled:opacity-40"
             >
               Export CSV
             </button>
             <button
               type="button"
               onClick={() => setSelected({})}
-              className="btn-base btn-secondary rounded-xl px-3 py-2 text-sm"
+              className="btn-base btn-secondary rounded-sm px-3 py-2 text-sm"
             >
               Clear selection
             </button>

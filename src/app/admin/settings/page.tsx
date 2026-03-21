@@ -55,27 +55,27 @@ export default async function WorkspaceSettingsPage(props: {
             title="Workspace identity"
             description="These values define who is operating and what plan posture the workspace currently carries."
             actions={
-              <Link href="/admin/branding" className="btn-base btn-secondary rounded-xl px-3 py-2 text-sm">
+              <Link href="/admin/branding" className="btn-base btn-secondary rounded-sm px-3 py-2 text-sm">
                 Open Branding
               </Link>
             }
           >
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-              <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-                <div className="text-xs uppercase tracking-[0.16em] text-white/45">Operator</div>
-                <div className="mt-2 text-lg font-semibold text-white">{user.email}</div>
+              <div className="selection-tile p-4">
+                <div className="text-xs uppercase tracking-[0.16em] text-[var(--text-faint)]">Operator</div>
+                <div className="mt-2 text-lg font-semibold text-[var(--text-primary)]">{user.email}</div>
               </div>
-              <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-                <div className="text-xs uppercase tracking-[0.16em] text-white/45">Workspace Role</div>
-                <div className="mt-2 text-lg font-semibold capitalize text-white">{user.role}</div>
+              <div className="selection-tile p-4">
+                <div className="text-xs uppercase tracking-[0.16em] text-[var(--text-faint)]">Workspace Role</div>
+                <div className="mt-2 text-lg font-semibold capitalize text-[var(--text-primary)]">{user.role}</div>
               </div>
-              <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-                <div className="text-xs uppercase tracking-[0.16em] text-white/45">Plan</div>
-                <div className="mt-2 text-lg font-semibold text-white">{plan.name}</div>
+              <div className="selection-tile p-4">
+                <div className="text-xs uppercase tracking-[0.16em] text-[var(--text-faint)]">Plan</div>
+                <div className="mt-2 text-lg font-semibold text-[var(--text-primary)]">{plan.name}</div>
               </div>
-              <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-                <div className="text-xs uppercase tracking-[0.16em] text-white/45">Entitlement</div>
-                <div className="mt-2 text-lg font-semibold text-white">{entitlement}</div>
+              <div className="selection-tile p-4">
+                <div className="text-xs uppercase tracking-[0.16em] text-[var(--text-faint)]">Entitlement</div>
+                <div className="mt-2 text-lg font-semibold text-[var(--text-primary)]">{entitlement}</div>
               </div>
             </div>
           </AdminSection>
@@ -88,31 +88,31 @@ export default async function WorkspaceSettingsPage(props: {
             title="Recommended protection modes"
             description="These are the workspace’s supported sharing packs. Free packs keep the default flow simple; Pro packs add stricter access and tighter viewing controls."
             actions={
-              <Link href="/admin/documents?createLink=1" className="btn-base btn-secondary rounded-xl px-3 py-2 text-sm">
+              <Link href="/admin/documents?createLink=1" className="btn-base btn-secondary rounded-sm px-3 py-2 text-sm">
                 Create Link
               </Link>
             }
           >
             <div className="grid gap-3 lg:grid-cols-2">
               {PACKS.map((pack) => (
-                <div key={pack.id} className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                <div key={pack.id} className="selection-tile p-4">
                   <div className="flex items-center gap-2">
-                    <div className="text-sm font-semibold text-white">{pack.label}</div>
+                    <div className="text-sm font-semibold text-[var(--text-primary)]">{pack.label}</div>
                     <span
                       className={[
                         "inline-flex rounded-full border px-2 py-0.5 text-[11px]",
                         pack.minPlan === "pro"
-                          ? "border-amber-300/28 bg-amber-300/12 text-amber-100"
-                          : "border-white/12 bg-white/[0.05] text-white/70",
+                          ? "border-amber-200 bg-amber-50 text-amber-700"
+                          : "border-[var(--border-subtle)] bg-white text-[var(--text-secondary)]",
                       ].join(" ")}
                     >
                       {pack.minPlan === "pro" ? "Pro" : "Free"}
                     </span>
                   </div>
-                  <div className="mt-2 text-sm text-white/62">{pack.description}</div>
+                  <div className="mt-2 text-sm text-[var(--text-secondary)]">{pack.description}</div>
                   <div className="mt-3 flex flex-wrap gap-2">
                     {pack.recommendedFor?.map((label) => (
-                      <span key={label} className="rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[11px] text-white/68">
+                      <span key={label} className="rounded-full border border-[var(--border-subtle)] bg-white px-2.5 py-1 text-[11px] text-[var(--text-secondary)]">
                         {label}
                       </span>
                     ))}
@@ -131,14 +131,14 @@ export default async function WorkspaceSettingsPage(props: {
             description="Control when operators are warned that active links are about to expire."
           >
             <form action={saveExpirationAlertsAction} className="grid gap-4 lg:grid-cols-[1fr_1fr_240px]">
-              <label className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-sm text-white/72">
+              <label className="selection-tile p-4 text-sm text-[var(--text-secondary)]">
                 <span className="flex items-center justify-between gap-3">
                   <span>Enable in-app expiration alerts</span>
                   <input type="checkbox" name="enabled" value="1" defaultChecked={expirationAlertSettings.enabled} />
                 </span>
-                <span className="mt-2 block text-xs text-white/48">Shows expiring-link pressure inside the admin surfaces.</span>
+                <span className="mt-2 block text-xs text-[var(--text-faint)]">Shows expiring-link pressure inside the admin surfaces.</span>
               </label>
-              <label className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-sm text-white/72">
+              <label className="selection-tile p-4 text-sm text-[var(--text-secondary)]">
                 <span className="flex items-center justify-between gap-3">
                   <span>Send email alerts</span>
                   <input
@@ -148,9 +148,9 @@ export default async function WorkspaceSettingsPage(props: {
                     defaultChecked={expirationAlertSettings.emailEnabled}
                   />
                 </span>
-                <span className="mt-2 block text-xs text-white/48">Adds outbound warning email when the threshold is reached.</span>
+                <span className="mt-2 block text-xs text-[var(--text-faint)]">Adds outbound warning email when the threshold is reached.</span>
               </label>
-              <label className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-sm text-white/72">
+              <label className="selection-tile p-4 text-sm text-[var(--text-secondary)]">
                 Alert threshold
                 <input
                   type="number"
@@ -158,12 +158,12 @@ export default async function WorkspaceSettingsPage(props: {
                   max={30}
                   name="days"
                   defaultValue={expirationAlertSettings.days}
-                  className="mt-2 w-full rounded-xl border border-white/14 bg-black/20 px-3 py-2 text-sm text-white"
+                  className="field-input mt-2 w-full rounded-sm px-3 py-2 text-sm"
                 />
-                <span className="mt-2 block text-xs text-white/48">Warn when links are within this many days of expiry.</span>
+                <span className="mt-2 block text-xs text-[var(--text-faint)]">Warn when links are within this many days of expiry.</span>
               </label>
               <div className="lg:col-span-3">
-                <button type="submit" className="btn-base rounded-xl border border-white/12 bg-white/[0.06] px-4 py-2.5 text-sm text-white/82 hover:bg-white/[0.1]">
+                <button type="submit" className="btn-base btn-secondary rounded-sm px-4 py-2.5 text-sm">
                   Save Notification Defaults
                 </button>
               </div>

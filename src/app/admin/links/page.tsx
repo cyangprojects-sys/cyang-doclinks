@@ -34,50 +34,50 @@ export default async function AdminLinksPage() {
     <div className="space-y-6">
       <DashboardHeaderActions docs={homeData.headerDocs} planId={linksData.planId} mode="modal-only" />
 
-      <section className="glass-card-strong ui-sheen rounded-[32px] p-6 sm:p-7">
+      <section className="surface-panel-strong p-6 sm:p-7">
         <div className="grid gap-6 xl:grid-cols-[1.2fr_minmax(0,0.8fr)]">
           <div>
-            <div className="text-xs uppercase tracking-[0.18em] text-cyan-200/70">Shared links</div>
-            <h1 className="mt-3 text-3xl font-semibold tracking-tight text-white sm:text-4xl">
+            <div className="text-xs uppercase tracking-[0.18em] text-[var(--accent-primary)]">Shared links</div>
+            <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
               Manage every protected link from one calm, clear place.
             </h1>
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-white/68 sm:text-base">
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-[var(--text-secondary)] sm:text-base">
               See what is active, what is expiring, which links are password protected, and what to copy or adjust next.
             </p>
             <div className="mt-5 flex flex-wrap gap-3">
-              <Link href="/admin/documents" className="btn-base btn-secondary rounded-2xl px-4 py-3 text-sm">
+              <Link href="/admin/documents" className="btn-base btn-secondary rounded-sm px-4 py-3 text-sm">
                 Open files
               </Link>
-              <Link href="/admin?openPicker=1" className="btn-base btn-secondary rounded-2xl px-4 py-3 text-sm">
+              <Link href="/admin?openPicker=1" className="btn-base btn-secondary rounded-sm px-4 py-3 text-sm">
                 Upload file
               </Link>
             </div>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
-            <div className="rounded-[24px] border border-white/10 bg-white/[0.04] p-4">
-              <div className="text-xs uppercase tracking-[0.16em] text-white/45">Active</div>
-              <div className="mt-2 text-2xl font-semibold text-white">{active}</div>
-              <div className="mt-1 text-sm text-white/60">Links people can still open.</div>
+            <div className="selection-tile p-4">
+              <div className="text-xs uppercase tracking-[0.16em] text-[var(--text-faint)]">Active</div>
+              <div className="mt-2 text-2xl font-semibold text-slate-950">{active}</div>
+              <div className="mt-1 text-sm text-[var(--text-secondary)]">Links people can still open.</div>
             </div>
-            <div className="rounded-[24px] border border-white/10 bg-white/[0.04] p-4">
-              <div className="text-xs uppercase tracking-[0.16em] text-white/45">Expiring soon</div>
-              <div className="mt-2 text-2xl font-semibold text-white">{expiring}</div>
-              <div className="mt-1 text-sm text-white/60">Worth checking before access ends.</div>
+            <div className="selection-tile p-4">
+              <div className="text-xs uppercase tracking-[0.16em] text-[var(--text-faint)]">Expiring soon</div>
+              <div className="mt-2 text-2xl font-semibold text-slate-950">{expiring}</div>
+              <div className="mt-1 text-sm text-[var(--text-secondary)]">Worth checking before access ends.</div>
             </div>
-            <div className="rounded-[24px] border border-white/10 bg-white/[0.04] p-4">
-              <div className="text-xs uppercase tracking-[0.16em] text-white/45">Password protected</div>
-              <div className="mt-2 text-2xl font-semibold text-white">{protectedCount}</div>
-              <div className="mt-1 text-sm text-white/60">Extra protection added to the link itself.</div>
+            <div className="selection-tile p-4">
+              <div className="text-xs uppercase tracking-[0.16em] text-[var(--text-faint)]">Password protected</div>
+              <div className="mt-2 text-2xl font-semibold text-slate-950">{protectedCount}</div>
+              <div className="mt-1 text-sm text-[var(--text-secondary)]">Extra protection added to the link itself.</div>
             </div>
           </div>
         </div>
       </section>
 
       {linksData.missingCoreTables ? (
-        <div className="rounded-lg border border-neutral-800 bg-neutral-950 p-4 text-sm text-neutral-300">
-          <div className="font-medium text-neutral-100">Shared links unavailable</div>
-          <div className="mt-1 text-neutral-400">The required sharing tables are missing.</div>
+        <div className="surface-panel p-4 text-sm text-[var(--text-secondary)]">
+          <div className="font-medium text-slate-950">Shared links unavailable</div>
+          <div className="mt-1 text-[var(--text-secondary)]">The required sharing tables are missing.</div>
         </div>
       ) : (
         <SharesTableClient shares={linksData.shares} nowTs={linksData.nowTs} canManageBulk={linksData.canSeeAll} />

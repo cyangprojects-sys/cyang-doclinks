@@ -114,8 +114,8 @@ function statusConfig(status: PlatformState) {
     return {
       label: "Operational",
       short: "Operational",
-      badge: "border-emerald-400/30 bg-emerald-400/12 text-emerald-100",
-      dot: "bg-emerald-300/90",
+      badge: "border-[rgba(40,136,88,0.18)] bg-[rgba(40,136,88,0.08)] text-[var(--success)]",
+      dot: "bg-[var(--success)]",
       headline: "All core systems are operating normally.",
       summary: "Customers can sign in, share protected links, and access documents without disruption.",
     };
@@ -124,8 +124,8 @@ function statusConfig(status: PlatformState) {
     return {
       label: "Degraded Performance",
       short: "Degraded",
-      badge: "border-amber-400/30 bg-amber-400/12 text-amber-100",
-      dot: "bg-amber-300/90",
+      badge: "border-[rgba(161,109,27,0.18)] bg-[rgba(161,109,27,0.08)] text-[var(--accent-warm)]",
+      dot: "bg-[var(--warning)]",
       headline: "Some services are slower than normal.",
       summary: "Core availability is intact, but response times are elevated for selected workflows.",
     };
@@ -134,8 +134,8 @@ function statusConfig(status: PlatformState) {
     return {
       label: "Partial Outage",
       short: "Partial outage",
-      badge: "border-orange-400/30 bg-orange-400/12 text-orange-100",
-      dot: "bg-orange-300/90",
+      badge: "border-[rgba(186,104,48,0.18)] bg-[rgba(186,104,48,0.08)] text-[#8e4d14]",
+      dot: "bg-[#d97706]",
       headline: "A subset of services is currently unavailable.",
       summary: "Customers may see intermittent failures in affected workflows while we restore full service.",
     };
@@ -144,8 +144,8 @@ function statusConfig(status: PlatformState) {
     return {
       label: "Major Outage",
       short: "Major outage",
-      badge: "border-rose-400/35 bg-rose-400/14 text-rose-100",
-      dot: "bg-rose-300/90",
+      badge: "border-[rgba(186,71,50,0.18)] bg-[rgba(186,71,50,0.08)] text-[var(--danger)]",
+      dot: "bg-[var(--danger)]",
       headline: "We are actively responding to a major service disruption.",
       summary: "Multiple core workflows are impacted. Updates will be posted as mitigation progresses.",
     };
@@ -153,18 +153,18 @@ function statusConfig(status: PlatformState) {
   return {
     label: "Maintenance",
     short: "Maintenance",
-    badge: "border-sky-400/30 bg-sky-400/12 text-sky-100",
-    dot: "bg-sky-300/90",
+    badge: "border-[var(--border-accent)] bg-[var(--surface-selected)] text-[var(--accent-primary)]",
+    dot: "bg-[var(--accent-primary)]",
     headline: "Scheduled maintenance is in progress.",
     summary: "Some operations may be delayed while planned maintenance tasks complete.",
   };
 }
 
 function incidentStateConfig(status: IncidentState) {
-  if (status === "investigating") return { label: "Investigating", badge: "border-amber-400/30 bg-amber-400/12 text-amber-100" };
-  if (status === "identified") return { label: "Identified", badge: "border-orange-400/30 bg-orange-400/12 text-orange-100" };
-  if (status === "monitoring") return { label: "Monitoring", badge: "border-sky-400/30 bg-sky-400/12 text-sky-100" };
-  return { label: "Resolved", badge: "border-emerald-400/30 bg-emerald-400/12 text-emerald-100" };
+  if (status === "investigating") return { label: "Investigating", badge: "border-[rgba(161,109,27,0.18)] bg-[rgba(161,109,27,0.08)] text-[var(--accent-warm)]" };
+  if (status === "identified") return { label: "Identified", badge: "border-[rgba(186,104,48,0.18)] bg-[rgba(186,104,48,0.08)] text-[#8e4d14]" };
+  if (status === "monitoring") return { label: "Monitoring", badge: "border-[var(--border-accent)] bg-[var(--surface-selected)] text-[var(--accent-primary)]" };
+  return { label: "Resolved", badge: "border-[rgba(40,136,88,0.18)] bg-[rgba(40,136,88,0.08)] text-[var(--success)]" };
 }
 
 function latencyForStatus(baseLatency: number | null, status: ServiceState) {
@@ -404,16 +404,16 @@ function ServiceGlyph({ name }: { name: string }) {
 function LoadingSkeleton() {
   return (
     <div className="space-y-6" aria-live="polite" aria-busy="true">
-      <section className="glass-card-strong rounded-[30px] p-6 sm:p-8">
-        <div className="h-5 w-32 animate-pulse rounded bg-white/10" />
-        <div className="mt-3 h-10 w-72 animate-pulse rounded bg-white/10" />
-        <div className="mt-3 h-5 w-full max-w-2xl animate-pulse rounded bg-white/10" />
+      <section className="surface-panel-strong p-6 sm:p-8">
+        <div className="h-5 w-32 animate-pulse rounded bg-[var(--surface-soft)]" />
+        <div className="mt-3 h-10 w-72 animate-pulse rounded bg-[var(--surface-soft)]" />
+        <div className="mt-3 h-5 w-full max-w-2xl animate-pulse rounded bg-[var(--surface-soft)]" />
       </section>
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {Array.from({ length: 8 }).map((_, i) => (
-          <div key={i} className="glass-card-strong rounded-2xl p-4">
-            <div className="h-5 w-36 animate-pulse rounded bg-white/10" />
-            <div className="mt-3 h-4 w-full animate-pulse rounded bg-white/10" />
+          <div key={i} className="surface-panel-strong p-4">
+            <div className="h-5 w-36 animate-pulse rounded bg-[var(--surface-soft)]" />
+            <div className="mt-3 h-4 w-full animate-pulse rounded bg-[var(--surface-soft)]" />
           </div>
         ))}
       </section>
@@ -653,28 +653,28 @@ export default function StatusCenterClient({ preview }: { preview?: StatusPrevie
 
   return (
     <div className="space-y-6">
-      <section className="glass-card-strong ui-sheen rounded-[30px] p-6 sm:p-8">
+      <section className="surface-panel-strong ui-sheen p-6 sm:p-8">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <div className="text-xs uppercase tracking-[0.16em] text-white/55">Current service posture</div>
-            <h2 className="mt-2 text-2xl font-semibold tracking-tight text-white sm:text-3xl">{stateUi.headline}</h2>
-            <p className="mt-3 max-w-3xl text-sm leading-6 text-white/68 sm:text-base">{stateUi.summary}</p>
+            <div className="text-xs uppercase tracking-[0.16em] text-[var(--text-faint)]">Current service posture</div>
+            <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">{stateUi.headline}</h2>
+            <p className="mt-3 max-w-3xl text-sm leading-6 text-[var(--text-secondary)] sm:text-base">{stateUi.summary}</p>
           </div>
           <div className="flex flex-col items-end gap-2">
-            <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium ${stateUi.badge}`}>
+            <span className={`inline-flex items-center gap-2 border px-3 py-1.5 text-sm font-medium ${stateUi.badge}`}>
               <span className={`h-2 w-2 rounded-full ${stateUi.dot}`} />
               {stateUi.label}
             </span>
-            <div className="text-xs text-white/55">Last updated {fmtDateTime(snapshot?.ts ?? null)} ({fmtRelative(snapshot?.ts ?? null)})</div>
+            <div className="text-xs text-[var(--text-faint)]">Last updated {fmtDateTime(snapshot?.ts ?? null)} ({fmtRelative(snapshot?.ts ?? null)})</div>
             <div className="flex items-center gap-2">
-              <span className="rounded-full border border-white/12 bg-white/[0.04] px-2.5 py-1 text-[11px] text-white/58">
+              <span className="selection-pill px-2.5 py-1 text-[11px] text-[var(--text-secondary)]">
                 {liveMode
                   ? snapshot?.ok && snapshot.status === "ok"
                     ? "Auto-refresh slows while healthy"
                     : "Auto-refresh accelerates while degraded"
                   : "Preview mode disables live polling"}
               </span>
-              <button type="button" onClick={() => void refreshSnapshot(true)} disabled={refreshing} className="btn-base rounded-xl border border-white/14 bg-white/[0.04] px-3 py-1.5 text-xs text-white/82 hover:border-white/24 hover:bg-white/[0.08] disabled:opacity-60">
+              <button type="button" onClick={() => void refreshSnapshot(true)} disabled={refreshing} className="btn-base btn-secondary px-3 py-1.5 text-xs disabled:opacity-60">
                 {refreshing ? "Refreshing..." : "Refresh now"}
               </button>
             </div>
@@ -682,61 +682,61 @@ export default function StatusCenterClient({ preview }: { preview?: StatusPrevie
         </div>
       </section>
 
-      {errorMsg ? <div className="rounded-2xl border border-amber-400/30 bg-amber-400/12 px-4 py-3 text-sm text-amber-100">{errorMsg}</div> : null}
+      {errorMsg ? <div className="border border-[rgba(186,71,50,0.22)] bg-[rgba(186,71,50,0.08)] px-4 py-3 text-sm text-[var(--danger)]">{errorMsg}</div> : null}
 
-      <section className="glass-card-strong rounded-[30px] p-6 sm:p-7">
+      <section className="surface-panel-strong p-6 sm:p-7">
         <div className="grid gap-4 xl:grid-cols-[1.2fr_minmax(0,0.8fr)]">
           <div>
-            <div className="text-xs uppercase tracking-[0.16em] text-white/45">Overall platform status</div>
-            <h2 className="mt-2 text-2xl font-semibold text-white">Live summary and service coverage</h2>
-            <p className="mt-3 max-w-2xl text-sm text-white/67">
+            <div className="text-xs uppercase tracking-[0.16em] text-[var(--text-faint)]">Overall platform status</div>
+            <h2 className="mt-2 text-2xl font-semibold text-slate-950">Live summary and service coverage</h2>
+            <p className="mt-3 max-w-2xl text-sm text-[var(--text-secondary)]">
               Public traffic reads a cached health snapshot, while authenticated operators can still drill into deeper
               diagnostics through the linked readiness and dependency endpoints.
             </p>
           </div>
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
-            <div className="rounded-2xl border border-white/12 bg-white/[0.04] p-4">
-              <div className="text-xs uppercase tracking-[0.16em] text-white/45">30-day uptime</div>
-              <div className="mt-2 text-2xl font-semibold text-white">{uptimePercent != null ? `${uptimePercent.toFixed(2)}%` : "Live snapshot"}</div>
-              <div className="mt-1 text-sm text-white/60">
+            <div className="surface-panel-soft p-4">
+              <div className="text-xs uppercase tracking-[0.16em] text-[var(--text-faint)]">30-day uptime</div>
+              <div className="mt-2 text-2xl font-semibold text-slate-950">{uptimePercent != null ? `${uptimePercent.toFixed(2)}%` : "Live snapshot"}</div>
+              <div className="mt-1 text-sm text-[var(--text-muted)]">
                 {uptimePercent != null
                   ? "Platform availability over the last 30 days."
                   : "Cached public health summary from the current live snapshot."}
               </div>
             </div>
-            <div className="rounded-2xl border border-white/12 bg-white/[0.04] p-4">
-              <div className="text-xs uppercase tracking-[0.16em] text-white/45">Open incidents</div>
-              <div className="mt-2 text-2xl font-semibold text-white">{openIncidents}</div>
-              <div className="mt-1 text-sm text-white/60">{openIncidents === 0 ? "No unresolved incidents at this time." : "Incident response is currently in progress."}</div>
+            <div className="surface-panel-soft p-4">
+              <div className="text-xs uppercase tracking-[0.16em] text-[var(--text-faint)]">Open incidents</div>
+              <div className="mt-2 text-2xl font-semibold text-slate-950">{openIncidents}</div>
+              <div className="mt-1 text-sm text-[var(--text-muted)]">{openIncidents === 0 ? "No unresolved incidents at this time." : "Incident response is currently in progress."}</div>
             </div>
           </div>
         </div>
       </section>
 
-      <section className="glass-card-strong rounded-[30px] p-5 sm:p-6">
+      <section className="surface-panel-strong p-5 sm:p-6">
         <div className="mb-4">
-          <div className="text-xs uppercase tracking-[0.16em] text-white/45">Services</div>
-          <h2 className="mt-2 text-xl font-semibold text-white">Core service health</h2>
-          <p className="mt-1 text-sm text-white/62">At-a-glance status for key product systems.</p>
+          <div className="text-xs uppercase tracking-[0.16em] text-[var(--text-faint)]">Services</div>
+          <h2 className="mt-2 text-xl font-semibold text-slate-950">Core service health</h2>
+          <p className="mt-1 text-sm text-[var(--text-secondary)]">At-a-glance status for key product systems.</p>
         </div>
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {services.map((service) => {
             const ui = statusConfig(service.status);
             return (
-              <article key={service.key} className="rounded-2xl border border-white/12 bg-white/[0.03] p-4">
+              <article key={service.key} className="selection-tile p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <div className="flex items-center gap-2 text-sm font-medium text-white">
-                      <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-white/12 bg-white/[0.05] text-white/82">
+                    <div className="flex items-center gap-2 text-sm font-medium text-slate-950">
+                      <span className="inline-flex h-7 w-7 items-center justify-center border border-[var(--border-subtle)] bg-white text-[var(--text-secondary)] shadow-[var(--shadow-soft)]">
                         <ServiceGlyph name={service.name} />
                       </span>
                       <span>{service.name}</span>
                     </div>
-                    <p className="mt-2 text-xs leading-5 text-white/56">{service.description}</p>
+                    <p className="mt-2 text-xs leading-5 text-[var(--text-faint)]">{service.description}</p>
                   </div>
-                  <span className={`inline-flex shrink-0 items-center rounded-full border px-2 py-1 text-[11px] ${ui.badge}`}>{ui.short}</span>
+                  <span className={`inline-flex shrink-0 items-center border px-2 py-1 text-[11px] ${ui.badge}`}>{ui.short}</span>
                 </div>
-                <div className="mt-3 flex items-center justify-between text-xs text-white/56">
+                <div className="mt-3 flex items-center justify-between text-xs text-[var(--text-faint)]">
                   <span>{service.latencyMs != null ? `${service.latencyMs}ms p95` : "Latency n/a"}</span>
                   <span>{service.uptime30d.toFixed(2)}% uptime</span>
                 </div>
@@ -749,48 +749,48 @@ export default function StatusCenterClient({ preview }: { preview?: StatusPrevie
         </div>
       </section>
 
-      <section className="glass-card-strong rounded-[30px] p-5 sm:p-6">
+      <section className="surface-panel-strong p-5 sm:p-6">
         <div className="mb-4">
-          <div className="text-xs uppercase tracking-[0.16em] text-white/45">Incident history</div>
-          <h2 className="mt-2 text-xl font-semibold text-white">Recent events</h2>
+          <div className="text-xs uppercase tracking-[0.16em] text-[var(--text-faint)]">Incident history</div>
+          <h2 className="mt-2 text-xl font-semibold text-slate-950">Recent events</h2>
         </div>
         {!isPreviewScenario ? (
-          <div className="rounded-2xl border border-dashed border-white/16 bg-white/[0.03] px-5 py-8 text-center">
-            <div className="text-lg font-semibold text-white">Live snapshot mode</div>
-            <p className="mx-auto mt-2 max-w-2xl text-sm text-white/62">
+          <div className="surface-panel-soft border-dashed px-5 py-8 text-center">
+            <div className="text-lg font-semibold text-slate-950">Live snapshot mode</div>
+            <p className="mx-auto mt-2 max-w-2xl text-sm text-[var(--text-secondary)]">
               This public page shows the current cached service snapshot. Historical incident publishing stays manual so
               we do not fabricate timelines from a single health check.
             </p>
           </div>
         ) : incidents.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-white/16 bg-white/[0.03] px-5 py-8 text-center">
-            <div className="text-lg font-semibold text-white">No recent incidents</div>
-            <p className="mx-auto mt-2 max-w-2xl text-sm text-white/62">We have not recorded incidents in the current reporting window. Core systems are operating as expected.</p>
+          <div className="surface-panel-soft border-dashed px-5 py-8 text-center">
+            <div className="text-lg font-semibold text-slate-950">No recent incidents</div>
+            <p className="mx-auto mt-2 max-w-2xl text-sm text-[var(--text-secondary)]">We have not recorded incidents in the current reporting window. Core systems are operating as expected.</p>
           </div>
         ) : (
           <div className="space-y-3">
             {incidents.map((incident) => {
               const ui = incidentStateConfig(incident.status);
               return (
-                <article key={incident.id} className="rounded-2xl border border-white/12 bg-white/[0.03] p-4">
+                <article key={incident.id} className="selection-tile p-4">
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <div>
-                      <h3 className="text-sm font-semibold text-white">{incident.title}</h3>
-                      <p className="mt-1 text-sm text-white/64">{incident.summary}</p>
+                      <h3 className="text-sm font-semibold text-slate-950">{incident.title}</h3>
+                      <p className="mt-1 text-sm text-[var(--text-secondary)]">{incident.summary}</p>
                     </div>
-                    <span className={`inline-flex items-center rounded-full border px-2 py-1 text-[11px] ${ui.badge}`}>{ui.label}</span>
+                    <span className={`inline-flex items-center border px-2 py-1 text-[11px] ${ui.badge}`}>{ui.label}</span>
                   </div>
-                  <div className="mt-3 text-xs text-white/56">Started {fmtDateTime(incident.startedAt)}</div>
-                  <div className="mt-3 space-y-2 border-l border-white/12 pl-3">
+                  <div className="mt-3 text-xs text-[var(--text-faint)]">Started {fmtDateTime(incident.startedAt)}</div>
+                  <div className="mt-3 space-y-2 border-l border-[var(--border-subtle)] pl-3">
                     {incident.updates.map((update, idx) => {
                       const updateUi = incidentStateConfig(update.status);
                       return (
-                        <div key={`${incident.id}-${idx}`} className="rounded-xl border border-white/10 bg-white/[0.02] p-3">
+                        <div key={`${incident.id}-${idx}`} className="surface-panel-soft p-3">
                           <div className="flex flex-wrap items-center gap-2 text-xs">
-                            <span className={`rounded-full border px-2 py-0.5 ${updateUi.badge}`}>{updateUi.label}</span>
-                            <span className="text-white/55">{fmtDateTime(update.timestamp)}</span>
+                            <span className={`inline-flex border px-2 py-0.5 ${updateUi.badge}`}>{updateUi.label}</span>
+                            <span className="text-[var(--text-faint)]">{fmtDateTime(update.timestamp)}</span>
                           </div>
-                          <p className="mt-2 text-sm text-white/67">{update.message}</p>
+                          <p className="mt-2 text-sm text-[var(--text-secondary)]">{update.message}</p>
                         </div>
                       );
                     })}
@@ -802,20 +802,20 @@ export default function StatusCenterClient({ preview }: { preview?: StatusPrevie
         )}
       </section>
 
-      <section className="glass-card-strong rounded-[30px] p-5 sm:p-6">
+      <section className="surface-panel-strong p-5 sm:p-6">
         <div className="mb-4">
-          <div className="text-xs uppercase tracking-[0.16em] text-white/45">{isPreviewScenario ? "Reliability" : "Snapshot model"}</div>
-          <h2 className="mt-2 text-xl font-semibold text-white">{isPreviewScenario ? "Uptime over 30 days" : "How this status page stays cheap and accurate"}</h2>
+          <div className="text-xs uppercase tracking-[0.16em] text-[var(--text-faint)]">{isPreviewScenario ? "Reliability" : "Snapshot model"}</div>
+          <h2 className="mt-2 text-xl font-semibold text-slate-950">{isPreviewScenario ? "Uptime over 30 days" : "How this status page stays cheap and accurate"}</h2>
         </div>
         {isPreviewScenario ? (
           <div className="grid gap-4 xl:grid-cols-[1.35fr_minmax(0,0.65fr)]">
-            <div className="rounded-2xl border border-white/12 bg-white/[0.03] p-4">
+            <div className="surface-panel-soft p-4">
               <div className="mt-3 grid grid-cols-[repeat(15,minmax(0,1fr))] gap-1 sm:grid-cols-[repeat(30,minmax(0,1fr))]">
                 {uptime.map((day) => (
                   <div key={day.date} className={`h-8 rounded ${dailyBarClass(day.status)}`} title={`${fmtDateTime(day.date)} · ${statusConfig(day.status).short}`} />
                 ))}
               </div>
-              <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-white/58">
+              <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-[var(--text-faint)]">
                 <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-emerald-300/90" />Operational</span>
                 <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-amber-300/90" />Degraded</span>
                 <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-orange-300/90" />Partial outage</span>
@@ -823,64 +823,64 @@ export default function StatusCenterClient({ preview }: { preview?: StatusPrevie
                 <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-sky-300/90" />Maintenance</span>
               </div>
             </div>
-            <div className="rounded-2xl border border-white/12 bg-white/[0.03] p-4">
-              <div className="text-xs uppercase tracking-[0.16em] text-white/45">Highlights</div>
-              <div className="mt-3 text-3xl font-semibold text-white">{uptimePercent?.toFixed(2)}%</div>
-              <div className="mt-1 text-sm text-white/63">Platform uptime over the last 30 days.</div>
-              <div className="mt-4 space-y-2 text-sm text-white/65">
-                <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2"><span className="font-medium text-white">Open incidents:</span> {openIncidents}</div>
-                <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2"><span className="font-medium text-white">Last refresh:</span> {lastRefreshAt ? fmtDateTime(lastRefreshAt) : "Pending"}</div>
+            <div className="surface-panel-soft p-4">
+              <div className="text-xs uppercase tracking-[0.16em] text-[var(--text-faint)]">Highlights</div>
+              <div className="mt-3 text-3xl font-semibold text-slate-950">{uptimePercent?.toFixed(2)}%</div>
+              <div className="mt-1 text-sm text-[var(--text-muted)]">Platform uptime over the last 30 days.</div>
+              <div className="mt-4 space-y-2 text-sm text-[var(--text-secondary)]">
+                <div className="surface-panel px-3 py-2"><span className="font-medium text-slate-950">Open incidents:</span> {openIncidents}</div>
+                <div className="surface-panel px-3 py-2"><span className="font-medium text-slate-950">Last refresh:</span> {lastRefreshAt ? fmtDateTime(lastRefreshAt) : "Pending"}</div>
               </div>
             </div>
           </div>
         ) : (
           <div className="grid gap-4 xl:grid-cols-3">
-            <div className="rounded-2xl border border-white/12 bg-white/[0.03] p-4">
-              <div className="text-xs uppercase tracking-[0.16em] text-white/45">Current source</div>
-              <div className="mt-2 text-lg font-semibold text-white">Cached public health snapshot</div>
-              <div className="mt-1 text-sm text-white/63">Anonymous traffic reads a lightweight summary instead of live dependency fan-out.</div>
+            <div className="surface-panel-soft p-4">
+              <div className="text-xs uppercase tracking-[0.16em] text-[var(--text-faint)]">Current source</div>
+              <div className="mt-2 text-lg font-semibold text-slate-950">Cached public health snapshot</div>
+              <div className="mt-1 text-sm text-[var(--text-muted)]">Anonymous traffic reads a lightweight summary instead of live dependency fan-out.</div>
             </div>
-            <div className="rounded-2xl border border-white/12 bg-white/[0.03] p-4">
-              <div className="text-xs uppercase tracking-[0.16em] text-white/45">Refresh policy</div>
-              <div className="mt-2 text-lg font-semibold text-white">Manual plus slow auto-refresh</div>
-              <div className="mt-1 text-sm text-white/63">Live mode only polls while visible, backs off when healthy, and resumes immediately only once the cached snapshot is stale.</div>
+            <div className="surface-panel-soft p-4">
+              <div className="text-xs uppercase tracking-[0.16em] text-[var(--text-faint)]">Refresh policy</div>
+              <div className="mt-2 text-lg font-semibold text-slate-950">Manual plus slow auto-refresh</div>
+              <div className="mt-1 text-sm text-[var(--text-muted)]">Live mode only polls while visible, backs off when healthy, and resumes immediately only once the cached snapshot is stale.</div>
             </div>
-            <div className="rounded-2xl border border-white/12 bg-white/[0.03] p-4">
-              <div className="text-xs uppercase tracking-[0.16em] text-white/45">Historical reporting</div>
-              <div className="mt-2 text-lg font-semibold text-white">Published intentionally</div>
-              <div className="mt-1 text-sm text-white/63">We do not synthesize incident timelines or uptime history from a single transient health check.</div>
+            <div className="surface-panel-soft p-4">
+              <div className="text-xs uppercase tracking-[0.16em] text-[var(--text-faint)]">Historical reporting</div>
+              <div className="mt-2 text-lg font-semibold text-slate-950">Published intentionally</div>
+              <div className="mt-1 text-sm text-[var(--text-muted)]">We do not synthesize incident timelines or uptime history from a single transient health check.</div>
             </div>
           </div>
         )}
       </section>
 
-      <details className="glass-card-strong rounded-[24px] p-4 sm:p-5">
-        <summary className="cursor-pointer list-none text-sm font-semibold text-white">Technical diagnostics (advanced)</summary>
-        <div className="mt-3 rounded-2xl border border-white/12 bg-black/20 p-4">
-          <p className="mb-3 text-xs text-white/56">
+      <details className="surface-panel-strong p-4 sm:p-5">
+        <summary className="cursor-pointer list-none text-sm font-semibold text-slate-950">Technical diagnostics (advanced)</summary>
+        <div className="surface-panel mt-3 p-4">
+          <p className="mb-3 text-xs text-[var(--text-faint)]">
             This section is intended for engineering review and integration troubleshooting.
           </p>
-          <pre className="overflow-auto whitespace-pre-wrap text-xs leading-6 text-white/72">
+          <pre className="overflow-auto whitespace-pre-wrap text-xs leading-6 text-[var(--text-secondary)]">
 {JSON.stringify(technical, null, 2)}
           </pre>
-          <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-white/55">
-            <a href="/api/health/live" target="_blank" rel="noreferrer" className="underline hover:text-white">Live</a>
-            <a href="/api/health/ready" target="_blank" rel="noreferrer" className="underline hover:text-white">Ready</a>
-            <a href="/api/health/deps" target="_blank" rel="noreferrer" className="underline hover:text-white">Dependencies</a>
+          <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-[var(--text-faint)]">
+            <a href="/api/health/live" target="_blank" rel="noreferrer" className="subtle-link underline">Live</a>
+            <a href="/api/health/ready" target="_blank" rel="noreferrer" className="subtle-link underline">Ready</a>
+            <a href="/api/health/deps" target="_blank" rel="noreferrer" className="subtle-link underline">Dependencies</a>
           </div>
         </div>
       </details>
 
-      <section className="glass-card-strong rounded-[24px] p-4 sm:p-5">
+      <section className="surface-panel-strong p-4 sm:p-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="text-base font-semibold text-white">Need help or updates?</h2>
-            <p className="mt-1 text-sm text-white/62">Contact support for account-specific questions, or subscribe for daily platform updates delivered at 6:00 AM UTC.</p>
+            <h2 className="text-base font-semibold text-slate-950">Need help or updates?</h2>
+            <p className="mt-1 text-sm text-[var(--text-secondary)]">Contact support for account-specific questions, or subscribe for daily platform updates delivered at 6:00 AM UTC.</p>
           </div>
           <div className="flex flex-wrap items-center gap-2 text-sm">
-            <a href="mailto:support@cyang.io" className="btn-base btn-secondary rounded-xl px-3 py-2">Contact support</a>
-            <Link href="/contact" className="btn-base btn-secondary rounded-xl px-3 py-2">Contact page</Link>
-            <Link href="/security-disclosure" className="btn-base btn-secondary rounded-xl px-3 py-2">Security docs</Link>
+            <a href="mailto:support@cyang.io" className="btn-base btn-secondary px-3 py-2">Contact support</a>
+            <Link href="/contact" className="btn-base btn-secondary px-3 py-2">Contact page</Link>
+            <Link href="/security-disclosure" className="btn-base btn-secondary px-3 py-2">Security docs</Link>
           </div>
         </div>
         <form onSubmit={submitSubscription} className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center" noValidate>
@@ -893,23 +893,23 @@ export default function StatusCenterClient({ preview }: { preview?: StatusPrevie
             placeholder="you@company.com"
             value={subscriptionEmail}
             onChange={(event) => setSubscriptionEmail(event.target.value)}
-            className="h-11 w-full rounded-xl border border-white/14 bg-white/[0.04] px-3.5 text-sm text-white placeholder:text-white/42 outline-none transition focus:border-cyan-300/60 focus:ring-2 focus:ring-cyan-300/20 sm:max-w-sm"
+            className="field-input h-11 w-full px-3.5 text-sm sm:max-w-sm"
             required
           />
           <button
             type="submit"
             disabled={subscriptionBusy}
-            className="btn-base rounded-xl border border-cyan-300/30 bg-cyan-300/18 px-4 py-2.5 text-sm font-medium text-cyan-100 hover:border-cyan-200/40 hover:bg-cyan-300/25 disabled:opacity-60"
+            className="btn-base btn-primary px-4 py-2.5 text-sm font-medium disabled:opacity-60"
           >
             {subscriptionBusy ? "Subscribing..." : "Subscribe to updates"}
           </button>
         </form>
         {subscriptionFeedback ? (
           <div
-            className={`mt-3 rounded-xl border px-3 py-2 text-sm ${
+            className={`mt-3 border px-3 py-2 text-sm ${
               subscriptionFeedback.tone === "success"
-                ? "border-emerald-400/30 bg-emerald-400/12 text-emerald-100"
-                : "border-amber-400/30 bg-amber-400/12 text-amber-100"
+                ? "border-[rgba(40,136,88,0.18)] bg-[rgba(40,136,88,0.08)] text-[var(--success)]"
+                : "border-[rgba(186,71,50,0.22)] bg-[rgba(186,71,50,0.08)] text-[var(--danger)]"
             }`}
             role="status"
             aria-live="polite"

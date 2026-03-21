@@ -55,12 +55,12 @@ export default function SiteHeaderClient({ config }: { config: PublicRuntimeConf
       <header className="surface-panel-strong nav-satin rounded-sm px-4 py-3 sm:px-5">
         <div className="flex items-center justify-between gap-4">
           <Link href="/" className="flex min-w-0 items-center gap-3">
-            <div className="grid h-11 w-11 place-items-center rounded-sm border border-white/12 bg-white/[0.045] p-2 shadow-[0_10px_24px_rgba(25,38,52,0.12)]">
+            <div className="grid h-11 w-11 place-items-center rounded-sm border border-[var(--border-subtle)] bg-white p-2 shadow-[var(--shadow-soft)]">
               <img src="/branding/cyang_primary.svg" alt="cyang.io" className="h-full w-full object-contain" />
             </div>
             <div className="min-w-0">
-              <div className="truncate text-sm font-semibold tracking-tight text-white sm:text-base">cyang.io</div>
-              <div className="truncate text-[10px] uppercase tracking-[0.24em] text-white/60 sm:text-[11px]">
+              <div className="truncate text-sm font-semibold tracking-tight text-slate-950 sm:text-base">cyang.io</div>
+              <div className="truncate text-[10px] uppercase tracking-[0.24em] text-[var(--text-faint)] sm:text-[11px]">
                 Secure workflow software
               </div>
             </div>
@@ -73,7 +73,7 @@ export default function SiteHeaderClient({ config }: { config: PublicRuntimeConf
                 href={item.href}
                 className={[
                   "btn-base rounded-sm px-3.5 py-2 text-sm",
-                  isCurrent(pathname, item.href) ? "bg-white/10 text-white" : "btn-ghost",
+                  isCurrent(pathname, item.href) ? "border-[var(--border-accent)] bg-[var(--surface-selected)] text-[var(--accent-primary)]" : "btn-ghost",
                 ].join(" ")}
                 aria-current={isCurrent(pathname, item.href) ? "page" : undefined}
               >
@@ -101,7 +101,7 @@ export default function SiteHeaderClient({ config }: { config: PublicRuntimeConf
               href={item.href}
               className={[
                 "btn-base rounded-sm px-3 py-1.5 text-xs whitespace-nowrap",
-                isCurrent(pathname, item.href) ? "bg-white/10 text-white" : "btn-ghost",
+                isCurrent(pathname, item.href) ? "border-[var(--border-accent)] bg-[var(--surface-selected)] text-[var(--accent-primary)]" : "btn-ghost",
               ].join(" ")}
               aria-current={isCurrent(pathname, item.href) ? "page" : undefined}
             >

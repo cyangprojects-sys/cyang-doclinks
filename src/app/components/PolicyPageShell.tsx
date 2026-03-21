@@ -31,10 +31,10 @@ export function PolicyPageShell({
         <div className="max-w-4xl">
           <Breadcrumbs items={breadcrumbs} />
           <Eyebrow className="mt-5">{eyebrow}</Eyebrow>
-          <h1 className="font-editorial mt-6 text-balance text-4xl leading-[0.98] tracking-[-0.03em] text-white sm:text-5xl lg:text-6xl">
+          <h1 className="font-editorial mt-6 text-balance text-4xl leading-[0.98] tracking-[-0.03em] text-slate-950 sm:text-5xl lg:text-6xl">
             {title}
           </h1>
-          <p className="mt-6 max-w-3xl text-base leading-8 text-white/66 sm:text-lg">{body}</p>
+          <p className="mt-6 max-w-3xl text-base leading-8 text-[var(--text-secondary)] sm:text-lg">{body}</p>
           {actions?.length ? <CTAGroup className="mt-8" actions={actions} /> : null}
         </div>
 

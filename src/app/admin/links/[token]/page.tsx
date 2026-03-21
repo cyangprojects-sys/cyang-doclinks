@@ -118,10 +118,10 @@ export default async function LinkDetailPage({
         description="Adjust one protected link without losing the surrounding document context. Keep expiry, password posture, and view controls tight when access needs to change."
         actions={
           <>
-            <Link href="/admin/links" className="btn-base btn-secondary rounded-xl px-3 py-2 text-sm">
+            <Link href="/admin/links" className="btn-base btn-secondary rounded-sm px-3 py-2 text-sm">
               Back to Links
             </Link>
-            <Link href={`/s/${encodeURIComponent(share.token)}`} target="_blank" rel="noreferrer" className="btn-base btn-secondary rounded-xl px-3 py-2 text-sm">
+            <Link href={`/s/${encodeURIComponent(share.token)}`} target="_blank" rel="noreferrer" className="btn-base btn-secondary rounded-sm px-3 py-2 text-sm">
               Open Link
             </Link>
           </>
@@ -129,25 +129,25 @@ export default async function LinkDetailPage({
       />
 
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <div className="glass-card-strong rounded-[26px] p-5">
-          <div className="text-xs uppercase tracking-[0.18em] text-white/45">Status</div>
-          <div className="mt-3 text-2xl font-semibold text-white">{statusLabel}</div>
-          <div className="mt-1 text-sm text-white/60">Current live access posture.</div>
+        <div className="surface-panel p-5">
+          <div className="text-xs uppercase tracking-[0.18em] text-[var(--text-faint)]">Status</div>
+          <div className="mt-3 text-2xl font-semibold text-slate-950">{statusLabel}</div>
+          <div className="mt-1 text-sm text-[var(--text-secondary)]">Current live access posture.</div>
         </div>
-        <div className="glass-card-strong rounded-[26px] p-5">
-          <div className="text-xs uppercase tracking-[0.18em] text-white/45">Views</div>
-          <div className="mt-3 text-2xl font-semibold text-white">{fmtInt(share.view_count)}</div>
-          <div className="mt-1 text-sm text-white/60">Total recorded opens for this link.</div>
+        <div className="surface-panel p-5">
+          <div className="text-xs uppercase tracking-[0.18em] text-[var(--text-faint)]">Views</div>
+          <div className="mt-3 text-2xl font-semibold text-slate-950">{fmtInt(share.view_count)}</div>
+          <div className="mt-1 text-sm text-[var(--text-secondary)]">Total recorded opens for this link.</div>
         </div>
-        <div className="glass-card-strong rounded-[26px] p-5">
-          <div className="text-xs uppercase tracking-[0.18em] text-white/45">Recipient</div>
-          <div className="mt-3 text-lg font-semibold text-white">{share.to_email || "No fixed recipient"}</div>
-          <div className="mt-1 text-sm text-white/60">Recipient routing for this access path.</div>
+        <div className="surface-panel p-5">
+          <div className="text-xs uppercase tracking-[0.18em] text-[var(--text-faint)]">Recipient</div>
+          <div className="mt-3 text-lg font-semibold text-slate-950">{share.to_email || "No fixed recipient"}</div>
+          <div className="mt-1 text-sm text-[var(--text-secondary)]">Recipient routing for this access path.</div>
         </div>
-        <div className="glass-card-strong rounded-[26px] p-5">
-          <div className="text-xs uppercase tracking-[0.18em] text-white/45">Expires</div>
-          <div className="mt-3 text-lg font-semibold text-white">{fmtDate(share.expires_at)}</div>
-          <div className="mt-1 text-sm text-white/60">Current expiry for this protected link.</div>
+        <div className="surface-panel p-5">
+          <div className="text-xs uppercase tracking-[0.18em] text-[var(--text-faint)]">Expires</div>
+          <div className="mt-3 text-lg font-semibold text-slate-950">{fmtDate(share.expires_at)}</div>
+          <div className="mt-1 text-sm text-[var(--text-secondary)]">Current expiry for this protected link.</div>
         </div>
       </section>
 
@@ -157,9 +157,9 @@ export default async function LinkDetailPage({
           description="Change password posture, expiry, and view controls with clear one-link scope."
         >
           <div className="grid gap-4 lg:grid-cols-2">
-            <form action={setSharePasswordAction} className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-              <div className="text-sm font-medium text-white">Set or rotate password</div>
-              <div className="mt-1 text-sm text-white/60">
+            <form action={setSharePasswordAction} className="surface-panel-soft p-4">
+              <div className="text-sm font-medium text-slate-950">Set or rotate password</div>
+              <div className="mt-1 text-sm text-[var(--text-secondary)]">
                 {share.has_password ? "This link is currently password protected." : "This link does not currently require a password."}
               </div>
               <input type="hidden" name="token" value={share.token} />
@@ -168,60 +168,60 @@ export default async function LinkDetailPage({
                 name="password"
                 minLength={4}
                 placeholder="New password"
-                className="mt-3 w-full rounded-xl border border-white/14 bg-black/20 px-3 py-2.5 text-sm text-white placeholder:text-white/38"
+                className="field-input mt-3 w-full px-3 py-2.5 text-sm"
               />
               <div className="mt-3 flex flex-wrap gap-2">
-                <button type="submit" className="btn-base rounded-xl border border-cyan-300/38 bg-cyan-300 px-3 py-2 text-sm font-semibold text-[#07131f] hover:bg-cyan-200">
+                <button type="submit" className="btn-base btn-primary rounded-sm px-3 py-2 text-sm font-semibold">
                   Save Password
                 </button>
-                <button formAction={clearSharePasswordAction} className="btn-base btn-secondary rounded-xl px-3 py-2 text-sm">
+                <button formAction={clearSharePasswordAction} className="btn-base btn-secondary rounded-sm px-3 py-2 text-sm">
                   Clear Password
                 </button>
-                <button formAction={forceSharePasswordResetAction} className="btn-base btn-secondary rounded-xl px-3 py-2 text-sm">
+                <button formAction={forceSharePasswordResetAction} className="btn-base btn-secondary rounded-sm px-3 py-2 text-sm">
                   Clear Saved Unlocks
                 </button>
               </div>
             </form>
 
-            <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-              <div className="text-sm font-medium text-white">Expiry and view controls</div>
+            <div className="surface-panel-soft p-4">
+              <div className="text-sm font-medium text-slate-950">Expiry and view controls</div>
               <div className="mt-3 flex flex-wrap gap-2">
                 <form action={extendShareExpirationAction}>
                   <input type="hidden" name="token" value={share.token} />
                   <input type="hidden" name="days" value="7" />
-                  <button type="submit" className="btn-base btn-secondary rounded-xl px-3 py-2 text-sm">
+                  <button type="submit" className="btn-base btn-secondary rounded-sm px-3 py-2 text-sm">
                     Extend 7 days
                   </button>
                 </form>
                 <form action={extendShareExpirationAction}>
                   <input type="hidden" name="token" value={share.token} />
                   <input type="hidden" name="days" value="30" />
-                  <button type="submit" className="btn-base btn-secondary rounded-xl px-3 py-2 text-sm">
+                  <button type="submit" className="btn-base btn-secondary rounded-sm px-3 py-2 text-sm">
                     Extend 30 days
                   </button>
                 </form>
                 <form action={resetShareViewsCountAction}>
                   <input type="hidden" name="token" value={share.token} />
-                  <button type="submit" className="btn-base btn-secondary rounded-xl px-3 py-2 text-sm">
+                  <button type="submit" className="btn-base btn-secondary rounded-sm px-3 py-2 text-sm">
                     Reset Views
                   </button>
                 </form>
               </div>
 
-              <form action={setShareMaxViewsAction} className="mt-4 rounded-2xl border border-white/10 bg-black/20 p-4">
+              <form action={setShareMaxViewsAction} className="mt-4 rounded-sm border border-[var(--border-subtle)] bg-white p-4">
                 <input type="hidden" name="token" value={share.token} />
-                <label className="text-sm text-white/68">
+                <label className="text-sm text-[var(--text-secondary)]">
                   Total view cap
                   <input
                     type="number"
                     min={0}
                     name="maxViews"
                     defaultValue={share.max_views ?? 0}
-                    className="mt-2 w-full rounded-xl border border-white/14 bg-black/20 px-3 py-2.5 text-sm text-white"
+                    className="field-input mt-2 w-full px-3 py-2.5 text-sm"
                   />
                 </label>
-                <div className="mt-1 text-xs text-white/48">Use 0 to remove the cap.</div>
-                <button type="submit" className="btn-base mt-3 rounded-xl border border-white/12 bg-white/[0.06] px-3 py-2 text-sm text-white/82 hover:bg-white/[0.1]">
+                <div className="mt-1 text-xs text-[var(--text-faint)]">Use 0 to remove the cap.</div>
+                <button type="submit" className="btn-base btn-secondary mt-3 rounded-sm px-3 py-2 text-sm">
                   Save View Cap
                 </button>
               </form>
@@ -233,24 +233,24 @@ export default async function LinkDetailPage({
           title="Destructive actions"
           description="Use these when a recipient should immediately lose access."
         >
-          <div className="rounded-2xl border border-rose-400/26 bg-rose-400/[0.08] p-4">
-            <div className="text-sm font-medium text-white">Remove this link</div>
-            <div className="mt-1 text-sm text-white/62">Revoking the link blocks further access without touching the underlying document.</div>
+          <div className="rounded-sm border border-[rgba(186,71,50,0.18)] bg-[rgba(186,71,50,0.06)] p-4">
+            <div className="text-sm font-medium text-slate-950">Remove this link</div>
+            <div className="mt-1 text-sm text-[var(--text-secondary)]">Revoking the link blocks further access without touching the underlying document.</div>
             <form action={revokeDocShareAction} className="mt-4">
               <input type="hidden" name="token" value={share.token} />
-              <button type="submit" className="btn-base rounded-xl border border-rose-300/28 bg-rose-400/14 px-3 py-2 text-sm text-rose-50 hover:bg-rose-400/20">
+              <button type="submit" className="btn-base rounded-sm border border-[rgba(186,71,50,0.2)] bg-[rgba(186,71,50,0.09)] px-3 py-2 text-sm text-[var(--danger)] hover:bg-[rgba(186,71,50,0.14)]">
                 Revoke Access
               </button>
             </form>
           </div>
 
-          <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-            <div className="text-xs uppercase tracking-[0.16em] text-white/45">Link summary</div>
-            <div className="mt-3 space-y-2 text-sm text-white/68">
-              <div>Token: <span className="font-mono text-white/82">{share.token}</span></div>
-              <div>Created: <span className="text-white/82">{fmtDate(share.created_at)}</span></div>
-              <div>Document: <span className="text-white/82">{share.doc_title || share.doc_id}</span></div>
-              <div>Scan state: <span className="text-white/82">{share.scan_status || "unknown"}</span></div>
+          <div className="mt-4 rounded-sm border border-[var(--border-subtle)] bg-[var(--surface-soft)] p-4">
+            <div className="text-xs uppercase tracking-[0.16em] text-[var(--text-faint)]">Link summary</div>
+            <div className="mt-3 space-y-2 text-sm text-[var(--text-secondary)]">
+              <div>Token: <span className="font-mono text-slate-950">{share.token}</span></div>
+              <div>Created: <span className="text-slate-950">{fmtDate(share.created_at)}</span></div>
+              <div>Document: <span className="text-slate-950">{share.doc_title || share.doc_id}</span></div>
+              <div>Scan state: <span className="text-slate-950">{share.scan_status || "unknown"}</span></div>
             </div>
           </div>
         </AdminSection>
@@ -260,28 +260,28 @@ export default async function LinkDetailPage({
         title="Recent activity"
         description="Token-level event logging is still limited, so this feed shows document activity since this link was created."
       >
-        <div className="overflow-hidden rounded-2xl border border-white/10">
+        <div className="overflow-hidden rounded-sm border border-[var(--border-subtle)]">
           <div className="max-h-[380px] overflow-auto">
             <table className="min-w-full text-left text-sm">
-              <thead className="sticky top-0 bg-[#10192b]/95 text-xs text-white/58 backdrop-blur">
+              <thead className="sticky top-0 bg-[var(--surface-soft)] text-xs text-[var(--text-faint)] backdrop-blur">
                 <tr>
                   <th className="px-4 py-3">Time</th>
                   <th className="px-4 py-3">IP Hash</th>
                   <th className="px-4 py-3">Device Hash</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-white/10">
+              <tbody className="divide-y divide-[var(--border-subtle)]">
                 {activityRows.length ? (
                   activityRows.map((row, index) => (
-                    <tr key={`${row.created_at}-${index}`} className="bg-black/10">
-                      <td className="px-4 py-3 text-white/62">{fmtDate(row.created_at)}</td>
-                      <td className="px-4 py-3 font-mono text-xs text-white/78">{row.ip_hash || "Unknown"}</td>
-                      <td className="px-4 py-3 font-mono text-xs text-white/62">{row.user_agent_hash || "Unavailable"}</td>
+                    <tr key={`${row.created_at}-${index}`} className="bg-white">
+                      <td className="px-4 py-3 text-[var(--text-secondary)]">{fmtDate(row.created_at)}</td>
+                      <td className="px-4 py-3 font-mono text-xs text-slate-950">{row.ip_hash || "Unknown"}</td>
+                      <td className="px-4 py-3 font-mono text-xs text-[var(--text-secondary)]">{row.user_agent_hash || "Unavailable"}</td>
                     </tr>
                   ))
                 ) : (
-                  <tr className="bg-black/10">
-                    <td colSpan={3} className="px-4 py-10 text-center text-sm text-white/54">
+                  <tr className="bg-white">
+                    <td colSpan={3} className="px-4 py-10 text-center text-sm text-[var(--text-secondary)]">
                       No activity has been recorded since this link was created.
                     </td>
                   </tr>

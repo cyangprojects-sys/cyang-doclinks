@@ -18,9 +18,9 @@ function isActive(pathname: string, href: string) {
 }
 
 function toneClass(tone: "default" | "warning" | "danger") {
-  if (tone === "danger") return "border-rose-400/35 bg-rose-400/14 text-rose-100";
-  if (tone === "warning") return "border-amber-300/35 bg-amber-300/12 text-amber-100";
-  return "border-white/15 bg-white/[0.05] text-white/78";
+  if (tone === "danger") return "border-[rgba(186,71,50,0.18)] bg-[rgba(186,71,50,0.08)] text-[var(--danger)]";
+  if (tone === "warning") return "border-[rgba(161,109,27,0.18)] bg-[rgba(161,109,27,0.08)] text-[var(--accent-warm)]";
+  return "border-[var(--border-subtle)] bg-[var(--surface-soft)] text-[var(--text-secondary)]";
 }
 
 function iconPath(name: ViewerIconName) {
@@ -80,19 +80,19 @@ function NavRow({
       href={item.href}
       onClick={onNavigate}
       className={[
-        "group relative flex items-center gap-3 rounded-2xl border px-3 py-3 transition",
+        "group relative flex items-center gap-3 rounded-sm border px-3 py-3 transition",
         active
-          ? "border-cyan-300/28 bg-[linear-gradient(135deg,rgba(79,213,203,0.14),rgba(111,167,255,0.12))] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]"
-          : "border-transparent bg-transparent text-white/68 hover:border-white/10 hover:bg-white/[0.04] hover:text-white",
+          ? "border-[var(--border-accent)] bg-[var(--surface-selected)] text-[var(--accent-primary)] shadow-[var(--shadow-soft)]"
+          : "border-transparent bg-transparent text-[var(--text-secondary)] hover:border-[var(--border-subtle)] hover:bg-[var(--surface-soft)] hover:text-[var(--text-primary)]",
       ].join(" ")}
     >
-      {active ? <span className="absolute inset-y-3 left-0 w-1 rounded-r-full bg-cyan-300/90" /> : null}
-      <span className={["flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border", active ? "border-cyan-300/20 bg-cyan-300/12 text-cyan-100" : "border-white/10 bg-white/[0.04] text-white/72 group-hover:border-white/16 group-hover:text-white"].join(" ")}>
+      {active ? <span className="absolute inset-y-3 left-0 w-1 rounded-r-sm bg-[var(--accent-primary)]" /> : null}
+      <span className={["flex h-10 w-10 shrink-0 items-center justify-center rounded-sm border", active ? "border-[var(--border-accent)] bg-[var(--surface-selected)] text-[var(--accent-primary)]" : "border-[var(--border-subtle)] bg-white text-[var(--text-secondary)] group-hover:border-[var(--border-strong)] group-hover:text-[var(--text-primary)]"].join(" ")}>
         <ViewerIcon name={item.icon} />
       </span>
       <span className="min-w-0 flex-1">
         <span className="block truncate text-sm font-medium">{item.label}</span>
-        <span className="mt-0.5 block truncate text-xs text-white/45">{item.description}</span>
+        <span className="mt-0.5 block truncate text-xs text-[var(--text-faint)]">{item.description}</span>
       </span>
       <NavBadge badge={badge} />
     </Link>
@@ -109,37 +109,37 @@ export default function ViewerShell(props: ViewerShellProps) {
 
   const navContent = (onNavigate?: () => void) => (
     <div className="flex h-full flex-col">
-      <div className="border-b border-white/10 px-5 pb-5">
-        <div className="flex items-center gap-3 rounded-[24px] border border-white/10 bg-white/[0.03] p-3.5">
-          <img src="/branding/cyang_primary.svg" alt="cyang.io" className="h-10 w-10 rounded-2xl border border-white/10 bg-[#07131f] p-1.5" />
+      <div className="border-b border-[var(--border-subtle)] px-5 pb-5">
+        <div className="flex items-center gap-3 rounded-sm border border-[var(--border-subtle)] bg-[var(--surface-soft)] p-3.5">
+          <img src="/branding/cyang_primary.svg" alt="cyang.io" className="h-10 w-10 rounded-sm border border-[var(--border-subtle)] bg-white p-1.5 shadow-[var(--shadow-soft)]" />
           <div className="min-w-0">
-            <div className="truncate text-sm font-semibold tracking-tight text-white">{props.context.workspaceName}</div>
+            <div className="truncate text-sm font-semibold tracking-tight text-slate-950">{props.context.workspaceName}</div>
             <div className="mt-1 flex flex-wrap items-center gap-2">
-              <span className="rounded-full border border-white/12 bg-white/[0.04] px-2 py-0.5 text-[11px] uppercase tracking-[0.14em] text-white/55">
+              <span className="selection-pill px-2 py-0.5 text-[11px] uppercase tracking-[0.14em] text-[var(--text-secondary)]">
                 {props.context.roleLabel}
               </span>
-              <span className="rounded-full border border-cyan-300/18 bg-cyan-300/10 px-2 py-0.5 text-[11px] uppercase tracking-[0.14em] text-cyan-100">
+              <span className="selection-pill-active px-2 py-0.5 text-[11px] uppercase tracking-[0.14em]">
                 {props.context.planLabel}
               </span>
             </div>
           </div>
         </div>
 
-        <div className="mt-4 rounded-[24px] border border-cyan-300/18 bg-[linear-gradient(135deg,rgba(79,213,203,0.13),rgba(111,167,255,0.1))] p-4">
-          <div className="text-xs uppercase tracking-[0.16em] text-cyan-100/80">Member workflow</div>
-          <div className="mt-2 text-sm font-medium text-white">Upload, create a protected link, and track recipient activity from one workspace.</div>
+        <div className="mt-4 rounded-sm border border-[var(--border-accent)] bg-[linear-gradient(135deg,rgba(217,233,252,0.85),rgba(255,255,255,0.96))] p-4 shadow-[var(--shadow-soft)]">
+          <div className="text-xs uppercase tracking-[0.16em] text-[var(--accent-primary)]">Member workflow</div>
+          <div className="mt-2 text-sm font-medium text-slate-950">Upload, create a protected link, and track recipient activity from one workspace.</div>
           <div className="mt-3 flex gap-2">
             <Link
               href="/viewer/documents?openPicker=1"
               onClick={onNavigate}
-              className="btn-base inline-flex rounded-xl border border-cyan-300/35 bg-cyan-300 px-3 py-2 text-xs font-semibold text-[#07131f] hover:bg-cyan-200"
+              className="btn-base btn-primary inline-flex px-3 py-2 text-xs font-semibold"
             >
               Upload
             </Link>
             <Link
               href="/viewer/links"
               onClick={onNavigate}
-              className="btn-base inline-flex rounded-xl border border-white/12 bg-white/[0.08] px-3 py-2 text-xs text-white/82 hover:bg-white/[0.12]"
+              className="btn-base btn-secondary inline-flex px-3 py-2 text-xs"
             >
               Links
             </Link>
@@ -159,27 +159,27 @@ export default function ViewerShell(props: ViewerShellProps) {
         ))}
       </div>
 
-      <div className="border-t border-white/10 px-4 pt-4">
+      <div className="border-t border-[var(--border-subtle)] px-4 pt-4">
         <div className="space-y-2">
-          <Link href="/security-disclosure" onClick={onNavigate} className="flex items-center gap-3 rounded-2xl border border-transparent px-3 py-2 text-sm text-white/64 hover:border-white/10 hover:bg-white/[0.04] hover:text-white">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04]">
+          <Link href="/security-disclosure" onClick={onNavigate} className="flex items-center gap-3 rounded-sm border border-transparent px-3 py-2 text-sm text-[var(--text-secondary)] hover:border-[var(--border-subtle)] hover:bg-[var(--surface-soft)] hover:text-[var(--text-primary)]">
+            <span className="flex h-9 w-9 items-center justify-center rounded-sm border border-[var(--border-subtle)] bg-white">
               <ViewerIcon name="help" />
             </span>
             <span className="flex-1">Help & Security</span>
           </Link>
         </div>
 
-        <div className="mt-3 rounded-[24px] border border-white/10 bg-white/[0.03] p-3.5">
-          <div className="text-[11px] uppercase tracking-[0.16em] text-white/38">Signed in</div>
-          <div className="mt-2 truncate text-sm font-medium text-white/84">{props.email || "unknown"}</div>
+        <div className="mt-3 rounded-sm border border-[var(--border-subtle)] bg-[var(--surface-soft)] p-3.5">
+          <div className="text-[11px] uppercase tracking-[0.16em] text-[var(--text-faint)]">Signed in</div>
+          <div className="mt-2 truncate text-sm font-medium text-slate-950">{props.email || "unknown"}</div>
           <div className="mt-3 flex gap-2">
             <button
               onClick={() => signOut({ callbackUrl: "/signin" })}
-              className="btn-base flex-1 rounded-xl border border-white/12 bg-white/[0.06] px-3 py-2 text-xs text-white/84 hover:bg-white/[0.1]"
+              className="btn-base btn-secondary flex-1 px-3 py-2 text-xs"
             >
               Sign out
             </button>
-            <Link href="/projects/doclinks" className="btn-base rounded-xl border border-white/12 bg-white/[0.04] px-3 py-2 text-xs text-white/68 hover:bg-white/[0.08]">
+            <Link href="/projects/doclinks" className="btn-base btn-ghost px-3 py-2 text-xs">
               Site
             </Link>
           </div>
@@ -191,12 +191,12 @@ export default function ViewerShell(props: ViewerShellProps) {
   return (
     <div className="app-shell min-h-screen">
       <div className="mx-auto flex w-full max-w-[2200px] gap-4 px-3 py-4 sm:px-4 lg:gap-6 lg:px-6 xl:px-8">
-        <aside className="glass-card-strong hidden w-[310px] shrink-0 rounded-[32px] border-white/12 p-3 md:flex md:flex-col">
+        <aside className="surface-panel-strong hidden w-[310px] shrink-0 p-3 md:flex md:flex-col">
           {navContent()}
         </aside>
 
         <div className="min-w-0 flex-1">
-          <header className="glass-card-strong sticky top-2 z-40 rounded-[30px] border-white/12 px-4 py-4 md:px-6">
+          <header className="surface-panel-strong sticky top-2 z-40 px-4 py-4 md:px-6">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div className="flex min-w-0 items-start gap-3">
                 <button
@@ -208,29 +208,29 @@ export default function ViewerShell(props: ViewerShellProps) {
                   Menu
                 </button>
                 <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-white/42">
+                  <div className="flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-[var(--text-faint)]">
                     <span>{props.context.workspaceLabel}</span>
-                    <span className="rounded-full border border-white/10 bg-white/[0.03] px-2 py-0.5 text-[10px] text-white/55">
+                    <span className="selection-pill px-2 py-0.5 text-[10px] text-[var(--text-secondary)]">
                       {props.context.roleLabel}
                     </span>
-                    <span className="rounded-full border border-cyan-300/18 bg-cyan-300/10 px-2 py-0.5 text-[10px] text-cyan-100">
+                    <span className="selection-pill-active px-2 py-0.5 text-[10px]">
                       {props.context.planLabel}
                     </span>
                   </div>
-                  <h1 className="mt-2 truncate text-2xl font-semibold tracking-tight text-white">
+                  <h1 className="mt-2 truncate text-2xl font-semibold tracking-tight text-slate-950">
                     {currentItem?.label || "Member workspace"}
                   </h1>
-                  <p className="mt-1 max-w-3xl text-sm text-white/58">
+                  <p className="mt-1 max-w-3xl text-sm text-[var(--text-secondary)]">
                     {currentItem?.description || "Secure document access, protected links, and clear recipient workflows."}
                   </p>
                 </div>
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
-                <Link href="/viewer/links" className="btn-base rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-white/78 hover:bg-white/[0.08]">
+                <Link href="/viewer/links" className="btn-base btn-secondary px-3 py-2 text-sm">
                   Open links
                 </Link>
-                <Link href="/viewer/documents?openPicker=1" className="btn-base rounded-xl border border-cyan-300/38 bg-cyan-300 px-3.5 py-2 text-sm font-semibold text-[#07131f] hover:bg-cyan-200">
+                <Link href="/viewer/documents?openPicker=1" className="btn-base btn-primary px-3.5 py-2 text-sm font-semibold">
                   Upload Documents
                 </Link>
               </div>
@@ -244,7 +244,7 @@ export default function ViewerShell(props: ViewerShellProps) {
       {mobileOpen ? (
         <div className="fixed inset-0 z-[60] md:hidden">
           <button type="button" className="absolute inset-0 bg-black/68" onClick={() => setMobileOpen(false)} aria-label="Close navigation backdrop" />
-          <div className="glass-card-strong absolute inset-y-2 left-2 w-[88%] max-w-sm rounded-[30px] p-3">
+          <div className="surface-panel-strong absolute inset-y-2 left-2 w-[88%] max-w-sm p-3">
             {navContent(() => setMobileOpen(false))}
           </div>
         </div>

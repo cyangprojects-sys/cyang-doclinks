@@ -14,14 +14,14 @@ export default function CreateApiKeyForm() {
     <div className="space-y-3">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
         <div className="flex-1">
-          <label htmlFor="api-key-name" className="block text-sm text-white/75">Key name</label>
+          <label htmlFor="api-key-name" className="block text-sm text-[var(--text-secondary)]">Key name</label>
           <input
             id="api-key-name"
             aria-label="API key name"
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="e.g. CI deploy bot"
-            className="mt-1 w-full rounded-xl border border-white/20 bg-black/20 px-3 py-2 text-sm text-white placeholder:text-white/45 focus:border-cyan-300/55 focus:outline-none"
+            className="field-input mt-1 w-full rounded-sm px-3 py-2 text-sm"
           />
         </div>
 
@@ -47,22 +47,22 @@ export default function CreateApiKeyForm() {
             })
           }
           disabled={pending || !name.trim()}
-          className="btn-base btn-primary rounded-xl px-4 py-2 text-sm font-medium disabled:opacity-50"
+          className="btn-base btn-primary rounded-sm px-4 py-2 text-sm font-medium disabled:opacity-50"
         >
           {pending ? "Creating..." : "Create API key"}
         </button>
       </div>
 
-      {err ? <div className="text-sm text-red-200">{err}</div> : null}
+      {err ? <div className="text-sm text-[var(--danger)]">{err}</div> : null}
 
       {createdKey ? (
-        <div className="glass-card rounded-xl border-emerald-500/25 p-3">
-          <div className="text-sm text-emerald-100">Your new API key (shown once):</div>
+        <div className="rounded-sm border border-emerald-200 bg-emerald-50 p-3">
+          <div className="text-sm text-emerald-800">Your new API key (shown once):</div>
           <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <code className="break-all rounded-lg bg-black/30 p-2 text-xs text-emerald-50">{createdKey}</code>
+            <code className="break-all rounded-sm border border-emerald-200 bg-white px-3 py-2 text-xs text-emerald-900">{createdKey}</code>
             <button
               type="button"
-              className="btn-base btn-secondary rounded-lg px-3 py-2 text-xs"
+              className="btn-base btn-secondary rounded-sm px-3 py-2 text-xs"
               onClick={async () => {
                 try {
                   await navigator.clipboard.writeText(createdKey);

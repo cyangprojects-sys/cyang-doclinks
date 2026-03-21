@@ -317,7 +317,7 @@ export default function DashboardHeaderActions(props: {
           <button
             type="button"
             onClick={onPrimaryCreateClick}
-            className="btn-base h-[56px] w-[220px] rounded-lg border border-cyan-300/45 bg-cyan-400 px-4 py-2 text-sm font-semibold text-[#04111e] shadow-[0_6px_20px_rgba(34,211,238,0.28)] hover:bg-cyan-300"
+            className="btn-base btn-primary h-[56px] w-[220px] rounded-sm px-4 py-2 text-sm font-semibold"
           >
             <span className="flex flex-col items-start leading-tight">
               <span>{hasAnyDocs ? "Create protected link" : "Upload a file"}</span>
@@ -327,7 +327,7 @@ export default function DashboardHeaderActions(props: {
           <button
             type="button"
             onClick={() => router.push(uploadPickerHref)}
-            className="btn-base h-[56px] w-[220px] rounded-lg border border-amber-300/45 bg-amber-300/18 px-3.5 py-2 text-sm font-medium text-amber-50 shadow-[0_5px_14px_rgba(251,191,36,0.18)] hover:bg-amber-300/24"
+            className="btn-base btn-secondary h-[56px] w-[220px] rounded-sm px-3.5 py-2 text-sm font-medium"
           >
             Upload file
           </button>
@@ -336,11 +336,11 @@ export default function DashboardHeaderActions(props: {
 
       {open ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-          <div className="w-full max-w-2xl rounded-2xl border border-white/15 bg-[#0b1220] p-4 shadow-2xl">
+          <div className="surface-panel-strong w-full max-w-2xl rounded-sm p-4 shadow-2xl">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <h3 className="text-lg font-semibold text-white">Create protected link</h3>
-                <p className="mt-1 text-xs text-white/60">Choose a file, choose a preset, create the link, then share it.</p>
+                <h3 className="text-lg font-semibold text-[var(--text-primary)]">Create protected link</h3>
+                <p className="mt-1 text-xs text-[var(--text-muted)]">Choose a file, choose a preset, create the link, then share it.</p>
               </div>
               <button
                 type="button"
@@ -348,7 +348,7 @@ export default function DashboardHeaderActions(props: {
                   setOpen(false);
                   clearCreateParams();
                 }}
-                className="btn-base btn-secondary rounded-lg px-2 py-1 text-xs"
+                className="btn-base btn-secondary rounded-sm px-2 py-1 text-xs"
               >
                 Close
               </button>
@@ -357,13 +357,13 @@ export default function DashboardHeaderActions(props: {
             {!createdUrl ? (
               <div className="mt-4 space-y-4">
                 <div>
-                  <div className="text-xs font-semibold uppercase tracking-[0.12em] text-white/60">Step 1</div>
-                  <label className="mt-2 block text-sm text-white/80">Choose file</label>
+                  <div className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-faint)]">Step 1</div>
+                  <label className="mt-2 block text-sm text-[var(--text-secondary)]">Choose file</label>
                   <input
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                     placeholder="Search by file name..."
-                    className="mt-1 w-full rounded-lg border border-white/20 bg-black/25 px-3 py-2 text-sm text-white placeholder:text-white/45"
+                    className="field-input mt-1 w-full rounded-sm px-3 py-2 text-sm"
                   />
                   <select
                     value={selectedDocId}
@@ -373,7 +373,7 @@ export default function DashboardHeaderActions(props: {
                       const doc = docsWithStatus.find((d) => d.docId === nextId);
                       setShareWarning(doc ? (doc.canCreateNow ? doc.eligibility.warning ?? null : doc.shareBlockedReason) : null);
                     }}
-                    className="mt-2 w-full rounded-lg border border-white/20 bg-white px-3 py-2 text-sm text-black"
+                    className="field-input mt-2 w-full rounded-sm px-3 py-2 text-sm"
                     style={{ colorScheme: "light" }}
                   >
                     {filteredDocs.map((d) => (
@@ -387,15 +387,15 @@ export default function DashboardHeaderActions(props: {
                     ))}
                   </select>
                   {shareWarning ? (
-                    <div className="mt-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-2 text-xs text-amber-100">
+                    <div className="mt-2 rounded-sm border border-amber-200 bg-amber-50 p-2 text-xs text-amber-700">
                       {shareWarning}
                     </div>
                   ) : null}
                 </div>
 
                 <div>
-                  <div className="text-xs font-semibold uppercase tracking-[0.12em] text-white/60">Step 2</div>
-                  <div className="mt-1 text-xs text-white/60">Preset controls expiration, watermarking, and viewing rules.</div>
+                  <div className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-faint)]">Step 2</div>
+                  <div className="mt-1 text-xs text-[var(--text-muted)]">Preset controls expiration, watermarking, and viewing rules.</div>
                   <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
                     {PRESET_OPTIONS.map((p) => (
                       (() => {
@@ -414,33 +414,33 @@ export default function DashboardHeaderActions(props: {
                             }}
                             className={`rounded-lg border p-3 text-left text-sm transition ${
                               preset === p.id
-                                ? "border-cyan-400/40 bg-cyan-500/10 text-white"
+                                ? "border-[var(--border-accent)] bg-[var(--surface-selected)] text-[var(--text-primary)]"
                                 : locked
-                                  ? "border-white/10 bg-white/[0.02] text-white/45"
-                                  : "border-white/15 bg-white/[0.03] text-white/80 hover:bg-white/[0.06]"
+                                  ? "border-[var(--border-subtle)] bg-[var(--surface-disabled)] text-[var(--text-faint)]"
+                                  : "border-[var(--border-subtle)] bg-white text-[var(--text-secondary)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-soft)]"
                             }`}
                           >
                             <div className="flex items-center gap-2">
                               <div className="font-medium">{p.label}</div>
                               {locked ? (
-                                <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-[10px] text-amber-200">
+                                <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] text-amber-700">
                                   Locked
                                 </span>
                               ) : null}
                             </div>
-                            <div className="mt-1 text-xs text-white/60">{p.description}</div>
+                            <div className="mt-1 text-xs text-[var(--text-muted)]">{p.description}</div>
                           </button>
                         );
                       })()
                     ))}
                   </div>
-                  <div className="mt-2 text-xs text-white/60">
+                  <div className="mt-2 text-xs text-[var(--text-muted)]">
                     Unlock Pro presets: one-time access, confidential defaults, ID mode.
                   </div>
                   {proUpsellPreset ? (
-                    <div className="mt-2 flex items-center gap-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-2 text-xs text-amber-100">
+                    <div className="mt-2 flex items-center gap-3 rounded-sm border border-amber-200 bg-amber-50 p-2 text-xs text-amber-700">
                       <span>Pro preset - upgrade to enable.</span>
-                      <a href={upgradeHref} className="rounded-md border border-amber-400/40 bg-amber-400/15 px-2 py-1 text-amber-50 hover:bg-amber-400/25">
+                      <a href={upgradeHref} className="btn-base btn-secondary rounded-sm px-2 py-1 text-xs">
                         Upgrade to Pro
                       </a>
                     </div>
@@ -448,19 +448,19 @@ export default function DashboardHeaderActions(props: {
                 </div>
 
                 <div>
-                  <div className="text-xs font-semibold uppercase tracking-[0.12em] text-white/60">Step 3</div>
+                  <div className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-faint)]">Step 3</div>
                   <button
                     type="button"
                     onClick={onCreateLink}
                     disabled={busy}
-                    className="mt-2 rounded-lg bg-white px-3 py-2 text-sm font-medium text-black hover:bg-white/90 disabled:opacity-50"
+                    className="btn-base btn-primary mt-2 rounded-sm px-3 py-2 text-sm font-medium disabled:opacity-50"
                   >
                     {busy ? "Creating..." : "Create link"}
                   </button>
                   {showUpgradePrompt ? (
-                    <div className="mt-2 flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-2 py-2 text-xs text-amber-100">
+                    <div className="mt-2 flex items-center gap-2 rounded-sm border border-amber-200 bg-amber-50 px-2 py-2 text-xs text-amber-700">
                       <span>Need stricter controls or higher limits?</span>
-                      <a href={upgradeHref} className="rounded-md border border-amber-400/40 bg-amber-400/15 px-2 py-1 text-amber-50 hover:bg-amber-400/25">
+                      <a href={upgradeHref} className="btn-base btn-secondary rounded-sm px-2 py-1 text-xs">
                         Upgrade to Pro
                       </a>
                     </div>
@@ -469,31 +469,31 @@ export default function DashboardHeaderActions(props: {
               </div>
             ) : (
               <div className="mt-4 space-y-3">
-                <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-100">
+                <div className="rounded-sm border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">
                   Protected link created.
                 </div>
-                <input readOnly value={createdUrl} className="w-full rounded-lg border border-white/20 bg-black/25 px-3 py-2 text-sm text-white" />
+                <input readOnly value={createdUrl} className="field-input w-full rounded-sm px-3 py-2 text-sm" />
                 <div className="flex flex-wrap gap-2">
-                  <button type="button" onClick={onCopy} className="rounded-lg bg-white px-3 py-2 text-sm font-medium text-black hover:bg-white/90">
+                  <button type="button" onClick={onCopy} className="btn-base btn-primary rounded-sm px-3 py-2 text-sm font-medium">
                     Copy link
                   </button>
                   <input
                     value={sendToEmail}
                     onChange={(e) => setSendToEmail(e.target.value)}
                     placeholder="recipient@example.com (optional)"
-                    className="min-w-[220px] flex-1 rounded-lg border border-white/20 bg-black/25 px-3 py-2 text-sm text-white placeholder:text-white/45"
+                    className="field-input min-w-[220px] flex-1 rounded-sm px-3 py-2 text-sm"
                   />
-                  <button type="button" onClick={onSendEmail} className="btn-base btn-secondary rounded-lg px-3 py-2 text-sm">
+                  <button type="button" onClick={onSendEmail} className="btn-base btn-secondary rounded-sm px-3 py-2 text-sm">
                     Send email
                   </button>
-                  <button type="button" onClick={resetFlow} className="btn-base btn-secondary rounded-lg px-3 py-2 text-sm">
+                  <button type="button" onClick={resetFlow} className="btn-base btn-secondary rounded-sm px-3 py-2 text-sm">
                     Create another
                   </button>
                 </div>
               </div>
             )}
 
-            {err ? <div className="mt-3 rounded-lg border border-rose-500/30 bg-rose-500/10 p-2 text-sm text-rose-200">{err}</div> : null}
+            {err ? <div className="mt-3 rounded-sm border border-rose-200 bg-rose-50 p-2 text-sm text-rose-700">{err}</div> : null}
           </div>
         </div>
       ) : null}

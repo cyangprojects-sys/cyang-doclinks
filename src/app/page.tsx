@@ -100,7 +100,7 @@ export default function HomePage() {
         src="/media/cyang-hero-atmosphere.mp4"
         poster="/media/cyang-hero-atmosphere.jpg"
         priority
-        className="mt-3 min-h-[96svh] border-b border-white/8"
+        className="mt-3 min-h-[96svh] border-b border-[var(--border-subtle)]"
         contentClassName="min-h-[96svh]"
       >
         <AmbientScene tone="cool" />
@@ -108,9 +108,9 @@ export default function HomePage() {
           <div className="grid gap-10 lg:grid-cols-[minmax(0,1.08fr)_360px] lg:items-end">
             <ScrollRevealFrame className="max-w-5xl">
               <Eyebrow>cyang.io product studio</Eyebrow>
-              <h1 className="font-editorial mt-6 text-balance text-[3.25rem] leading-[0.9] tracking-[-0.06em] text-white sm:text-[4.75rem] lg:text-[7.5rem]">
+              <h1 className="font-editorial mt-6 text-balance text-[3.25rem] leading-[0.9] tracking-[-0.06em] text-slate-950 sm:text-[4.75rem] lg:text-[7.5rem]">
                 Secure workflow software,
-                <span className="block text-white/64">staged like controlled infrastructure.</span>
+                <span className="block text-[var(--text-muted)]">staged like controlled infrastructure.</span>
               </h1>
               <Lead className="mt-6 max-w-2xl text-base sm:text-xl">
                 Products for high-trust sharing, policy-aware delivery, and operational clarity.
@@ -125,9 +125,9 @@ export default function HomePage() {
             </ScrollRevealFrame>
 
             <ScrollRevealFrame delay={120} className="floating-stage p-6 sm:p-7">
-              <div className="text-[11px] uppercase tracking-[0.24em] text-white/36">Launch surface</div>
-              <div className="mt-4 text-2xl font-semibold tracking-[-0.04em] text-white">A public shell built to feel decisive.</div>
-              <p className="mt-4 text-sm leading-7 text-white/62">
+              <div className="text-[11px] uppercase tracking-[0.24em] text-[var(--text-faint)]">Launch surface</div>
+              <div className="mt-4 text-2xl font-semibold tracking-[-0.04em] text-slate-950">A public shell built to feel decisive.</div>
+              <p className="mt-4 text-sm leading-7 text-[var(--text-secondary)]">
                 cyang.io is positioned as a serious software studio: flagship product first, trust architecture
                 visible, and room to grow without losing discipline.
               </p>
@@ -145,18 +145,18 @@ export default function HomePage() {
           </div>
 
           <ScrollRevealFrame delay={220} className="mt-10">
-            <div className="grid gap-4 border-t border-white/10 pt-5 sm:grid-cols-3">
+            <div className="grid gap-4 border-t border-[var(--border-subtle)] pt-5 sm:grid-cols-3">
               <div>
-                <div className="text-[11px] uppercase tracking-[0.22em] text-white/58">Current flagship</div>
-                <div className="mt-2 text-lg text-white/86">Doclinks</div>
+                <div className="text-[11px] uppercase tracking-[0.22em] text-[var(--text-faint)]">Current flagship</div>
+                <div className="mt-2 text-lg text-[var(--text-primary)]">Doclinks</div>
               </div>
               <div>
-                <div className="text-[11px] uppercase tracking-[0.22em] text-white/58">Public proof</div>
-                <div className="mt-2 text-lg text-white/86">Status, legal, disclosure, procurement</div>
+                <div className="text-[11px] uppercase tracking-[0.22em] text-[var(--text-faint)]">Public proof</div>
+                <div className="mt-2 text-lg text-[var(--text-primary)]">Status, legal, disclosure, procurement</div>
               </div>
               <div>
-                <div className="text-[11px] uppercase tracking-[0.22em] text-white/58">Operating tone</div>
-                <div className="mt-2 text-lg text-white/86">Controlled, auditable, operational</div>
+                <div className="text-[11px] uppercase tracking-[0.22em] text-[var(--text-faint)]">Operating tone</div>
+                <div className="mt-2 text-lg text-[var(--text-primary)]">Controlled, auditable, operational</div>
               </div>
             </div>
           </ScrollRevealFrame>
@@ -177,7 +177,7 @@ export default function HomePage() {
                 title={
                   <>
                     Controlled document delivery,
-                    <span className="block text-white/64">revealed as the center of the studio.</span>
+                    <span className="block text-[var(--text-muted)]">revealed as the center of the studio.</span>
                   </>
                 }
                 body="Doclinks is the flagship because it expresses the entire cyang.io thesis in one product: tighter boundaries, better recipient experience, and public trust surfaces that already exist."
@@ -216,11 +216,11 @@ export default function HomePage() {
                 <AmbientScene tone={index === 2 ? "steel" : "cool"} className="opacity-80" />
                 <div className="relative grid gap-8 lg:grid-cols-[minmax(0,1fr)_380px] lg:items-end">
                   <div>
-                    <div className="text-[11px] uppercase tracking-[0.24em] text-white/32">{band.eyebrow}</div>
-                    <h2 className="mt-4 max-w-4xl text-balance text-4xl font-semibold tracking-[-0.05em] text-white sm:text-5xl lg:text-6xl">
+                    <div className="text-[11px] uppercase tracking-[0.24em] text-[var(--text-faint)]">{band.eyebrow}</div>
+                    <h2 className="mt-4 max-w-4xl text-balance text-4xl font-semibold tracking-[-0.05em] text-slate-950 sm:text-5xl lg:text-6xl">
                       {band.title}
                     </h2>
-                    <p className="mt-5 max-w-2xl text-base leading-8 text-white/64 sm:text-lg">{band.body}</p>
+                    <p className="mt-5 max-w-2xl text-base leading-8 text-[var(--text-secondary)] sm:text-lg">{band.body}</p>
                   </div>
                   <VisualSignalCluster title={`${band.eyebrow} signals`} items={band.signal} />
                 </div>
@@ -236,11 +236,11 @@ export default function HomePage() {
         <ContentRail>
           <div className="grid gap-8 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] lg:items-start">
             <ScrollRevealFrame className="lg:sticky lg:top-28">
-              <div className="text-[11px] uppercase tracking-[0.24em] text-white/58">Product studio</div>
-              <h2 className="mt-4 text-balance text-4xl font-semibold tracking-[-0.05em] text-white sm:text-5xl lg:text-6xl">
+              <div className="text-[11px] uppercase tracking-[0.24em] text-[var(--text-faint)]">Product studio</div>
+              <h2 className="mt-4 text-balance text-4xl font-semibold tracking-[-0.05em] text-slate-950 sm:text-5xl lg:text-6xl">
                 Broader than one product. Still sharply edited.
               </h2>
-              <p className="mt-5 max-w-xl text-base leading-8 text-white/64 sm:text-lg">
+              <p className="mt-5 max-w-xl text-base leading-8 text-[var(--text-secondary)] sm:text-lg">
                 The studio is built to hold future systems without losing the clarity that makes the flagship credible.
               </p>
             </ScrollRevealFrame>
@@ -276,11 +276,11 @@ export default function HomePage() {
               <AmbientScene tone="signal" className="opacity-75" />
               <div className="relative grid gap-8 lg:grid-cols-[minmax(0,0.86fr)_minmax(0,1.14fr)]">
                 <div>
-                  <div className="text-[11px] uppercase tracking-[0.24em] text-white/58">Trust and proof</div>
-                  <h2 className="mt-4 text-balance text-4xl font-semibold tracking-[-0.05em] text-white sm:text-5xl lg:text-6xl">
+                  <div className="text-[11px] uppercase tracking-[0.24em] text-[var(--text-faint)]">Trust and proof</div>
+                  <h2 className="mt-4 text-balance text-4xl font-semibold tracking-[-0.05em] text-slate-950 sm:text-5xl lg:text-6xl">
                     Trust shown as architecture, not a loose link dump.
                   </h2>
-                  <p className="mt-5 max-w-xl text-base leading-8 text-white/64 sm:text-lg">
+                  <p className="mt-5 max-w-xl text-base leading-8 text-[var(--text-secondary)] sm:text-lg">
                     Status, legal, disclosure, retention, and procurement are visible enough to signal seriousness within seconds.
                   </p>
                 </div>
@@ -296,20 +296,20 @@ export default function HomePage() {
           <div className="grid gap-6 lg:grid-cols-[280px_minmax(0,1fr)] lg:items-center">
             <ScrollRevealFrame>
               <div className="floating-stage flex min-h-[320px] flex-col items-center justify-center text-center p-8">
-                <div className="grid h-28 w-28 place-items-center rounded-sm border border-white/12 bg-white/[0.05] text-3xl font-semibold tracking-[0.08em] text-white">
+                <div className="grid h-28 w-28 place-items-center rounded-sm border border-[var(--border-subtle)] bg-white text-3xl font-semibold tracking-[0.08em] text-slate-950 shadow-[var(--shadow-soft)]">
                   CY
                 </div>
-                <div className="mt-6 text-lg font-semibold text-white">Built by Chang Yang</div>
+                <div className="mt-6 text-lg font-semibold text-slate-950">Built by Chang Yang</div>
               </div>
             </ScrollRevealFrame>
 
             <ScrollRevealFrame delay={120}>
               <div className="px-0 py-2 sm:px-4">
-                <div className="text-[11px] uppercase tracking-[0.24em] text-white/58">Founder statement</div>
-                <h2 className="mt-4 text-balance text-4xl font-semibold tracking-[-0.05em] text-white sm:text-5xl">
+                <div className="text-[11px] uppercase tracking-[0.24em] text-[var(--text-faint)]">Founder statement</div>
+                <h2 className="mt-4 text-balance text-4xl font-semibold tracking-[-0.05em] text-slate-950 sm:text-5xl">
                   Practical software, architecture-level controls, and no appetite for noise.
                 </h2>
-                <p className="mt-5 max-w-2xl text-base leading-8 text-white/64 sm:text-lg">
+                <p className="mt-5 max-w-2xl text-base leading-8 text-[var(--text-secondary)] sm:text-lg">
                   cyang.io is built as a long-term home for useful systems that remain calm on the surface and strict
                   where risk actually lives.
                 </p>
@@ -323,18 +323,18 @@ export default function HomePage() {
       <BackgroundVideoSection
         src="/media/cyang-doclinks-signal.mp4"
         poster="/media/cyang-doclinks-signal.jpg"
-        className="min-h-[70svh] border-t border-white/8"
+        className="min-h-[70svh] border-t border-[var(--border-subtle)]"
         contentClassName="min-h-[70svh]"
       >
         <AmbientScene tone="steel" />
         <div className="mx-auto flex min-h-[70svh] w-full max-w-[1600px] items-end px-4 py-10 sm:px-6 lg:px-8 lg:py-14">
           <ScrollRevealFrame className="max-w-4xl">
-            <div className="text-[11px] uppercase tracking-[0.24em] text-white/58">Final close</div>
-            <h2 className="mt-4 text-balance text-[3rem] font-semibold tracking-[-0.06em] text-white sm:text-[4.5rem] lg:text-[6rem]">
+            <div className="text-[11px] uppercase tracking-[0.24em] text-[var(--text-faint)]">Final close</div>
+            <h2 className="mt-4 text-balance text-[3rem] font-semibold tracking-[-0.06em] text-slate-950 sm:text-[4.5rem] lg:text-[6rem]">
               Start with the flagship.
-              <span className="block text-white/60">Then follow the system outward.</span>
+              <span className="block text-[var(--text-muted)]">Then follow the system outward.</span>
             </h2>
-            <p className="mt-5 max-w-2xl text-base leading-8 text-white/64 sm:text-lg">
+            <p className="mt-5 max-w-2xl text-base leading-8 text-[var(--text-secondary)] sm:text-lg">
               The site is designed so customers, buyers, and future partners can understand the hierarchy quickly and remember it later.
             </p>
             <CTAGroup

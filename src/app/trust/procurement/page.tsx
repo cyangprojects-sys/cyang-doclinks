@@ -47,7 +47,7 @@ export default function ProcurementTrustPage() {
           { label: "Audience", value: "Security, legal, privacy, procurement, and IT reviewers" },
         ]}
         aside={
-          <div className="space-y-3 text-sm text-white/62">
+          <div className="space-y-3 text-sm text-[var(--text-secondary)]">
             <div>1. Review Security Policy, Privacy, and Terms for baseline fit.</div>
             <div>2. Move to DPA, SLA, and Subprocessors for deeper business review.</div>
             <div>3. Use contact routing for open procurement questions.</div>
@@ -69,16 +69,16 @@ export default function ProcurementTrustPage() {
       <Section>
         <div className="grid gap-4 md:grid-cols-3">
           <PremiumCard>
-            <div className="text-xl font-semibold text-white">Security package</div>
-            <p className="mt-3 text-sm leading-7 text-white/62">Security policy, disclosure path, and public operational posture.</p>
+            <div className="text-xl font-semibold text-slate-950">Security package</div>
+            <p className="mt-3 text-sm leading-7 text-[var(--text-secondary)]">Security policy, disclosure path, and public operational posture.</p>
           </PremiumCard>
           <PremiumCard>
-            <div className="text-xl font-semibold text-white">Privacy package</div>
-            <p className="mt-3 text-sm leading-7 text-white/62">Privacy, DPA, retention expectations, and subprocessor transparency.</p>
+            <div className="text-xl font-semibold text-slate-950">Privacy package</div>
+            <p className="mt-3 text-sm leading-7 text-[var(--text-secondary)]">Privacy, DPA, retention expectations, and subprocessor transparency.</p>
           </PremiumCard>
           <PremiumCard>
-            <div className="text-xl font-semibold text-white">Reliability package</div>
-            <p className="mt-3 text-sm leading-7 text-white/62">Status and SLA surfaces that keep operating expectations clear.</p>
+            <div className="text-xl font-semibold text-slate-950">Reliability package</div>
+            <p className="mt-3 text-sm leading-7 text-[var(--text-secondary)]">Status and SLA surfaces that keep operating expectations clear.</p>
           </PremiumCard>
         </div>
       </Section>
@@ -86,16 +86,16 @@ export default function ProcurementTrustPage() {
       <Section>
         <PremiumCard strong className="grid gap-4 md:grid-cols-3">
           <div>
-            <div className="text-sm font-semibold text-white">Legal</div>
-            <div className="mt-2 text-sm text-white/62">{legalEmail}</div>
+            <div className="text-sm font-semibold text-slate-950">Legal</div>
+            <div className="mt-2 text-sm text-[var(--text-secondary)]">{legalEmail}</div>
           </div>
           <div>
-            <div className="text-sm font-semibold text-white">Security</div>
-            <div className="mt-2 text-sm text-white/62">{securityEmail}</div>
+            <div className="text-sm font-semibold text-slate-950">Security</div>
+            <div className="mt-2 text-sm text-[var(--text-secondary)]">{securityEmail}</div>
           </div>
           <div>
-            <div className="text-sm font-semibold text-white">Support</div>
-            <div className="mt-2 text-sm text-white/62">{supportEmail}</div>
+            <div className="text-sm font-semibold text-slate-950">Support</div>
+            <div className="mt-2 text-sm text-[var(--text-secondary)]">{supportEmail}</div>
           </div>
         </PremiumCard>
       </Section>

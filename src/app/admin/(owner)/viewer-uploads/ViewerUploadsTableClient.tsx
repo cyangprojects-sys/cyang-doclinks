@@ -146,7 +146,7 @@ export default function ViewerUploadsTableClient({ rows }: { rows: ViewerUploadR
 
   return (
     <div className="space-y-4">
-      <div className="glass-card-strong rounded-2xl p-4">
+      <div className="surface-panel-strong p-4">
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-12">
           <div className="xl:col-span-2">
             <label htmlFor="viewer-uploads-search" className="sr-only">Search uploads</label>
@@ -156,12 +156,12 @@ export default function ViewerUploadsTableClient({ rows }: { rows: ViewerUploadR
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder="Search title, alias, uploader, doc id"
-              className="w-full rounded-lg border border-neutral-800 bg-black/30 px-3 py-2 text-sm text-white"
+              className="field-input w-full px-3 py-2 text-sm"
             />
           </div>
           <div className="xl:col-span-2">
           <label htmlFor="viewer-uploads-moderation" className="sr-only">Moderation filter</label>
-          <select id="viewer-uploads-moderation" aria-label="Moderation filter" value={moderation} onChange={(e) => setModeration(e.target.value)} className="w-full rounded-lg border border-neutral-800 bg-black/30 px-3 py-2 text-sm">
+          <select id="viewer-uploads-moderation" aria-label="Moderation filter" value={moderation} onChange={(e) => setModeration(e.target.value)} className="field-input w-full px-3 py-2 text-sm">
             <option value="all">Moderation: all</option>
             <option value="active">Active</option>
             <option value="quarantined">Quarantined</option>
@@ -171,7 +171,7 @@ export default function ViewerUploadsTableClient({ rows }: { rows: ViewerUploadR
           </div>
           <div className="xl:col-span-2">
           <label htmlFor="viewer-uploads-scan" className="sr-only">Scan status filter</label>
-          <select id="viewer-uploads-scan" aria-label="Scan status filter" value={scan} onChange={(e) => setScan(e.target.value)} className="w-full rounded-lg border border-neutral-800 bg-black/30 px-3 py-2 text-sm">
+          <select id="viewer-uploads-scan" aria-label="Scan status filter" value={scan} onChange={(e) => setScan(e.target.value)} className="field-input w-full px-3 py-2 text-sm">
             <option value="all">Scan: all</option>
             <option value="clean">Clean</option>
             <option value="risky">Risky</option>
@@ -183,7 +183,7 @@ export default function ViewerUploadsTableClient({ rows }: { rows: ViewerUploadR
           </div>
           <div className="xl:col-span-2">
           <label htmlFor="viewer-uploads-risk" className="sr-only">Risk filter</label>
-          <select id="viewer-uploads-risk" aria-label="Risk filter" value={risk} onChange={(e) => setRisk(e.target.value)} className="w-full rounded-lg border border-neutral-800 bg-black/30 px-3 py-2 text-sm">
+          <select id="viewer-uploads-risk" aria-label="Risk filter" value={risk} onChange={(e) => setRisk(e.target.value)} className="field-input w-full px-3 py-2 text-sm">
             <option value="all">Risk: all</option>
             <option value="low">Low</option>
             <option value="medium">Medium</option>
@@ -192,7 +192,7 @@ export default function ViewerUploadsTableClient({ rows }: { rows: ViewerUploadR
           </div>
           <div className="xl:col-span-2">
           <label htmlFor="viewer-uploads-recent" className="sr-only">Created date filter</label>
-          <select id="viewer-uploads-recent" aria-label="Created date filter" value={recent} onChange={(e) => setRecent(e.target.value)} className="w-full rounded-lg border border-neutral-800 bg-black/30 px-3 py-2 text-sm">
+          <select id="viewer-uploads-recent" aria-label="Created date filter" value={recent} onChange={(e) => setRecent(e.target.value)} className="field-input w-full px-3 py-2 text-sm">
             <option value="all">Created: all</option>
             <option value="24h">Last 24h</option>
             <option value="7d">Last 7d</option>
@@ -207,11 +207,11 @@ export default function ViewerUploadsTableClient({ rows }: { rows: ViewerUploadR
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               placeholder="Action reason (logged)"
-              className="w-full rounded-lg border border-neutral-800 bg-black/30 px-3 py-2 text-sm text-white"
+              className="field-input w-full px-3 py-2 text-sm"
             />
           </div>
         </div>
-        <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-neutral-400">
+        <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-[var(--text-secondary)]">
           <span>Rows: {filtered.length}</span>
           <span>Selected: {selectedIds.length}</span>
           <span className="ml-2">Sort:</span>
@@ -226,7 +226,7 @@ export default function ViewerUploadsTableClient({ rows }: { rows: ViewerUploadR
                   setSortDesc(true);
                 }
               }}
-              className={`rounded-md px-2 py-1 ${sortKey === k ? "bg-white/20 text-white" : "bg-white/5 text-white/80"}`}
+              className={`rounded-sm px-2 py-1 ${sortKey === k ? "selection-pill-active" : "selection-pill text-[var(--text-secondary)]"}`}
             >
               {k}
             </button>
@@ -234,11 +234,11 @@ export default function ViewerUploadsTableClient({ rows }: { rows: ViewerUploadR
         </div>
       </div>
 
-      {error ? <div className="rounded-lg border border-red-800 bg-red-950/40 px-3 py-2 text-sm text-red-200">{error}</div> : null}
+      {error ? <div className="rounded-sm border border-[rgba(186,71,50,0.2)] bg-[rgba(186,71,50,0.09)] px-3 py-2 text-sm text-[var(--danger)]">{error}</div> : null}
 
-      <div className="glass-card-strong rounded-2xl p-3">
+      <div className="surface-panel-strong p-3">
         <div className="flex flex-wrap gap-2">
-          <button type="button" disabled={isPending || !selectedIds.length} onClick={() => runAbuseAction("disable_doc", selectedIds)} className="rounded-md border border-amber-600/40 bg-amber-500/10 px-3 py-1.5 text-sm text-amber-100 disabled:opacity-50">
+          <button type="button" disabled={isPending || !selectedIds.length} onClick={() => runAbuseAction("disable_doc", selectedIds)} className="btn-base rounded-sm border border-[rgba(161,109,27,0.2)] bg-[rgba(161,109,27,0.09)] px-3 py-1.5 text-sm text-[var(--accent-warm)] disabled:opacity-50">
             Disable selected
           </button>
           <form
@@ -250,7 +250,7 @@ export default function ViewerUploadsTableClient({ rows }: { rows: ViewerUploadR
             }}
           >
             <input type="hidden" name="docIds" value="[]" />
-            <button type="submit" disabled={isPending || !selectedIds.length} className="rounded-md border border-neutral-700 bg-white/5 px-3 py-1.5 text-sm disabled:opacity-50">
+            <button type="submit" disabled={isPending || !selectedIds.length} className="btn-base btn-secondary rounded-sm px-3 py-1.5 text-sm disabled:opacity-50">
               Revoke shares
             </button>
           </form>
@@ -266,17 +266,17 @@ export default function ViewerUploadsTableClient({ rows }: { rows: ViewerUploadR
           >
             <input type="hidden" name="docIds" value="[]" />
             <input type="hidden" name="reason" value={reason} />
-            <button type="submit" disabled={isPending || !selectedIds.length} className="rounded-md border border-red-700/60 bg-red-700/20 px-3 py-1.5 text-sm text-red-100 disabled:opacity-50">
+            <button type="submit" disabled={isPending || !selectedIds.length} className="btn-base rounded-sm border border-[rgba(186,71,50,0.2)] bg-[rgba(186,71,50,0.09)] px-3 py-1.5 text-sm text-[var(--danger)] disabled:opacity-50">
               Delete selected
             </button>
           </form>
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-2xl border border-white/10">
+      <div className="overflow-hidden rounded-sm border border-[var(--border-subtle)]">
         <div className="max-h-[560px] overflow-auto">
         <table className="min-w-[1180px] w-full text-sm">
-          <thead className="sticky top-0 bg-[#10192b]/95 text-neutral-300 backdrop-blur">
+          <thead className="sticky top-0 bg-[var(--surface-soft)] text-[var(--text-secondary)] backdrop-blur">
             <tr>
               <th className="px-3 py-2 text-left">
                 <input type="checkbox" aria-label="Select all visible uploads" checked={allVisibleSelected} onChange={(e) => setAllVisible(e.target.checked)} />
@@ -293,17 +293,17 @@ export default function ViewerUploadsTableClient({ rows }: { rows: ViewerUploadR
           </thead>
           <tbody>
             {filtered.map((r) => (
-              <tr key={r.doc_id} className="border-t border-white/10 bg-black/20">
+              <tr key={r.doc_id} className="border-t border-[var(--border-subtle)] bg-white">
                 <td className="px-3 py-2 align-top">
                   <input type="checkbox" aria-label={`Select upload ${r.title || r.doc_id}`} checked={!!selected[r.doc_id]} onChange={(e) => setSelected((prev) => ({ ...prev, [r.doc_id]: e.target.checked }))} />
                 </td>
                 <td className="px-3 py-2">
-                  <div className="font-medium text-white">{r.title || "Untitled"}</div>
-                  <div className="font-mono text-xs text-neutral-400">{r.doc_id}</div>
+                  <div className="font-medium text-slate-950">{r.title || "Untitled"}</div>
+                  <div className="font-mono text-xs text-[var(--text-secondary)]">{r.doc_id}</div>
                   {r.alias ? (
                     <Link
                       href={`/d/${r.alias}`}
-                      className="inline-flex rounded-md border border-cyan-500/35 bg-cyan-500/15 px-2 py-0.5 text-xs text-cyan-100 hover:bg-cyan-500/25"
+                      className="inline-flex rounded-sm border border-[var(--border-accent)] bg-[var(--surface-selected)] px-2 py-0.5 text-xs text-[var(--accent-primary)] hover:bg-[rgba(217,233,252,0.98)]"
                     >
                       Share
                     </Link>
@@ -311,7 +311,7 @@ export default function ViewerUploadsTableClient({ rows }: { rows: ViewerUploadR
                 </td>
                 <td className="px-3 py-2">
                   <div>{r.uploader_email || "-"}</div>
-                  <div className="text-xs text-neutral-500">{r.uploader_role || "viewer"}</div>
+                  <div className="text-xs text-[var(--text-faint)]">{r.uploader_role || "viewer"}</div>
                 </td>
                 <td className="px-3 py-2">{fmtDate(r.created_at)}</td>
                 <td className="px-3 py-2 text-right">{fmtBytes(r.size_bytes)}</td>
@@ -324,8 +324,8 @@ export default function ViewerUploadsTableClient({ rows }: { rows: ViewerUploadR
                 <td className="px-3 py-2 text-right">{r.active_shares}</td>
                 <td className="px-3 py-2 text-right">
                   <div className="flex flex-wrap justify-end gap-2">
-                    <Link aria-label={`Open upload ${r.title || r.doc_id}`} href={`/admin/docs/${r.doc_id}`} className="rounded-md border border-white/20 bg-white/10 px-2 py-1 text-xs">Open</Link>
-                    <button aria-label={`Disable upload ${r.title || r.doc_id}`} type="button" onClick={() => runAbuseAction("disable_doc", [r.doc_id])} className="rounded-md border border-amber-700/50 bg-amber-700/10 px-2 py-1 text-xs text-amber-100">Disable</button>
+                    <Link aria-label={`Open upload ${r.title || r.doc_id}`} href={`/admin/docs/${r.doc_id}`} className="btn-base btn-secondary rounded-sm px-2 py-1 text-xs">Open</Link>
+                    <button aria-label={`Disable upload ${r.title || r.doc_id}`} type="button" onClick={() => runAbuseAction("disable_doc", [r.doc_id])} className="btn-base rounded-sm border border-[rgba(161,109,27,0.2)] bg-[rgba(161,109,27,0.09)] px-2 py-1 text-xs text-[var(--accent-warm)]">Disable</button>
                     <form
                       action={async (fd) => {
                         if (!window.confirm("Revoke all shares for this document?")) return;
@@ -333,7 +333,7 @@ export default function ViewerUploadsTableClient({ rows }: { rows: ViewerUploadR
                       }}
                     >
                       <input type="hidden" name="docId" value={r.doc_id} />
-                      <button aria-label={`Revoke all shares for upload ${r.title || r.doc_id}`} type="submit" className="rounded-md border border-neutral-700 bg-white/5 px-2 py-1 text-xs">Revoke shares</button>
+                      <button aria-label={`Revoke all shares for upload ${r.title || r.doc_id}`} type="submit" className="btn-base btn-secondary rounded-sm px-2 py-1 text-xs">Revoke shares</button>
                     </form>
                     <form
                       action={async (fd) => {
@@ -345,7 +345,7 @@ export default function ViewerUploadsTableClient({ rows }: { rows: ViewerUploadR
                     >
                       <input type="hidden" name="docId" value={r.doc_id} />
                       <input type="hidden" name="reason" value={reason} />
-                      <button aria-label={`Delete upload ${r.title || r.doc_id}`} type="submit" className="rounded-md border border-red-700/60 bg-red-700/20 px-2 py-1 text-xs text-red-100">Delete</button>
+                      <button aria-label={`Delete upload ${r.title || r.doc_id}`} type="submit" className="btn-base rounded-sm border border-[rgba(186,71,50,0.2)] bg-[rgba(186,71,50,0.09)] px-2 py-1 text-xs text-[var(--danger)]">Delete</button>
                     </form>
                   </div>
                 </td>
@@ -353,7 +353,7 @@ export default function ViewerUploadsTableClient({ rows }: { rows: ViewerUploadR
             ))}
             {!filtered.length ? (
               <tr>
-                <td colSpan={9} className="px-3 py-8 text-center text-sm text-neutral-400">No viewer uploads matched your filters.</td>
+                <td colSpan={9} className="px-3 py-8 text-center text-sm text-[var(--text-secondary)]">No viewer uploads matched your filters.</td>
               </tr>
             ) : null}
           </tbody>

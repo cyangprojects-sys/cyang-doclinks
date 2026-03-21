@@ -34,12 +34,12 @@ export default function SharePasswordForm(props: {
           value={pw}
           onChange={(e) => setPw(e.target.value)}
           placeholder={props.hasPassword ? "New password" : "Set password"}
-          className="w-[140px] rounded-lg border border-white/20 bg-black/20 px-2 py-1 text-xs text-white placeholder:text-white/45 focus:border-cyan-300/55 focus:outline-none"
+          className="field-input w-[140px] rounded-sm px-2 py-1 text-xs"
         />
         <button
           type="submit"
           disabled={busy || pw.trim().length < 4}
-          className="btn-base btn-secondary rounded-lg px-2 py-1 text-xs disabled:opacity-50"
+          className="btn-base btn-secondary rounded-sm px-2 py-1 text-xs disabled:opacity-50"
           title="Set or change password"
         >
           {busy ? "..." : props.hasPassword ? "Update" : "Set"}
@@ -60,7 +60,7 @@ export default function SharePasswordForm(props: {
         <button
           type="submit"
           disabled={busy || !props.hasPassword}
-          className="btn-base btn-secondary rounded-lg px-2 py-1 text-xs disabled:opacity-50"
+          className="btn-base btn-secondary rounded-sm px-2 py-1 text-xs disabled:opacity-50"
           title="Remove password protection"
         >
           Remove

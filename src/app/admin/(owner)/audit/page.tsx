@@ -161,25 +161,25 @@ export default async function AuditPage() {
   } catch { }
 
   return (
-    <div className="w-full p-6 text-white">
+    <div className="w-full p-6">
       <div className="mb-8 flex items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold">Audit Logs</h1>
+        <h1 className="text-2xl font-semibold text-[var(--text-primary)]">Audit Logs</h1>
         <div className="flex flex-wrap items-center justify-end gap-2">
           <a
             href="/api/admin/audit/export?type=audit"
-            className="rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm text-neutral-200 hover:bg-neutral-900"
+            className="btn-base btn-secondary rounded-sm px-3 py-2 text-sm"
           >
             Export Audit CSV
           </a>
           <a
             href="/api/admin/audit/export?type=access"
-            className="rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm text-neutral-200 hover:bg-neutral-900"
+            className="btn-base btn-secondary rounded-sm px-3 py-2 text-sm"
           >
             Export Access CSV
           </a>
           <a
             href="/api/admin/audit/export?type=views"
-            className="rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm text-neutral-200 hover:bg-neutral-900"
+            className="btn-base btn-secondary rounded-sm px-3 py-2 text-sm"
           >
             Export Views CSV
           </a>
@@ -191,12 +191,12 @@ export default async function AuditPage() {
 
         {/* ================= AUDIT EVENTS ================= */}
         <section className="space-y-4">
-          <h2 className="text-lg font-medium">Audit Events</h2>
+          <h2 className="text-lg font-medium text-[var(--text-primary)]">Audit Events</h2>
 
-          <div className="overflow-hidden rounded-2xl border border-white/10">
+          <div className="overflow-hidden rounded-sm border border-[var(--border-subtle)] bg-white/92">
             <div className="max-h-[560px] overflow-auto">
             <table className="min-w-[1200px] text-sm">
-              <thead className="sticky top-0 bg-[#10192b]/95 text-neutral-400 backdrop-blur">
+              <thead className="sticky top-0 bg-[rgba(245,248,252,0.96)] text-[var(--text-muted)] backdrop-blur">
                 <tr>
                   {auditRows[0] &&
                     Object.keys(auditRows[0]).map((key) => (
@@ -210,7 +210,7 @@ export default async function AuditPage() {
                 {auditRows.map((row, i) => (
                   <tr
                     key={i}
-                    className="border-t border-white/10 hover:bg-white/[0.03]"
+                    className="border-t border-[var(--border-subtle)] text-[var(--text-secondary)] hover:bg-[var(--surface-soft)]/75"
                   >
                     {Object.values(row).map((val, j) => (
                       <td key={j} className="px-4 py-3 whitespace-nowrap">
@@ -227,19 +227,19 @@ export default async function AuditPage() {
 
         {/* ================= ACCESS LOGS ================= */}
         <section className="space-y-4">
-          <h2 className="text-lg font-medium">Access Logs</h2>
+          <h2 className="text-lg font-medium text-[var(--text-primary)]">Access Logs</h2>
 
           {accessError && (
-            <div className="text-yellow-400 text-sm">
+            <div className="text-sm text-[var(--warning)]">
               Access logs query failed.<br />
-              <span className="text-neutral-500">{accessError}</span>
+              <span className="text-[var(--text-muted)]">{accessError}</span>
             </div>
           )}
 
-          <div className="overflow-hidden rounded-2xl border border-white/10">
+          <div className="overflow-hidden rounded-sm border border-[var(--border-subtle)] bg-white/92">
             <div className="max-h-[560px] overflow-auto">
             <table className="min-w-[1200px] text-sm">
-              <thead className="sticky top-0 bg-[#10192b]/95 text-neutral-400 backdrop-blur">
+              <thead className="sticky top-0 bg-[rgba(245,248,252,0.96)] text-[var(--text-muted)] backdrop-blur">
                 <tr>
                   {accessRows[0] &&
                     Object.keys(accessRows[0]).map((key) => (
@@ -253,7 +253,7 @@ export default async function AuditPage() {
                 {accessRows.map((row, i) => (
                   <tr
                     key={i}
-                    className="border-t border-white/10 hover:bg-white/[0.03]"
+                    className="border-t border-[var(--border-subtle)] text-[var(--text-secondary)] hover:bg-[var(--surface-soft)]/75"
                   >
                     {Object.values(row).map((val, j) => (
                       <td key={j} className="px-4 py-3 whitespace-nowrap">
@@ -270,12 +270,12 @@ export default async function AuditPage() {
 
         {/* ================= VIEWS ================= */}
         <section className="space-y-4">
-          <h2 className="text-lg font-medium">Views</h2>
+          <h2 className="text-lg font-medium text-[var(--text-primary)]">Views</h2>
 
-          <div className="overflow-hidden rounded-2xl border border-white/10">
+          <div className="overflow-hidden rounded-sm border border-[var(--border-subtle)] bg-white/92">
             <div className="max-h-[560px] overflow-auto">
             <table className="min-w-[1200px] text-sm">
-              <thead className="sticky top-0 bg-[#10192b]/95 text-neutral-400 backdrop-blur">
+              <thead className="sticky top-0 bg-[rgba(245,248,252,0.96)] text-[var(--text-muted)] backdrop-blur">
                 <tr>
                   {viewRows[0] &&
                     Object.keys(viewRows[0]).map((key) => (
@@ -289,7 +289,7 @@ export default async function AuditPage() {
                 {viewRows.map((row, i) => (
                   <tr
                     key={i}
-                    className="border-t border-white/10 hover:bg-white/[0.03]"
+                    className="border-t border-[var(--border-subtle)] text-[var(--text-secondary)] hover:bg-[var(--surface-soft)]/75"
                   >
                     {Object.values(row).map((val, j) => (
                       <td key={j} className="px-4 py-3 whitespace-nowrap">

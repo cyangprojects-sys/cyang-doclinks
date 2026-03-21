@@ -47,13 +47,13 @@ export default async function ApiKeysPage() {
   `) as unknown as Row[];
 
   return (
-    <div className="w-full p-4 text-white md:p-6">
+    <div className="w-full p-4 md:p-6">
       <div className="mb-5 flex items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold tracking-tight">API Keys</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-[var(--text-primary)]">API Keys</h1>
       </div>
 
-      <section className="glass-card-strong rounded-2xl p-4">
-        <p className="text-sm text-white/70">
+      <section className="surface-panel-strong rounded-sm p-4">
+        <p className="text-sm text-[var(--text-secondary)]">
           Create keys for programmatic access. New keys are shown once at creation.
         </p>
         <div className="mt-4">
@@ -62,11 +62,11 @@ export default async function ApiKeysPage() {
       </section>
 
       <section className="mt-8">
-        <h2 className="text-lg font-medium">Your keys</h2>
-        <div className="glass-card-strong mt-3 overflow-hidden rounded-2xl border border-white/10">
+        <h2 className="text-lg font-medium text-[var(--text-primary)]">Your keys</h2>
+        <div className="surface-panel-strong mt-3 overflow-hidden rounded-sm">
           <div className="max-h-[560px] overflow-auto">
           <table className="min-w-[900px] text-sm">
-            <thead className="sticky top-0 bg-[#10192b]/95 text-white/75 backdrop-blur">
+            <thead className="sticky top-0 bg-[rgba(245,248,252,0.96)] text-[var(--text-muted)] backdrop-blur">
               <tr>
                 <th className="px-4 py-3 text-left">Name</th>
                 <th className="px-4 py-3 text-left">Prefix</th>
@@ -80,27 +80,27 @@ export default async function ApiKeysPage() {
               {rows.map((r) => {
                 const revoked = !!r.revoked_at;
                 return (
-                  <tr key={r.id} className="border-t border-white/10 hover:bg-white/[0.03]">
-                    <td className="whitespace-nowrap px-4 py-3 text-white">{r.name}</td>
-                    <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-white/85">{r.prefix}</td>
-                    <td className="whitespace-nowrap px-4 py-3 text-white/70">{fmtDate(r.created_at)}</td>
-                    <td className="whitespace-nowrap px-4 py-3 text-white/70">{fmtDate(r.last_used_at)}</td>
+                  <tr key={r.id} className="border-t border-[var(--border-subtle)] hover:bg-[var(--surface-soft)]/80">
+                    <td className="whitespace-nowrap px-4 py-3 text-[var(--text-primary)]">{r.name}</td>
+                    <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-[var(--text-secondary)]">{r.prefix}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-[var(--text-secondary)]">{fmtDate(r.created_at)}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-[var(--text-secondary)]">{fmtDate(r.last_used_at)}</td>
                     <td className="whitespace-nowrap px-4 py-3">
                       {revoked ? (
-                        <span className="inline-flex items-center rounded-full border border-amber-500/25 bg-amber-500/10 px-2 py-0.5 text-xs text-amber-100">Revoked</span>
+                        <span className="inline-flex items-center rounded-sm border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs text-amber-800">Revoked</span>
                       ) : (
-                        <span className="inline-flex items-center rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2 py-0.5 text-xs text-emerald-100">Active</span>
+                        <span className="inline-flex items-center rounded-sm border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs text-emerald-800">Active</span>
                       )}
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-right">
-                      {revoked ? <span className="text-white/50">-</span> : <RevokeApiKeyButton id={r.id} />}
+                      {revoked ? <span className="text-[var(--text-faint)]">-</span> : <RevokeApiKeyButton id={r.id} />}
                     </td>
                   </tr>
                 );
               })}
               {!rows.length && (
                 <tr>
-                  <td className="px-4 py-6 text-white/60" colSpan={6}>
+                  <td className="px-4 py-6 text-[var(--text-muted)]" colSpan={6}>
                     No API keys yet.
                   </td>
                 </tr>
@@ -110,7 +110,7 @@ export default async function ApiKeysPage() {
           </div>
         </div>
 
-        <div className="mt-3 text-xs text-white/60">
+        <div className="mt-3 text-xs text-[var(--text-muted)]">
           Tip: set <span className="font-mono">API_KEY_SALT</span> in env to enable hashing.
         </div>
       </section>

@@ -110,11 +110,11 @@ export default async function SecurityCenterPage() {
         description="This page keeps security operational instead of abstract: live signals, queue pressure, abusive-source indicators, and the owner-only controls that change blast radius during an incident."
         actions={
           <>
-            <Link href="/admin/governance?tab=audit" className="btn-base btn-secondary rounded-xl px-3 py-2 text-sm">
+            <Link href="/admin/governance?tab=audit" className="btn-base btn-secondary rounded-sm px-3 py-2 text-sm">
               Open Audit
             </Link>
             {isOwner ? (
-              <Link href="/admin/review?tab=uploads" className="btn-base btn-secondary rounded-xl px-3 py-2 text-sm">
+              <Link href="/admin/review?tab=uploads" className="btn-base btn-secondary rounded-sm px-3 py-2 text-sm">
                 Open Review Queue
               </Link>
             ) : null}
@@ -157,8 +157,8 @@ export default async function SecurityCenterPage() {
           description="These controls affect workspace-wide security posture and should be used deliberately during incidents."
         >
           <div className="grid gap-4 xl:grid-cols-[1.1fr_minmax(0,0.9fr)]">
-            <div className="rounded-[24px] border border-red-400/28 bg-red-400/[0.08] p-4">
-              <div className="text-sm font-semibold text-red-50">Emergency freeze posture</div>
+            <div className="rounded-sm border border-[rgba(186,71,50,0.18)] bg-[rgba(186,71,50,0.06)] p-4">
+              <div className="text-sm font-semibold text-slate-950">Emergency freeze posture</div>
               <div className="mt-3 grid gap-3 md:grid-cols-2">
                 {[
                   {
@@ -178,20 +178,20 @@ export default async function SecurityCenterPage() {
                     value: freezeSettings?.settings.ticketServeDisabled ? "Frozen" : "Active",
                   },
                 ].map((item) => (
-                  <div key={item.label} className="rounded-2xl border border-red-300/20 bg-black/20 p-3">
-                    <div className="text-xs uppercase tracking-[0.16em] text-red-100/55">{item.label}</div>
-                    <div className="mt-2 text-lg font-semibold text-white">{item.value}</div>
+                  <div key={item.label} className="rounded-sm border border-[rgba(186,71,50,0.16)] bg-white p-3">
+                    <div className="text-xs uppercase tracking-[0.16em] text-[var(--danger)]">{item.label}</div>
+                    <div className="mt-2 text-lg font-semibold text-slate-950">{item.value}</div>
                   </div>
                 ))}
               </div>
               <div className="mt-4">
-                <Link href="/admin/governance?tab=policies" className="btn-base rounded-xl border border-red-300/28 bg-red-400/14 px-3 py-2 text-sm text-red-50 hover:bg-red-400/20">
+                <Link href="/admin/governance?tab=policies" className="btn-base rounded-sm border border-[rgba(186,71,50,0.2)] bg-[rgba(186,71,50,0.09)] px-3 py-2 text-sm text-[var(--danger)] hover:bg-[rgba(186,71,50,0.14)]">
                   Review Policy Controls
                 </Link>
               </div>
             </div>
 
-            <div className="rounded-[24px] border border-white/10 bg-white/[0.03] p-4">
+            <div className="surface-panel-soft p-4">
               <KeyManagementPanel />
             </div>
           </div>
@@ -206,16 +206,16 @@ export default async function SecurityCenterPage() {
           <div className="space-y-3">
             {abusiveIps.length ? (
               abusiveIps.map((row) => (
-                <div key={row.ip_hash} className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3">
+                <div key={row.ip_hash} className="selection-tile flex items-center justify-between px-4 py-3">
                   <div className="min-w-0">
-                    <div className="truncate font-mono text-xs text-white/82">{row.ip_hash}</div>
-                    <div className="mt-1 text-xs text-white/45">Last seen {row.last_seen}</div>
+                    <div className="truncate font-mono text-xs text-slate-950">{row.ip_hash}</div>
+                    <div className="mt-1 text-xs text-[var(--text-faint)]">Last seen {row.last_seen}</div>
                   </div>
-                  <div className="text-lg font-semibold text-white">{fmt(row.hits)}</div>
+                  <div className="text-lg font-semibold text-slate-950">{fmt(row.hits)}</div>
                 </div>
               ))
             ) : (
-              <div className="rounded-2xl border border-dashed border-white/12 bg-white/[0.03] px-4 py-8 text-center text-sm text-white/54">
+              <div className="rounded-sm border border-dashed border-[var(--border-subtle)] bg-[var(--surface-soft)] px-4 py-8 text-center text-sm text-[var(--text-secondary)]">
                 No abusive-source signals were recorded in the last 24 hours.
               </div>
             )}
@@ -226,10 +226,10 @@ export default async function SecurityCenterPage() {
           title="Recent security events"
           description="Use this stream as the first investigation surface, then move into review or audit when you need deeper evidence."
         >
-          <div className="overflow-hidden rounded-2xl border border-white/10">
+          <div className="overflow-hidden rounded-sm border border-[var(--border-subtle)]">
             <div className="max-h-[520px] overflow-auto">
               <table className="min-w-full text-left text-sm">
-                <thead className="sticky top-0 bg-[#10192b]/95 text-xs text-white/58 backdrop-blur">
+                <thead className="sticky top-0 bg-[var(--surface-soft)] text-xs text-[var(--text-faint)] backdrop-blur">
                   <tr>
                     <th className="px-4 py-3">Time</th>
                     <th className="px-4 py-3">Type</th>
@@ -238,33 +238,33 @@ export default async function SecurityCenterPage() {
                     <th className="px-4 py-3">Message</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-white/10">
+                <tbody className="divide-y divide-[var(--border-subtle)]">
                   {securityEvents.length ? (
                     securityEvents.map((event) => (
-                      <tr key={event.id} className="bg-black/10">
-                        <td className="px-4 py-3 whitespace-nowrap text-white/58">{event.created_at}</td>
-                        <td className="px-4 py-3 font-mono text-xs text-white/82">{event.type}</td>
+                      <tr key={event.id} className="bg-white">
+                        <td className="px-4 py-3 whitespace-nowrap text-[var(--text-secondary)]">{event.created_at}</td>
+                        <td className="px-4 py-3 font-mono text-xs text-slate-950">{event.type}</td>
                         <td className="px-4 py-3">
                           <span
                             className={[
                               "inline-flex rounded-full border px-2.5 py-1 text-[11px]",
                               String(event.severity || "").toLowerCase() === "high"
-                                ? "border-rose-400/30 bg-rose-400/12 text-rose-100"
+                                ? "border-[rgba(186,71,50,0.2)] bg-[rgba(186,71,50,0.08)] text-[var(--danger)]"
                                 : String(event.severity || "").toLowerCase() === "medium"
-                                  ? "border-amber-300/30 bg-amber-300/12 text-amber-100"
-                                  : "border-white/12 bg-white/[0.05] text-white/72",
+                                  ? "border-[rgba(161,109,27,0.18)] bg-[rgba(161,109,27,0.08)] text-[var(--accent-warm)]"
+                                  : "border-[var(--border-subtle)] bg-[var(--surface-soft)] text-[var(--text-secondary)]",
                             ].join(" ")}
                           >
                             {event.severity || "low"}
                           </span>
                         </td>
-                        <td className="px-4 py-3 font-mono text-xs text-white/62">{event.scope || "workspace"}</td>
-                        <td className="px-4 py-3 text-white/72">{event.message || "No message recorded."}</td>
+                        <td className="px-4 py-3 font-mono text-xs text-[var(--text-secondary)]">{event.scope || "workspace"}</td>
+                        <td className="px-4 py-3 text-[var(--text-secondary)]">{event.message || "No message recorded."}</td>
                       </tr>
                     ))
                   ) : (
-                    <tr className="bg-black/10">
-                      <td colSpan={5} className="px-4 py-10 text-center text-sm text-white/54">
+                    <tr className="bg-white">
+                      <td colSpan={5} className="px-4 py-10 text-center text-sm text-[var(--text-secondary)]">
                         No security events were recorded in this environment.
                       </td>
                     </tr>
@@ -282,16 +282,16 @@ export default async function SecurityCenterPage() {
         actions={
           <form action="/api/admin/security/requeue-scans" method="post">
             <input type="hidden" name="scope" value="quarantined" />
-            <button type="submit" className="btn-base btn-secondary rounded-xl px-3 py-2 text-sm">
+            <button type="submit" className="btn-base btn-secondary rounded-sm px-3 py-2 text-sm">
               Rescan Quarantined
             </button>
           </form>
         }
       >
-        <div className="overflow-hidden rounded-2xl border border-white/10">
+        <div className="overflow-hidden rounded-sm border border-[var(--border-subtle)]">
           <div className="max-h-[360px] overflow-auto">
             <table className="min-w-full text-left text-sm">
-              <thead className="sticky top-0 bg-[#10192b]/95 text-xs text-white/58 backdrop-blur">
+              <thead className="sticky top-0 bg-[var(--surface-soft)] text-xs text-[var(--text-faint)] backdrop-blur">
                 <tr>
                   <th className="px-4 py-3">Document</th>
                   <th className="px-4 py-3">Scan</th>
@@ -299,22 +299,22 @@ export default async function SecurityCenterPage() {
                   <th className="px-4 py-3">Created</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-white/10">
+              <tbody className="divide-y divide-[var(--border-subtle)]">
                 {quarantined.length ? (
                   quarantined.map((doc) => (
-                    <tr key={doc.id} className="bg-black/10">
+                    <tr key={doc.id} className="bg-white">
                       <td className="px-4 py-3">
-                        <div className="font-medium text-white">{doc.title}</div>
-                        <div className="mt-1 text-xs text-white/45">{doc.id}</div>
+                        <div className="font-medium text-slate-950">{doc.title}</div>
+                        <div className="mt-1 text-xs text-[var(--text-faint)]">{doc.id}</div>
                       </td>
-                      <td className="px-4 py-3 text-amber-100">{doc.scan_status}</td>
-                      <td className="px-4 py-3 text-amber-100">{doc.moderation_status}</td>
-                      <td className="px-4 py-3 text-white/58">{doc.created_at}</td>
+                      <td className="px-4 py-3 text-[var(--accent-warm)]">{doc.scan_status}</td>
+                      <td className="px-4 py-3 text-[var(--accent-warm)]">{doc.moderation_status}</td>
+                      <td className="px-4 py-3 text-[var(--text-secondary)]">{doc.created_at}</td>
                     </tr>
                   ))
                 ) : (
-                  <tr className="bg-black/10">
-                    <td colSpan={4} className="px-4 py-10 text-center text-sm text-white/54">
+                  <tr className="bg-white">
+                    <td colSpan={4} className="px-4 py-10 text-center text-sm text-[var(--text-secondary)]">
                       No quarantined documents right now.
                     </td>
                   </tr>

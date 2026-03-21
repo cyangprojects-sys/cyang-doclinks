@@ -59,16 +59,16 @@ function keysSignature(payload: KeysResponse | null): string {
 }
 
 function pillClass(active: boolean, revoked: boolean): string {
-  if (revoked) return "border-red-400/20 bg-red-400/10 text-red-200";
-  if (active) return "border-emerald-400/20 bg-emerald-400/10 text-emerald-200";
-  return "border-white/10 bg-white/5 text-white/70";
+  if (revoked) return "border-[rgba(186,71,50,0.18)] bg-[rgba(186,71,50,0.08)] text-[var(--danger)]";
+  if (active) return "border-[rgba(47,111,70,0.18)] bg-[rgba(47,111,70,0.08)] text-[var(--success)]";
+  return "border-[var(--border-subtle)] bg-[var(--surface-soft)] text-[var(--text-secondary)]";
 }
 
 function statusClass(status: RotationJob["status"]): string {
-  if (status === "completed") return "border-emerald-500/30 bg-emerald-500/10 text-emerald-200";
-  if (status === "running") return "border-blue-500/30 bg-blue-500/10 text-blue-200";
-  if (status === "failed") return "border-red-500/30 bg-red-500/10 text-red-200";
-  return "border-white/15 bg-white/5 text-white/70";
+  if (status === "completed") return "border-[rgba(47,111,70,0.18)] bg-[rgba(47,111,70,0.08)] text-[var(--success)]";
+  if (status === "running") return "border-[var(--border-accent)] bg-[var(--surface-selected)] text-[var(--accent-primary)]";
+  if (status === "failed") return "border-[rgba(186,71,50,0.18)] bg-[rgba(186,71,50,0.08)] text-[var(--danger)]";
+  return "border-[var(--border-subtle)] bg-[var(--surface-soft)] text-[var(--text-secondary)]";
 }
 
 function toUserError(e: unknown, fallback: string): string {
@@ -249,18 +249,18 @@ export default function KeyManagementPanel() {
   }
 
   return (
-    <section className="glass-card-strong rounded-2xl p-4">
+    <section className="surface-panel-strong p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-sm font-semibold">Master key operations</h2>
-          <p className="mt-1 text-xs text-white/50">
+          <h2 className="text-sm font-semibold text-slate-950">Master key operations</h2>
+          <p className="mt-1 text-xs text-[var(--text-faint)]">
             Active key switching, async rewrap jobs, and rollback history.
           </p>
         </div>
         <button
           onClick={() => void refresh()}
           disabled={busy}
-          className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-xs font-semibold hover:bg-white/10 disabled:opacity-50"
+          className="btn-base btn-secondary rounded-sm px-3 py-2 text-xs font-semibold disabled:opacity-50"
         >
           Refresh
         </button>
@@ -276,7 +276,7 @@ export default function KeyManagementPanel() {
               <button
                 disabled={busy || k.revoked}
                 onClick={() => void onRevoke(k.id)}
-                className="rounded-full border border-white/10 bg-black/20 px-2 py-0.5 text-[10px] font-semibold hover:bg-black/30 disabled:opacity-50"
+                className="rounded-full border border-[var(--border-subtle)] bg-white px-2 py-0.5 text-[10px] font-semibold text-[var(--text-secondary)] hover:border-[var(--border-strong)] hover:text-[var(--text-primary)] disabled:opacity-50"
                 title="Revoke key"
               >
                 Revoke
@@ -284,19 +284,19 @@ export default function KeyManagementPanel() {
             </div>
           ))
         ) : (
-          <div className="text-sm text-white/60">No keys detected. Configure DOC_MASTER_KEYS.</div>
+          <div className="text-sm text-[var(--text-secondary)]">No keys detected. Configure DOC_MASTER_KEYS.</div>
         )}
       </div>
 
       <div className="mt-4 grid gap-3 lg:grid-cols-3">
-        <div className="rounded-lg border border-white/10 bg-black/30 p-3">
-          <div className="text-xs font-semibold text-white/80">Active key switch</div>
-          <div className="mt-1 text-[11px] text-white/60">Current: {activeId || "none"}</div>
+        <div className="surface-panel-soft p-3">
+          <div className="text-xs font-semibold text-slate-950">Active key switch</div>
+          <div className="mt-1 text-[11px] text-[var(--text-secondary)]">Current: {activeId || "none"}</div>
           <select
             aria-label="Select active key"
             value={activateKey}
             onChange={(e) => setActivateKey(e.target.value)}
-            className="mt-2 w-full rounded-lg border border-white/10 bg-black/40 px-2 py-2 text-xs outline-none focus:border-white/20"
+            className="field-input mt-2 w-full px-2 py-2 text-xs"
           >
             <option value="">Select key...</option>
             {keys.filter((k) => !k.revoked).map((k) => (
@@ -311,20 +311,20 @@ export default function KeyManagementPanel() {
             value={activateReason}
             onChange={(e) => setActivateReason(e.target.value)}
             placeholder="Reason (optional)"
-            className="mt-2 w-full rounded-lg border border-white/10 bg-black/40 px-2 py-2 text-xs outline-none focus:border-white/20"
+            className="field-input mt-2 w-full px-2 py-2 text-xs"
           />
           <button
             onClick={() => void onActivate()}
             disabled={busy || !activateKey}
-            className="mt-2 w-full rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-xs font-semibold hover:bg-white/10 disabled:opacity-50"
+            className="btn-base btn-primary mt-2 w-full rounded-sm px-3 py-2 text-xs font-semibold disabled:opacity-50"
           >
             Set Active Key
           </button>
         </div>
 
-        <div className="rounded-lg border border-white/10 bg-black/30 p-3 lg:col-span-2">
-          <div className="text-xs font-semibold text-white/80">Re-encryption job queue</div>
-          <p className="mt-1 text-[11px] text-white/55">
+        <div className="surface-panel-soft p-3 lg:col-span-2">
+          <div className="text-xs font-semibold text-slate-950">Re-encryption job queue</div>
+          <p className="mt-1 text-[11px] text-[var(--text-faint)]">
             Jobs are processed by Cloudflare-triggered cron calling `/api/cron/key-rotation`.
           </p>
           <div className="mt-2 grid gap-2 md:grid-cols-3">
@@ -332,7 +332,7 @@ export default function KeyManagementPanel() {
               aria-label="Rotation from key"
               value={fromKey}
               onChange={(e) => setFromKey(e.target.value)}
-              className="rounded-lg border border-white/10 bg-black/40 px-2 py-2 text-xs outline-none focus:border-white/20"
+              className="field-input px-2 py-2 text-xs"
             >
               <option value="">FROM key...</option>
               {keys.map((k) => (
@@ -345,7 +345,7 @@ export default function KeyManagementPanel() {
               aria-label="Rotation to key"
               value={toKey}
               onChange={(e) => setToKey(e.target.value)}
-              className="rounded-lg border border-white/10 bg-black/40 px-2 py-2 text-xs outline-none focus:border-white/20"
+              className="field-input px-2 py-2 text-xs"
             >
               <option value="">TO key...</option>
               {keys.filter((k) => !k.revoked).map((k) => (
@@ -361,10 +361,10 @@ export default function KeyManagementPanel() {
               max={2000}
               value={limit}
               onChange={(e) => setLimit(Number(e.target.value || 250))}
-              className="rounded-lg border border-white/10 bg-black/40 px-2 py-2 text-xs outline-none focus:border-white/20"
+              className="field-input px-2 py-2 text-xs"
             />
           </div>
-          <div className="mt-2 flex items-center gap-2 text-xs text-white/60">
+          <div className="mt-2 flex items-center gap-2 text-xs text-[var(--text-secondary)]">
             <span>Queued: {jobSummary.queued}</span>
             <span>Running: {jobSummary.running}</span>
             <span>Failed: {jobSummary.failed}</span>
@@ -373,7 +373,7 @@ export default function KeyManagementPanel() {
           <button
             onClick={() => void onEnqueueRotation()}
             disabled={busy || !fromKey || !toKey}
-            className="mt-2 rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-xs font-semibold hover:bg-white/10 disabled:opacity-50"
+            className="btn-base btn-secondary mt-2 rounded-sm px-3 py-2 text-xs font-semibold disabled:opacity-50"
           >
             Enqueue Rotation Job
           </button>
@@ -381,55 +381,55 @@ export default function KeyManagementPanel() {
       </div>
 
       <div className="mt-4 grid gap-3 lg:grid-cols-2">
-        <div className="rounded-lg border border-white/10 bg-black/30 p-3">
-          <div className="text-xs font-semibold text-white/80">Recent key changes</div>
+        <div className="surface-panel-soft p-3">
+          <div className="text-xs font-semibold text-slate-950">Recent key changes</div>
           <div className="mt-2 max-h-[360px] space-y-2 overflow-auto pr-1">
             {changes.length ? (
               changes.map((c) => (
-                <div key={c.id} className="rounded-lg border border-white/10 bg-black/20 p-2 text-xs">
-                  <div className="font-mono text-white/70">{c.created_at}</div>
-                  <div className="mt-1 text-white/80">{c.previous_key_id || "none"} → {c.new_key_id}</div>
-                  <div className="text-white/50">{c.reason || "no reason"}</div>
+                <div key={c.id} className="rounded-sm border border-[var(--border-subtle)] bg-white p-2 text-xs">
+                  <div className="font-mono text-[var(--text-secondary)]">{c.created_at}</div>
+                  <div className="mt-1 text-slate-950">{c.previous_key_id || "none"} → {c.new_key_id}</div>
+                  <div className="text-[var(--text-faint)]">{c.reason || "no reason"}</div>
                   <button
                     onClick={() => void onRollback(c.id, c.previous_key_id)}
                     disabled={busy || !c.previous_key_id}
-                    className="mt-1 rounded border border-white/15 bg-white/5 px-2 py-1 text-[11px] font-semibold hover:bg-white/10 disabled:opacity-40"
+                    className="btn-base btn-secondary mt-1 rounded-sm px-2 py-1 text-[11px] font-semibold disabled:opacity-40"
                   >
                     Rollback
                   </button>
                 </div>
               ))
             ) : (
-              <div className="text-xs text-white/60">No key change history available.</div>
+              <div className="text-xs text-[var(--text-secondary)]">No key change history available.</div>
             )}
           </div>
         </div>
 
-        <div className="rounded-lg border border-white/10 bg-black/30 p-3">
-          <div className="text-xs font-semibold text-white/80">Rotation jobs</div>
+        <div className="surface-panel-soft p-3">
+          <div className="text-xs font-semibold text-slate-950">Rotation jobs</div>
           <div className="mt-2 max-h-[360px] space-y-2 overflow-auto pr-1">
             {jobs.length ? (
               jobs.map((j) => (
-                <div key={j.id} className="rounded-lg border border-white/10 bg-black/20 p-2 text-xs">
+                <div key={j.id} className="rounded-sm border border-[var(--border-subtle)] bg-white p-2 text-xs">
                   <div className="flex items-center justify-between">
-                    <div className="font-mono text-white/70">{j.id.slice(0, 8)}</div>
-                    <span className={`rounded-md border px-2 py-0.5 text-[10px] ${statusClass(j.status)}`}>{j.status}</span>
+                    <div className="font-mono text-[var(--text-secondary)]">{j.id.slice(0, 8)}</div>
+                    <span className={`rounded-sm border px-2 py-0.5 text-[10px] ${statusClass(j.status)}`}>{j.status}</span>
                   </div>
-                  <div className="mt-1 text-white/80">{j.from_key_id} → {j.to_key_id}</div>
-                  <div className="text-white/55">
+                  <div className="mt-1 text-slate-950">{j.from_key_id} → {j.to_key_id}</div>
+                  <div className="text-[var(--text-faint)]">
                     scanned {j.scanned_count}, rotated {j.rotated_count}, failed {j.failed_count}
                   </div>
-                  {j.last_error ? <div className="mt-1 text-red-300">{j.last_error}</div> : null}
+                  {j.last_error ? <div className="mt-1 text-[var(--danger)]">{j.last_error}</div> : null}
                 </div>
               ))
             ) : (
-              <div className="text-xs text-white/60">No jobs yet.</div>
+              <div className="text-xs text-[var(--text-secondary)]">No jobs yet.</div>
             )}
           </div>
         </div>
       </div>
 
-      {error ? <div className="mt-3 text-sm text-red-300">{error}</div> : null}
+      {error ? <div className="mt-3 text-sm text-[var(--danger)]">{error}</div> : null}
     </section>
   );
 }

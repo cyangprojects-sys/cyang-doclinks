@@ -52,11 +52,11 @@ export default function AbuseActionsClient({ reportId, token, docId }: Props) {
         value={reason}
         onChange={(e) => setReason(e.target.value)}
         placeholder="Reason (optional)"
-        className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-xs text-white placeholder:text-white/30 outline-none focus:border-white/20"
+        className="field-input w-full rounded-sm px-3 py-2 text-xs"
       />
 
       {err ? (
-        <div className="mt-2 rounded-xl border border-red-900/40 bg-red-950/30 px-3 py-2 text-xs text-red-200">
+        <div className="mt-2 rounded-sm border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-800">
           {err}
         </div>
       ) : null}
@@ -67,7 +67,7 @@ export default function AbuseActionsClient({ reportId, token, docId }: Props) {
             <button
               disabled={busy}
               onClick={() => run({ action: "disable_doc", docId })}
-              className="rounded-xl bg-white px-3 py-1.5 text-xs font-medium text-black hover:bg-white/90 disabled:opacity-50"
+              className="btn-base btn-primary rounded-sm px-3 py-1.5 text-xs font-medium disabled:opacity-50"
             >
               Disable doc
             </button>
@@ -78,7 +78,7 @@ export default function AbuseActionsClient({ reportId, token, docId }: Props) {
                 if (!confirm) return;
                 run({ action: "override_quarantine", docId, ttlMinutes: 30, confirm });
               }}
-              className="rounded-xl bg-amber-500/20 px-3 py-1.5 text-xs text-amber-100 hover:bg-amber-500/25 disabled:opacity-50"
+              className="rounded-sm border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs text-amber-800 transition hover:bg-amber-100 disabled:opacity-50"
             >
               Override 30m
             </button>
@@ -89,7 +89,7 @@ export default function AbuseActionsClient({ reportId, token, docId }: Props) {
                 if (!confirm) return;
                 run({ action: "revoke_override", docId, confirm });
               }}
-              className="rounded-xl bg-amber-500/10 px-3 py-1.5 text-xs text-amber-100 hover:bg-amber-500/20 disabled:opacity-50"
+              className="btn-base btn-secondary rounded-sm px-3 py-1.5 text-xs disabled:opacity-50"
             >
               Revoke override
             </button>
@@ -100,7 +100,7 @@ export default function AbuseActionsClient({ reportId, token, docId }: Props) {
           <button
             disabled={busy}
             onClick={() => run({ action: "revoke_share", token })}
-            className="rounded-xl bg-white/10 px-3 py-1.5 text-xs text-white hover:bg-white/15 disabled:opacity-50"
+            className="btn-base btn-secondary rounded-sm px-3 py-1.5 text-xs disabled:opacity-50"
           >
             Revoke share
           </button>
@@ -109,7 +109,7 @@ export default function AbuseActionsClient({ reportId, token, docId }: Props) {
         <button
           disabled={busy}
           onClick={() => run({ action: "close_report", reportId, notes: reason || null })}
-          className="rounded-xl bg-white/10 px-3 py-1.5 text-xs text-white hover:bg-white/15 disabled:opacity-50"
+          className="btn-base btn-secondary rounded-sm px-3 py-1.5 text-xs disabled:opacity-50"
         >
           Close
         </button>

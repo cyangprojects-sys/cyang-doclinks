@@ -77,7 +77,7 @@ export default function LegalCenterClient({ docs }: { docs: LegalDocMeta[] }) {
       <PremiumCard strong>
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
           <div>
-            <label htmlFor="legal-search" className="text-[11px] uppercase tracking-[0.22em] text-white/40">
+            <label htmlFor="legal-search" className="text-[11px] uppercase tracking-[0.22em] text-[var(--text-faint)]">
               Search legal docs
             </label>
             <input
@@ -85,7 +85,7 @@ export default function LegalCenterClient({ docs }: { docs: LegalDocMeta[] }) {
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Search terms, privacy, DPA, SLA, security..."
-              className="mt-3 w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white placeholder:text-white/30 outline-none transition-colors hover:border-white/20 focus:border-sky-300/50 focus:ring-2 focus:ring-sky-300/20"
+              className="field-input mt-3 w-full px-4 py-3 text-sm"
             />
           </div>
 
@@ -101,10 +101,10 @@ export default function LegalCenterClient({ docs }: { docs: LegalDocMeta[] }) {
                 type="button"
                 onClick={() => setCategory(option.id as LegalDocCategory | "all")}
                 className={[
-                  "rounded-full border px-3 py-2 text-xs transition-colors",
+                  "selection-pill px-3 py-2 text-xs",
                   category === option.id
-                    ? "border-sky-200/30 bg-sky-300/12 text-sky-100"
-                    : "border-white/10 bg-white/[0.03] text-white/64 hover:bg-white/[0.06] hover:text-white",
+                    ? "selection-pill-active"
+                    : "",
                 ].join(" ")}
               >
                 {option.label}
@@ -113,7 +113,7 @@ export default function LegalCenterClient({ docs }: { docs: LegalDocMeta[] }) {
           </div>
         </div>
 
-        <div className="mt-4 text-xs text-white/48">
+        <div className="mt-4 text-xs text-[var(--text-faint)]">
           Showing {filtered.length} document{filtered.length === 1 ? "" : "s"}.
         </div>
       </PremiumCard>
@@ -125,42 +125,42 @@ export default function LegalCenterClient({ docs }: { docs: LegalDocMeta[] }) {
         return (
           <section key={groupKey}>
             <div className="max-w-3xl">
-              <h2 className="text-2xl font-semibold tracking-[-0.03em] text-white">{LEGAL_CATEGORY_META[groupKey].label}</h2>
-              <p className="mt-2 text-sm leading-7 text-white/62">{LEGAL_CATEGORY_META[groupKey].description}</p>
+              <h2 className="text-2xl font-semibold tracking-[-0.03em] text-slate-950">{LEGAL_CATEGORY_META[groupKey].label}</h2>
+              <p className="mt-2 text-sm leading-7 text-[var(--text-secondary)]">{LEGAL_CATEGORY_META[groupKey].description}</p>
             </div>
 
             <div className="mt-5 grid gap-4 md:grid-cols-2">
               {docsInGroup.map((doc) => (
                 <PremiumCard key={doc.slug} className="h-full">
                   <div className="flex items-start justify-between gap-3">
-                    <div className="text-[11px] uppercase tracking-[0.18em] text-white/40">{doc.startHereLabel}</div>
+                    <div className="text-[11px] uppercase tracking-[0.18em] text-[var(--text-faint)]">{doc.startHereLabel}</div>
                     <MaturityBadge tone="neutral">{LEGAL_CATEGORY_META[groupKey].label}</MaturityBadge>
                   </div>
-                  <h3 className="mt-3 text-2xl font-semibold tracking-tight text-white">{doc.title}</h3>
-                  <p className="mt-3 text-sm leading-7 text-white/64">{doc.summary}</p>
+                  <h3 className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">{doc.title}</h3>
+                  <p className="mt-3 text-sm leading-7 text-[var(--text-secondary)]">{doc.summary}</p>
                   <div className="mt-4 flex flex-wrap gap-2">
                     {doc.badges.map((badge) => (
-                      <span key={badge} className="ui-badge rounded-full px-2.5 py-1 text-[11px]">
+                      <span key={badge} className="ui-badge px-2.5 py-1 text-[11px]">
                         {badge}
                       </span>
                     ))}
                   </div>
-                  <dl className="mt-5 grid gap-3 text-xs text-white/56 sm:grid-cols-2">
+                  <dl className="mt-5 grid gap-3 text-xs text-[var(--text-faint)] sm:grid-cols-2">
                     <div>
                       <dt className="uppercase tracking-[0.16em]">Effective</dt>
-                      <dd className="mt-1 text-white/76">{formatDate(doc.effectiveDate)}</dd>
+                      <dd className="mt-1 text-[var(--text-secondary)]">{formatDate(doc.effectiveDate)}</dd>
                     </div>
                     <div>
                       <dt className="uppercase tracking-[0.16em]">Updated</dt>
-                      <dd className="mt-1 text-white/76">{formatDate(doc.lastUpdated)}</dd>
+                      <dd className="mt-1 text-[var(--text-secondary)]">{formatDate(doc.lastUpdated)}</dd>
                     </div>
                     <div className="sm:col-span-2">
                       <dt className="uppercase tracking-[0.16em]">Applies to</dt>
-                      <dd className="mt-1 text-white/76">{doc.appliesTo}</dd>
+                      <dd className="mt-1 text-[var(--text-secondary)]">{doc.appliesTo}</dd>
                     </div>
                   </dl>
                   <div className="mt-6">
-                    <Link href={`/legal/${doc.slug}`} className="btn-base btn-secondary inline-flex rounded-full px-4 py-2.5 text-sm">
+                    <Link href={`/legal/${doc.slug}`} className="btn-base btn-secondary inline-flex px-4 py-2.5 text-sm">
                       Read document
                     </Link>
                   </div>
@@ -173,7 +173,7 @@ export default function LegalCenterClient({ docs }: { docs: LegalDocMeta[] }) {
 
       {!filtered.length ? (
         <PremiumCard>
-          <p className="text-sm leading-7 text-white/62">No documents matched your current search or category filter.</p>
+          <p className="text-sm leading-7 text-[var(--text-secondary)]">No documents matched your current search or category filter.</p>
         </PremiumCard>
       ) : null}
     </div>

@@ -37,22 +37,22 @@ export default async function SignupActivatePage(props: {
   return (
     <main className="relative mx-auto w-full max-w-[980px] px-4 py-16 sm:px-6">
       <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
-        <div className="absolute -left-12 top-2 h-64 w-64 rounded-full bg-sky-400/12 blur-3xl" />
-        <div className="absolute right-0 top-10 h-64 w-64 rounded-full bg-teal-300/10 blur-3xl" />
+        <div className="absolute -left-12 top-2 h-64 w-64 rounded-full bg-[rgba(71,116,189,0.12)] blur-3xl" />
+        <div className="absolute right-0 top-10 h-64 w-64 rounded-full bg-[rgba(152,167,188,0.16)] blur-3xl" />
       </div>
 
-      <section className="glass-card-strong rounded-[30px] p-7 sm:p-8">
-        <span className="ui-badge inline-flex rounded-full px-3 py-1 text-xs uppercase tracking-[0.16em]">
+      <section className="surface-panel-strong p-7 sm:p-8">
+        <span className="ui-badge inline-flex px-3 py-1 text-xs uppercase tracking-[0.16em]">
           Account activation
         </span>
-        <h1 className="mt-4 text-3xl font-semibold tracking-tight text-white sm:text-4xl">{title}</h1>
-        <p className="mt-3 text-sm leading-relaxed text-white/70 sm:text-base">{detail}</p>
+        <h1 className="mt-4 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">{title}</h1>
+        <p className="mt-3 text-sm leading-relaxed text-[var(--text-secondary)] sm:text-base">{detail}</p>
 
         <div
-          className={`mt-5 rounded-xl border px-3.5 py-2.5 text-sm ${
+          className={`mt-5 border px-3.5 py-2.5 text-sm ${
             tone === "success"
-              ? "border-emerald-300/30 bg-emerald-300/10 text-emerald-100"
-              : "border-amber-300/30 bg-amber-300/10 text-amber-100"
+              ? "border-[rgba(40,136,88,0.18)] bg-[rgba(40,136,88,0.08)] text-[var(--success)]"
+              : "border-[rgba(186,71,50,0.22)] bg-[rgba(186,71,50,0.08)] text-[var(--danger)]"
           }`}
         >
           {tone === "success"
@@ -63,23 +63,23 @@ export default async function SignupActivatePage(props: {
         <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
           <Link
             href={ok ? "/signin/manual" : "/signup/manual"}
-            className={ok ? "btn-base btn-primary rounded-xl px-5 py-2.5 text-sm font-semibold" : "btn-base btn-secondary rounded-xl px-5 py-2.5 text-sm"}
+            className={ok ? "btn-base btn-primary px-5 py-2.5 text-sm font-semibold" : "btn-base btn-secondary px-5 py-2.5 text-sm"}
           >
             {ok ? "Continue to sign in" : "Back to manual sign up"}
           </Link>
-          <Link href="/signin" className="btn-base btn-secondary rounded-xl px-5 py-2.5 text-sm">
+          <Link href="/signin" className="btn-base btn-secondary px-5 py-2.5 text-sm">
             Sign-in options
           </Link>
-          <Link href="/" className="btn-base btn-secondary rounded-xl px-5 py-2.5 text-sm">
+          <Link href="/" className="btn-base btn-secondary px-5 py-2.5 text-sm">
             Home
           </Link>
         </div>
 
-        <div className="mt-6 grid gap-2 text-xs text-white/60 sm:grid-cols-4">
-          <Link href="/trust" className="underline hover:text-white">Trust Center</Link>
-          <Link href="/terms" className="underline hover:text-white">Terms</Link>
-          <Link href="/privacy" className="underline hover:text-white">Privacy</Link>
-          <Link href="/status" className="underline hover:text-white">Status</Link>
+        <div className="mt-6 grid gap-2 text-xs text-[var(--text-faint)] sm:grid-cols-4">
+          <Link href="/trust" className="subtle-link underline">Trust Center</Link>
+          <Link href="/terms" className="subtle-link underline">Terms</Link>
+          <Link href="/privacy" className="subtle-link underline">Privacy</Link>
+          <Link href="/status" className="subtle-link underline">Status</Link>
         </div>
       </section>
     </main>

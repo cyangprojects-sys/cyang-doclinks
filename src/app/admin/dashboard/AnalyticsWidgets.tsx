@@ -518,10 +518,10 @@ export default async function AnalyticsWidgets({
   return (
     <section className="mb-6">
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 2xl:grid-cols-4">
-        <div className="glass-card-strong rounded-2xl p-4">
-          <div className="text-xs text-white/60">Usage snapshot</div>
-          <div className="mt-2 text-xl font-semibold text-white">Plan: {planDisplayLabel}</div>
-          <ul className="mt-2 space-y-1 text-xs text-white/70">
+        <div className="surface-panel-strong rounded-sm p-4">
+          <div className="text-xs text-[var(--text-muted)]">Usage snapshot</div>
+          <div className="mt-2 text-xl font-semibold text-[var(--text-primary)]">Plan: {planDisplayLabel}</div>
+          <ul className="mt-2 space-y-1 text-xs text-[var(--text-secondary)]">
             {isOwnerRole ? <li>Role: Owner</li> : null}
             <li>
               Links: {fmtInt(usageActiveShares)} of{" "}
@@ -535,7 +535,7 @@ export default async function AnalyticsWidgets({
             </li>
           </ul>
           <div
-            className="mt-2 text-[11px] text-white/55"
+            className="mt-2 text-[11px] text-[var(--text-faint)]"
             title={`Uploads today: ${usageDailyUploads == null ? "-" : fmtInt(usageDailyUploads)}${
               usageMaxUploadsPerDay == null ? " / unlimited" : ` / ${fmtInt(usageMaxUploadsPerDay)}`
             }`}
@@ -544,52 +544,52 @@ export default async function AnalyticsWidgets({
             {usageMaxUploadsPerDay == null ? " / unlimited" : ` / ${fmtInt(usageMaxUploadsPerDay)}`}
           </div>
           {!isOwnerRole && usagePlanId !== "pro" ? (
-            <div className="mt-2 text-xs text-white/60">Upgrade to Pro for 100MB uploads + Pro presets.</div>
+            <div className="mt-2 text-xs text-[var(--text-muted)]">Upgrade to Pro for 100MB uploads + Pro presets.</div>
           ) : null}
           <div className="mt-3">
             {!isOwnerRole && usagePlanId !== "pro" ? (
-              <Link href="/admin/upgrade" className="inline-flex rounded-lg border border-cyan-400/35 bg-cyan-400/20 px-3 py-1.5 text-xs text-cyan-50 hover:bg-cyan-400/30">
+              <Link href="/admin/upgrade" className="btn-base btn-primary inline-flex rounded-sm px-3 py-1.5 text-xs">
                 Upgrade to Pro
               </Link>
             ) : (
-              <span className="inline-flex rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-xs text-white/70">
+              <span className="inline-flex rounded-full border border-[var(--border-subtle)] bg-white px-3 py-1.5 text-xs text-[var(--text-secondary)]">
                 {isOwnerRole ? "Owner access" : "Pro enabled"}
               </span>
             )}
           </div>
         </div>
 
-        <div className="glass-card-strong rounded-2xl p-4">
-          <div className="text-xs text-white/60">Active shares</div>
-          <div className="mt-1 text-3xl font-semibold text-white">{fmtInt(activeShares)}</div>
-          <div className="mt-1 text-xs text-white/65">Expiring soon: {fmtInt(expiringShares)}</div>
+        <div className="surface-panel-strong rounded-sm p-4">
+          <div className="text-xs text-[var(--text-muted)]">Active shares</div>
+          <div className="mt-1 text-3xl font-semibold text-[var(--text-primary)]">{fmtInt(activeShares)}</div>
+          <div className="mt-1 text-xs text-[var(--text-secondary)]">Expiring soon: {fmtInt(expiringShares)}</div>
         </div>
 
-        <div className="glass-card-strong rounded-2xl p-4">
-          <div className="text-xs text-white/60">Recent activity</div>
-          <div className="mt-1 text-3xl font-semibold text-white">{fmtInt(views7)}</div>
-          <div className="text-xs text-white/65">Views this week</div>
+        <div className="surface-panel-strong rounded-sm p-4">
+          <div className="text-xs text-[var(--text-muted)]">Recent activity</div>
+          <div className="mt-1 text-3xl font-semibold text-[var(--text-primary)]">{fmtInt(views7)}</div>
+          <div className="text-xs text-[var(--text-secondary)]">Views this week</div>
           <div className="mt-2 flex items-center justify-between gap-3">
-            <div className="text-xs text-white/60">This month: {fmtInt(views30)}</div>
+            <div className="text-xs text-[var(--text-muted)]">This month: {fmtInt(views30)}</div>
             <Sparkline values={series30} ariaLabel="Views this week sparkline" />
           </div>
-          <div className="mt-2 text-xs text-white/60">
+          <div className="mt-2 text-xs text-[var(--text-muted)]">
             Most viewed: {topDocs[0]?.doc_title || "No activity yet"}
           </div>
-          <div className="mt-1 text-xs text-white/50">All-time views: {fmtInt(totalViews)}</div>
+          <div className="mt-1 text-xs text-[var(--text-faint)]">All-time views: {fmtInt(totalViews)}</div>
         </div>
 
-        <div className="glass-card-strong rounded-2xl p-4">
-          <div className="text-xs text-white/60">Protection status</div>
-          <div className="mt-2 text-xl font-semibold text-white">
+        <div className="surface-panel-strong rounded-sm p-4">
+          <div className="text-xs text-[var(--text-muted)]">Protection status</div>
+          <div className="mt-2 text-xl font-semibold text-[var(--text-primary)]">
             {pendingScanDocs > 0
               ? `Scanning: ${fmtInt(pendingScanDocs)} ${pendingScanDocs === 1 ? "document" : "documents"}`
               : unencryptedDocs === 0 && blockedDocs === 0 && needsReviewDocs === 0
                 ? "Protected"
                 : "Needs attention"}
           </div>
-          {pendingScanDocs > 0 ? <div className="mt-1 text-xs text-amber-100/90">Sharing unlocks after scan completes.</div> : null}
-          <ul className="mt-2 space-y-1 text-xs text-white/70">
+          {pendingScanDocs > 0 ? <div className="mt-1 text-xs text-amber-700">Sharing unlocks after scan completes.</div> : null}
+          <ul className="mt-2 space-y-1 text-xs text-[var(--text-secondary)]">
             <li>{unencryptedDocs === 0 ? "All documents encrypted" : `${fmtInt(unencryptedDocs)} documents need encryption review`}</li>
             <li>{unencryptedDocs === 0 ? "0 unencrypted docs" : `${fmtInt(unencryptedDocs)} unencrypted docs`}</li>
             <li>{blockedDocs === 0 ? "No blocked files" : `${fmtInt(blockedDocs)} blocked files`}</li>
@@ -597,14 +597,14 @@ export default async function AnalyticsWidgets({
             <li>Last security check: {fmtMinsAgo(lastSecurityEventAt)}</li>
           </ul>
           {pendingScanDocs > 0 ? (
-            <div className="mt-2 inline-flex items-center rounded-full border border-amber-500/35 bg-amber-500/15 px-2 py-0.5 text-xs text-amber-100">
+            <div className="mt-2 inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs text-amber-700">
               Scanning now: {fmtInt(pendingScanDocs)}
             </div>
           ) : null}
           <div className="mt-3">
             <Link
               href={pendingScanDocs > 0 ? "/admin/documents?docSort=status&docDir=asc" : "/admin/activity"}
-              className="inline-flex rounded-lg border border-white/20 bg-white/10 px-3 py-1.5 text-xs text-white hover:bg-white/15"
+              className="btn-base btn-secondary inline-flex rounded-sm px-3 py-1.5 text-xs"
             >
               {pendingScanDocs > 0 ? "View scanning" : "View activity"}
             </Link>
@@ -614,28 +614,28 @@ export default async function AnalyticsWidgets({
 
       {showHealth ? (
       <div className="mt-3">
-        <details className="glass-card-strong rounded-2xl p-4">
+        <details className="surface-panel-strong rounded-sm p-4">
           <summary className="cursor-pointer list-none">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
-                <div className="text-sm font-semibold text-white">Health</div>
-                <div className="mt-1 text-xs text-white/60">System checks in plain language. View details for advanced signals.</div>
+                <div className="text-sm font-semibold text-[var(--text-primary)]">Health</div>
+                <div className="mt-1 text-xs text-[var(--text-muted)]">System checks in plain language. View details for advanced signals.</div>
               </div>
-              <span className="text-xs text-white/60">View details</span>
+              <span className="text-xs text-[var(--text-muted)]">View details</span>
             </div>
             <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
-              <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-white/80">
+              <div className="selection-tile rounded-sm px-3 py-2 text-sm text-[var(--text-secondary)]">
                 <div>{presignErrors24h === 0 ? "Uploads working" : "Some uploads failed to start"}</div>
                 {presignErrors24h > 0 ? (
                   <Link
                     href={failedUploadsHref}
-                    className="mt-1 inline-flex rounded-md border border-rose-400/35 bg-rose-500/15 px-2 py-1 text-xs text-rose-100 hover:bg-rose-500/25"
+                    className="mt-1 inline-flex rounded-sm border border-rose-200 bg-rose-50 px-2 py-1 text-xs text-rose-700 hover:bg-rose-100"
                   >
                     View failed uploads
                   </Link>
                 ) : null}
               </div>
-              <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-white/80">
+              <div className="selection-tile rounded-sm px-3 py-2 text-sm text-[var(--text-secondary)]">
                 {scanSystemDelayed
                   ? `Scan system delayed (${fmtInt(pendingScanDocs)} pending)`
                   : pendingScanDocs > 0
@@ -645,8 +645,8 @@ export default async function AnalyticsWidgets({
             </div>
           </summary>
           <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
-            <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3 text-xs text-white/70">
-              <div className="font-medium text-white/90">Layer 2: Guidance</div>
+            <div className="selection-tile rounded-sm p-3 text-xs text-[var(--text-secondary)]">
+              <div className="font-medium text-[var(--text-primary)]">Layer 2: Guidance</div>
               <ul className="mt-2 space-y-1">
                 <li>Background checks running: {fmtInt(cronFreshHealthy)}/{fmtInt(cronFreshTotal || 6)} jobs fresh in 6h</li>
                 <li>Some uploads failed to start: {fmtInt(presignErrors24h)}</li>
@@ -655,8 +655,8 @@ export default async function AnalyticsWidgets({
                 <li>Some emails failed to send or process: {fmtInt(deadLetterAlerts24h)}</li>
               </ul>
             </div>
-            <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3 text-xs text-white/70">
-              <div className="font-medium text-white/90">Layer 3: Advanced / System</div>
+            <div className="selection-tile rounded-sm p-3 text-xs text-[var(--text-secondary)]">
+              <div className="font-medium text-[var(--text-primary)]">Layer 3: Advanced / System</div>
               <ul className="mt-2 space-y-1">
                 <li>Revoked shares: {fmtInt(revokedShares)}</li>
                 <li>Alias links expiring (3d): {fmtInt(expiringAliases)}</li>
@@ -668,45 +668,45 @@ export default async function AnalyticsWidgets({
                 <li>Abuse spikes (24h): {fmtInt(abuseSpikes24h)}</li>
               </ul>
               {!isViewerScoped ? (
-                <Link href="/admin/security" className="mt-3 inline-flex rounded-md border border-white/20 px-2 py-1 text-xs text-white/85 hover:bg-white/10">
+                <Link href="/admin/security" className="btn-base btn-secondary mt-3 inline-flex rounded-sm px-2 py-1 text-xs">
                   Open security details
                 </Link>
               ) : null}
             </div>
           </div>
           {!isViewerScoped ? (
-            <div className="mt-3 rounded-xl border border-cyan-400/20 bg-cyan-500/[0.06] p-3 text-xs text-white/80">
-              <div className="font-medium text-white">Owner: Backup setup check</div>
-              <div className="mt-1 text-white/65">Use this to diagnose why backup health is not green.</div>
+            <div className="mt-3 rounded-sm border border-[var(--border-accent)] bg-[var(--surface-selected)] p-3 text-xs text-[var(--text-secondary)]">
+              <div className="font-medium text-[var(--text-primary)]">Owner: Backup setup check</div>
+              <div className="mt-1 text-[var(--text-secondary)]">Use this to diagnose why backup health is not green.</div>
               <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
-                <div className="rounded-lg border border-white/10 bg-black/20 px-3 py-2">
+                <div className="selection-tile rounded-sm px-3 py-2">
                   Automation: {backupAutomationEnabled ? "Enabled" : "Disabled"}
                 </div>
-                <div className="rounded-lg border border-white/10 bg-black/20 px-3 py-2">
+                <div className="selection-tile rounded-sm px-3 py-2">
                   Backup destination: {backupUsesGithubReporting || backupStatusWebhookTokenConfigured
                     ? (backupStatusWebhookTokenConfigured ? "GitHub status webhook configured" : "GitHub status webhook missing app token")
                     : (backupWebhookConfigured ? "Configured" : "Missing BACKUP_WEBHOOK_URL")}
                 </div>
-                <div className="rounded-lg border border-white/10 bg-black/20 px-3 py-2">
+                <div className="selection-tile rounded-sm px-3 py-2">
                   Backup telemetry table: {hasBackupRuns ? "Ready" : "Missing public.backup_runs"}
                 </div>
-                <div className="rounded-lg border border-white/10 bg-black/20 px-3 py-2">
+                <div className="selection-tile rounded-sm px-3 py-2">
                   Recorded runs: {hasBackupRuns ? fmtInt(backupRunCount) : "0"}
                 </div>
-                <div className="rounded-lg border border-white/10 bg-black/20 px-3 py-2">
+                <div className="selection-tile rounded-sm px-3 py-2">
                   Last backup run: {backupLastCreatedAt ? `${backupLastStatus || "unknown"} (${fmtMinsAgo(backupLastCreatedAt)})` : "No run yet"}
                 </div>
-                <div className="rounded-lg border border-white/10 bg-black/20 px-3 py-2">
+                <div className="selection-tile rounded-sm px-3 py-2">
                   Last successful backup: {backupHoursSinceLastSuccess == null ? "No success yet" : `${backupHoursSinceLastSuccess.toFixed(1)}h ago`}
                 </div>
-                <div className="rounded-lg border border-white/10 bg-black/20 px-3 py-2">
+                <div className="selection-tile rounded-sm px-3 py-2">
                   Freshness threshold: {backupMaxAgeHours}h
                 </div>
-                <div className="rounded-lg border border-white/10 bg-black/20 px-3 py-2">
+                <div className="selection-tile rounded-sm px-3 py-2">
                   Nightly cron: {nightlyLastOkAt ? `OK (${fmtMinsAgo(nightlyLastOkAt)})` : "No recent nightly cron ok event"}
                 </div>
               </div>
-              <div className="mt-3 rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-white/75">
+              <div className="selection-tile mt-3 rounded-sm px-3 py-2 text-[var(--text-secondary)]">
                 Next step: {backupUsesGithubReporting || backupStatusWebhookTokenConfigured
                   ? "set `BACKUP_STATUS_WEBHOOK_TOKEN` in app env, set GitHub `BACKUP_STATUS_WEBHOOK_URL`, run backup workflow once, then confirm at least one `ok` row in `public.backup_runs` from `github-actions`."
                   : "set `BACKUP_AUTOMATION_ENABLED=true`, set `BACKUP_WEBHOOK_URL`, verify cron secret wiring, then run `/api/cron/nightly` once and confirm at least one `ok` row in `public.backup_runs`."}

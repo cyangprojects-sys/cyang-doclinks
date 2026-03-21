@@ -73,16 +73,16 @@ export function SiteFooter({ config }: { config: PublicRuntimeConfig }) {
         <div className="grid gap-10 lg:grid-cols-[1.4fr_repeat(6,minmax(0,1fr))]">
           <div>
             <div className="flex items-center gap-3">
-              <div className="grid h-12 w-12 place-items-center rounded-sm border border-white/12 bg-white/[0.05] p-2">
+              <div className="grid h-12 w-12 place-items-center rounded-sm border border-[var(--border-subtle)] bg-white p-2 shadow-[var(--shadow-soft)]">
                 <img src="/branding/cyang_primary.svg" alt="cyang.io" className="h-full w-full object-contain" />
               </div>
               <div>
-                <div className="text-base font-semibold text-white">cyang.io</div>
-                <div className="text-[11px] uppercase tracking-[0.22em] text-white/36">Premium trust shell</div>
+                <div className="text-base font-semibold text-slate-950">cyang.io</div>
+                <div className="text-[11px] uppercase tracking-[0.22em] text-[var(--text-faint)]">Premium trust shell</div>
               </div>
             </div>
 
-            <p className="mt-5 max-w-xs text-sm leading-7 text-white/62">
+            <p className="mt-5 max-w-xs text-sm leading-7 text-[var(--text-secondary)]">
               Quietly powerful infrastructure for secure workflows, controlled delivery, and reviewable operations.
             </p>
 
@@ -98,10 +98,10 @@ export function SiteFooter({ config }: { config: PublicRuntimeConfig }) {
 
           {groups.map((group) => (
             <div key={group.title}>
-              <div className="text-[11px] uppercase tracking-[0.22em] text-white/58">{group.title}</div>
+              <div className="text-[11px] uppercase tracking-[0.22em] text-[var(--text-faint)]">{group.title}</div>
               <div className="mt-4 grid gap-2">
                 {group.links.map((link) => (
-                  <Link key={`${group.title}-${link.href}`} href={link.href} className="text-sm text-white/66 transition-colors hover:text-white">
+                  <Link key={`${group.title}-${link.href}`} href={link.href} className="text-sm text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)]">
                     {link.label}
                   </Link>
                 ))}
@@ -110,7 +110,7 @@ export function SiteFooter({ config }: { config: PublicRuntimeConfig }) {
           ))}
         </div>
 
-        <div className="mt-8 border-t border-white/8 pt-4 text-xs text-white/48 sm:flex sm:items-center sm:justify-between">
+        <div className="mt-8 border-t border-[var(--border-subtle)] pt-4 text-xs text-[var(--text-faint)] sm:flex sm:items-center sm:justify-between">
           <p>Copyright {new Date().getFullYear()} cyang.io. All rights reserved.</p>
           <p className="mt-2 sm:mt-0">Cyang.io Proprietary License remains in effect.</p>
         </div>

@@ -99,35 +99,35 @@ export default async function TeamAccessPage() {
         description="Invite-only access keeps workspace membership explicit. Owners can invite any role. Admins should only invite viewer or admin members."
       >
         {!membershipReady ? (
-          <div className="rounded-2xl border border-amber-400/30 bg-amber-400/10 p-4 text-sm text-amber-100">
+          <div className="rounded-sm border border-amber-200 bg-amber-50 p-4 text-sm text-amber-700">
             Membership tables are not installed yet. Run <span className="font-mono">scripts/sql/org_membership_invites.sql</span>.
           </div>
         ) : (
           <form action="/api/admin/security/org-access" method="post" className="grid gap-3 lg:grid-cols-[1.3fr_180px_140px_auto]">
             <input type="hidden" name="action" value="invite" />
-            <label className="text-sm text-white/68">
+            <label className="text-sm text-[var(--text-secondary)]">
               Email
               <input
                 name="email"
                 type="email"
                 required
                 placeholder="teammate@company.com"
-                className="mt-2 w-full rounded-2xl border border-white/14 bg-black/20 px-4 py-3 text-sm text-white placeholder:text-white/38 focus:border-cyan-300/45 focus:outline-none"
+                className="field-input mt-2 w-full rounded-sm px-4 py-3 text-sm"
               />
             </label>
-            <label className="text-sm text-white/68">
+            <label className="text-sm text-[var(--text-secondary)]">
               Role
               <select
                 name="role"
                 defaultValue="viewer"
-                className="mt-2 w-full rounded-2xl border border-white/14 bg-black/20 px-4 py-3 text-sm text-white focus:border-cyan-300/45 focus:outline-none"
+                className="field-input mt-2 w-full rounded-sm px-4 py-3 text-sm"
               >
                 <option value="viewer">Viewer</option>
                 <option value="admin">Admin</option>
                 <option value="owner">Owner</option>
               </select>
             </label>
-            <label className="text-sm text-white/68">
+            <label className="text-sm text-[var(--text-secondary)]">
               Expires
               <input
                 name="expires_days"
@@ -135,11 +135,11 @@ export default async function TeamAccessPage() {
                 min={1}
                 max={90}
                 defaultValue={7}
-                className="mt-2 w-full rounded-2xl border border-white/14 bg-black/20 px-4 py-3 text-sm text-white focus:border-cyan-300/45 focus:outline-none"
+                className="field-input mt-2 w-full rounded-sm px-4 py-3 text-sm"
               />
             </label>
             <div className="flex items-end">
-              <button type="submit" className="btn-base rounded-2xl border border-cyan-300/38 bg-cyan-300 px-4 py-3 text-sm font-semibold text-[#07131f] hover:bg-cyan-200">
+              <button type="submit" className="btn-base btn-primary rounded-sm px-4 py-3 text-sm font-semibold">
                 Send Invite
               </button>
             </div>
@@ -151,10 +151,10 @@ export default async function TeamAccessPage() {
         title="Members"
         description="Keep roles explicit and remove access the moment someone should stop operating the workspace."
       >
-        <div className="overflow-hidden rounded-2xl border border-white/10">
+        <div className="overflow-hidden rounded-sm border border-[var(--border-subtle)] bg-white/92">
           <div className="max-h-[520px] overflow-auto">
             <table className="min-w-full text-left text-sm">
-              <thead className="sticky top-0 bg-[#10192b]/95 text-xs text-white/58 backdrop-blur">
+              <thead className="sticky top-0 bg-[rgba(245,248,252,0.96)] text-xs text-[var(--text-muted)] backdrop-blur">
                 <tr>
                   <th className="px-4 py-3">Member</th>
                   <th className="px-4 py-3">Role</th>
@@ -163,13 +163,13 @@ export default async function TeamAccessPage() {
                   <th className="px-4 py-3 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-white/10">
+              <tbody className="divide-y divide-[var(--border-subtle)] text-[var(--text-primary)]">
                 {activeMembers.length ? (
                   activeMembers.map((member) => (
-                    <tr key={member.user_id} className="bg-black/10">
+                    <tr key={member.user_id} className="bg-transparent">
                       <td className="px-4 py-3">
-                        <div className="font-medium text-white">{member.email}</div>
-                        <div className="mt-1 text-xs text-white/45">{member.user_id}</div>
+                        <div className="font-medium text-[var(--text-primary)]">{member.email}</div>
+                        <div className="mt-1 text-xs text-[var(--text-faint)]">{member.user_id}</div>
                       </td>
                       <td className="px-4 py-3">
                         <form action="/api/admin/security/org-access" method="post" className="flex items-center gap-2">
@@ -178,13 +178,13 @@ export default async function TeamAccessPage() {
                           <select
                             name="role"
                             defaultValue={member.role}
-                            className="rounded-xl border border-white/14 bg-black/20 px-3 py-2 text-sm text-white"
+                            className="field-input rounded-sm px-3 py-2 text-sm"
                           >
                             <option value="viewer">Viewer</option>
                             <option value="admin">Admin</option>
                             <option value="owner">Owner</option>
                           </select>
-                          <button type="submit" className="btn-base rounded-xl border border-white/12 bg-white/[0.06] px-3 py-2 text-xs text-white/80 hover:bg-white/[0.1]">
+                          <button type="submit" className="btn-base btn-secondary rounded-sm px-3 py-2 text-xs">
                             Save
                           </button>
                         </form>
@@ -201,12 +201,12 @@ export default async function TeamAccessPage() {
                           {mfaByUser.get(member.user_id) ? "Enabled" : "Not enabled"}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-white/62">{member.joined_at}</td>
+                      <td className="px-4 py-3 text-[var(--text-muted)]">{member.joined_at}</td>
                       <td className="px-4 py-3 text-right">
                         <form action="/api/admin/security/org-access" method="post">
                           <input type="hidden" name="action" value="remove_member" />
                           <input type="hidden" name="user_id" value={member.user_id} />
-                          <button type="submit" className="btn-base rounded-xl border border-rose-400/28 bg-rose-400/12 px-3 py-2 text-xs text-rose-100 hover:bg-rose-400/18">
+                          <button type="submit" className="inline-flex rounded-sm border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700 transition hover:bg-rose-100">
                             Remove
                           </button>
                         </form>
@@ -214,8 +214,8 @@ export default async function TeamAccessPage() {
                     </tr>
                   ))
                 ) : (
-                  <tr className="bg-black/10">
-                    <td colSpan={5} className="px-4 py-10 text-center text-sm text-white/56">
+                  <tr className="bg-transparent">
+                    <td colSpan={5} className="px-4 py-10 text-center text-sm text-[var(--text-muted)]">
                       No members yet. Use the invite form to add the first operator.
                     </td>
                   </tr>
@@ -230,10 +230,10 @@ export default async function TeamAccessPage() {
         title="Pending invites"
         description="Track invites that are still outstanding and revoke them if they should no longer grant access."
       >
-        <div className="overflow-hidden rounded-2xl border border-white/10">
+        <div className="overflow-hidden rounded-sm border border-[var(--border-subtle)] bg-white/92">
           <div className="max-h-[400px] overflow-auto">
             <table className="min-w-full text-left text-sm">
-              <thead className="sticky top-0 bg-[#10192b]/95 text-xs text-white/58 backdrop-blur">
+              <thead className="sticky top-0 bg-[rgba(245,248,252,0.96)] text-xs text-[var(--text-muted)] backdrop-blur">
                 <tr>
                   <th className="px-4 py-3">Invitee</th>
                   <th className="px-4 py-3">Role</th>
@@ -241,18 +241,18 @@ export default async function TeamAccessPage() {
                   <th className="px-4 py-3 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-white/10">
+              <tbody className="divide-y divide-[var(--border-subtle)] text-[var(--text-primary)]">
                 {invites.length ? (
                   invites.map((invite) => (
-                    <tr key={invite.id} className="bg-black/10">
-                      <td className="px-4 py-3 font-medium text-white">{invite.email}</td>
-                      <td className="px-4 py-3 text-white/74">{invite.role}</td>
-                      <td className="px-4 py-3 text-white/62">{invite.expires_at}</td>
+                    <tr key={invite.id} className="bg-transparent">
+                      <td className="px-4 py-3 font-medium text-[var(--text-primary)]">{invite.email}</td>
+                      <td className="px-4 py-3 text-[var(--text-secondary)]">{invite.role}</td>
+                      <td className="px-4 py-3 text-[var(--text-muted)]">{invite.expires_at}</td>
                       <td className="px-4 py-3 text-right">
                         <form action="/api/admin/security/org-access" method="post">
                           <input type="hidden" name="action" value="revoke_invite" />
                           <input type="hidden" name="invite_id" value={invite.id} />
-                          <button type="submit" className="btn-base rounded-xl border border-white/12 bg-white/[0.06] px-3 py-2 text-xs text-white/80 hover:bg-white/[0.1]">
+                          <button type="submit" className="btn-base btn-secondary rounded-sm px-3 py-2 text-xs">
                             Revoke Invite
                           </button>
                         </form>
@@ -260,8 +260,8 @@ export default async function TeamAccessPage() {
                     </tr>
                   ))
                 ) : (
-                  <tr className="bg-black/10">
-                    <td colSpan={4} className="px-4 py-10 text-center text-sm text-white/56">
+                  <tr className="bg-transparent">
+                    <td colSpan={4} className="px-4 py-10 text-center text-sm text-[var(--text-muted)]">
                       No pending invites right now.
                     </td>
                   </tr>

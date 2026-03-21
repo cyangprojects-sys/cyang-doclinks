@@ -12,8 +12,10 @@ function NavLink({ href, label }: { href: string; label: string }) {
     <Link
       href={href}
       className={[
-        "inline-flex items-center rounded-md px-3 py-1.5 text-sm transition",
-        active ? "bg-white/15 text-white" : "bg-white/5 text-white/80 hover:bg-white/10",
+        "inline-flex items-center rounded-sm border px-3 py-1.5 text-sm transition",
+        active
+          ? "border-[var(--border-accent)] bg-[var(--surface-selected)] text-[var(--accent-primary)] shadow-[var(--shadow-soft)]"
+          : "border-transparent bg-transparent text-[var(--text-secondary)] hover:border-[var(--border-subtle)] hover:bg-[var(--surface-soft)] hover:text-[var(--text-primary)]",
       ].join(" ")}
     >
       {label}
@@ -29,10 +31,10 @@ export default function AdminTopNav({
   isOwner: boolean;
 }) {
   return (
-    <header className="sticky top-0 z-50 border-b border-white/10 bg-black/60 backdrop-blur">
+    <header className="sticky top-0 z-50 border-b border-[var(--border-subtle)] bg-[rgba(255,255,255,0.92)] backdrop-blur">
       <div className="mx-auto flex w-full max-w-[2200px] items-center justify-between px-3 py-3 sm:px-4 lg:px-6 xl:px-8">
         <div className="flex items-center gap-3">
-          <Link href="/" className="font-semibold tracking-tight">
+          <Link href="/" className="font-semibold tracking-tight text-slate-950">
             CYANG.IO
           </Link>
 
@@ -56,9 +58,9 @@ export default function AdminTopNav({
         </div>
 
         <div className="flex items-center gap-3">
-          {email && <div className="text-sm text-white/70">{email}</div>}
+          {email && <div className="text-sm text-[var(--text-secondary)]">{email}</div>}
           <button
-            className="inline-flex items-center rounded-md border border-white/15 bg-white/5 px-3 py-1.5 text-sm text-white/90 hover:bg-white/10"
+            className="btn-base btn-secondary inline-flex rounded-sm px-3 py-1.5 text-sm"
             onClick={() => signOut({ callbackUrl: "/" })}
           >
             Sign out

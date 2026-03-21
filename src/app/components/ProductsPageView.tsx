@@ -88,10 +88,10 @@ export function ProductsPageView() {
             <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-end">
               <div className="max-w-4xl">
                 <Eyebrow>Product studio</Eyebrow>
-                <h1 className="mt-6 text-balance text-4xl font-semibold tracking-[-0.05em] text-white sm:text-5xl lg:text-7xl">
+                <h1 className="mt-6 text-balance text-4xl font-semibold tracking-[-0.05em] text-slate-950 sm:text-5xl lg:text-7xl">
                   Products and systems built with discipline.
                 </h1>
-                <p className="mt-6 max-w-2xl text-base leading-8 text-white/64 sm:text-lg">
+                <p className="mt-6 max-w-2xl text-base leading-8 text-[var(--text-secondary)] sm:text-lg">
                   cyang.io is structured around one flagship today and a clean foundation for what comes next.
                 </p>
                 <CTAGroup
@@ -146,7 +146,7 @@ export function ProductsPageView() {
           <div className="space-y-10">
             <div>
               <div className="mb-5 flex items-center justify-between gap-4">
-                <h3 className="text-xl font-semibold text-white">Live now</h3>
+                <h3 className="text-xl font-semibold text-slate-950">Live now</h3>
                 <MaturityBadge tone="live">Customer-facing</MaturityBadge>
               </div>
               <div className="grid gap-4 md:grid-cols-2">{LIVE_NOW.map((item) => <ProductCard key={item.title} item={item} />)}</div>
@@ -154,7 +154,7 @@ export function ProductsPageView() {
 
             <div>
               <div className="mb-5 flex items-center justify-between gap-4">
-                <h3 className="text-xl font-semibold text-white">In development</h3>
+                <h3 className="text-xl font-semibold text-slate-950">In development</h3>
                 <MaturityBadge tone="build">Actively shaping</MaturityBadge>
               </div>
               <div className="grid gap-4 md:grid-cols-2">{IN_DEVELOPMENT.map((item) => <ProductCard key={item.title} item={item} />)}</div>
@@ -162,7 +162,7 @@ export function ProductsPageView() {
 
             <div>
               <div className="mb-5 flex items-center justify-between gap-4">
-                <h3 className="text-xl font-semibold text-white">Systems and experiments</h3>
+                <h3 className="text-xl font-semibold text-slate-950">Systems and experiments</h3>
                 <MaturityBadge tone="lab">Exploratory</MaturityBadge>
               </div>
               <div className="grid gap-4 md:grid-cols-2">{SYSTEMS_LAB.map((item) => <ProductCard key={item.title} item={item} />)}</div>
@@ -180,19 +180,19 @@ export function ProductsPageView() {
               <AmbientScene tone="cool" className="opacity-75" />
               <div className="relative grid gap-8 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
                 <div>
-                  <div className="text-[11px] uppercase tracking-[0.24em] text-white/58">Product philosophy</div>
-                  <h2 className="mt-4 text-balance text-4xl font-semibold tracking-[-0.05em] text-white sm:text-5xl">
+                  <div className="text-[11px] uppercase tracking-[0.24em] text-[var(--text-faint)]">Product philosophy</div>
+                  <h2 className="mt-4 text-balance text-4xl font-semibold tracking-[-0.05em] text-slate-950 sm:text-5xl">
                     Practical software. Long-term stewardship. Policy where it matters.
                   </h2>
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <PremiumCard className="p-5">
-                    <div className="text-sm font-semibold text-white">Clarity over clutter</div>
-                    <p className="mt-3 text-sm leading-7 text-white/62">Every public page and product surface should answer one question well.</p>
+                    <div className="text-sm font-semibold text-slate-950">Clarity over clutter</div>
+                    <p className="mt-3 text-sm leading-7 text-[var(--text-secondary)]">Every public page and product surface should answer one question well.</p>
                   </PremiumCard>
                   <PremiumCard className="p-5">
-                    <div className="text-sm font-semibold text-white">Controlled growth</div>
-                    <p className="mt-3 text-sm leading-7 text-white/62">New work inherits the same trust posture as the flagship instead of improvising later.</p>
+                    <div className="text-sm font-semibold text-slate-950">Controlled growth</div>
+                    <p className="mt-3 text-sm leading-7 text-[var(--text-secondary)]">New work inherits the same trust posture as the flagship instead of improvising later.</p>
                   </PremiumCard>
                 </div>
               </div>
@@ -203,11 +203,11 @@ export function ProductsPageView() {
             <div className="floating-stage p-6 sm:p-8">
               <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
                 <div className="max-w-3xl">
-                  <div className="text-[11px] uppercase tracking-[0.24em] text-white/58">Trust continuity</div>
-                  <h2 className="mt-4 text-balance text-4xl font-semibold tracking-[-0.05em] text-white sm:text-5xl">
+                  <div className="text-[11px] uppercase tracking-[0.24em] text-[var(--text-faint)]">Trust continuity</div>
+                  <h2 className="mt-4 text-balance text-4xl font-semibold tracking-[-0.05em] text-slate-950 sm:text-5xl">
                     The same trust posture carries across the portfolio.
                   </h2>
-                  <p className="mt-5 text-base leading-8 text-white/64 sm:text-lg">
+                  <p className="mt-5 text-base leading-8 text-[var(--text-secondary)] sm:text-lg">
                     Status, legal, disclosure routes, and procurement readiness are part of the public product system rather than optional side channels.
                   </p>
                 </div>

@@ -21,7 +21,7 @@ export default function DeleteDocForm({
   const [pending, setPending] = useState(false);
   const buttonClass =
     variant === "subtle"
-      ? "rounded-lg border border-white/10 bg-transparent px-3 py-1.5 text-xs text-white/55 hover:border-white/20 hover:bg-white/5 hover:text-white"
+      ? "btn-base btn-secondary rounded-sm px-3 py-1.5 text-xs"
       : "btn-base btn-danger rounded-lg px-3 py-1.5 text-xs";
 
   return (

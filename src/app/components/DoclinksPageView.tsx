@@ -121,7 +121,7 @@ export function DoclinksPageView({ publicConfig }: { publicConfig: PublicRuntime
         src="/media/cyang-doclinks-signal.mp4"
         poster="/media/cyang-doclinks-signal.jpg"
         priority
-        className="mt-3 min-h-[92svh] border-b border-white/8"
+        className="mt-3 min-h-[92svh] border-b border-[var(--border-subtle)]"
         contentClassName="min-h-[92svh]"
       >
         <AmbientScene tone="steel" />
@@ -129,11 +129,11 @@ export function DoclinksPageView({ publicConfig }: { publicConfig: PublicRuntime
           <div className="grid gap-10 lg:grid-cols-[minmax(0,1.06fr)_390px] lg:items-end">
             <ScrollRevealFrame className="max-w-5xl">
               <Eyebrow>Flagship product</Eyebrow>
-              <h1 className="font-editorial mt-6 text-balance text-[3.15rem] leading-[0.9] tracking-[-0.06em] text-white sm:text-[4.75rem] lg:text-[7rem]">
+              <h1 className="font-editorial mt-6 text-balance text-[3.15rem] leading-[0.9] tracking-[-0.06em] text-slate-950 sm:text-[4.75rem] lg:text-[7rem]">
                 Secure document delivery
-                <span className="block text-white/62">with enforced controls.</span>
+                <span className="block text-[var(--text-muted)]">with enforced controls.</span>
               </h1>
-              <p className="mt-6 max-w-2xl text-base leading-8 text-white/64 sm:text-xl">
+              <p className="mt-6 max-w-2xl text-base leading-8 text-[var(--text-secondary)] sm:text-xl">
                 Share sensitive files with a professional recipient experience while serve-time enforcement,
                 lifecycle control, and audit visibility stay intact.
               </p>
@@ -160,11 +160,11 @@ export function DoclinksPageView({ publicConfig }: { publicConfig: PublicRuntime
           </div>
 
           <ScrollRevealFrame delay={220} className="mt-10">
-            <div className="grid gap-4 border-t border-white/10 pt-5 sm:grid-cols-4">
+            <div className="grid gap-4 border-t border-[var(--border-subtle)] pt-5 sm:grid-cols-4">
               {OUTCOMES.map((item) => (
                 <div key={item}>
-                  <div className="text-[11px] uppercase tracking-[0.22em] text-white/58">Outcome</div>
-                  <div className="mt-2 text-lg text-white/86">{item}</div>
+                  <div className="text-[11px] uppercase tracking-[0.22em] text-[var(--text-faint)]">Outcome</div>
+                  <div className="mt-2 text-lg text-[var(--text-primary)]">{item}</div>
                 </div>
               ))}
             </div>
@@ -180,8 +180,8 @@ export function DoclinksPageView({ publicConfig }: { publicConfig: PublicRuntime
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               {OUTCOMES.map((item, index) => (
                 <div key={item} className="floating-stage p-6 sm:p-7">
-                  <div className="text-[11px] uppercase tracking-[0.22em] text-white/58">{String(index + 1).padStart(2, "0")}</div>
-                  <div className="mt-5 text-3xl font-semibold tracking-[-0.04em] text-white">{item}</div>
+                  <div className="text-[11px] uppercase tracking-[0.22em] text-[var(--text-faint)]">{String(index + 1).padStart(2, "0")}</div>
+                  <div className="mt-5 text-3xl font-semibold tracking-[-0.04em] text-slate-950">{item}</div>
                 </div>
               ))}
             </div>
@@ -196,18 +196,18 @@ export function DoclinksPageView({ publicConfig }: { publicConfig: PublicRuntime
           <ScrollRevealFrame>
             <div className="grid gap-8 lg:grid-cols-[320px_minmax(0,1fr)] lg:items-start">
               <div className="lg:sticky lg:top-28">
-                <div className="text-[11px] uppercase tracking-[0.24em] text-white/58">How it works</div>
-                <h2 className="mt-4 text-balance text-4xl font-semibold tracking-[-0.05em] text-white sm:text-5xl">
+                <div className="text-[11px] uppercase tracking-[0.24em] text-[var(--text-faint)]">How it works</div>
+                <h2 className="mt-4 text-balance text-4xl font-semibold tracking-[-0.05em] text-slate-950 sm:text-5xl">
                   A secure serving flow in four deliberate steps.
                 </h2>
               </div>
-              <div className="relative border-l border-white/10 pl-6 sm:pl-8">
+              <div className="relative border-l border-[var(--border-subtle)] pl-6 sm:pl-8">
                 {TIMELINE.map((step, index) => (
                   <div key={step.id} className={index === TIMELINE.length - 1 ? "" : "pb-10"}>
-                    <div className="absolute -left-[9px] mt-1 h-4 w-4 rounded-[2px] border border-white/16 bg-black/70" />
-                    <div className="text-[11px] uppercase tracking-[0.24em] text-white/58">{step.id}</div>
-                    <div className="mt-2 text-2xl font-semibold tracking-[-0.04em] text-white">{step.title}</div>
-                    <p className="mt-3 max-w-xl text-base leading-8 text-white/64">{step.body}</p>
+                    <div className="absolute -left-[9px] mt-1 h-4 w-4 rounded-[2px] border border-[var(--border-accent)] bg-[var(--surface-selected)]" />
+                    <div className="text-[11px] uppercase tracking-[0.24em] text-[var(--text-faint)]">{step.id}</div>
+                    <div className="mt-2 text-2xl font-semibold tracking-[-0.04em] text-slate-950">{step.title}</div>
+                    <p className="mt-3 max-w-xl text-base leading-8 text-[var(--text-secondary)]">{step.body}</p>
                   </div>
                 ))}
               </div>
@@ -246,8 +246,8 @@ export function DoclinksPageView({ publicConfig }: { publicConfig: PublicRuntime
           <div className="grid gap-8 lg:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)]">
             <ScrollRevealFrame>
               <PremiumCard strong className="h-full">
-                <div className="text-[11px] uppercase tracking-[0.24em] text-white/58">Audience and use cases</div>
-                <h2 className="mt-4 text-balance text-4xl font-semibold tracking-[-0.05em] text-white sm:text-5xl">
+                <div className="text-[11px] uppercase tracking-[0.24em] text-[var(--text-faint)]">Audience and use cases</div>
+                <h2 className="mt-4 text-balance text-4xl font-semibold tracking-[-0.05em] text-slate-950 sm:text-5xl">
                   Built for workflows where external sharing still needs discipline.
                 </h2>
                 <ul className="mt-6 space-y-4">
@@ -257,8 +257,8 @@ export function DoclinksPageView({ publicConfig }: { publicConfig: PublicRuntime
                     "Sensitive external sharing for finance, HR, and legal workflows.",
                     "Small businesses that need stronger trust posture without enterprise complexity.",
                   ].map((item) => (
-                    <li key={item} className="flex gap-3 text-sm leading-7 text-white/68">
-                      <span className="mt-3 h-1.5 w-1.5 flex-none rounded-full bg-sky-300/90" />
+                    <li key={item} className="flex gap-3 text-sm leading-7 text-[var(--text-secondary)]">
+                      <span className="mt-3 h-1.5 w-1.5 flex-none rounded-full bg-[var(--accent-primary)]/80" />
                       <span>{item}</span>
                     </li>
                   ))}
@@ -270,11 +270,11 @@ export function DoclinksPageView({ publicConfig }: { publicConfig: PublicRuntime
               <div className="floating-stage p-6 sm:p-8">
                 <AmbientScene tone="signal" className="opacity-75" />
                 <div className="relative">
-                  <div className="text-[11px] uppercase tracking-[0.24em] text-white/58">Trust architecture</div>
-                  <h2 className="mt-4 text-balance text-4xl font-semibold tracking-[-0.05em] text-white sm:text-5xl">
+                  <div className="text-[11px] uppercase tracking-[0.24em] text-[var(--text-faint)]">Trust architecture</div>
+                  <h2 className="mt-4 text-balance text-4xl font-semibold tracking-[-0.05em] text-slate-950 sm:text-5xl">
                     Reviewable trust continuity for the flagship product.
                   </h2>
-                  <p className="mt-5 max-w-xl text-base leading-8 text-white/64">
+                  <p className="mt-5 max-w-xl text-base leading-8 text-[var(--text-secondary)]">
                     Doclinks inherits the same public trust shell as the wider cyang.io platform, so product review is
                     already connected to policy, status, and procurement routes.
                   </p>
@@ -295,11 +295,11 @@ export function DoclinksPageView({ publicConfig }: { publicConfig: PublicRuntime
               <AmbientScene tone="steel" />
               <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
                 <div className="max-w-3xl">
-                  <div className="text-[11px] uppercase tracking-[0.24em] text-white/58">Final CTA</div>
-                  <h2 className="mt-4 text-balance text-4xl font-semibold tracking-[-0.05em] text-white sm:text-5xl lg:text-6xl">
+                  <div className="text-[11px] uppercase tracking-[0.24em] text-[var(--text-faint)]">Final CTA</div>
+                  <h2 className="mt-4 text-balance text-4xl font-semibold tracking-[-0.05em] text-slate-950 sm:text-5xl lg:text-6xl">
                     Start with Doclinks when delivery needs to stay controlled.
                   </h2>
-                  <p className="mt-5 text-base leading-8 text-white/64 sm:text-lg">
+                  <p className="mt-5 text-base leading-8 text-[var(--text-secondary)] sm:text-lg">
                     It is the clearest expression of the cyang.io approach: calm UX, bounded exposure, and trust
                     surfaces that are easy to review.
                   </p>

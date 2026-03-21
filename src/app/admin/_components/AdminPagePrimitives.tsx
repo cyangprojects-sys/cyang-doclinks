@@ -12,12 +12,12 @@ export function AdminPageIntro({
   actions?: React.ReactNode;
 }) {
   return (
-    <section className="glass-card-strong ui-sheen rounded-[32px] p-6 sm:p-7">
+    <section className="surface-panel-strong p-6 sm:p-7">
       <div className="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
         <div className="max-w-3xl">
-          <div className="text-xs uppercase tracking-[0.18em] text-cyan-200/72">{eyebrow}</div>
-          <h2 className="mt-3 text-3xl font-semibold tracking-tight text-white sm:text-4xl">{title}</h2>
-          <p className="mt-3 text-sm leading-6 text-white/68 sm:text-base">{description}</p>
+          <div className="text-xs uppercase tracking-[0.18em] text-[var(--accent-primary)]">{eyebrow}</div>
+          <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">{title}</h2>
+          <p className="mt-3 text-sm leading-6 text-[var(--text-secondary)] sm:text-base">{description}</p>
         </div>
         {actions ? <div className="flex flex-wrap gap-2">{actions}</div> : null}
       </div>
@@ -36,17 +36,17 @@ export function AdminKpiGrid({
         <div
           key={item.label}
           className={[
-            "glass-card-strong rounded-[26px] p-5",
+            "surface-panel p-5",
             item.tone === "warning"
-              ? "border-amber-300/20"
+              ? "border-[rgba(161,109,27,0.18)] bg-[rgba(161,109,27,0.05)]"
               : item.tone === "danger"
-                ? "border-rose-300/20"
+                ? "border-[rgba(186,71,50,0.18)] bg-[rgba(186,71,50,0.05)]"
                 : "",
           ].join(" ")}
         >
-          <div className="text-xs uppercase tracking-[0.18em] text-white/45">{item.label}</div>
-          <div className="mt-3 text-3xl font-semibold text-white">{item.value}</div>
-          <div className="mt-1 text-sm text-white/60">{item.hint}</div>
+          <div className="text-xs uppercase tracking-[0.18em] text-[var(--text-faint)]">{item.label}</div>
+          <div className="mt-3 text-3xl font-semibold text-slate-950">{item.value}</div>
+          <div className="mt-1 text-sm text-[var(--text-secondary)]">{item.hint}</div>
         </div>
       ))}
     </section>
@@ -61,7 +61,7 @@ export function AdminTabs({
   current: string;
 }) {
   return (
-    <div className="glass-card-strong sticky top-[98px] z-20 rounded-[24px] p-2">
+    <div className="surface-panel-strong sticky top-[98px] z-20 rounded-sm p-2">
       <div className="flex flex-wrap gap-2">
         {tabs.map((tab) => {
           const active = tab.key === current;
@@ -70,10 +70,10 @@ export function AdminTabs({
               key={tab.key}
               href={tab.href}
               className={[
-                "rounded-2xl border px-4 py-2.5 text-sm transition",
+                "rounded-sm border px-4 py-2.5 text-sm transition",
                 active
-                  ? "border-cyan-300/28 bg-cyan-400/12 text-white"
-                  : "border-transparent bg-transparent text-white/64 hover:border-white/10 hover:bg-white/[0.04] hover:text-white",
+                  ? "border-[var(--border-accent)] bg-[var(--surface-selected)] text-[var(--accent-primary)] shadow-[var(--shadow-soft)]"
+                  : "border-transparent bg-transparent text-[var(--text-secondary)] hover:border-[var(--border-subtle)] hover:bg-[var(--surface-soft)] hover:text-[var(--text-primary)]",
               ].join(" ")}
             >
               {tab.label}
@@ -97,11 +97,11 @@ export function AdminSection({
   children: React.ReactNode;
 }) {
   return (
-    <section className="glass-card-strong rounded-[28px] p-5">
+    <section className="surface-panel-strong p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="max-w-3xl">
-          <h3 className="text-lg font-semibold text-white">{title}</h3>
-          {description ? <p className="mt-1 text-sm text-white/62">{description}</p> : null}
+          <h3 className="text-lg font-semibold text-slate-950">{title}</h3>
+          {description ? <p className="mt-1 text-sm text-[var(--text-secondary)]">{description}</p> : null}
         </div>
         {actions ? <div className="flex flex-wrap gap-2">{actions}</div> : null}
       </div>

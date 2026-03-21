@@ -247,35 +247,35 @@ export default function SharesTableClient(props: {
   return (
     <div className="space-y-5">
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <div className="glass-card-strong rounded-[24px] p-4">
-          <div className="text-xs uppercase tracking-[0.16em] text-white/45">All links</div>
-          <div className="mt-2 text-2xl font-semibold text-white">{counts.all}</div>
-          <div className="mt-1 text-sm text-white/60">Reusable links currently available to manage.</div>
+        <div className="selection-tile p-4">
+          <div className="text-xs uppercase tracking-[0.16em] text-[var(--text-faint)]">All links</div>
+          <div className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-[var(--text-primary)]">{counts.all}</div>
+          <div className="mt-1 text-sm text-[var(--text-muted)]">Reusable links currently available to manage.</div>
         </div>
-        <div className="glass-card-strong rounded-[24px] p-4">
-          <div className="text-xs uppercase tracking-[0.16em] text-white/45">Active</div>
-          <div className="mt-2 text-2xl font-semibold text-white">{activeCount}</div>
-          <div className="mt-1 text-sm text-white/60">Links people can still open now.</div>
+        <div className="selection-tile p-4">
+          <div className="text-xs uppercase tracking-[0.16em] text-[var(--text-faint)]">Active</div>
+          <div className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-[var(--text-primary)]">{activeCount}</div>
+          <div className="mt-1 text-sm text-[var(--text-muted)]">Links people can still open now.</div>
         </div>
-        <div className="glass-card-strong rounded-[24px] p-4">
-          <div className="text-xs uppercase tracking-[0.16em] text-white/45">Expiring soon</div>
-          <div className="mt-2 text-2xl font-semibold text-white">{counts.expiring}</div>
-          <div className="mt-1 text-sm text-white/60">Good candidates for a quick extension.</div>
+        <div className="selection-tile p-4">
+          <div className="text-xs uppercase tracking-[0.16em] text-[var(--text-faint)]">Expiring soon</div>
+          <div className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-[var(--text-primary)]">{counts.expiring}</div>
+          <div className="mt-1 text-sm text-[var(--text-muted)]">Good candidates for a quick extension.</div>
         </div>
-        <div className="glass-card-strong rounded-[24px] p-4">
-          <div className="text-xs uppercase tracking-[0.16em] text-white/45">Password protected</div>
-          <div className="mt-2 text-2xl font-semibold text-white">{passwordCount}</div>
-          <div className="mt-1 text-sm text-white/60">Links with an extra password step.</div>
+        <div className="selection-tile p-4">
+          <div className="text-xs uppercase tracking-[0.16em] text-[var(--text-faint)]">Password protected</div>
+          <div className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-[var(--text-primary)]">{passwordCount}</div>
+          <div className="mt-1 text-sm text-[var(--text-muted)]">Links with an extra password step.</div>
         </div>
       </section>
 
-      <section className="glass-card-strong rounded-[30px]">
-        <div className="flex flex-col gap-4 border-b border-white/10 p-5 lg:flex-row lg:items-end lg:justify-between">
+      <section className="surface-panel-strong rounded-sm">
+        <div className="flex flex-col gap-4 border-b border-[var(--border-subtle)] p-5 lg:flex-row lg:items-end lg:justify-between">
           <div className="space-y-3">
             <div>
-              <div className="text-xs uppercase tracking-[0.16em] text-white/45">Find a link fast</div>
-              <h2 className="mt-2 text-xl font-semibold text-white">Protected links</h2>
-              <p className="mt-2 max-w-2xl text-sm text-white/65">
+              <div className="text-xs uppercase tracking-[0.16em] text-[var(--text-faint)]">Find a link fast</div>
+              <h2 className="mt-2 text-xl font-semibold text-[var(--text-primary)]">Protected links</h2>
+              <p className="mt-2 max-w-2xl text-sm text-[var(--text-secondary)]">
                 Search by file name or recipient, filter by state, then copy or adjust the link without digging through a table.
               </p>
             </div>
@@ -286,10 +286,10 @@ export default function SharesTableClient(props: {
                   type="button"
                   onClick={() => syncUrl({ shareStatus: item })}
                   className={[
-                    "btn-base rounded-full border px-3 py-1.5 text-sm",
+                    "btn-base px-3 py-1.5 text-sm rounded-sm",
                     status === item
-                      ? "border-cyan-300/35 bg-cyan-400/14 text-cyan-50"
-                      : "border-white/10 bg-white/[0.04] text-white/70 hover:border-white/20 hover:bg-white/[0.08] hover:text-white",
+                      ? "selection-pill selection-pill-active"
+                      : "selection-pill",
                   ].join(" ")}
                 >
                   {buildFilterLabel(item, counts[item])}
@@ -299,7 +299,7 @@ export default function SharesTableClient(props: {
           </div>
 
           <div className="flex w-full flex-col gap-3 lg:w-auto lg:min-w-[360px]">
-            <label htmlFor="share-search" className="text-xs text-white/55">
+            <label htmlFor="share-search" className="text-xs text-[var(--text-muted)]">
               Search
             </label>
             <input
@@ -308,23 +308,23 @@ export default function SharesTableClient(props: {
               value={q}
               onChange={(event) => syncUrl({ shareQ: event.target.value })}
               placeholder="Search by file name, recipient, or link"
-              className="w-full rounded-2xl border border-white/14 bg-black/20 px-4 py-3 text-sm text-white placeholder:text-white/40 focus:border-cyan-300/45 focus:outline-none"
+              className="field-input w-full rounded-sm px-4 py-3 text-sm"
             />
           </div>
         </div>
 
         {filtered.length === 0 ? (
           <div className="p-6">
-            <div className="rounded-[28px] border border-dashed border-white/16 bg-white/[0.03] p-8 text-center">
-              <div className="text-lg font-semibold text-white">No protected links yet</div>
-              <div className="mt-2 text-sm text-white/65">
+            <div className="surface-panel-soft rounded-sm p-8 text-center">
+              <div className="text-lg font-semibold text-[var(--text-primary)]">No protected links yet</div>
+              <div className="mt-2 text-sm text-[var(--text-secondary)]">
                 Create a protected link from Files once a file is ready to share.
               </div>
               <div className="mt-5 flex justify-center gap-3">
-                <Link href={documentsPath} className="btn-base rounded-xl border border-cyan-300/40 bg-cyan-300 px-4 py-2 text-sm font-semibold text-[#07131f] hover:bg-cyan-200">
+                <Link href={documentsPath} className="btn-base btn-primary rounded-sm px-4 py-2 text-sm font-semibold">
                   Open files
                 </Link>
-                <Link href={overviewUploadPath} className="btn-base btn-secondary rounded-xl px-4 py-2 text-sm">
+                <Link href={overviewUploadPath} className="btn-base btn-secondary rounded-sm px-4 py-2 text-sm">
                   Upload file
                 </Link>
               </div>
@@ -340,45 +340,45 @@ export default function SharesTableClient(props: {
               return (
                 <article
                   key={share.token}
-                  className="rounded-[28px] border border-white/12 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-5"
+                  className="surface-panel-soft rounded-sm p-5"
                 >
                   <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
-                        <div className="text-lg font-semibold text-white">{share.doc_title || "Untitled file"}</div>
+                        <div className="text-lg font-semibold text-[var(--text-primary)]">{share.doc_title || "Untitled file"}</div>
                         <span className={`rounded-full border px-2.5 py-1 text-[11px] ${badge.cls}`}>{badge.label}</span>
                         {share.has_password ? (
-                          <span className="rounded-full border border-white/12 bg-white/[0.04] px-2.5 py-1 text-[11px] text-white/70">
+                          <span className="rounded-full border border-[var(--border-subtle)] bg-white px-2.5 py-1 text-[11px] text-[var(--text-secondary)]">
                             Password protected
                           </span>
                         ) : null}
                       </div>
 
-                      <p className="mt-3 text-sm text-white/68">
+                      <p className="mt-3 text-sm text-[var(--text-secondary)]">
                         {share.to_email
                           ? `Shared directly with ${share.to_email}.`
                           : "Ready to copy and share with the right person when you need it."}
                       </p>
 
-                      <div className="mt-4 flex flex-wrap gap-2 text-xs text-white/55">
-                        <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5">
+                      <div className="mt-4 flex flex-wrap gap-2 text-xs text-[var(--text-muted)]">
+                        <span className="rounded-full border border-[var(--border-subtle)] bg-white px-3 py-1.5">
                           Created {formatShortDate(share.created_at)}
                         </span>
-                        <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5">
+                        <span className="rounded-full border border-[var(--border-subtle)] bg-white px-3 py-1.5">
                           {share.expires_at ? `Expires ${formatShortDate(share.expires_at)}` : "No expiry set"}
                         </span>
-                        <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5">
+                        <span className="rounded-full border border-[var(--border-subtle)] bg-white px-3 py-1.5">
                           {formatViews(share.max_views, share.view_count)}
                         </span>
                         {share.alias ? (
-                          <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5">
+                          <span className="rounded-full border border-[var(--border-subtle)] bg-white px-3 py-1.5">
                             Based on {share.alias}
                           </span>
                         ) : null}
                       </div>
 
-                      <details className="mt-4 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-                        <summary className="cursor-pointer list-none text-sm font-medium text-white">Adjust protection</summary>
+                      <details className="surface-panel mt-4 rounded-sm p-4">
+                        <summary className="cursor-pointer list-none text-sm font-medium text-[var(--text-primary)]">Adjust protection</summary>
                         <div className="mt-4 space-y-4">
                           <SharePasswordForm
                             token={share.token}
@@ -404,7 +404,7 @@ export default function SharesTableClient(props: {
                             >
                               <input type="hidden" name="token" value={share.token} />
                               <input type="hidden" name="days" value="7" />
-                              <button type="submit" disabled={Boolean(share.revoked_at)} className="btn-base btn-secondary rounded-xl px-3 py-2 text-sm disabled:opacity-40">
+                              <button type="submit" disabled={Boolean(share.revoked_at)} className="btn-base btn-secondary rounded-sm px-3 py-2 text-sm disabled:opacity-40">
                                 Extend 7 days
                               </button>
                             </form>
@@ -418,7 +418,7 @@ export default function SharesTableClient(props: {
                             >
                               <input type="hidden" name="token" value={share.token} />
                               <input type="hidden" name="days" value="30" />
-                              <button type="submit" disabled={Boolean(share.revoked_at)} className="btn-base btn-secondary rounded-xl px-3 py-2 text-sm disabled:opacity-40">
+                              <button type="submit" disabled={Boolean(share.revoked_at)} className="btn-base btn-secondary rounded-sm px-3 py-2 text-sm disabled:opacity-40">
                                 Extend 30 days
                               </button>
                             </form>
@@ -443,7 +443,7 @@ export default function SharesTableClient(props: {
                             >
                               <input type="hidden" name="token" value={share.token} />
                               <input type="hidden" name="maxViews" defaultValue="" />
-                              <button type="submit" disabled={Boolean(share.revoked_at)} className="btn-base btn-secondary rounded-xl px-3 py-2 text-sm disabled:opacity-40">
+                              <button type="submit" disabled={Boolean(share.revoked_at)} className="btn-base btn-secondary rounded-sm px-3 py-2 text-sm disabled:opacity-40">
                                 Set view limit
                               </button>
                             </form>
@@ -454,13 +454,13 @@ export default function SharesTableClient(props: {
                                 )}
                             >
                               <input type="hidden" name="token" value={share.token} />
-                              <button type="submit" disabled={Boolean(share.revoked_at)} className="btn-base btn-secondary rounded-xl px-3 py-2 text-sm disabled:opacity-40">
+                              <button type="submit" disabled={Boolean(share.revoked_at)} className="btn-base btn-secondary rounded-sm px-3 py-2 text-sm disabled:opacity-40">
                                 Reset views
                               </button>
                             </form>
                             <form action={async (fd) => runAction(forceSharePasswordResetAction, fd)}>
                               <input type="hidden" name="token" value={share.token} />
-                              <button type="submit" disabled={Boolean(share.revoked_at)} className="btn-base btn-secondary rounded-xl px-3 py-2 text-sm disabled:opacity-40">
+                              <button type="submit" disabled={Boolean(share.revoked_at)} className="btn-base btn-secondary rounded-sm px-3 py-2 text-sm disabled:opacity-40">
                                 Clear saved password
                               </button>
                             </form>
@@ -473,7 +473,7 @@ export default function SharesTableClient(props: {
                       <button
                         type="button"
                         onClick={() => copyLink(share.token)}
-                        className="btn-base rounded-2xl border border-cyan-300/35 bg-cyan-400/14 px-4 py-3 text-sm font-medium text-cyan-100 hover:bg-cyan-400/22"
+                        className="btn-base btn-primary rounded-sm px-4 py-3 text-sm font-medium"
                       >
                         {copiedToken === share.token ? "Link copied" : "Copy protected link"}
                       </button>
@@ -481,11 +481,11 @@ export default function SharesTableClient(props: {
                         href={`/s/${encodeURIComponent(share.token)}`}
                         target="_blank"
                         rel="noreferrer"
-                        className="btn-base btn-secondary rounded-2xl px-4 py-3 text-center text-sm"
+                        className="btn-base btn-secondary rounded-sm px-4 py-3 text-center text-sm"
                       >
                         Open link
                       </Link>
-                      <Link href={`${linksPath}/${encodeURIComponent(share.token)}`} className="btn-base btn-secondary rounded-2xl px-4 py-3 text-center text-sm">
+                      <Link href={`${linksPath}/${encodeURIComponent(share.token)}`} className="btn-base btn-secondary rounded-sm px-4 py-3 text-center text-sm">
                         Link detail
                       </Link>
                       <RevokeShareForm
@@ -496,7 +496,7 @@ export default function SharesTableClient(props: {
                             applySharePatch([share.token], { revoked_at: new Date().toISOString() })
                           )}
                       />
-                      <div className="pt-1 text-[11px] text-white/40">
+                      <div className="pt-1 text-[11px] text-[var(--text-faint)]">
                         Link ID: <span className="font-mono">{share.token.slice(0, 8)}…{share.token.slice(-4)}</span>
                       </div>
                     </div>
@@ -507,9 +507,9 @@ export default function SharesTableClient(props: {
           </div>
         )}
 
-        <div className="flex flex-col gap-3 border-t border-white/10 px-5 py-4 text-sm text-white/60 md:flex-row md:items-center md:justify-between">
+        <div className="flex flex-col gap-3 border-t border-[var(--border-subtle)] px-5 py-4 text-sm text-[var(--text-muted)] md:flex-row md:items-center md:justify-between">
           <div>
-            Showing <span className="text-white">{filtered.length}</span> of <span className="text-white">{reusableShares.length}</span> links
+            Showing <span className="text-[var(--text-primary)]">{filtered.length}</span> of <span className="text-[var(--text-primary)]">{reusableShares.length}</span> links
           </div>
           <div className="flex flex-wrap gap-2">
             {canManageBulk ? (
@@ -522,7 +522,7 @@ export default function SharesTableClient(props: {
                   onSubmit={(e) => { if (!anySelected) e.preventDefault(); }}
                 >
                   <input type="hidden" name="tokens" value={JSON.stringify(selectedTokens)} />
-                  <button type="submit" disabled={!anySelected} className="btn-base btn-danger rounded-xl px-3 py-2 text-sm disabled:opacity-40">
+                  <button type="submit" disabled={!anySelected} className="btn-base rounded-sm border border-[color:rgba(186,71,50,0.2)] bg-[color:rgba(186,71,50,0.08)] px-3 py-2 text-sm text-[var(--danger)] transition hover:bg-[color:rgba(186,71,50,0.12)] disabled:opacity-40">
                     Remove selected access
                   </button>
                 </form>
@@ -552,16 +552,16 @@ export default function SharesTableClient(props: {
                 >
                   <input type="hidden" name="tokens" value={JSON.stringify(selectedTokens)} />
                   <input type="hidden" name="days" defaultValue="7" />
-                  <button type="submit" disabled={!anySelected} className="btn-base btn-secondary rounded-xl px-3 py-2 text-sm disabled:opacity-40">
+                  <button type="submit" disabled={!anySelected} className="btn-base btn-secondary rounded-sm px-3 py-2 text-sm disabled:opacity-40">
                     Extend selected
                   </button>
                 </form>
               </>
             ) : null}
-            <button type="button" onClick={() => downloadCsvForSelected()} disabled={!anySelected} className="btn-base btn-secondary rounded-xl px-3 py-2 text-sm disabled:opacity-40">
+            <button type="button" onClick={() => downloadCsvForSelected()} disabled={!anySelected} className="btn-base btn-secondary rounded-sm px-3 py-2 text-sm disabled:opacity-40">
               Export selected
             </button>
-            <button type="button" onClick={() => setSelected({})} className="btn-base btn-secondary rounded-xl px-3 py-2 text-sm">
+            <button type="button" onClick={() => setSelected({})} className="btn-base btn-secondary rounded-sm px-3 py-2 text-sm">
               Clear selection
             </button>
           </div>

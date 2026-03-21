@@ -42,7 +42,7 @@ export default function DmcaActionsClient({ noticeId, docId, status }: Props) {
   return (
     <div className="flex flex-wrap items-center gap-2">
       <button
-        className="rounded-md bg-white/10 px-3 py-1.5 text-sm text-white hover:bg-white/15 disabled:opacity-50"
+        className="btn-base btn-secondary rounded-sm px-3 py-1.5 text-sm disabled:opacity-50"
         disabled={!!busy}
         onClick={() => act({ action: "set_status", noticeId, status: "reviewing" }, "reviewing")}
       >
@@ -50,7 +50,7 @@ export default function DmcaActionsClient({ noticeId, docId, status }: Props) {
       </button>
 
       <button
-        className="rounded-md bg-white/10 px-3 py-1.5 text-sm text-white hover:bg-white/15 disabled:opacity-50"
+        className="btn-base btn-secondary rounded-sm px-3 py-1.5 text-sm disabled:opacity-50"
         disabled={!!busy}
         onClick={() => act({ action: "set_status", noticeId, status: "accepted" }, "accepted")}
       >
@@ -58,7 +58,7 @@ export default function DmcaActionsClient({ noticeId, docId, status }: Props) {
       </button>
 
       <button
-        className="rounded-md bg-white/10 px-3 py-1.5 text-sm text-white hover:bg-white/15 disabled:opacity-50"
+        className="btn-base btn-secondary rounded-sm px-3 py-1.5 text-sm disabled:opacity-50"
         disabled={!!busy}
         onClick={() => act({ action: "set_status", noticeId, status: "rejected" }, "rejected")}
       >
@@ -66,7 +66,7 @@ export default function DmcaActionsClient({ noticeId, docId, status }: Props) {
       </button>
 
       <button
-        className="rounded-md bg-red-500/20 px-3 py-1.5 text-sm text-red-200 hover:bg-red-500/25 disabled:opacity-50"
+        className="btn-base rounded-sm border border-[rgba(186,71,50,0.2)] bg-[rgba(186,71,50,0.09)] px-3 py-1.5 text-sm text-[var(--danger)] hover:bg-[rgba(186,71,50,0.14)] disabled:opacity-50"
         disabled={!!busy || !docId}
         onClick={() => {
           if (!docId) return;
@@ -79,7 +79,7 @@ export default function DmcaActionsClient({ noticeId, docId, status }: Props) {
       </button>
 
       <button
-        className="rounded-md bg-emerald-500/15 px-3 py-1.5 text-sm text-emerald-200 hover:bg-emerald-500/20 disabled:opacity-50"
+        className="btn-base rounded-sm border border-[rgba(47,111,70,0.2)] bg-[rgba(47,111,70,0.09)] px-3 py-1.5 text-sm text-[var(--success)] hover:bg-[rgba(47,111,70,0.14)] disabled:opacity-50"
         disabled={!!busy || !docId}
         onClick={() => {
           if (!docId) return;
@@ -91,8 +91,8 @@ export default function DmcaActionsClient({ noticeId, docId, status }: Props) {
         Restore
       </button>
 
-      {msg ? <span className="text-xs text-white/60">{msg}</span> : null}
-      <span className="text-xs text-white/40">Status: {status}</span>
+      {msg ? <span className="text-xs text-[var(--text-secondary)]">{msg}</span> : null}
+      <span className="text-xs text-[var(--text-faint)]">Status: {status}</span>
     </div>
   );
 }

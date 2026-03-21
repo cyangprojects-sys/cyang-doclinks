@@ -32,16 +32,16 @@ export default function LegalIndexPage() {
           { label: "Format", value: "Readable public pages with source-backed markdown content" },
         ]}
         aside={
-          <div className="space-y-3 text-sm text-white/62">
+          <div className="space-y-3 text-sm text-[var(--text-secondary)]">
             <div>
-              Start with <Link href="/terms" className="underline underline-offset-4 hover:text-white">Terms</Link>,{" "}
-              <Link href="/privacy" className="underline underline-offset-4 hover:text-white">Privacy</Link>, and{" "}
-              <Link href="/legal/security-policy" className="underline underline-offset-4 hover:text-white">Security Policy</Link>.
+              Start with <Link href="/terms" className="subtle-link underline underline-offset-4">Terms</Link>,{" "}
+              <Link href="/privacy" className="subtle-link underline underline-offset-4">Privacy</Link>, and{" "}
+              <Link href="/legal/security-policy" className="subtle-link underline underline-offset-4">Security Policy</Link>.
             </div>
             <div>
-              For business review, move next to <Link href="/legal/data-processing-addendum" className="underline underline-offset-4 hover:text-white">DPA</Link>,{" "}
-              <Link href="/legal/service-level-agreement" className="underline underline-offset-4 hover:text-white">SLA</Link>, and{" "}
-              <Link href="/legal/subprocessors" className="underline underline-offset-4 hover:text-white">Subprocessors</Link>.
+              For business review, move next to <Link href="/legal/data-processing-addendum" className="subtle-link underline underline-offset-4">DPA</Link>,{" "}
+              <Link href="/legal/service-level-agreement" className="subtle-link underline underline-offset-4">SLA</Link>, and{" "}
+              <Link href="/legal/subprocessors" className="subtle-link underline underline-offset-4">Subprocessors</Link>.
             </div>
           </div>
         }
@@ -55,16 +55,16 @@ export default function LegalIndexPage() {
         />
         <div className="mt-8 grid gap-4 md:grid-cols-3">
           <PremiumCard>
-            <div className="text-xl font-semibold text-white">Readable structure</div>
-            <p className="mt-3 text-sm leading-7 text-white/62">Narrower line lengths, stronger heading rhythm, and calmer chrome.</p>
+            <div className="text-xl font-semibold text-slate-950">Readable structure</div>
+            <p className="mt-3 text-sm leading-7 text-[var(--text-secondary)]">Narrower line lengths, stronger heading rhythm, and calmer chrome.</p>
           </PremiumCard>
           <PremiumCard>
-            <div className="text-xl font-semibold text-white">Reviewable metadata</div>
-            <p className="mt-3 text-sm leading-7 text-white/62">Dates, applicability, and document relationships stay visible without clutter.</p>
+            <div className="text-xl font-semibold text-slate-950">Reviewable metadata</div>
+            <p className="mt-3 text-sm leading-7 text-[var(--text-secondary)]">Dates, applicability, and document relationships stay visible without clutter.</p>
           </PremiumCard>
           <PremiumCard>
-            <div className="text-xl font-semibold text-white">Connected surfaces</div>
-            <p className="mt-3 text-sm leading-7 text-white/62">Trust, procurement, disclosure, and status are one system rather than disconnected pages.</p>
+            <div className="text-xl font-semibold text-slate-950">Connected surfaces</div>
+            <p className="mt-3 text-sm leading-7 text-[var(--text-secondary)]">Trust, procurement, disclosure, and status are one system rather than disconnected pages.</p>
           </PremiumCard>
         </div>
       </Section>

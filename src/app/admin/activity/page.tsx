@@ -39,53 +39,53 @@ export default async function AdminActivityPage() {
     <div className="space-y-6">
       <DashboardHeaderActions docs={homeData.headerDocs} planId={activityData.planId} mode="modal-only" />
 
-      <section className="glass-card-strong ui-sheen rounded-[32px] p-6 sm:p-7">
+      <section className="surface-panel-strong overflow-hidden p-6 sm:p-7">
         <div className="grid gap-6 xl:grid-cols-[1.2fr_minmax(0,0.8fr)]">
           <div>
-            <div className="text-xs uppercase tracking-[0.18em] text-cyan-200/70">Insights</div>
-            <h1 className="mt-3 text-3xl font-semibold tracking-tight text-white sm:text-4xl">
+            <div className="text-xs uppercase tracking-[0.18em] text-[var(--accent-primary)]">Insights</div>
+            <h1 className="mt-3 text-3xl font-semibold tracking-[-0.04em] text-[var(--text-primary)] sm:text-4xl">
               See which files are getting attention and when people open them.
             </h1>
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-white/68 sm:text-base">
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-[var(--text-secondary)] sm:text-base">
               This view keeps activity understandable: what has been opened, how often, and which files are getting the most engagement.
             </p>
             <div className="mt-5 flex flex-wrap gap-3">
-              <Link href="/admin/documents" className="btn-base btn-secondary rounded-2xl px-4 py-3 text-sm">
+              <Link href="/admin/documents" className="btn-base btn-secondary rounded-sm px-4 py-3 text-sm">
                 Open files
               </Link>
-              <Link href="/admin/links" className="btn-base btn-secondary rounded-2xl px-4 py-3 text-sm">
+              <Link href="/admin/links" className="btn-base btn-secondary rounded-sm px-4 py-3 text-sm">
                 Manage shared links
               </Link>
             </div>
-            <div className="mt-4 text-[11px] uppercase tracking-[0.16em] text-white/38">
+            <div className="mt-4 text-[11px] uppercase tracking-[0.16em] text-[var(--text-faint)]">
               Snapshot updated {fmtDateTime(new Date(snapshotGeneratedAt).toISOString())}
             </div>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
-            <div className="rounded-[24px] border border-white/10 bg-white/[0.04] p-4">
-              <div className="text-xs uppercase tracking-[0.16em] text-white/45">Total views</div>
-              <div className="mt-2 text-2xl font-semibold text-white">{fmtInt(totalViews)}</div>
-              <div className="mt-1 text-sm text-white/60">Across every file with activity.</div>
+            <div className="selection-tile p-4">
+              <div className="text-xs uppercase tracking-[0.16em] text-[var(--text-faint)]">Total views</div>
+              <div className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-[var(--text-primary)]">{fmtInt(totalViews)}</div>
+              <div className="mt-1 text-sm text-[var(--text-muted)]">Across every file with activity.</div>
             </div>
-            <div className="rounded-[24px] border border-white/10 bg-white/[0.04] p-4">
-              <div className="text-xs uppercase tracking-[0.16em] text-white/45">Files with views</div>
-              <div className="mt-2 text-2xl font-semibold text-white">{fmtInt(activeFiles)}</div>
-              <div className="mt-1 text-sm text-white/60">Files that have been opened at least once.</div>
+            <div className="selection-tile p-4">
+              <div className="text-xs uppercase tracking-[0.16em] text-[var(--text-faint)]">Files with views</div>
+              <div className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-[var(--text-primary)]">{fmtInt(activeFiles)}</div>
+              <div className="mt-1 text-sm text-[var(--text-muted)]">Files that have been opened at least once.</div>
             </div>
-            <div className="rounded-[24px] border border-white/10 bg-white/[0.04] p-4">
-              <div className="text-xs uppercase tracking-[0.16em] text-white/45">Recent activity</div>
-              <div className="mt-2 text-2xl font-semibold text-white">{fmtInt(recentFiles)}</div>
-              <div className="mt-1 text-sm text-white/60">Files with a recorded latest view.</div>
+            <div className="selection-tile p-4">
+              <div className="text-xs uppercase tracking-[0.16em] text-[var(--text-faint)]">Recent activity</div>
+              <div className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-[var(--text-primary)]">{fmtInt(recentFiles)}</div>
+              <div className="mt-1 text-sm text-[var(--text-muted)]">Files with a recorded latest view.</div>
             </div>
           </div>
         </div>
       </section>
 
       {activityData.missingCoreTables ? (
-        <div className="rounded-lg border border-neutral-800 bg-neutral-950 p-4 text-sm text-neutral-300">
-          <div className="font-medium text-neutral-100">Insights unavailable</div>
-          <div className="mt-1 text-neutral-400">The required view-tracking tables are missing.</div>
+        <div className="surface-panel rounded-sm p-4 text-sm text-[var(--text-secondary)]">
+          <div className="font-medium text-[var(--text-primary)]">Insights unavailable</div>
+          <div className="mt-1 text-[var(--text-muted)]">The required view-tracking tables are missing.</div>
         </div>
       ) : (
         <ViewsByDocTableClient rows={activityData.viewsRows} canManageShares={activityData.canSeeAll} />

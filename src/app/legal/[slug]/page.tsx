@@ -123,10 +123,10 @@ export default async function LegalDocPage({
         aside={
           <>
             <Eyebrow>At a glance</Eyebrow>
-            <p className="mt-3 text-sm leading-7 text-white/62">{doc.atGlance}</p>
+            <p className="mt-3 text-sm leading-7 text-[var(--text-secondary)]">{doc.atGlance}</p>
             <div className="mt-4 flex flex-wrap gap-2">
               {doc.badges.map((badge) => (
-                <span key={badge} className="ui-badge rounded-full px-2.5 py-1 text-[11px]">
+                <span key={badge} className="ui-badge px-2.5 py-1 text-[11px]">
                   {badge}
                 </span>
               ))}
@@ -138,7 +138,7 @@ export default async function LegalDocPage({
       <Section>
         <div className="grid gap-4 lg:grid-cols-12">
           <div className="lg:col-span-8">
-            <article className="surface-panel rounded-[2rem] p-6 sm:p-8">
+            <article className="surface-panel rounded-sm p-6 sm:p-8">
               <MarkdownLegal markdown={bodyMarkdown} />
             </article>
           </div>
@@ -148,15 +148,15 @@ export default async function LegalDocPage({
 
             <PremiumCard>
               <Eyebrow>Need help?</Eyebrow>
-              <p className="mt-3 text-sm leading-7 text-white/62">
+              <p className="mt-3 text-sm leading-7 text-[var(--text-secondary)]">
                 For procurement, privacy, or security clarification, use the documented contact route below.
               </p>
-              <a href={`mailto:${doc.primaryContact}`} className="mt-4 inline-flex text-sm text-white/84 underline underline-offset-4 hover:text-white">
+              <a href={`mailto:${doc.primaryContact}`} className="subtle-link mt-4 inline-flex text-sm underline underline-offset-4">
                 {doc.primaryContact}
               </a>
-              <div className="mt-4 flex flex-wrap gap-3 text-xs text-white/56">
-                <Link href="/report" className="underline underline-offset-4 hover:text-white">Report abuse</Link>
-                <Link href="/security-disclosure" className="underline underline-offset-4 hover:text-white">Security disclosure</Link>
+              <div className="mt-4 flex flex-wrap gap-3 text-xs text-[var(--text-faint)]">
+                <Link href="/report" className="subtle-link underline underline-offset-4">Report abuse</Link>
+                <Link href="/security-disclosure" className="subtle-link underline underline-offset-4">Security disclosure</Link>
               </div>
             </PremiumCard>
           </div>
@@ -166,7 +166,7 @@ export default async function LegalDocPage({
       <Section>
         <div className="max-w-3xl">
           <Eyebrow>Related documents</Eyebrow>
-          <h2 className="mt-4 text-3xl font-semibold tracking-[-0.03em] text-white sm:text-4xl">
+          <h2 className="mt-4 text-3xl font-semibold tracking-[-0.03em] text-slate-950 sm:text-4xl">
             Continue the legal review without losing context.
           </h2>
         </div>

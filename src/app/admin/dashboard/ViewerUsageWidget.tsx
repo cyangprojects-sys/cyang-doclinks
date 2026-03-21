@@ -119,19 +119,19 @@ export default async function ViewerUsageWidget(props: {
   const sharesHref = props.sharesHref || "#shares";
 
   return (
-    <section className="glass-card-strong rounded-2xl p-4">
+    <section className="surface-panel-strong rounded-sm p-4">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <div className="text-sm font-medium text-white">Usage Snapshot</div>
-          <div className="mt-0.5 text-xs text-white/60">Plan: {planName}</div>
+          <div className="text-sm font-medium text-[var(--text-primary)]">Usage Snapshot</div>
+          <div className="mt-0.5 text-xs text-[var(--text-muted)]">Plan: {planName}</div>
         </div>
         <div className="flex items-center gap-2">
           {showUpgrade ? (
-            <a href={props.upgradeHref!} className="btn-base rounded-lg border border-cyan-400/35 bg-cyan-400/20 px-3 py-1.5 text-xs text-cyan-50 hover:bg-cyan-400/30">
+            <a href={props.upgradeHref!} className="btn-base btn-primary rounded-sm px-3 py-1.5 text-xs">
               Upgrade to Pro
             </a>
           ) : null}
-          <a href={sharesHref} className="btn-base btn-secondary rounded-lg px-3 py-1.5 text-xs">
+          <a href={sharesHref} className="btn-base btn-secondary rounded-sm px-3 py-1.5 text-xs">
             Open shares
           </a>
         </div>
@@ -179,12 +179,12 @@ function MetricCard(props: {
   warning?: string | null;
 }) {
   return (
-    <div className="glass-card rounded-xl p-3">
-      <div className="text-xs text-white/55">{props.title}</div>
-      <div className="mt-1 text-lg font-semibold text-white">{props.value}</div>
-      {props.note ? <div className="mt-1 text-xs text-white/60">{props.note}</div> : null}
+    <div className="selection-tile rounded-sm p-3">
+      <div className="text-xs text-[var(--text-faint)]">{props.title}</div>
+      <div className="mt-1 text-lg font-semibold text-[var(--text-primary)]">{props.value}</div>
+      {props.note ? <div className="mt-1 text-xs text-[var(--text-muted)]">{props.note}</div> : null}
       {props.warning ? (
-        <div className="mt-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-1 text-xs text-amber-100">
+        <div className="mt-2 rounded-sm border border-amber-200 bg-amber-50 px-2 py-1 text-xs text-amber-700">
           {props.warning}
         </div>
       ) : null}

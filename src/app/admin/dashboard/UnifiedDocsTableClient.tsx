@@ -90,10 +90,10 @@ function formatNumber(value: number) {
 }
 
 function toneClass(tone: StatusTone) {
-  if (tone === "positive") return "border-emerald-400/30 bg-emerald-400/12 text-emerald-100";
-  if (tone === "warning") return "border-amber-400/30 bg-amber-400/12 text-amber-100";
-  if (tone === "danger") return "border-rose-400/30 bg-rose-400/12 text-rose-100";
-  return "border-white/12 bg-white/6 text-white/80";
+  if (tone === "positive") return "border-emerald-200 bg-emerald-50 text-emerald-800";
+  if (tone === "warning") return "border-amber-200 bg-amber-50 text-amber-800";
+  if (tone === "danger") return "border-rose-200 bg-rose-50 text-rose-800";
+  return "border-[var(--border-subtle)] bg-white text-[var(--text-secondary)]";
 }
 
 function getExtension(title: string | null) {
@@ -366,39 +366,39 @@ export default function UnifiedDocsTableClient(props: {
       {layout === "full" ? (
         <>
           <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <div className="glass-card-strong rounded-[26px] p-5">
-              <div className="text-xs uppercase tracking-[0.18em] text-white/45">Documents</div>
-              <div className="mt-3 text-3xl font-semibold text-white">{formatNumber(totals.documents)}</div>
-              <div className="mt-1 text-sm text-white/60">Everything in your secure library.</div>
+            <div className="selection-tile rounded-sm p-5">
+              <div className="text-xs uppercase tracking-[0.18em] text-[var(--text-faint)]">Documents</div>
+              <div className="mt-3 text-3xl font-semibold text-[var(--text-primary)]">{formatNumber(totals.documents)}</div>
+              <div className="mt-1 text-sm text-[var(--text-muted)]">Everything in your secure library.</div>
             </div>
-            <div className="glass-card-strong rounded-[26px] p-5">
-              <div className="text-xs uppercase tracking-[0.18em] text-white/45">Ready to share</div>
-              <div className="mt-3 text-3xl font-semibold text-white">{formatNumber(totals.ready)}</div>
-              <div className="mt-1 text-sm text-white/60">Scanned and available for protected links.</div>
+            <div className="selection-tile rounded-sm p-5">
+              <div className="text-xs uppercase tracking-[0.18em] text-[var(--text-faint)]">Ready to share</div>
+              <div className="mt-3 text-3xl font-semibold text-[var(--text-primary)]">{formatNumber(totals.ready)}</div>
+              <div className="mt-1 text-sm text-[var(--text-muted)]">Scanned and available for protected links.</div>
             </div>
-            <div className="glass-card-strong rounded-[26px] p-5">
-              <div className="text-xs uppercase tracking-[0.18em] text-white/45">Active links</div>
-              <div className="mt-3 text-3xl font-semibold text-white">{formatNumber(totals.activeLinks)}</div>
-              <div className="mt-1 text-sm text-white/60">Protected links your recipients can use now.</div>
+            <div className="selection-tile rounded-sm p-5">
+              <div className="text-xs uppercase tracking-[0.18em] text-[var(--text-faint)]">Active links</div>
+              <div className="mt-3 text-3xl font-semibold text-[var(--text-primary)]">{formatNumber(totals.activeLinks)}</div>
+              <div className="mt-1 text-sm text-[var(--text-muted)]">Protected links your recipients can use now.</div>
             </div>
-            <div className="glass-card-strong rounded-[26px] p-5">
-              <div className="text-xs uppercase tracking-[0.18em] text-white/45">Waiting for scan</div>
-              <div className="mt-3 text-3xl font-semibold text-white">{formatNumber(totals.awaitingScan)}</div>
-              <div className="mt-1 text-sm text-white/60">Sharing unlocks automatically after a clean result.</div>
+            <div className="selection-tile rounded-sm p-5">
+              <div className="text-xs uppercase tracking-[0.18em] text-[var(--text-faint)]">Waiting for scan</div>
+              <div className="mt-3 text-3xl font-semibold text-[var(--text-primary)]">{formatNumber(totals.awaitingScan)}</div>
+              <div className="mt-1 text-sm text-[var(--text-muted)]">Sharing unlocks automatically after a clean result.</div>
             </div>
           </section>
           {rows.length > 0 ? (
             <section className="grid gap-4 xl:grid-cols-[1.4fr_minmax(0,1fr)]">
-              <div className="glass-card-strong rounded-[28px] p-5">
+              <div className="surface-panel-strong rounded-sm p-5">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <div className="text-xs uppercase tracking-[0.18em] text-cyan-200/70">Step 2</div>
-                    <h2 className="mt-2 text-xl font-semibold text-white">Create protected links from ready files</h2>
-                    <p className="mt-2 max-w-2xl text-sm text-white/65">
+                    <div className="text-xs uppercase tracking-[0.18em] text-[var(--accent-primary)]">Step 2</div>
+                    <h2 className="mt-2 text-xl font-semibold text-[var(--text-primary)]">Create protected links from ready files</h2>
+                    <p className="mt-2 max-w-2xl text-sm text-[var(--text-secondary)]">
                       Once a document is clean, create its protected link here. Then copy it or manage it from the links page.
                     </p>
                   </div>
-                  <Link href={linksPath} className="btn-base btn-secondary rounded-xl px-3 py-2 text-sm">
+                  <Link href={linksPath} className="btn-base btn-secondary rounded-sm px-3 py-2 text-sm">
                     Manage all links
                   </Link>
                 </div>
@@ -408,15 +408,15 @@ export default function UnifiedDocsTableClient(props: {
                     {readyWithoutLinks.map((row) => (
                       <div
                         key={row.doc_id}
-                        className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-emerald-400/20 bg-emerald-400/[0.07] p-4"
+                        className="flex flex-wrap items-center justify-between gap-3 rounded-sm border border-emerald-200 bg-emerald-50 p-4"
                       >
                         <div className="min-w-0">
-                          <div className="text-sm font-medium text-white">{row.doc_title || "Untitled document"}</div>
-                          <div className="mt-1 text-xs text-emerald-100/80">Scan complete. No protected link yet.</div>
+                          <div className="text-sm font-medium text-[var(--text-primary)]">{row.doc_title || "Untitled document"}</div>
+                          <div className="mt-1 text-xs text-emerald-700">Scan complete. No protected link yet.</div>
                         </div>
                         <Link
                           href={buildCreateLinkHref(row.doc_id)}
-                          className="btn-base rounded-xl border border-emerald-300/45 bg-emerald-300 px-4 py-2 text-sm font-semibold text-[#082012] shadow-[0_10px_28px_rgba(74,222,128,0.2)] hover:bg-emerald-200"
+                          className="btn-base btn-primary rounded-sm px-4 py-2 text-sm font-semibold"
                         >
                           Create protected link
                         </Link>
@@ -428,11 +428,11 @@ export default function UnifiedDocsTableClient(props: {
                     {sharedRows.map((row) => (
                       <div
                         key={row.doc_id}
-                        className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/12 bg-white/[0.04] p-4"
+                        className="selection-tile flex flex-wrap items-center justify-between gap-3 rounded-sm p-4"
                       >
                         <div className="min-w-0">
-                          <div className="text-sm font-medium text-white">{row.doc_title || "Untitled document"}</div>
-                          <div className="mt-1 text-xs text-white/65">
+                          <div className="text-sm font-medium text-[var(--text-primary)]">{row.doc_title || "Untitled document"}</div>
+                          <div className="mt-1 text-xs text-[var(--text-secondary)]">
                             {row.active_shares} active protected {row.active_shares === 1 ? "link" : "links"}.
                           </div>
                         </div>
@@ -441,7 +441,7 @@ export default function UnifiedDocsTableClient(props: {
                             <button
                               type="button"
                               onClick={() => copyLatestLink(row.doc_id, row.latest_share_token)}
-                              className="btn-base rounded-xl border border-cyan-300/35 bg-cyan-400/14 px-3 py-2 text-sm text-cyan-100 hover:bg-cyan-400/22"
+                              className="btn-base btn-primary rounded-sm px-3 py-2 text-sm"
                             >
                               {copiedId === row.doc_id ? "Copied" : "Copy latest link"}
                             </button>
@@ -452,7 +452,7 @@ export default function UnifiedDocsTableClient(props: {
                                 ? `${linksPath}/${encodeURIComponent(row.latest_share_token)}`
                                 : `${linksPath}?shareQ=${encodeURIComponent(row.doc_title || row.doc_id)}`
                             }
-                            className="btn-base btn-secondary rounded-xl px-3 py-2 text-sm"
+                            className="btn-base btn-secondary rounded-sm px-3 py-2 text-sm"
                           >
                             Manage links
                           </Link>
@@ -461,38 +461,38 @@ export default function UnifiedDocsTableClient(props: {
                     ))}
                   </div>
                 ) : (
-                  <div className="mt-5 rounded-2xl border border-white/10 bg-white/[0.04] p-4 text-sm text-white/65">
+                  <div className="surface-panel-soft mt-5 rounded-sm p-4 text-sm text-[var(--text-secondary)]">
                     Upload a file above. As soon as the security scan finishes, you will be able to create its protected link here.
                   </div>
                 )}
               </div>
 
-              <div className="glass-card-strong rounded-[28px] p-5">
-                <div className="text-xs uppercase tracking-[0.18em] text-amber-200/70">Security status</div>
-                <h2 className="mt-2 text-xl font-semibold text-white">Clear, reassuring trust signals</h2>
+              <div className="surface-panel-strong rounded-sm p-5">
+                <div className="text-xs uppercase tracking-[0.18em] text-[var(--accent-warm)]">Security status</div>
+                <h2 className="mt-2 text-xl font-semibold text-[var(--text-primary)]">Clear, reassuring trust signals</h2>
                 <div className="mt-4 space-y-3">
                   <div className="rounded-2xl border border-emerald-400/20 bg-emerald-400/[0.07] p-4">
-                    <div className="text-sm font-medium text-white">Scan complete</div>
+                    <div className="text-sm font-medium text-[var(--text-primary)]">Scan complete</div>
                     <div className="mt-1 text-sm text-emerald-100/80">Files marked Ready are safe to turn into protected links.</div>
                   </div>
                   <div className="rounded-2xl border border-amber-400/20 bg-amber-400/[0.07] p-4">
-                    <div className="text-sm font-medium text-white">Waiting for scan</div>
+                    <div className="text-sm font-medium text-[var(--text-primary)]">Waiting for scan</div>
                     <div className="mt-1 text-sm text-amber-100/80">
                       Sharing stays unavailable until the security scan finishes. This happens automatically.
                     </div>
                   </div>
                   <div className="rounded-2xl border border-rose-400/20 bg-rose-400/[0.07] p-4">
-                    <div className="text-sm font-medium text-white">Blocked or needs review</div>
+                    <div className="text-sm font-medium text-[var(--text-primary)]">Blocked or needs review</div>
                     <div className="mt-1 text-sm text-rose-100/80">
                       Quarantined or flagged files stay blocked so you never accidentally share them.
                     </div>
                   </div>
                   {awaitingScanRows.length > 0 ? (
-                    <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
-                      <div className="text-xs uppercase tracking-[0.16em] text-white/45">In progress</div>
+                    <div className="selection-tile rounded-sm p-4">
+                      <div className="text-xs uppercase tracking-[0.16em] text-[var(--text-faint)]">In progress</div>
                       <div className="mt-2 space-y-2">
                         {awaitingScanRows.map((row) => (
-                          <div key={row.doc_id} className="flex items-center justify-between gap-3 text-sm text-white/75">
+                          <div key={row.doc_id} className="flex items-center justify-between gap-3 text-sm text-[var(--text-secondary)]">
                             <span className="truncate">{row.doc_title || "Untitled document"}</span>
                             <span className="rounded-full border border-amber-400/25 bg-amber-400/10 px-2 py-0.5 text-[11px] text-amber-100">
                               Waiting for scan
@@ -509,13 +509,13 @@ export default function UnifiedDocsTableClient(props: {
         </>
       ) : null}
 
-      <section className="glass-card-strong rounded-[30px]">
-        <div className="flex flex-col gap-4 border-b border-white/10 p-5 lg:flex-row lg:items-end lg:justify-between">
+      <section className="surface-panel-strong rounded-sm">
+        <div className="flex flex-col gap-4 border-b border-[var(--border-subtle)] p-5 lg:flex-row lg:items-end lg:justify-between">
           <div className="space-y-3">
             <div>
-              <div className="text-xs uppercase tracking-[0.18em] text-white/45">Your documents</div>
-              <h2 className="mt-2 text-xl font-semibold text-white">Upload, create a protected link, then share</h2>
-              <p className="mt-2 max-w-2xl text-sm text-white/65">
+              <div className="text-xs uppercase tracking-[0.18em] text-[var(--text-faint)]">Your documents</div>
+              <h2 className="mt-2 text-xl font-semibold text-[var(--text-primary)]">Upload, create a protected link, then share</h2>
+              <p className="mt-2 max-w-2xl text-sm text-[var(--text-secondary)]">
                 Each document stays clearly labeled as Ready, Waiting for scan, or Blocked so you always know when sharing is safe.
               </p>
             </div>
@@ -526,10 +526,8 @@ export default function UnifiedDocsTableClient(props: {
                   type="button"
                   onClick={() => syncUrl({ docStatus: item, docPage: 1 })}
                   className={[
-                    "btn-base rounded-full border px-3 py-1.5 text-sm",
-                    filter === item
-                      ? "border-cyan-300/35 bg-cyan-400/14 text-cyan-50"
-                      : "border-white/10 bg-white/[0.04] text-white/70 hover:border-white/20 hover:bg-white/[0.08] hover:text-white",
+                    "btn-base rounded-sm px-3 py-1.5 text-sm",
+                    filter === item ? "selection-pill selection-pill-active" : "selection-pill",
                   ].join(" ")}
                 >
                   {buildFilterLabel(item, counts[item])}
@@ -539,7 +537,7 @@ export default function UnifiedDocsTableClient(props: {
           </div>
 
           <div className="flex w-full flex-col gap-3 lg:w-auto lg:min-w-[420px]">
-            <label className="text-xs text-white/55" htmlFor="documents-search">
+            <label className="text-xs text-[var(--text-muted)]" htmlFor="documents-search">
               Search
             </label>
             <input
@@ -548,9 +546,9 @@ export default function UnifiedDocsTableClient(props: {
               value={q}
               onChange={(event) => syncUrl({ docQ: event.target.value, docPage: 1 })}
               placeholder="Search by document name, link token, or status"
-              className="w-full rounded-2xl border border-white/14 bg-black/20 px-4 py-3 text-sm text-white placeholder:text-white/40 focus:border-cyan-300/45 focus:outline-none"
+              className="field-input w-full rounded-sm px-4 py-3 text-sm"
             />
-            <div className="flex flex-wrap items-center gap-2 text-xs text-white/55">
+            <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--text-muted)]">
               <span>{formatNumber(total)} shown</span>
               <span aria-hidden="true">|</span>
               <label className="flex items-center gap-2">
@@ -562,7 +560,7 @@ export default function UnifiedDocsTableClient(props: {
                     const [nextSort, nextDir] = event.target.value.split(":") as [SortKey, SortDir];
                     syncUrl({ docSort: nextSort, docDir: nextDir, docPage: 1 });
                   }}
-                  className="rounded-xl border border-white/14 bg-black/20 px-3 py-2 text-white"
+                  className="field-input rounded-sm px-3 py-2 text-sm"
                 >
                   <option value="created_at:desc">Newest first</option>
                   <option value="status:asc">Most actionable first</option>
@@ -578,7 +576,7 @@ export default function UnifiedDocsTableClient(props: {
                   aria-label="Documents page size"
                   value={pageSize}
                   onChange={(event) => syncUrl({ docPageSize: Number(event.target.value), docPage: 1 })}
-                  className="rounded-xl border border-white/14 bg-black/20 px-3 py-2 text-white"
+                  className="field-input rounded-sm px-3 py-2 text-sm"
                 >
                   {[10, 25, 50].map((size) => (
                     <option key={size} value={size}>
@@ -603,7 +601,7 @@ export default function UnifiedDocsTableClient(props: {
                     });
                     setSelectedIds([]);
                   }}
-                  className="btn-base rounded-xl border border-white/12 bg-white/[0.04] px-3 py-2 text-white/75 hover:border-white/20 hover:bg-white/[0.08] hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+                  className="btn-base btn-secondary rounded-sm px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   {isPending ? "Removing..." : `Remove selected (${selectedIds.length})`}
                 </button>
@@ -613,37 +611,37 @@ export default function UnifiedDocsTableClient(props: {
         </div>
         {pageRows.length === 0 ? (
           <div className="p-6">
-            <div className="rounded-[28px] border border-dashed border-white/16 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-8 text-center">
-              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-cyan-300/25 bg-cyan-400/10 text-sm font-semibold tracking-[0.2em] text-cyan-100">
+            <div className="surface-panel-soft rounded-sm border border-dashed border-[var(--border-strong)] p-8 text-center">
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-sm border border-[var(--border-accent)] bg-[var(--surface-selected)] text-sm font-semibold tracking-[0.2em] text-[var(--accent-primary)]">
                 DOC
               </div>
-              <h3 className="mt-5 text-2xl font-semibold text-white">Upload your first document</h3>
-              <p className="mx-auto mt-3 max-w-2xl text-sm text-white/65">
+              <h3 className="mt-5 text-2xl font-semibold text-[var(--text-primary)]">Upload your first document</h3>
+              <p className="mx-auto mt-3 max-w-2xl text-sm text-[var(--text-secondary)]">
                 Add a file, wait for the security scan to finish, then create a protected link to share with confidence.
               </p>
               <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
                 <Link
                   href={`${pathname}?openPicker=1`}
-                  className="btn-base rounded-xl border border-cyan-300/45 bg-cyan-300 px-5 py-3 text-sm font-semibold text-[#07131f] shadow-[0_14px_32px_rgba(34,211,238,0.18)] hover:bg-cyan-200"
+                  className="btn-base btn-primary rounded-sm px-5 py-3 text-sm font-semibold"
                 >
                   Upload document
                 </Link>
-                <Link href={linksPath} className="btn-base btn-secondary rounded-xl px-4 py-3 text-sm">
+                <Link href={linksPath} className="btn-base btn-secondary rounded-sm px-4 py-3 text-sm">
                   View links
                 </Link>
               </div>
               <div className="mt-6 grid gap-3 text-left sm:grid-cols-3">
-                <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
-                  <div className="text-sm font-medium text-white">1. Upload</div>
-                  <div className="mt-1 text-sm text-white/60">Choose a document from your device.</div>
+                <div className="selection-tile rounded-sm p-4">
+                  <div className="text-sm font-medium text-[var(--text-primary)]">1. Upload</div>
+                  <div className="mt-1 text-sm text-[var(--text-secondary)]">Choose a document from your device.</div>
                 </div>
-                <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
-                  <div className="text-sm font-medium text-white">2. Protect</div>
-                  <div className="mt-1 text-sm text-white/60">We scan it before sharing becomes available.</div>
+                <div className="selection-tile rounded-sm p-4">
+                  <div className="text-sm font-medium text-[var(--text-primary)]">2. Protect</div>
+                  <div className="mt-1 text-sm text-[var(--text-secondary)]">We scan it before sharing becomes available.</div>
                 </div>
-                <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
-                  <div className="text-sm font-medium text-white">3. Share</div>
-                  <div className="mt-1 text-sm text-white/60">Create a protected link and copy it when ready.</div>
+                <div className="selection-tile rounded-sm p-4">
+                  <div className="text-sm font-medium text-[var(--text-primary)]">3. Share</div>
+                  <div className="mt-1 text-sm text-[var(--text-secondary)]">Create a protected link and copy it when ready.</div>
                 </div>
               </div>
             </div>
@@ -651,7 +649,7 @@ export default function UnifiedDocsTableClient(props: {
         ) : (
           <div className="space-y-3 p-5">
             {showDelete ? (
-              <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white/65">
+              <div className="surface-panel-soft flex items-center justify-between rounded-sm px-4 py-3 text-sm text-[var(--text-secondary)]">
                 <label className="flex items-center gap-3">
                   <input
                     type="checkbox"
@@ -701,7 +699,7 @@ export default function UnifiedDocsTableClient(props: {
               return (
                 <article
                   key={row.doc_id}
-                  className="rounded-[28px] border border-white/12 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]"
+                  className="surface-panel rounded-sm p-5"
                 >
                   <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
                     <div className="min-w-0 flex-1">
@@ -716,52 +714,52 @@ export default function UnifiedDocsTableClient(props: {
                           />
                         ) : null}
 
-                        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-white/12 bg-white/[0.06] text-xs font-semibold tracking-[0.16em] text-white/75">
+                        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-sm border border-[var(--border-subtle)] bg-[var(--surface-soft)] text-xs font-semibold tracking-[0.16em] text-[var(--text-muted)]">
                           {getExtension(row.doc_title)}
                         </div>
 
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-2">
-                            <Link href={detailsHref} className="truncate text-lg font-semibold text-white hover:text-cyan-100">
+                            <Link href={detailsHref} className="truncate text-lg font-semibold text-[var(--text-primary)] hover:text-[var(--accent-primary)]">
                               {row.doc_title || "Untitled document"}
                             </Link>
                             <span className={`rounded-full border px-2.5 py-1 text-[11px] ${toneClass(docStatus.tone)}`}>
                               {docStatus.label}
                             </span>
-                            <span className="rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[11px] text-white/70">
+                            <span className="rounded-sm border border-[var(--border-subtle)] bg-[var(--surface-soft)] px-2.5 py-1 text-[11px] text-[var(--text-muted)]">
                               {readinessText}
                             </span>
                             {row.active_shares > 0 ? (
-                              <span className="rounded-full border border-cyan-300/25 bg-cyan-400/10 px-2.5 py-1 text-[11px] text-cyan-100">
+                              <span className="rounded-sm border border-[var(--border-accent)] bg-[var(--surface-selected)] px-2.5 py-1 text-[11px] text-[var(--accent-primary)]">
                                 {row.active_shares} active {row.active_shares === 1 ? "link" : "links"}
                               </span>
                             ) : null}
                           </div>
 
-                          <p className="mt-3 max-w-3xl text-sm text-white/68">{primaryMessage}</p>
+                          <p className="mt-3 max-w-3xl text-sm text-[var(--text-secondary)]">{primaryMessage}</p>
 
-                          <div className="mt-4 flex flex-wrap gap-2 text-xs text-white/55">
-                            <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5">
+                          <div className="mt-4 flex flex-wrap gap-2 text-xs text-[var(--text-muted)]">
+                            <span className="rounded-sm border border-[var(--border-subtle)] bg-[var(--surface-soft)] px-3 py-1.5">
                               Added {formatShortDate(row.created_at)}
                             </span>
-                            <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5">
+                            <span className="rounded-sm border border-[var(--border-subtle)] bg-[var(--surface-soft)] px-3 py-1.5">
                               {formatNumber(row.total_views || 0)} views
                             </span>
-                            <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5">
+                            <span className="rounded-sm border border-[var(--border-subtle)] bg-[var(--surface-soft)] px-3 py-1.5">
                               Last viewed {formatRelativeTime(row.last_view)}
                             </span>
                             {row.latest_share_created_at ? (
-                              <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5">
+                              <span className="rounded-sm border border-[var(--border-subtle)] bg-[var(--surface-soft)] px-3 py-1.5">
                                 Latest link {formatShortDate(row.latest_share_created_at)}
                               </span>
                             ) : null}
                           </div>
 
                           <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                            <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-                              <div className="text-xs uppercase tracking-[0.16em] text-white/45">Security</div>
-                              <div className="mt-2 text-sm font-medium text-white">{docStatus.subtext}</div>
-                              <div className="mt-1 text-xs text-white/55">
+                            <div className="selection-tile rounded-sm p-4">
+                              <div className="text-xs uppercase tracking-[0.16em] text-[var(--text-faint)]">Security</div>
+                              <div className="mt-2 text-sm font-medium text-[var(--text-primary)]">{docStatus.subtext}</div>
+                              <div className="mt-1 text-xs text-[var(--text-muted)]">
                                 {scanState === "CLEAN"
                                   ? "Sharing is available."
                                   : scanState === "MALICIOUS"
@@ -769,12 +767,12 @@ export default function UnifiedDocsTableClient(props: {
                                     : "We will unlock sharing after the scan completes."}
                               </div>
                             </div>
-                            <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-                              <div className="text-xs uppercase tracking-[0.16em] text-white/45">Sharing</div>
-                              <div className="mt-2 text-sm font-medium text-white">
+                            <div className="selection-tile rounded-sm p-4">
+                              <div className="text-xs uppercase tracking-[0.16em] text-[var(--text-faint)]">Sharing</div>
+                              <div className="mt-2 text-sm font-medium text-[var(--text-primary)]">
                                 {row.active_shares > 0 ? "Protected links live" : "No link yet"}
                               </div>
-                              <div className="mt-1 text-xs text-white/55">
+                              <div className="mt-1 text-xs text-[var(--text-muted)]">
                                 {canCreateLinkNow
                                   ? row.active_shares > 0
                                     ? "Copy the latest link or create another."
@@ -782,10 +780,10 @@ export default function UnifiedDocsTableClient(props: {
                                   : shareEligibility.blockedReason || "Waiting for the next step."}
                               </div>
                             </div>
-                            <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-                              <div className="text-xs uppercase tracking-[0.16em] text-white/45">Activity</div>
-                              <div className="mt-2 text-sm font-medium text-white">{formatNumber(row.total_views || 0)} views</div>
-                              <div className="mt-1 text-xs text-white/55">Last activity {formatDateTime(row.last_view)}</div>
+                            <div className="selection-tile rounded-sm p-4">
+                              <div className="text-xs uppercase tracking-[0.16em] text-[var(--text-faint)]">Activity</div>
+                              <div className="mt-2 text-sm font-medium text-[var(--text-primary)]">{formatNumber(row.total_views || 0)} views</div>
+                              <div className="mt-1 text-xs text-[var(--text-muted)]">Last activity {formatDateTime(row.last_view)}</div>
                             </div>
                           </div>
                         </div>
@@ -796,7 +794,7 @@ export default function UnifiedDocsTableClient(props: {
                       {canCreateLinkNow && row.active_shares === 0 ? (
                         <Link
                           href={buildCreateLinkHref(row.doc_id)}
-                          className="btn-base rounded-2xl border border-cyan-300/40 bg-cyan-300 px-4 py-3 text-center text-sm font-semibold text-[#07131f] shadow-[0_14px_36px_rgba(34,211,238,0.18)] hover:bg-cyan-200"
+                          className="btn-base btn-primary rounded-sm px-4 py-3 text-center text-sm font-semibold"
                         >
                           Create protected link
                         </Link>
@@ -805,7 +803,7 @@ export default function UnifiedDocsTableClient(props: {
                           <button
                             type="button"
                             onClick={() => copyLatestLink(row.doc_id, row.latest_share_token)}
-                            className="btn-base rounded-2xl border border-cyan-300/35 bg-cyan-400/14 px-4 py-3 text-sm font-medium text-cyan-100 hover:bg-cyan-400/22"
+                            className="btn-base btn-primary rounded-sm px-4 py-3 text-sm font-medium"
                           >
                             {copiedId === row.doc_id ? "Link copied" : "Copy latest link"}
                           </button>
@@ -813,11 +811,11 @@ export default function UnifiedDocsTableClient(props: {
                             href={latestShareUrl}
                             target="_blank"
                             rel="noreferrer"
-                            className="btn-base btn-secondary rounded-2xl px-4 py-3 text-center text-sm"
+                            className="btn-base btn-secondary rounded-sm px-4 py-3 text-center text-sm"
                           >
                             Open shared link
                           </Link>
-                          <Link href={buildCreateLinkHref(row.doc_id)} className="btn-base btn-secondary rounded-2xl px-4 py-3 text-center text-sm">
+                          <Link href={buildCreateLinkHref(row.doc_id)} className="btn-base btn-secondary rounded-sm px-4 py-3 text-center text-sm">
                             Create another link
                           </Link>
                         </>
@@ -826,16 +824,16 @@ export default function UnifiedDocsTableClient(props: {
                           type="button"
                           disabled
                           title={shareEligibility.blockedReason || "Sharing unavailable"}
-                          className="cursor-not-allowed rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white/45"
+                          className="cursor-not-allowed rounded-sm border border-[var(--border-subtle)] bg-[var(--surface-soft)] px-4 py-3 text-sm text-[var(--text-faint)]"
                         >
                           {scanState === "MALICIOUS" || docState === "ERROR" ? "Sharing blocked" : "Create link when ready"}
                         </button>
                       )}
 
-                      <Link href={manageHref} className="btn-base btn-secondary rounded-2xl px-4 py-3 text-center text-sm">
+                      <Link href={manageHref} className="btn-base btn-secondary rounded-sm px-4 py-3 text-center text-sm">
                         Manage links
                       </Link>
-                      <Link href={detailsHref} className="btn-base btn-secondary rounded-2xl px-4 py-3 text-center text-sm">
+                      <Link href={detailsHref} className="btn-base btn-secondary rounded-sm px-4 py-3 text-center text-sm">
                         View details
                       </Link>
 
@@ -863,16 +861,16 @@ export default function UnifiedDocsTableClient(props: {
         )}
 
         {pageRows.length > 0 ? (
-          <div className="flex flex-col gap-3 border-t border-white/10 px-5 py-4 text-sm text-white/60 md:flex-row md:items-center md:justify-between">
+          <div className="flex flex-col gap-3 border-t border-[var(--border-subtle)] px-5 py-4 text-sm text-[var(--text-muted)] md:flex-row md:items-center md:justify-between">
             <div>
-              Page <span className="text-white">{safePage}</span> of <span className="text-white">{totalPages}</span>
+              Page <span className="text-[var(--text-primary)]">{safePage}</span> of <span className="text-[var(--text-primary)]">{totalPages}</span>
             </div>
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
                 disabled={safePage <= 1}
                 onClick={() => syncUrl({ docPage: 1 })}
-                className="btn-base btn-secondary rounded-xl px-3 py-2 text-sm disabled:opacity-40"
+                className="btn-base btn-secondary rounded-sm px-3 py-2 text-sm disabled:opacity-40"
               >
                 First
               </button>
@@ -880,7 +878,7 @@ export default function UnifiedDocsTableClient(props: {
                 type="button"
                 disabled={safePage <= 1}
                 onClick={() => syncUrl({ docPage: Math.max(1, safePage - 1) })}
-                className="btn-base btn-secondary rounded-xl px-3 py-2 text-sm disabled:opacity-40"
+                className="btn-base btn-secondary rounded-sm px-3 py-2 text-sm disabled:opacity-40"
               >
                 Previous
               </button>
@@ -888,7 +886,7 @@ export default function UnifiedDocsTableClient(props: {
                 type="button"
                 disabled={safePage >= totalPages}
                 onClick={() => syncUrl({ docPage: Math.min(totalPages, safePage + 1) })}
-                className="btn-base btn-secondary rounded-xl px-3 py-2 text-sm disabled:opacity-40"
+                className="btn-base btn-secondary rounded-sm px-3 py-2 text-sm disabled:opacity-40"
               >
                 Next
               </button>
@@ -896,7 +894,7 @@ export default function UnifiedDocsTableClient(props: {
                 type="button"
                 disabled={safePage >= totalPages}
                 onClick={() => syncUrl({ docPage: totalPages })}
-                className="btn-base btn-secondary rounded-xl px-3 py-2 text-sm disabled:opacity-40"
+                className="btn-base btn-secondary rounded-sm px-3 py-2 text-sm disabled:opacity-40"
               >
                 Last
               </button>
