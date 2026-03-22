@@ -1,5 +1,10 @@
 import { expect, test } from "@playwright/test";
-import { classifyBackupRecoverySummary, summarizeHealthChecks, type HealthCheck } from "../src/lib/health";
+import {
+  classifyBackupRecoverySummary,
+  summarizeHealthChecks,
+  toExternalHealthSummary,
+  type HealthCheck,
+} from "../src/lib/health";
 
 test.describe("health readiness aggregation", () => {
   test("fails readiness when a critical dependency is down", () => {
@@ -71,5 +76,40 @@ test.describe("health readiness aggregation", () => {
 
     expect(result.state).toBe("degraded");
     expect(result.summary).toContain("restore drill cadence");
+  });
+
+  test("sanitizes external health summaries so raw details are not exposed", () => {
+    const summary = toExternalHealthSummary({
+      ok: false,
+      service: "cyang.io",
+      ts: Date.now(),
+      status: "degraded",
+      checks: [
+        {
+          name: "database",
+          state: "down",
+          critical: true,
+          summary: "Database dependency is unavailable.",
+          details: {
+            latencyMs: 17,
+            error: 'column "enc_key_version" does not exist',
+            table: "public.docs",
+          },
+        },
+      ],
+      config: {
+        environment: "production",
+        status: "fail",
+        errorCount: 2,
+        warningCount: 1,
+      },
+    });
+
+    expect(summary.summary.length).toBeGreaterThan(0);
+    expect("checks" in summary).toBeFalsy();
+    expect("config" in summary).toBeFalsy();
+    expect(JSON.stringify(summary)).not.toContain("enc_key_version");
+    expect(JSON.stringify(summary)).not.toContain("public.docs");
+    expect(JSON.stringify(summary)).not.toContain("database");
   });
 });

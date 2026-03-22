@@ -22,6 +22,7 @@ import { validateUploadType } from "@/lib/uploadTypeValidation";
 import { resolvePublicAppBaseUrl } from "@/lib/publicBaseUrl";
 import { findMissingPublicTableColumns } from "@/lib/dbSchema";
 import { withRequestTelemetry } from "@/lib/perfTelemetry";
+import { jsonError, jsonRateLimitError } from "@/lib/apiResponses";
 
 type CompleteRequest = {
   // Newer flow: doc_id from /presign response
@@ -82,6 +83,14 @@ function authErrorCode(err: unknown): "UNAUTHENTICATED" | "FORBIDDEN" | "MFA_REQ
   return null;
 }
 
+function uploadFinalizeUnavailable() {
+  return jsonError("UPLOAD_FINALIZE_UNAVAILABLE", 503);
+}
+
+function uploadFinalizeFailed() {
+  return jsonError("UPLOAD_FINALIZE_FAILED", 500);
+}
+
 async function streamToBuffer(body: AsyncIterable<unknown>): Promise<Buffer> {
   const chunks: Buffer[] = [];
   for await (const chunk of body) {
@@ -123,19 +132,16 @@ export async function POST(req: NextRequest) {
           strict: true,
         });
         if (!globalRl.ok) {
-          return NextResponse.json(
-            { ok: false, error: "RATE_LIMIT" },
-            { status: globalRl.status, headers: { "Retry-After": String(globalRl.retryAfterSeconds) } }
-          );
+          return jsonRateLimitError(globalRl.status, globalRl.retryAfterSeconds);
         }
 
     stage = "parse_body";
     if (parseJsonBodyLength(req) > MAX_UPLOAD_COMPLETE_BODY_BYTES) {
-      return NextResponse.json({ ok: false, error: "PAYLOAD_TOO_LARGE" }, { status: 413 });
+      return jsonError("PAYLOAD_TOO_LARGE", 413);
     }
     const parsedBody = await req.json().catch(() => null);
     if (!parsedBody || typeof parsedBody !== "object" || Array.isArray(parsedBody)) {
-      return NextResponse.json({ ok: false, error: "bad_request", message: "Request body must be a JSON object." }, { status: 400 });
+      return jsonError("BAD_REQUEST", 400, { message: "Request body must be a JSON object." });
     }
     const body = parsedBody as CompleteRequest;
 
@@ -169,10 +175,7 @@ export async function POST(req: NextRequest) {
             scope: "ip:upload_complete",
             message: "Upload complete throttled",
           });
-          return NextResponse.json(
-            { ok: false, error: "RATE_LIMIT" },
-            { status: completeRl.status, headers: { "Retry-After": String(completeRl.retryAfterSeconds) } }
-          );
+          return jsonRateLimitError(completeRl.status, completeRl.retryAfterSeconds);
         }
 
     const title = body.title ?? null;
@@ -203,7 +206,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         {
           ok: false,
-          error: "missing_doc_id",
+          error: "MISSING_DOC_ID",
           message: "Send doc_id (preferred) or r2_bucket + r2_key.",
         },
         { status: 400 }
@@ -245,16 +248,7 @@ export async function POST(req: NextRequest) {
         message: "Docs schema missing required upload finalization columns",
         meta: { missingFinalizeColumns },
       });
-      return NextResponse.json(
-        {
-          ok: false,
-          error: "SCHEMA_MISMATCH",
-          message: "Database schema is missing required columns for upload finalization.",
-          missing_columns: missingFinalizeColumns,
-          required_sql: ["scripts/sql/security_encryption.sql", "scripts/sql/abuse_moderation.sql"],
-        },
-        { status: 500 }
-      );
+      return uploadFinalizeUnavailable();
     }
 
     stage = "mark_processing";
@@ -272,7 +266,7 @@ export async function POST(req: NextRequest) {
     const docBucket = docRows[0].r2_bucket;
     const docKey = docRows[0].r2_key;
     if (!docBucket || !docKey) {
-      return NextResponse.json({ ok: false, error: "missing_r2_pointer" }, { status: 409 });
+      return jsonError("MISSING_R2_POINTER", 409);
     }
 
     // Defensive: ensure this doc points at the configured bucket.
@@ -287,7 +281,7 @@ export async function POST(req: NextRequest) {
         message: "Doc bucket does not match configured R2 bucket",
         meta: { docBucket, configuredBucket: r2Bucket },
       });
-      return NextResponse.json({ ok: false, error: "bucket_mismatch" }, { status: 409 });
+      return jsonError("BUCKET_MISMATCH", 409);
     }
 
     const cleanupRejectedObject = async (reason: string, meta?: Record<string, unknown>) => {
@@ -341,7 +335,7 @@ export async function POST(req: NextRequest) {
         message: "Upload completion blocked because encryption is not enabled for this doc",
       });
       await cleanupRejectedObject("encryption_required");
-      return NextResponse.json({ ok: false, error: "encryption_required" }, { status: 409 });
+      return jsonError("ENCRYPTION_REQUIRED", 409);
     }
 
     stage = "head_object";
@@ -363,7 +357,7 @@ export async function POST(req: NextRequest) {
         message: "Upload complete called but R2 object missing",
         meta: { err: e instanceof Error ? e.name || e.message : String(e) },
       });
-      return NextResponse.json({ ok: false, error: "object_missing" }, { status: 409 });
+      return jsonError("OBJECT_MISSING", 409);
     }
 
     const contentLength = Number(head?.ContentLength ?? 0);
@@ -372,7 +366,7 @@ export async function POST(req: NextRequest) {
 
     if (!Number.isFinite(contentLength) || contentLength <= 0) {
       await cleanupRejectedObject("invalid_object", { contentLength });
-      return NextResponse.json({ ok: false, error: "invalid_object" }, { status: 409 });
+      return jsonError("INVALID_OBJECT", 409);
     }
     if (Number.isFinite(absMax) && absMax > 0 && contentLength > absMax) {
       await logSecurityEvent({
@@ -385,7 +379,7 @@ export async function POST(req: NextRequest) {
         meta: { contentLength, absMax },
       });
       await cleanupRejectedObject("object_too_large", { contentLength, absMax });
-      return NextResponse.json({ ok: false, error: "object_too_large" }, { status: 413 });
+      return jsonError("OBJECT_TOO_LARGE", 413);
     }
 
     if (Number.isFinite(expectedPlain) && expectedPlain > 0) {
@@ -401,7 +395,7 @@ export async function POST(req: NextRequest) {
           meta: { expectedPlain, contentLength, encryptionEnabled },
         });
         await cleanupRejectedObject("size_mismatch", { expectedPlain, contentLength, encryptionEnabled });
-        return NextResponse.json({ ok: false, error: "size_mismatch" }, { status: 409 });
+        return jsonError("SIZE_MISMATCH", 409);
       }
     }
 
@@ -420,7 +414,7 @@ export async function POST(req: NextRequest) {
         message: "R2 object metadata doc-id missing",
       });
       await cleanupRejectedObject("metadata_missing");
-      return NextResponse.json({ ok: false, error: "metadata_missing" }, { status: 409 });
+      return jsonError("METADATA_MISSING", 409);
     }
 
     if (metaDocId !== docId) {
@@ -434,7 +428,7 @@ export async function POST(req: NextRequest) {
         meta: { metaDocId, docId },
       });
       await cleanupRejectedObject("metadata_mismatch", { metaDocId, docId });
-      return NextResponse.json({ ok: false, error: "metadata_mismatch" }, { status: 409 });
+      return jsonError("METADATA_MISMATCH", 409);
     }
 
     if (!metaOrigCt) {
@@ -448,7 +442,7 @@ export async function POST(req: NextRequest) {
         meta: { metaOrigCt, ct, metaOrigExt },
       });
       await cleanupRejectedObject("mime_missing", { metaOrigCt, contentType: ct, metaOrigExt });
-      return NextResponse.json({ ok: false, error: "mime_missing" }, { status: 409 });
+      return jsonError("MIME_MISSING", 409);
     }
 
     if (ct && ct !== metaOrigCt) {
@@ -462,7 +456,7 @@ export async function POST(req: NextRequest) {
         meta: { contentType: ct, metaOrigCt },
       });
       await cleanupRejectedObject("content_type_mismatch", { encryptionEnabled: true, contentType: ct, metaOrigCt });
-      return NextResponse.json({ ok: false, error: "content_type_mismatch" }, { status: 409 });
+      return jsonError("CONTENT_TYPE_MISMATCH", 409);
     }
 
     // 4) Read uploaded PDF bytes and validate server-side before encryption.
@@ -481,7 +475,7 @@ export async function POST(req: NextRequest) {
       uploadedBytes = await streamToBuffer(uploadedObj.Body as AsyncIterable<unknown>);
     } catch {
       await cleanupRejectedObject("object_read_failed");
-      return NextResponse.json({ ok: false, error: "object_read_failed" }, { status: 409 });
+      return jsonError("OBJECT_READ_FAILED", 409);
     }
 
     const filenameForValidation = (originalFilename || docRows[0].name || "upload.bin").trim();
@@ -502,7 +496,7 @@ export async function POST(req: NextRequest) {
         meta: { error: typeCheck.error, message: typeCheck.message, metaOrigCt, filenameForValidation },
       });
       await cleanupRejectedObject("type_validation_failed_before_encrypt", { error: typeCheck.error });
-      return NextResponse.json({ ok: false, error: typeCheck.error, message: typeCheck.message }, { status: 409 });
+      return jsonError(typeCheck.error, 409, { message: typeCheck.message });
     }
 
     if (typeCheck.canonicalMime === "application/pdf") {
@@ -522,7 +516,7 @@ export async function POST(req: NextRequest) {
           meta: { error: safety.error, message: safety.message, details: safety.details ?? null },
         });
         await cleanupRejectedObject("pdf_validation_failed_before_encrypt", { error: safety.error });
-        return NextResponse.json({ ok: false, error: safety.error, message: safety.message }, { status: 409 });
+        return jsonError(safety.error, 409, { message: safety.message });
       }
       scanStatus = "pending";
       riskLevel = safety.riskLevel;
@@ -566,11 +560,11 @@ export async function POST(req: NextRequest) {
       encWrapTag = wrap.tag;
     } catch {
       await cleanupRejectedObject("server_side_encrypt_failed");
-      return NextResponse.json({ ok: false, error: "server_side_encrypt_failed" }, { status: 500 });
+      return uploadFinalizeFailed();
     }
     if (!encIv || !encKeyVersion || !encWrappedKey || !encWrapIv || !encWrapTag) {
       await cleanupRejectedObject("server_side_encrypt_metadata_missing");
-      return NextResponse.json({ ok: false, error: "server_side_encrypt_metadata_missing" }, { status: 500 });
+      return uploadFinalizeFailed();
     }
 
     stage = "update_doc";
@@ -699,7 +693,7 @@ try {
     }
 
     if (!finalAlias) {
-      return NextResponse.json({ ok: false, error: "alias_generation_failed" }, { status: 500 });
+      return uploadFinalizeFailed();
     }
 
     stage = "build_view_url";
@@ -753,25 +747,22 @@ try {
     const missingColumn = extractMissingColumn(msg);
     const authCode = authErrorCode(e);
     if (authCode === "UNAUTHENTICATED") {
-      return NextResponse.json(
-        { ok: false, error: "UNAUTHENTICATED", message: "Sign in to finalize uploads.", stage },
-        { status: 401 }
-      );
+      return jsonError("UNAUTHENTICATED", 401, { message: "Sign in to finalize uploads." });
     }
     if (authCode === "FORBIDDEN") {
-      return NextResponse.json(
-        { ok: false, error: "FORBIDDEN", message: "You do not have permission to finalize this upload.", stage },
-        { status: 403 }
-      );
+      return jsonError("FORBIDDEN", 403, { message: "You do not have permission to finalize this upload." });
     }
     if (authCode === "MFA_REQUIRED") {
-      return NextResponse.json(
-        { ok: false, error: "MFA_REQUIRED", message: "Complete MFA to finalize uploads.", stage },
-        { status: 403 }
-      );
+      return jsonError("MFA_REQUIRED", 403, { message: "Complete MFA to finalize uploads." });
     }
     if (isRuntimeEnvError(e)) {
-      return NextResponse.json({ ok: false, error: "ENV_MISCONFIGURED", stage }, { status: 500 });
+      await logDbErrorEvent({
+        scope: "upload_complete",
+        message: "runtime_env_error",
+        ip: clientIpKey(req).ip,
+        meta: { route: "/api/admin/upload/complete", stage, code: "RUNTIME_ENV_ERROR" },
+      });
+      return uploadFinalizeUnavailable();
     }
     const stack = e instanceof Error ? e.stack || null : null;
     console.error("upload_complete_failed", {
@@ -789,31 +780,25 @@ try {
       message: "Upload completion exceeded timeout",
       meta: { timeoutMs },
       });
-      return NextResponse.json({ ok: false, error: "TIMEOUT", stage }, { status: 504 });
+      return jsonError("UPLOAD_FINALIZE_TIMEOUT", 504);
     }
     if (code === "42703" || missingColumn) {
-      return NextResponse.json(
-        {
-          ok: false,
-          error: "SCHEMA_MISMATCH",
-          message: "Upload finalization failed due to a missing database column.",
-          missing_column: missingColumn,
-          stage,
-          required_sql: ["scripts/sql/security_encryption.sql", "scripts/sql/abuse_moderation.sql"],
-        },
-        { status: 500 }
-      );
+      await logDbErrorEvent({
+        scope: "upload_complete",
+        message: msg,
+        ip: clientIpKey(req).ip,
+        meta: { route: "/api/admin/upload/complete", stage, code: code || "42703", missingColumn },
+      });
+      return uploadFinalizeUnavailable();
     }
     if (code === "42P01") {
-      return NextResponse.json(
-        {
-          ok: false,
-          error: "SCHEMA_MISMATCH",
-          message: "Upload finalization failed due to a missing database table.",
-          stage,
-        },
-        { status: 500 }
-      );
+      await logDbErrorEvent({
+        scope: "upload_complete",
+        message: msg,
+        ip: clientIpKey(req).ip,
+        meta: { route: "/api/admin/upload/complete", stage, code },
+      });
+      return uploadFinalizeUnavailable();
     }
     await logDbErrorEvent({
       scope: "upload_complete",
@@ -821,9 +806,6 @@ try {
       ip: clientIpKey(req).ip,
       meta: { route: "/api/admin/upload/complete", stage, code },
     });
-    return NextResponse.json(
-      { ok: false, error: "server_error", message: "Unable to finalize upload.", stage, code },
-      { status: 500 }
-    );
+    return jsonError("UPLOAD_FINALIZE_FAILED", 500, { message: "Unable to finalize upload." });
   }
 }

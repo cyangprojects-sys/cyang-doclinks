@@ -4,8 +4,9 @@ export const runtime = "nodejs";
 import { NextResponse, type NextRequest } from "next/server";
 import { enforceGlobalApiRateLimit } from "@/lib/securityTelemetry";
 import { getRouteTimeoutMs, isRouteTimeoutError, withRouteTimeout } from "@/lib/routeTimeout";
-import { getCachedDependencySummary, summarizeHealthChecks } from "@/lib/health";
+import { getCachedDependencySummary, summarizeHealthChecks, toExternalHealthSummary } from "@/lib/health";
 import { withRequestTelemetry } from "@/lib/perfTelemetry";
+import { jsonError, jsonRateLimitError } from "@/lib/apiResponses";
 
 export async function GET(req: NextRequest) {
   const timeoutMs = getRouteTimeoutMs("ROUTE_TIMEOUT_HEALTH_MS", 3_000);
@@ -22,16 +23,13 @@ export async function GET(req: NextRequest) {
           strict: true,
         });
         if (!rl.ok) {
-          return NextResponse.json(
-            { ok: false, error: "RATE_LIMIT" },
-            { status: rl.status, headers: { "Retry-After": String(rl.retryAfterSeconds) } }
-          );
+          return jsonRateLimitError(rl.status, rl.retryAfterSeconds);
         }
 
         const summary = await getCachedDependencySummary();
         const readiness = summarizeHealthChecks(summary.checks);
 
-        return NextResponse.json(summary, { status: readiness.httpStatus });
+        return NextResponse.json(toExternalHealthSummary(summary), { status: readiness.httpStatus });
         })(),
         timeoutMs
       ),
@@ -39,8 +37,8 @@ export async function GET(req: NextRequest) {
     );
   } catch (e: unknown) {
     if (isRouteTimeoutError(e)) {
-      return NextResponse.json({ ok: false, error: "TIMEOUT" }, { status: 504 });
+      return jsonError("TIMEOUT", 504);
     }
-    return NextResponse.json({ ok: false, error: "SERVER_ERROR" }, { status: 500 });
+    return jsonError("SERVER_ERROR", 500);
   }
 }

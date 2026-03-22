@@ -113,6 +113,11 @@ npm run audit:env-example
 npm run release:gate
 ```
 
+Environment ownership notes:
+- proof/local/deploy expectations are documented in [docs/environment-ownership.md](docs/environment-ownership.md)
+- `audit:env-example` now fails on missing referenced keys and on undocumented extras
+- intentionally extra keys are tracked in `scripts/lib/env-example-manifest.mjs`, not hidden in a generic bucket
+
 ### Core commands
 
 ```bash
@@ -169,6 +174,8 @@ npm run release:gate
 npm run db:migrations:verify
 npm run fire-drill:staging
 ```
+
+`npm run production-readiness` now ends with an explicit summary that separates repo/build proof from live runtime proof when deployment env vars are absent.
 
 ## Reproducible Build and Test Paths
 

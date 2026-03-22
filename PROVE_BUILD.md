@@ -32,6 +32,7 @@ Notes:
 - If `.env.local` is missing, the wrapper prepares it from the committed `.env.example`.
 - Real production secrets are not required for the proof sequence.
 - `production-readiness` and `release:gate` already degrade safely when real deployment infrastructure is not configured.
+- The proof wrappers now end with an explicit pass/fail step summary so reviewers can see which exact proof stage failed.
 
 ## Exact Wrapped Sequence
 
@@ -92,7 +93,7 @@ The proof and test wrappers now surface that case explicitly so reviewers know t
 
 ## Known Non-Blocking Caveats
 
-- `.env.example` intentionally includes some production-only and ops-only keys that are not all statically referenced in source. The env audit reports these as informational, not failing.
+- `.env.example` intentionally keeps a small explicit set of documented extra keys. See `docs/environment-ownership.md` and `scripts/lib/env-example-manifest.mjs`.
 - `production-readiness` skips live migration-status validation when `DATABASE_URL` is not configured with a real database. Migration manifest verification still runs and must pass.
 - The proof path validates build, type safety, tests, and repo guardrails. It does not claim live third-party integrations are reachable with placeholder secrets.
 
@@ -106,3 +107,9 @@ The following integrations are intentionally not required for proof runs:
 - malware scanner endpoints
 
 Those integrations are still validated structurally by config, routing, and guardrail checks. Real credentials are only required for deployment or live integration testing, not for external build proof.
+
+## Environment Ownership
+
+For a reviewer-friendly explanation of which env vars are required for proof, local dev, and real deploys, see:
+
+- `docs/environment-ownership.md`

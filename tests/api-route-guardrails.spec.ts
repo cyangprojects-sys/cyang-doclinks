@@ -224,7 +224,7 @@ test.describe("api route guardrails", () => {
       expect(code.includes("getRouteTimeoutMs(")).toBeTruthy();
       expect(code.includes("withRouteTimeout(")).toBeTruthy();
       expect(code.includes("isRouteTimeoutError(")).toBeTruthy();
-      expect(code.includes('error: "TIMEOUT"')).toBeTruthy();
+      expect(code.includes('error: "TIMEOUT"') || code.includes('jsonError("TIMEOUT"')).toBeTruthy();
     }
   });
 

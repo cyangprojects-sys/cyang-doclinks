@@ -66,6 +66,8 @@ export default async function AnalyticsWidgets({
   const hasSecurityEvents = await tableExists("public.security_events");
   const hasScanJobs = await tableExists("public.malware_scan_jobs");
   const hasBackupRuns = await tableExists("public.backup_runs");
+  const hasBillingWebhookEvents = !isViewerScoped && (await tableExists("public.billing_webhook_events"));
+  const hasSchemaMigrations = !isViewerScoped && (await tableExists("public.schema_migrations"));
 
   const ownerFilterDocs = ownerId ? sql`and d.owner_id = ${ownerId}::uuid` : sql``;
   const ownerFilterShares = ownerId ? sql`and st.owner_id = ${ownerId}::uuid` : sql``;
@@ -288,7 +290,9 @@ export default async function AnalyticsWidgets({
   let scanFailures24h = 0;
   let deadLetterAlerts24h = 0;
   let presignErrors24h = 0;
+  let uploadFinalizeFailures24h = 0;
   let abuseSpikes24h = 0;
+  let securitySpikeAlerts24h = 0;
   let deadLetterBacklog = 0;
   let cronFreshHealthy = 0;
   let cronFreshTotal = 0;
@@ -298,6 +302,10 @@ export default async function AnalyticsWidgets({
   let backupHoursSinceLastSuccess: number | null = null;
   let backupUsesGithubReporting = false;
   let topSecurityTypes: Array<{ type: string; c: number }> = [];
+  let stripeWebhookFailures24h = 0;
+  let stripeWebhookTotal24h = 0;
+  let stripeWebhookLastAt: string | null = null;
+  let stripeWebhookLastStatus: string | null = null;
   let unencryptedDocs = 0;
   let encryptedMissingKeyVersion = 0;
   let needsReviewDocs = 0;
@@ -305,6 +313,8 @@ export default async function AnalyticsWidgets({
   let pendingScanDocs = 0;
   let lastSecurityEventAt: string | null = null;
   let nightlyLastOkAt: string | null = null;
+  let uploadTelemetryReady = hasSecurityEvents;
+  let stripeWebhookTelemetryReady = hasBillingWebhookEvents;
   const backupAutomationEnabled = ["1", "true", "yes", "y", "on"].includes(
     String(process.env.BACKUP_AUTOMATION_ENABLED || "").trim().toLowerCase()
   );
@@ -333,7 +343,12 @@ export default async function AnalyticsWidgets({
           coalesce(sum(case when se.type = 'malware_scan_job_failed' then 1 else 0 end), 0)::int as scan_failures,
           coalesce(sum(case when se.type in ('malware_scan_dead_letter', 'malware_scan_dead_letter_backlog') then 1 else 0 end), 0)::int as dead_letter_alerts,
           coalesce(sum(case when se.type = 'upload_presign_error' then 1 else 0 end), 0)::int as presign_errors,
-          coalesce(sum(case when se.type = 'abuse_report_spike' then 1 else 0 end), 0)::int as abuse_spikes
+          coalesce(sum(case
+            when se.type like 'upload_complete_%'
+             and se.type not in ('upload_complete_success', 'upload_complete_base_url_fallback')
+            then 1 else 0 end), 0)::int as upload_finalize_failures,
+          coalesce(sum(case when se.type = 'abuse_report_spike' then 1 else 0 end), 0)::int as abuse_spikes,
+          coalesce(sum(case when se.type like '%_spike' then 1 else 0 end), 0)::int as security_spike_alerts
         from public.security_events se
         where se.created_at > now() - interval '24 hours'
           ${ownerId
@@ -350,13 +365,17 @@ export default async function AnalyticsWidgets({
         scan_failures: number;
         dead_letter_alerts: number;
         presign_errors: number;
+        upload_finalize_failures: number;
         abuse_spikes: number;
+        security_spike_alerts: number;
       }>;
 
       scanFailures24h = Number(rows?.[0]?.scan_failures ?? 0);
       deadLetterAlerts24h = Number(rows?.[0]?.dead_letter_alerts ?? 0);
       presignErrors24h = Number(rows?.[0]?.presign_errors ?? 0);
+      uploadFinalizeFailures24h = Number(rows?.[0]?.upload_finalize_failures ?? 0);
       abuseSpikes24h = Number(rows?.[0]?.abuse_spikes ?? 0);
+      securitySpikeAlerts24h = Number(rows?.[0]?.security_spike_alerts ?? 0);
     } catch {
       // ignore
     }
@@ -374,6 +393,39 @@ export default async function AnalyticsWidgets({
       `) as unknown as Array<{ type: string; c: number }>;
     } catch {
       topSecurityTypes = [];
+    }
+  }
+
+  if (hasBillingWebhookEvents) {
+    try {
+      const rows = (await sql`
+        select
+          coalesce(sum(case when received_at > now() - interval '24 hours' then 1 else 0 end), 0)::int as total_24h,
+          coalesce(sum(case when received_at > now() - interval '24 hours' and status = 'failed' then 1 else 0 end), 0)::int as failed_24h,
+          max(received_at)::text as last_at
+        from public.billing_webhook_events
+      `) as unknown as Array<{
+        total_24h: number;
+        failed_24h: number;
+        last_at: string | null;
+      }>;
+      stripeWebhookTotal24h = Number(rows?.[0]?.total_24h ?? 0);
+      stripeWebhookFailures24h = Number(rows?.[0]?.failed_24h ?? 0);
+      stripeWebhookLastAt = rows?.[0]?.last_at ?? null;
+    } catch {
+      // ignore
+    }
+
+    try {
+      const rows = (await sql`
+        select status::text as status
+        from public.billing_webhook_events
+        order by received_at desc
+        limit 1
+      `) as unknown as Array<{ status: string | null }>;
+      stripeWebhookLastStatus = rows?.[0]?.status ?? null;
+    } catch {
+      // ignore
     }
   }
 
@@ -507,7 +559,10 @@ export default async function AnalyticsWidgets({
   const scanDelayThresholdRaw = Number(process.env.SCAN_PENDING_DELAY_THRESHOLD || 25);
   const scanDelayThreshold = Number.isFinite(scanDelayThresholdRaw) && scanDelayThresholdRaw > 0 ? Math.floor(scanDelayThresholdRaw) : 25;
   const scanSystemDelayed = pendingScanDocs > scanDelayThreshold;
-  const failedUploadsHref = `/admin/uploads?show=failed&count=${encodeURIComponent(String(presignErrors24h))}`;
+  const uploadPathHealthy = uploadTelemetryReady && presignErrors24h === 0 && uploadFinalizeFailures24h === 0;
+  const stripeWebhookHealthy = stripeWebhookTelemetryReady && stripeWebhookFailures24h === 0;
+  const scanVisibilityReady = hasScanJobs;
+  const failedUploadsHref = uploadFinalizeFailures24h > 0 ? "/admin/activity" : `/admin/uploads?show=failed&count=${encodeURIComponent(String(presignErrors24h))}`;
   const planDisplayLabel = isOwnerRole ? "Pro" : usagePlanId === "pro" ? "Pro" : "Free";
   const effectiveMaxFileSizeBytes = isOwnerRole ? 104857600 : usageMaxFileSizeBytes;
   const fileSizeLimitLabel =
@@ -623,25 +678,54 @@ export default async function AnalyticsWidgets({
               </div>
               <span className="text-xs text-[var(--text-muted)]">View details</span>
             </div>
-            <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <div className={`mt-3 grid grid-cols-1 gap-2 ${!isViewerScoped ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
               <div className="selection-tile rounded-sm px-3 py-2 text-sm text-[var(--text-secondary)]">
-                <div>{presignErrors24h === 0 ? "Uploads working" : "Some uploads failed to start"}</div>
-                {presignErrors24h > 0 ? (
+                <div>
+                  {!uploadTelemetryReady
+                    ? "Upload telemetry unavailable"
+                    : uploadPathHealthy
+                      ? "Uploads working"
+                      : "Upload path needs review"}
+                </div>
+                <div className="mt-1 text-xs text-[var(--text-muted)]">
+                  {!uploadTelemetryReady
+                    ? "Security event telemetry table is not ready."
+                    : `Presign failures: ${fmtInt(presignErrors24h)}. Finalize failures: ${fmtInt(uploadFinalizeFailures24h)}.`}
+                </div>
+                {uploadTelemetryReady && (presignErrors24h > 0 || uploadFinalizeFailures24h > 0) ? (
                   <Link
                     href={failedUploadsHref}
                     className="mt-1 inline-flex rounded-sm border border-rose-200 bg-rose-50 px-2 py-1 text-xs text-rose-700 hover:bg-rose-100"
                   >
-                    View failed uploads
+                    {uploadFinalizeFailures24h > 0 ? "Open upload activity" : "View failed uploads"}
                   </Link>
                 ) : null}
               </div>
               <div className="selection-tile rounded-sm px-3 py-2 text-sm text-[var(--text-secondary)]">
-                {scanSystemDelayed
-                  ? `Scan system delayed (${fmtInt(pendingScanDocs)} pending)`
-                  : pendingScanDocs > 0
-                    ? `Scans running (${fmtInt(pendingScanDocs)})`
-                    : "Scans healthy"}
+                {!scanVisibilityReady
+                  ? "Scan telemetry unavailable"
+                  : scanSystemDelayed
+                    ? `Scan system delayed (${fmtInt(pendingScanDocs)} pending)`
+                    : pendingScanDocs > 0
+                      ? `Scans running (${fmtInt(pendingScanDocs)})`
+                      : "Scans healthy"}
               </div>
+              {!isViewerScoped ? (
+                <div className="selection-tile rounded-sm px-3 py-2 text-sm text-[var(--text-secondary)]">
+                  <div>
+                    {!stripeWebhookTelemetryReady
+                      ? "Stripe webhook telemetry unavailable"
+                      : stripeWebhookHealthy
+                        ? "Stripe webhooks healthy"
+                        : "Stripe webhooks need review"}
+                  </div>
+                  <div className="mt-1 text-xs text-[var(--text-muted)]">
+                    {!stripeWebhookTelemetryReady
+                      ? "billing_webhook_events is not ready."
+                      : `Failed in 24h: ${fmtInt(stripeWebhookFailures24h)}. Last event: ${fmtMinsAgo(stripeWebhookLastAt)}.`}
+                  </div>
+                </div>
+              ) : null}
             </div>
           </summary>
           <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
@@ -649,7 +733,8 @@ export default async function AnalyticsWidgets({
               <div className="font-medium text-[var(--text-primary)]">Layer 2: Guidance</div>
               <ul className="mt-2 space-y-1">
                 <li>Background checks running: {fmtInt(cronFreshHealthy)}/{fmtInt(cronFreshTotal || 6)} jobs fresh in 6h</li>
-                <li>Some uploads failed to start: {fmtInt(presignErrors24h)}</li>
+                <li>{uploadTelemetryReady ? `Some uploads failed to start: ${fmtInt(presignErrors24h)}` : "Upload telemetry visibility is unavailable"}</li>
+                <li>{uploadTelemetryReady ? `Some uploads failed to finalize: ${fmtInt(uploadFinalizeFailures24h)}` : "Upload finalization failures cannot be summarized without security telemetry"}</li>
                 <li>Some background checks failed: {fmtInt(scanFailures24h)}</li>
                 <li>Some items need manual processing: {fmtInt(deadLetterBacklog)}</li>
                 <li>Some emails failed to send or process: {fmtInt(deadLetterAlerts24h)}</li>
@@ -664,6 +749,9 @@ export default async function AnalyticsWidgets({
                 <li>Backup status: {backupLastStatus || "not configured"}</li>
                 <li>Backup freshness: {backupHoursSinceLastSuccess == null ? "unknown" : `${backupHoursSinceLastSuccess.toFixed(1)}h`}</li>
                 <li>Security signals (24h): {fmtInt(topSecurityTypes.reduce((a, b) => a + b.c, 0))}</li>
+                <li>Security spike alerts (24h): {fmtInt(securitySpikeAlerts24h)}</li>
+                {!isViewerScoped ? <li>{stripeWebhookTelemetryReady ? `Stripe webhook failures (24h): ${fmtInt(stripeWebhookFailures24h)}` : "Stripe webhook telemetry is unavailable"}</li> : null}
+                {!isViewerScoped ? <li>{stripeWebhookTelemetryReady ? `Stripe webhook last status: ${stripeWebhookLastStatus || "not recorded"}` : "Last Stripe webhook status is unavailable"}</li> : null}
                 <li>Encrypted docs missing key version: {fmtInt(encryptedMissingKeyVersion)}</li>
                 <li>Abuse spikes (24h): {fmtInt(abuseSpikes24h)}</li>
               </ul>
@@ -704,6 +792,12 @@ export default async function AnalyticsWidgets({
                 </div>
                 <div className="selection-tile rounded-sm px-3 py-2">
                   Nightly cron: {nightlyLastOkAt ? `OK (${fmtMinsAgo(nightlyLastOkAt)})` : "No recent nightly cron ok event"}
+                </div>
+                <div className="selection-tile rounded-sm px-3 py-2">
+                  Migration ledger: {hasSchemaMigrations ? "Ready" : "Missing public.schema_migrations"}
+                </div>
+                <div className="selection-tile rounded-sm px-3 py-2">
+                  Stripe webhooks: {hasBillingWebhookEvents ? `${fmtInt(stripeWebhookFailures24h)} failed in 24h` : "Telemetry table not ready"}
                 </div>
               </div>
               <div className="selection-tile mt-3 rounded-sm px-3 py-2 text-[var(--text-secondary)]">

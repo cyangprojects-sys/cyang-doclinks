@@ -20,6 +20,17 @@ test.describe("upload and cron guardrails", () => {
     expect(code.includes("RATE_LIMIT")).toBeTruthy();
   });
 
+  test("upload complete route returns opaque internal failure codes without schema leakage", () => {
+    const code = readFileSync("src/app/api/admin/upload/complete/route.ts", "utf8");
+    expect(code.includes('jsonError("UPLOAD_FINALIZE_UNAVAILABLE"')).toBeTruthy();
+    expect(code.includes('jsonError("UPLOAD_FINALIZE_FAILED"')).toBeTruthy();
+    expect(code.includes('jsonError("UPLOAD_FINALIZE_TIMEOUT"')).toBeTruthy();
+    expect(code.includes("missing_columns:")).toBeFalsy();
+    expect(code.includes("required_sql:")).toBeFalsy();
+    expect(code.includes("missing_column:")).toBeFalsy();
+    expect(code.includes('error: "SCHEMA_MISMATCH"')).toBeFalsy();
+  });
+
   test("viewer billing checkout route uses auth error classification helper", () => {
     const code = readFileSync("src/app/api/billing/checkout/route.ts", "utf8");
     expect(code.includes("authErrorCode(")).toBeTruthy();

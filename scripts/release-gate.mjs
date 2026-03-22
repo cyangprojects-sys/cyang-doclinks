@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
 import { parse as parseDotenv } from "dotenv";
 import { createMigrationClient, getMigrationStatus } from "./lib/migrations.mjs";
 
@@ -61,6 +61,12 @@ function inferEnvironment(env) {
   if (nodeEnv === "production") return "production";
   if (nodeEnv === "test") return "test";
   return "development";
+}
+
+function writeSummary(summaryPath, summary) {
+  if (!summaryPath) return;
+  mkdirSync(dirname(summaryPath), { recursive: true });
+  writeFileSync(summaryPath, `${JSON.stringify(summary, null, 2)}\n`, "utf8");
 }
 
 function validateUrl(findings, env, field, required, productionLike) {
@@ -166,62 +172,141 @@ function loadAuditEnv() {
 
 async function checkMigrationStatus(env) {
   if (!normalize(env.DATABASE_URL)) {
-    console.log("Migration status: skipped (DATABASE_URL not set).");
-    return;
+    return {
+      status: "skipped",
+      summary: "Migration status skipped because DATABASE_URL is not set.",
+      appliedCount: 0,
+      pendingCount: 0,
+      driftCount: 0,
+    };
   }
 
   const sql = await createMigrationClient(env);
   try {
     const status = await getMigrationStatus({ sql, env });
     if (status.drift.length) {
-      throw new Error(
-        `Applied migration checksum drift detected: ${status.drift.map((item) => item.version).join(", ")}`
-      );
+      throw Object.assign(new Error("Applied migration checksum drift detected."), {
+        migrationSummary: {
+          status: "failed",
+          summary: `Detected checksum drift in ${status.drift.length} applied migration(s).`,
+          appliedCount: status.applied.length,
+          pendingCount: status.pending.length,
+          driftCount: status.drift.length,
+        },
+      });
     }
     if (status.pending.length) {
-      throw new Error(`Pending migrations detected: ${status.pending.map((item) => item.version).join(", ")}`);
+      throw Object.assign(new Error("Pending migrations detected."), {
+        migrationSummary: {
+          status: "failed",
+          summary: `Detected ${status.pending.length} pending migration(s).`,
+          appliedCount: status.applied.length,
+          pendingCount: status.pending.length,
+          driftCount: status.drift.length,
+        },
+      });
     }
-    console.log(`Migration status: current (${status.applied.length} applied).`);
+    return {
+      status: "current",
+      summary: `Migration status current (${status.applied.length} applied).`,
+      appliedCount: status.applied.length,
+      pendingCount: status.pending.length,
+      driftCount: status.drift.length,
+    };
   } finally {
     await sql.end({ timeout: 5 });
   }
 }
 
 async function main() {
-  const env = loadAuditEnv();
-  const requireEnv = hasFlag("--require-env");
-  const allowMissingEnv = hasFlag("--allow-missing-env");
-  const hasRuntimeEnv = [
-    normalize(env.DATABASE_URL),
-    normalize(env.APP_URL),
-    normalize(env.R2_BUCKET),
-    normalize(env.DOC_MASTER_KEYS),
-  ].some(Boolean);
+  const summaryPath = argValue("--summary-json");
+  const summary = {
+    ok: false,
+    command: "release:gate",
+    generatedAt: new Date().toISOString(),
+    environment: "unknown",
+    runtimeEnvAudit: "pending",
+    migrationStatus: "pending",
+    findings: [],
+    proven: [],
+    skipped: [],
+  };
 
-  if (!hasRuntimeEnv) {
-    if (requireEnv) {
-      throw new Error("No runtime environment was detected. Provide deployment env vars before running the release gate.");
+  try {
+    const env = loadAuditEnv();
+    const requireEnv = hasFlag("--require-env");
+    const allowMissingEnv = hasFlag("--allow-missing-env");
+    const hasRuntimeEnv = [
+      normalize(env.DATABASE_URL),
+      normalize(env.APP_URL),
+      normalize(env.R2_BUCKET),
+      normalize(env.DOC_MASTER_KEYS),
+    ].some(Boolean);
+
+    if (!hasRuntimeEnv) {
+      if (requireEnv) {
+        throw new Error("No runtime environment was detected. Provide deployment env vars before running the release gate.");
+      }
+      if (allowMissingEnv) {
+        summary.ok = true;
+        summary.runtimeEnvAudit = "skipped";
+        summary.migrationStatus = "skipped";
+        summary.skipped.push("Runtime env audit skipped because deployment env vars were not detected.");
+        summary.skipped.push("Migration status skipped because DATABASE_URL was not provided.");
+        writeSummary(summaryPath, summary);
+        console.log("Release gate: runtime env audit skipped (no deployment env detected).");
+        console.log("Release gate summary: repo/build proof can still pass, but live deployment configuration was not verified.");
+        return;
+      }
     }
-    if (allowMissingEnv) {
-      console.log("Release gate: runtime env audit skipped (no deployment env detected).");
-      return;
+
+    const audit = buildAuditFindings(env);
+    summary.environment = audit.environment;
+    console.log(`Release gate environment: ${audit.environment}`);
+
+    if (audit.findings.length) {
+      summary.runtimeEnvAudit = "failed";
+      summary.findings = audit.findings;
+      writeSummary(summaryPath, summary);
+      for (const finding of audit.findings) {
+        console.error(`- ${finding}`);
+      }
+      throw new Error(`Release gate failed with ${audit.findings.length} configuration issue(s).`);
     }
+
+    summary.runtimeEnvAudit = "passed";
+    summary.proven.push("Runtime configuration passed the release-gate validation set.");
+    console.log("Release gate configuration audit: passed.");
+
+    const migration = await checkMigrationStatus(env);
+    summary.migrationStatus = migration.status;
+    summary.proven.push(migration.summary);
+    console.log(migration.summary);
+
+    summary.ok = true;
+    writeSummary(summaryPath, summary);
+    console.log("Release gate summary: runtime config and migration status passed.");
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    const migrationSummary =
+      error && typeof error === "object" && "migrationSummary" in error
+        ? error.migrationSummary
+        : null;
+    if (migrationSummary && typeof migrationSummary === "object") {
+      summary.migrationStatus = migrationSummary.status;
+      summary.proven.push(migrationSummary.summary);
+    } else if (summary.migrationStatus === "pending") {
+      summary.migrationStatus = "failed";
+    }
+    if (summary.runtimeEnvAudit === "pending") {
+      summary.runtimeEnvAudit = "failed";
+    }
+    summary.ok = false;
+    summary.error = message;
+    writeSummary(summaryPath, summary);
+    console.error(message);
+    process.exit(1);
   }
-
-  const audit = buildAuditFindings(env);
-  console.log(`Release gate environment: ${audit.environment}`);
-  if (audit.findings.length) {
-    for (const finding of audit.findings) {
-      console.error(`- ${finding}`);
-    }
-    throw new Error(`Release gate failed with ${audit.findings.length} configuration issue(s).`);
-  }
-  console.log("Release gate configuration audit: passed.");
-
-  await checkMigrationStatus(env);
 }
 
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : String(error));
-  process.exit(1);
-});
+main();

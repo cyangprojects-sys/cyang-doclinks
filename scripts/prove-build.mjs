@@ -2,39 +2,10 @@
 
 import { spawnSync } from "node:child_process";
 import { copyFileSync, existsSync, rmSync } from "node:fs";
+import { runCheckPlan } from "./lib/check-runner.mjs";
 
 const REQUIRED_NODE = "22.16.0";
 const REQUIRED_NPM = "10.9.2";
-
-function resolveSpawn(command, args) {
-  if (process.platform === "win32" && (command === "npm" || command === "npx")) {
-    return {
-      command: "cmd.exe",
-      args: ["/d", "/s", "/c", command, ...args],
-    };
-  }
-  return { command, args };
-}
-
-function run(command, args) {
-  console.log(`\n==> ${command} ${args.join(" ")}`);
-  const resolved = resolveSpawn(command, args);
-  const result = spawnSync(resolved.command, resolved.args, {
-    stdio: "inherit",
-    shell: false,
-    env: process.env,
-  });
-  if (result.error) {
-    if (process.platform === "win32" && result.error.code === "EPERM") {
-      fail(
-        `could not spawn "${command} ${args.join(" ")}" in the current Windows sandbox. ` +
-          "Rerun prove:build outside the sandbox or grant broader process-spawn permissions."
-      );
-    }
-    throw result.error;
-  }
-  if (result.status !== 0) process.exit(result.status ?? 1);
-}
 
 function fail(message) {
   console.error(`Build proof preflight failed: ${message}`);
@@ -86,16 +57,22 @@ cleanProofArtifacts();
 ensureProofEnv();
 
 const commands = [
-  ["npm", ["run", "lint"]],
-  ["npm", ["run", "typecheck"]],
-  ["npm", ["test", "--", "--runInBand"]],
-  ["npm", ["run", "build"]],
-  ["npm", ["run", "audit:bundle-budgets"]],
-  ["npm", ["run", "production-readiness"]],
+  { label: "Lint", command: "npm", args: ["run", "lint"] },
+  { label: "Typecheck", command: "npm", args: ["run", "typecheck"] },
+  { label: "Regression tests", command: "npm", args: ["test", "--", "--runInBand"] },
+  { label: "Production build", command: "npm", args: ["run", "build"] },
+  { label: "Bundle budget audit", command: "npm", args: ["run", "audit:bundle-budgets"] },
+  { label: "Production readiness", command: "npm", args: ["run", "production-readiness"] },
 ];
 
-for (const [command, args] of commands) {
-  run(command, args);
-}
+runCheckPlan({
+  title: "Build proof",
+  steps: commands.map((step) => ({
+    ...step,
+    spawnFailureMessage:
+      `could not spawn "${step.command} ${step.args.join(" ")}" in the current Windows sandbox. ` +
+      "Rerun prove:build outside the sandbox or grant broader process-spawn permissions.",
+  })),
+});
 
 console.log("\nBuild proof sequence passed.");

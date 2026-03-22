@@ -28,6 +28,14 @@ export type HealthSummary = {
   };
 };
 
+export type ExternalHealthSummary = {
+  ok: boolean;
+  service: string;
+  ts: number;
+  status: "ok" | "degraded" | "down";
+  summary: string;
+};
+
 export type PublicHealthSnapshot = {
   ok: boolean;
   service: string;
@@ -68,6 +76,22 @@ function toLatencyDetails(startedAt: number, details?: Record<string, unknown>) 
   return {
     latencyMs: Math.max(1, Date.now() - startedAt),
     ...(details || {}),
+  };
+}
+
+function externalSummaryText(status: HealthSummary["status"]) {
+  if (status === "ok") return "Core service readiness is operating normally.";
+  if (status === "degraded") return "Core service readiness is degraded.";
+  return "Core service readiness is unavailable.";
+}
+
+export function toExternalHealthSummary(summary: HealthSummary): ExternalHealthSummary {
+  return {
+    ok: summary.ok,
+    service: summary.service,
+    ts: summary.ts,
+    status: summary.status,
+    summary: externalSummaryText(summary.status),
   };
 }
 
@@ -527,7 +551,7 @@ export async function getCachedPublicHealthSnapshot(): Promise<PublicHealthSnaps
         ok: false,
         service: "cyang.io",
         ts: Date.now(),
-        error: error instanceof Error ? error.message.slice(0, 120) : "SERVER_ERROR",
+        error: "SERVER_ERROR",
       };
     } finally {
       publicHealthInFlight = null;

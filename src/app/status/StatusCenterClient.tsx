@@ -690,8 +690,7 @@ export default function StatusCenterClient({ preview }: { preview?: StatusPrevie
             <div className="text-xs uppercase tracking-[0.16em] text-[var(--text-faint)]">Overall platform status</div>
             <h2 className="mt-2 text-2xl font-semibold text-slate-950">Live summary and service coverage</h2>
             <p className="mt-3 max-w-2xl text-sm text-[var(--text-secondary)]">
-              Public traffic reads a cached health snapshot, while authenticated operators can still drill into deeper
-              diagnostics through the linked readiness and dependency endpoints.
+              Public traffic reads a cached readiness snapshot. Deeper dependency diagnostics stay on operator-only surfaces.
             </p>
           </div>
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
@@ -866,7 +865,6 @@ export default function StatusCenterClient({ preview }: { preview?: StatusPrevie
           <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-[var(--text-faint)]">
             <a href="/api/health/live" target="_blank" rel="noreferrer" className="subtle-link underline">Live</a>
             <a href="/api/health/ready" target="_blank" rel="noreferrer" className="subtle-link underline">Ready</a>
-            <a href="/api/health/deps" target="_blank" rel="noreferrer" className="subtle-link underline">Dependencies</a>
           </div>
         </div>
       </details>

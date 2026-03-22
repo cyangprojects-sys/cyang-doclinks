@@ -5,6 +5,7 @@ import { enforceGlobalApiRateLimit } from "@/lib/securityTelemetry";
 import { getCachedPublicHealthSnapshot } from "@/lib/health";
 import { getRouteTimeoutMs, isRouteTimeoutError, withRouteTimeout } from "@/lib/routeTimeout";
 import { withRequestTelemetry } from "@/lib/perfTelemetry";
+import { jsonError } from "@/lib/apiResponses";
 
 const PUBLIC_STATUS_S_MAXAGE = 300;
 const PUBLIC_STATUS_STALE_WHILE_REVALIDATE = 900;
@@ -24,16 +25,12 @@ export async function GET(req: NextRequest) {
           strict: true,
         });
         if (!rl.ok) {
-          return NextResponse.json(
-            { ok: false, error: "RATE_LIMIT" },
-            {
-              status: rl.status,
-              headers: {
-                "Retry-After": String(rl.retryAfterSeconds),
-                "Cache-Control": "no-store",
-              },
-            }
-          );
+          return jsonError("RATE_LIMIT", rl.status, {
+            headers: {
+              "Retry-After": String(rl.retryAfterSeconds),
+              "Cache-Control": "no-store",
+            },
+          });
         }
 
         const snapshot = await getCachedPublicHealthSnapshot();
@@ -49,14 +46,8 @@ export async function GET(req: NextRequest) {
     );
   } catch (error: unknown) {
     if (isRouteTimeoutError(error)) {
-      return NextResponse.json(
-        { ok: false, error: "TIMEOUT" },
-        { status: 504, headers: { "Cache-Control": "no-store" } }
-      );
+      return jsonError("TIMEOUT", 504, { headers: { "Cache-Control": "no-store" } });
     }
-    return NextResponse.json(
-      { ok: false, error: "SERVER_ERROR" },
-      { status: 500, headers: { "Cache-Control": "no-store" } }
-    );
+    return jsonError("SERVER_ERROR", 500, { headers: { "Cache-Control": "no-store" } });
   }
 }

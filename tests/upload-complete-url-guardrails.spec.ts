@@ -7,7 +7,7 @@ test.describe("upload complete URL guardrails", () => {
     expect(code.includes("resolvePublicAppBaseUrl(req.url)")).toBeTruthy();
     expect(code.includes("enforceGlobalApiRateLimit(")).toBeTruthy();
     expect(code.includes("parseJsonBodyLength(")).toBeTruthy();
-    expect(code.includes('error: "PAYLOAD_TOO_LARGE"')).toBeTruthy();
+    expect(code.includes('jsonError("PAYLOAD_TOO_LARGE"')).toBeTruthy();
     expect(code.includes("http://localhost:3000")).toBeFalsy();
   });
 

@@ -13,6 +13,7 @@ npm run production-readiness
 It validates:
 
 - `.env.example` completeness
+- documented intentional extras in `.env.example`
 - ordered migration manifest integrity
 - admin-route guard audit
 - lint
@@ -37,6 +38,12 @@ It fails on:
 - missing malware scanning config
 - pending or drifted database migrations when `DATABASE_URL` is set
 
+`release:gate` now writes a truthful runtime summary when requested:
+
+- runtime env audit passed / failed / skipped
+- migration status current / failed / skipped
+- clear distinction between repo/build proof and live env proof
+
 ## Recommended Deployment Sequence
 
 1. `npm ci`
@@ -51,6 +58,7 @@ It fails on:
 
 ## Related Docs
 
+- `docs/environment-ownership.md`
 - `docs/database-migrations.md`
 - `docs/staging-fire-drill.md`
 - `docs/backup-recovery-runbook.md`
