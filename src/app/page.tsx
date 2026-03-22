@@ -2,16 +2,18 @@ import type { Metadata } from "next";
 import { BackgroundVideoSection, ScrollRevealFrame } from "./components/CinematicClient";
 import { AmbientScene, SectionTransition, StoryBand, VisualSignalCluster } from "./components/CinematicScene";
 import {
+  ArrowLink,
   CTAGroup,
+  ComparisonMatrix,
   ContentRail,
   DocumentIndexList,
   DocumentVisual,
   Eyebrow,
   Lead,
-  LinkTile,
-  MaturityBadge,
-  PremiumCard,
+  ProofStepBand,
   Section,
+  SenderRecipientProof,
+  UseCaseClusterGrid,
 } from "./components/PublicPrimitives";
 import { SiteShell } from "./components/SiteShell";
 import { getPublicRuntimeConfig } from "@/lib/publicRuntimeConfig";
@@ -24,30 +26,6 @@ export const metadata: Metadata = {
     "Doclinks helps teams securely share sensitive documents, keep control after sending, and prove trust through real security, legal, and operational surfaces.",
 };
 
-const STUDIO_ITEMS = [
-  {
-    href: "/doclinks",
-    title: "Doclinks",
-    body: "Securely share sensitive documents with access controls, visibility, and control after send.",
-    badge: <MaturityBadge tone="live">Flagship</MaturityBadge>,
-    meta: "Live now",
-  },
-  {
-    href: "/trust",
-    title: "Trust Systems",
-    body: "A reviewable operating layer for legal, security, status, disclosure, and procurement surfaces.",
-    badge: <MaturityBadge tone="build">Platform trust</MaturityBadge>,
-    meta: "Growing system",
-  },
-  {
-    href: "/products",
-    title: "Systems Lab",
-    body: "A future-facing lane for adjacent workflow products that can inherit the same discipline without losing focus.",
-    badge: <MaturityBadge tone="lab">Expansion path</MaturityBadge>,
-    meta: "Studio direction",
-  },
-];
-
 const TRUST_DOCUMENTS = [
   { href: "/status", title: "Status", body: "Public operational health and updates." },
   { href: "/trust", title: "Trust Center", body: "A structured review path for controls, privacy, and operations." },
@@ -57,53 +35,33 @@ const TRUST_DOCUMENTS = [
   { href: "/trust/procurement", title: "Procurement Package", body: "Fast path for business, legal, and security review." },
 ];
 
-const OPERATING_BANDS = [
+const HOW_IT_WORKS_STEPS = [
   {
-    eyebrow: "Upload",
-    title: "Start with a secure upload path, not an email attachment.",
-    body: "Files enter a protected path with validation, storage boundaries, and a clean workflow state from the beginning.",
-    signal: [
-      { label: "Input", value: "Validated before delivery" },
-      { label: "Storage", value: "Private by default" },
-      { label: "Intent", value: "Built for sensitive files" },
-    ],
+    title: "Upload",
+    body: "Start with a secure path built for contracts, records, financial files, and other private documents.",
+    signal: "Validated path",
   },
   {
-    eyebrow: "Protect",
-    title: "Set access rules before the file ever leaves your hands.",
-    body: "Attach expiration, revocation, download posture, and bounded access rules to the share instead of hoping the recipient handles it carefully.",
-    signal: [
-      { label: "Access", value: "Tokenized and policy-bound" },
-      { label: "Lifecycle", value: "Expiry and revocation built in" },
-      { label: "Risk posture", value: "Less stale exposure" },
-    ],
+    title: "Protect",
+    body: "Set expiry, revoke access, bound views, and decide whether download is allowed before you send.",
+    signal: "Policy attached",
   },
   {
-    eyebrow: "Share",
-    title: "Send a protected link instead of an unbounded file.",
-    body: "Recipients get a calm, professional delivery experience while the system keeps the control layer on the server side.",
-    signal: [
-      { label: "Recipient UX", value: "Clear and professional" },
-      { label: "Serving", value: "Checked in real time" },
-      { label: "Experience", value: "Simple for both sides" },
-    ],
+    title: "Share",
+    body: "Send a protected link instead of an attachment or a generic file URL that keeps drifting around.",
+    signal: "Clean recipient UX",
   },
   {
-    eyebrow: "Control",
-    title: "Keep control after sending.",
-    body: "See what happened, revoke when needed, and rely on public trust surfaces that support serious review when buyers or stakeholders ask questions.",
-    signal: [
-      { label: "Visibility", value: "Reviewable delivery activity" },
-      { label: "Trust", value: "Status, legal, and disclosure visible" },
-      { label: "Follow-up", value: "Control does not end at send" },
-    ],
+    title: "Control after send",
+    body: "Serve-time checks, scan-gated release, and delivery visibility keep the sender in control after delivery starts.",
+    signal: "Serve-time enforced",
   },
 ];
 
 const AUDIENCE_ITEMS = [
   {
     title: "Finance and operations",
-    body: "For invoices, statements, closing documents, and other files that should not bounce around as attachments.",
+    body: "For invoices, statements, closing documents, and records that should not bounce around as attachments.",
   },
   {
     title: "HR and people workflows",
@@ -112,6 +70,10 @@ const AUDIENCE_ITEMS = [
   {
     title: "Legal and compliance-heavy teams",
     body: "For contracts, notices, and review materials where control, retention, and follow-up matter.",
+  },
+  {
+    title: "Small businesses with private client records",
+    body: "For firms that need a more professional, controlled delivery path without enterprise complexity.",
   },
 ];
 
@@ -152,6 +114,16 @@ export default function HomePage() {
                   },
                 ]}
               />
+              <div className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-[var(--text-secondary)]">
+                <span>Safer than email attachments</span>
+                <span>More control than generic links</span>
+                <span>Sender keeps control after send</span>
+              </div>
+              <div className="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-sm">
+                {publicConfig.showPricingUi ? <ArrowLink href="/pricing">Review pricing</ArrowLink> : null}
+                <ArrowLink href="/trust">Review trust</ArrowLink>
+                <ArrowLink href="/doclinks">See the product</ArrowLink>
+              </div>
             </ScrollRevealFrame>
 
             <ScrollRevealFrame delay={120} className="floating-stage p-6 sm:p-7">
@@ -242,64 +214,82 @@ export default function HomePage() {
         </ContentRail>
       </Section>
 
-      <SectionTransition label="Operating thesis" />
-
-      <Section className="py-20 sm:py-24">
-        <ContentRail className="space-y-14">
-          {OPERATING_BANDS.map((band, index) => (
-            <ScrollRevealFrame key={band.eyebrow} delay={index * 90}>
-              <div className="floating-stage relative overflow-hidden px-6 py-8 sm:px-8 sm:py-10">
-                <AmbientScene tone={index === 2 ? "steel" : "cool"} className="opacity-80" />
-                <div className="relative grid gap-8 lg:grid-cols-[minmax(0,1fr)_380px] lg:items-end">
-                  <div>
-                    <div className="text-[11px] uppercase tracking-[0.24em] text-[var(--text-faint)]">{band.eyebrow}</div>
-                    <h2 className="mt-4 max-w-4xl text-balance text-4xl font-semibold tracking-[-0.05em] text-slate-950 sm:text-5xl lg:text-6xl">
-                      {band.title}
-                    </h2>
-                    <p className="mt-5 max-w-2xl text-base leading-8 text-[var(--text-secondary)] sm:text-lg">{band.body}</p>
-                  </div>
-                  <VisualSignalCluster title={`${band.eyebrow} signals`} items={band.signal} />
-                </div>
-              </div>
-            </ScrollRevealFrame>
-          ))}
-        </ContentRail>
-      </Section>
-
-      <SectionTransition label="Studio expansion" />
+      <SectionTransition label="How it works" />
 
       <Section className="py-20 sm:py-24">
         <ContentRail>
-          <div className="grid gap-8 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] lg:items-start">
-            <ScrollRevealFrame className="lg:sticky lg:top-28">
-              <div className="text-[11px] uppercase tracking-[0.24em] text-[var(--text-faint)]">Product studio</div>
-              <h2 className="mt-4 text-balance text-4xl font-semibold tracking-[-0.05em] text-slate-950 sm:text-5xl lg:text-6xl">
-                Broader than one product. Still sharply edited.
-              </h2>
-              <p className="mt-5 max-w-xl text-base leading-8 text-[var(--text-secondary)] sm:text-lg">
-                The studio is built to hold future systems without losing the clarity that makes the flagship credible.
-              </p>
-            </ScrollRevealFrame>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              {STUDIO_ITEMS.map((item, index) => (
-                <ScrollRevealFrame
-                  key={item.href}
-                  delay={120 + index * 90}
-                  className={index === 1 ? "sm:translate-y-8" : index === 2 ? "sm:-translate-y-4 sm:col-span-2" : undefined}
-                >
-                  <LinkTile
-                    href={item.href}
-                    title={item.title}
-                    body={item.body}
-                    meta={item.meta}
-                    badge={item.badge}
-                    ctaLabel="Open"
-                  />
-                </ScrollRevealFrame>
-              ))}
+          <ScrollRevealFrame>
+            <div className="grid gap-8 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:items-end">
+              <div className="max-w-3xl">
+                <div className="text-[11px] uppercase tracking-[0.24em] text-[var(--text-faint)]">How it works</div>
+                <h2 className="mt-4 text-balance text-4xl font-semibold tracking-[-0.05em] text-slate-950 sm:text-5xl lg:text-6xl">
+                  A cleaner sharing flow with visible control at every step.
+                </h2>
+                <p className="mt-5 max-w-2xl text-base leading-8 text-[var(--text-secondary)] sm:text-lg">
+                  The product flow stays simple for the sender and calm for the recipient, while the important rules
+                  remain enforced by the system.
+                </p>
+              </div>
+              <DocumentVisual
+                rows={[
+                  { label: "Upload", value: "Validated", tone: "accent" },
+                  { label: "Protection", value: "Expiry, revocation, views", tone: "warm" },
+                  { label: "Delivery", value: "Protected link", tone: "neutral" },
+                  { label: "After send", value: "Visibility still available", tone: "neutral" },
+                ]}
+                footer="A simple sender flow backed by real enforcement instead of wishful sharing behavior."
+              />
             </div>
-          </div>
+          </ScrollRevealFrame>
+
+          <ScrollRevealFrame delay={120} className="mt-10">
+            <ProofStepBand steps={HOW_IT_WORKS_STEPS} />
+          </ScrollRevealFrame>
+        </ContentRail>
+      </Section>
+
+      <SectionTransition label="Product proof" />
+
+      <Section className="py-20 sm:py-24">
+        <ContentRail>
+          <ScrollRevealFrame>
+            <div className="max-w-3xl">
+              <div className="text-[11px] uppercase tracking-[0.24em] text-[var(--text-faint)]">Product proof</div>
+              <h2 className="mt-4 text-balance text-4xl font-semibold tracking-[-0.05em] text-slate-950 sm:text-5xl lg:text-6xl">
+                Show the control layer instead of asking visitors to imagine it.
+              </h2>
+              <p className="mt-5 max-w-2xl text-base leading-8 text-[var(--text-secondary)] sm:text-lg">
+                Doclinks is not just a file link. The sender chooses the rules, the recipient gets a clean experience,
+                and the system keeps the important decisions at serve time.
+              </p>
+            </div>
+          </ScrollRevealFrame>
+
+          <ScrollRevealFrame delay={120} className="mt-10">
+            <SenderRecipientProof
+              sender={{
+                title: "The sender keeps the levers that matter.",
+                body: "Choose how the document can be opened, how long it stays valid, and whether delivery remains available after the workflow ends.",
+                chips: ["Expiry", "Revocation", "Download allowed / blocked", "Bounded views", "Scan-gated release"],
+                proof: [
+                  "Set an expiry date instead of leaving the link open-ended.",
+                  "Revoke access immediately if the workflow changes.",
+                  "Allow or block download depending on the document.",
+                  "Keep delivery activity visible enough for real follow-up.",
+                ],
+              }}
+              recipient={{
+                title: "The recipient sees a calm, professional delivery flow.",
+                body: "Recipients get a focused viewing experience instead of a messy file-sharing interface, while the server keeps checking the current policy state.",
+                chips: ["Clean access page", "Professional viewing", "No noisy dashboard", "Serve-time checks"],
+                proof: [
+                  "Protected link opens into a clear branded delivery page.",
+                  "Unsafe or unscanned files fail closed before release.",
+                  "Access decisions happen in real time, not just when the link was created.",
+                ],
+              }}
+            />
+          </ScrollRevealFrame>
         </ContentRail>
       </Section>
 
@@ -321,19 +311,9 @@ export default function HomePage() {
               </div>
             </ScrollRevealFrame>
 
-            <div className="grid gap-4 md:grid-cols-3">
-              {AUDIENCE_ITEMS.map((item, index) => (
-                <ScrollRevealFrame key={item.title} delay={index * 90}>
-                  <PremiumCard className="h-full">
-                    <div className="text-[11px] uppercase tracking-[0.22em] text-[var(--text-faint)]">
-                      {String(index + 1).padStart(2, "0")}
-                    </div>
-                    <div className="mt-4 text-2xl font-semibold tracking-[-0.04em] text-slate-950">{item.title}</div>
-                    <p className="mt-4 text-sm leading-7 text-[var(--text-secondary)]">{item.body}</p>
-                  </PremiumCard>
-                </ScrollRevealFrame>
-              ))}
-            </div>
+            <ScrollRevealFrame delay={120}>
+              <UseCaseClusterGrid items={AUDIENCE_ITEMS} />
+            </ScrollRevealFrame>
           </div>
         </ContentRail>
       </Section>
@@ -360,35 +340,6 @@ export default function HomePage() {
               </div>
             </div>
           </ScrollRevealFrame>
-        </ContentRail>
-      </Section>
-
-      <Section className="py-18 sm:py-22">
-        <ContentRail>
-          <div className="grid gap-6 lg:grid-cols-[280px_minmax(0,1fr)] lg:items-center">
-            <ScrollRevealFrame>
-              <div className="floating-stage flex min-h-[320px] flex-col items-center justify-center text-center p-8">
-                <div className="grid h-28 w-28 place-items-center rounded-sm border border-[var(--border-subtle)] bg-white text-3xl font-semibold tracking-[0.08em] text-slate-950 shadow-[var(--shadow-soft)]">
-                  CY
-                </div>
-                <div className="mt-6 text-lg font-semibold text-slate-950">Built by Chang Yang</div>
-              </div>
-            </ScrollRevealFrame>
-
-            <ScrollRevealFrame delay={120}>
-              <div className="px-0 py-2 sm:px-4">
-                <div className="text-[11px] uppercase tracking-[0.24em] text-[var(--text-faint)]">Founder statement</div>
-                <h2 className="mt-4 text-balance text-4xl font-semibold tracking-[-0.05em] text-slate-950 sm:text-5xl">
-                  Practical software, architecture-level controls, and no appetite for noise.
-                </h2>
-                <p className="mt-5 max-w-2xl text-base leading-8 text-[var(--text-secondary)] sm:text-lg">
-                  cyang.io is built as a long-term home for useful systems that remain calm on the surface and strict
-                  where risk actually lives.
-                </p>
-                <CTAGroup className="mt-8" actions={[{ href: "/about", label: "About cyang.io", tone: "secondary" }]} />
-              </div>
-            </ScrollRevealFrame>
-          </div>
         </ContentRail>
       </Section>
 

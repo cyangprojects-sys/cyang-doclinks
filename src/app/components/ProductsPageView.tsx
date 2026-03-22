@@ -9,6 +9,7 @@ import {
   PremiumCard,
   Section,
 } from "./PublicPrimitives";
+import type { PublicRuntimeConfig } from "@/lib/publicRuntimeConfig";
 
 type ProductItem = {
   title: string;
@@ -79,7 +80,7 @@ function ProductCard({ item }: { item: ProductItem }) {
   );
 }
 
-export function ProductsPageView() {
+export function ProductsPageView({ publicConfig }: { publicConfig: PublicRuntimeConfig }) {
   return (
     <>
       <Section className="pt-10 sm:pt-14">
@@ -98,6 +99,7 @@ export function ProductsPageView() {
                   className="mt-8"
                   actions={[
                     { href: "/doclinks", label: "Explore Doclinks", tone: "primary" },
+                    ...(publicConfig.showPricingUi ? [{ href: "/pricing", label: "View pricing", tone: "secondary" as const }] : []),
                     { href: "/trust", label: "Review Trust", tone: "secondary" },
                   ]}
                 />
@@ -213,8 +215,8 @@ export function ProductsPageView() {
                 </div>
                 <CTAGroup
                   actions={[
-                    { href: "/trust", label: "Review Trust", tone: "primary" },
-                    { href: "/contact", label: "Contact", tone: "secondary" },
+                    { href: "/doclinks", label: "Explore Doclinks", tone: "primary" },
+                    ...(publicConfig.showPricingUi ? [{ href: "/pricing", label: "View pricing", tone: "secondary" as const }] : [{ href: "/contact", label: "Contact", tone: "secondary" as const }]),
                   ]}
                 />
               </div>

@@ -503,6 +503,41 @@ export function TimelineSteps({
   );
 }
 
+export function ProofStepBand({
+  steps,
+}: {
+  steps: Array<{ title: string; body: string; signal: string }>;
+}) {
+  return (
+    <div className="grid gap-4 lg:grid-cols-4">
+      {steps.map((step, index) => (
+        <PremiumCard
+          key={step.title}
+          strong
+          className={cn(
+            "relative h-full overflow-hidden",
+            index === 1 && "lg:translate-y-8",
+            index === 2 && "lg:-translate-y-6",
+            index === 3 && "lg:translate-y-4"
+          )}
+        >
+          <AmbientGradient />
+          <div className="relative">
+            <div className="flex items-center justify-between gap-3">
+              <div className="text-[11px] uppercase tracking-[0.22em] text-[var(--text-faint)]">
+                {String(index + 1).padStart(2, "0")}
+              </div>
+              <span className="selection-pill rounded-sm px-2.5 py-1 text-[11px]">{step.signal}</span>
+            </div>
+            <h3 className="mt-6 text-2xl font-semibold tracking-[-0.04em] text-slate-950">{step.title}</h3>
+            <p className="mt-4 text-sm leading-7 text-[var(--text-secondary)]">{step.body}</p>
+          </div>
+        </PremiumCard>
+      ))}
+    </div>
+  );
+}
+
 export function VisualProofBand({
   items,
 }: {
@@ -650,6 +685,143 @@ export function DocumentVisual({
         </div>
         {footer ? <div className="mt-4 rounded-sm border border-[var(--border-subtle)] bg-[var(--surface-soft)] p-4 text-xs text-[var(--text-secondary)]">{footer}</div> : null}
       </div>
+    </div>
+  );
+}
+
+export function SenderRecipientProof({
+  sender,
+  recipient,
+}: {
+  sender: { title: string; body: string; chips: string[]; proof: string[] };
+  recipient: { title: string; body: string; chips: string[]; proof: string[] };
+}) {
+  return (
+    <div className="grid gap-4 lg:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)]">
+      <PremiumCard strong className="relative overflow-hidden">
+        <AmbientGradient />
+        <div className="relative">
+          <MetaLabel>Sender controls</MetaLabel>
+          <h3 className="mt-4 text-3xl font-semibold tracking-[-0.04em] text-slate-950">{sender.title}</h3>
+          <p className="mt-4 max-w-2xl text-base leading-8 text-[var(--text-secondary)]">{sender.body}</p>
+          <div className="mt-6 flex flex-wrap gap-2">
+            {sender.chips.map((chip) => (
+              <span key={chip} className="selection-pill rounded-sm px-3 py-1.5 text-xs">
+                {chip}
+              </span>
+            ))}
+          </div>
+          <div className="mt-8 grid gap-3 sm:grid-cols-2">
+            {sender.proof.map((item, index) => (
+              <div key={item} className="rounded-sm border border-[var(--border-subtle)] bg-white/90 p-4 shadow-[var(--shadow-soft)]">
+                <div className="text-[11px] uppercase tracking-[0.22em] text-[var(--text-faint)]">
+                  {String(index + 1).padStart(2, "0")}
+                </div>
+                <div className="mt-3 text-sm leading-7 text-[var(--text-secondary)]">{item}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </PremiumCard>
+
+      <PremiumCard className="relative overflow-hidden">
+        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.72),rgba(240,244,248,0.9))]" />
+        <div className="relative">
+          <MetaLabel>Recipient experience</MetaLabel>
+          <h3 className="mt-4 text-3xl font-semibold tracking-[-0.04em] text-slate-950">{recipient.title}</h3>
+          <p className="mt-4 max-w-xl text-base leading-8 text-[var(--text-secondary)]">{recipient.body}</p>
+          <div className="mt-6 flex flex-wrap gap-2">
+            {recipient.chips.map((chip) => (
+              <span key={chip} className="selection-pill rounded-sm px-3 py-1.5 text-xs">
+                {chip}
+              </span>
+            ))}
+          </div>
+          <div className="mt-8 space-y-3">
+            {recipient.proof.map((item, index) => (
+              <div key={item} className="flex items-start gap-3 rounded-sm border border-[var(--border-subtle)] bg-white/92 p-4 shadow-[var(--shadow-soft)]">
+                <span className="mt-1 grid h-7 w-7 flex-none place-items-center rounded-sm bg-[var(--surface-selected)] text-[11px] font-medium text-[var(--accent-primary)]">
+                  {index + 1}
+                </span>
+                <div className="text-sm leading-7 text-[var(--text-secondary)]">{item}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </PremiumCard>
+    </div>
+  );
+}
+
+export function ComparisonMatrix({
+  columns,
+  rows,
+}: {
+  columns: string[];
+  rows: Array<{ label: string; values: string[] }>;
+}) {
+  return (
+    <div className="overflow-hidden rounded-sm border border-[var(--border-subtle)] bg-white shadow-[var(--shadow-soft)]">
+      <div className="grid grid-cols-[minmax(140px,1.2fr)_repeat(3,minmax(0,1fr))] border-b border-[var(--border-subtle)] bg-[var(--surface-soft)] text-xs uppercase tracking-[0.18em] text-[var(--text-faint)]">
+        <div className="px-4 py-4 sm:px-5">Comparison</div>
+        {columns.map((column) => (
+          <div key={column} className="px-4 py-4 text-center sm:px-5">
+            {column}
+          </div>
+        ))}
+      </div>
+      {rows.map((row, rowIndex) => (
+        <div
+          key={row.label}
+          className={cn(
+            "grid grid-cols-[minmax(140px,1.2fr)_repeat(3,minmax(0,1fr))]",
+            rowIndex !== 0 && "border-t border-[var(--border-subtle)]"
+          )}
+        >
+          <div className="px-4 py-4 text-sm font-medium text-slate-950 sm:px-5">{row.label}</div>
+          {row.values.map((value, index) => (
+            <div
+              key={`${row.label}-${index}`}
+              className={cn(
+                "px-4 py-4 text-sm leading-7 text-[var(--text-secondary)] sm:px-5",
+                index === 2 && "bg-[linear-gradient(180deg,rgba(230,239,255,0.28),rgba(255,255,255,0.9))]"
+              )}
+            >
+              {value}
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export function UseCaseClusterGrid({
+  items,
+}: {
+  items: Array<{ title: string; body: string; points?: string[] }>;
+}) {
+  return (
+    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      {items.map((item, index) => (
+        <PremiumCard key={item.title} className="h-full">
+          <div className="text-[11px] uppercase tracking-[0.22em] text-[var(--text-faint)]">
+            {String(index + 1).padStart(2, "0")}
+          </div>
+          <h3 className="mt-4 text-2xl font-semibold tracking-[-0.04em] text-slate-950">{item.title}</h3>
+          <p className="mt-4 text-sm leading-7 text-[var(--text-secondary)]">{item.body}</p>
+          {item.points?.length ? (
+            <ul className="mt-6 space-y-2">
+              {item.points.map((point) => (
+                <li key={point} className="flex gap-3 text-sm leading-7 text-[var(--text-secondary)]">
+                  <span className="mt-3 h-1.5 w-1.5 flex-none rounded-full bg-[var(--accent-primary)]/70" />
+                  <span>{point}</span>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </PremiumCard>
+      ))}
     </div>
   );
 }

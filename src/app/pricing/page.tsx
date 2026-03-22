@@ -11,7 +11,7 @@ export const revalidate = 300;
 export const metadata: Metadata = {
   title: "Pricing - Doclinks",
   description:
-    "Transparent Free and Pro pricing for Doclinks secure document sharing, with clear limits, security defaults, and straightforward upgrade paths.",
+    "Transparent Free and Pro pricing for secure document sharing with protected links, sender controls, and straightforward upgrade paths.",
 };
 
 type PlanFeature = {
@@ -27,10 +27,10 @@ type ComparisonGroup = {
 };
 
 const TRUST_CHIPS = [
-  "Encryption by default",
-  "Virus scan before delivery",
-  "Server-side policy enforcement",
-  "Audit-ready controls",
+  "Protected links",
+  "Expiry and revocation",
+  "Scan-gated delivery",
+  "Trust center included",
 ];
 
 const WHY_UPGRADE = [
@@ -184,6 +184,12 @@ export default function PricingPage() {
             richer control, and stronger operational visibility.
           </p>
 
+          <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-[var(--text-secondary)]">
+            <span>For contracts, HR records, financial files, and client documents</span>
+            <span>Safer than attachments</span>
+            <span>More control after send</span>
+          </div>
+
           <div className="mt-7 flex flex-wrap gap-2">
             {TRUST_CHIPS.map((chip) => (
               <span key={chip} className="selection-pill rounded-sm px-3 py-1.5 text-xs">
@@ -202,6 +208,9 @@ export default function PricingPage() {
             <Link href="/doclinks" className="btn-base btn-secondary rounded-sm px-6 py-3 text-sm">
               View Doclinks
             </Link>
+            <Link href="/trust" className="btn-base btn-secondary rounded-sm px-6 py-3 text-sm">
+              Review trust
+            </Link>
           </div>
         </div>
 
@@ -209,11 +218,12 @@ export default function PricingPage() {
           <div className="surface-panel-strong p-6">
             <div className="text-xs uppercase tracking-[0.14em] text-[var(--text-faint)]">At a glance</div>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <SummaryCard title="Free" price="$0/mo" subtitle="Best for validating workflow" />
-              <SummaryCard title="Pro" price="$12/mo" subtitle="Best for higher-volume delivery" pro />
+              <SummaryCard title="Free" price="$0/mo" subtitle="Best for replacing attachments and proving the workflow" />
+              <SummaryCard title="Pro" price="$12/mo" subtitle="Best for steady client delivery and richer control" pro />
             </div>
             <p className="mt-4 text-xs leading-relaxed text-[var(--text-secondary)]">
-              Both plans include enforced security baseline controls. Pro adds capacity, automation, and deeper visibility.
+              Both plans keep the secure-sharing baseline. Pro adds more room, stronger control depth, automation, and
+              deeper visibility for ongoing document delivery.
             </p>
           </div>
         </div>
@@ -223,7 +233,7 @@ export default function PricingPage() {
         <SectionIntro
           eyebrow="Plans"
           title="Choose the plan that matches your delivery volume"
-          body="Free supports proof-of-workflow and light use. Pro is built for customer-facing operations that need more throughput and richer control surfaces."
+          body="Free supports real secure-sharing workflows at light volume. Pro is for customer-facing delivery that needs more throughput, more control, and more visibility."
         />
 
         <div className="mt-8 grid gap-4 lg:grid-cols-2">
@@ -251,7 +261,7 @@ export default function PricingPage() {
         <SectionIntro
           eyebrow="Why upgrade"
           title="Why Pro exists"
-          body="Pro is for teams that need more operating headroom, stronger lifecycle flexibility, and richer insight into delivery behavior."
+          body="Pro is for teams that send private documents regularly and need more room, stronger lifecycle flexibility, and richer visibility after send."
         />
 
         <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -283,7 +293,7 @@ export default function PricingPage() {
         <SectionIntro
           eyebrow="Included baseline"
           title="Security posture included on both plans"
-          body="Doclinks is not priced as secure vs insecure. Core safeguards are part of the product baseline across Free and Pro."
+          body="Doclinks is not priced as secure versus insecure. Protected links, scan-gated delivery, and server-side enforcement are part of the baseline across Free and Pro."
         />
 
         <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -297,7 +307,7 @@ export default function PricingPage() {
         <SectionIntro
           eyebrow="Which plan fits"
           title="Quick self-selection"
-          body="If you are validating or sharing occasionally, start Free. If you are running steady external delivery, Pro removes friction and adds depth."
+          body="If you are validating or sharing occasionally, start Free. If you are running steady external delivery for clients, employees, or sensitive records, Pro removes friction and adds depth."
         />
 
         <div className="mt-8 grid gap-4 lg:grid-cols-2">
@@ -342,7 +352,8 @@ export default function PricingPage() {
         <div className="surface-panel-strong p-7 sm:p-8">
           <h2 className="text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">Start with Free. Scale with Pro.</h2>
           <p className="mt-3 max-w-3xl text-sm leading-relaxed text-[var(--text-secondary)]">
-            Choose the plan that matches your delivery stage today, then move up as volume and control requirements grow.
+            Choose the plan that matches your current document-sharing volume, then move up as control and delivery
+            requirements grow.
           </p>
 
           <div className="mt-7 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -353,7 +364,7 @@ export default function PricingPage() {
             />
             <CtaTile href="/signin?intent=admin" title="Upgrade to Pro" body="Existing workspace owners can upgrade instantly." />
             <CtaTile href="/doclinks" title="Learn about Doclinks" body="Review product capabilities and security model." />
-            <CtaTile href="/contact" title="Contact" body="Ask product, pricing, or procurement questions." />
+            <CtaTile href="/trust" title="Review trust" body="Inspect status, legal, disclosure, and procurement surfaces." />
           </div>
         </div>
       </section>

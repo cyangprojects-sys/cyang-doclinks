@@ -15,14 +15,14 @@ import { SiteShell } from "@/app/components/SiteShell";
 export const metadata: Metadata = {
   title: "Trust - cyang.io",
   description:
-    "Trust, made reviewable: security, privacy, legal, status, procurement, and disclosure surfaces for cyang.io and Doclinks.",
+    "Review the security, legal, privacy, status, procurement, and disclosure surfaces behind Doclinks secure document sharing.",
 };
 
 const PILLARS = [
   {
     href: "/legal/security-policy",
     title: "Security",
-    body: "Customer-facing controls, operating posture, and security review context.",
+    body: "The controls and review context behind secure document sharing with Doclinks.",
     meta: "Controls",
   },
   {
@@ -40,7 +40,7 @@ const PILLARS = [
   {
     href: "/status",
     title: "Status",
-    body: "Operational health, public incident visibility, and service continuity signals.",
+    body: "Public continuity signals for the product, platform, and current operational state.",
     meta: "Operations",
   },
   {
@@ -58,10 +58,10 @@ const PILLARS = [
 ];
 
 const PRINCIPLES = [
-  "Controls are enforced server-side rather than left to recipient behavior.",
-  "Scan-gated delivery blocks unsafe file states before public serving.",
-  "Bounded access and lifecycle constraints reduce stale exposure.",
-  "Public operating surfaces stay reviewable enough for serious diligence.",
+  "Access rules stay enforced by the server after the link is sent.",
+  "Scan-gated delivery blocks unsafe file states before recipients can open them.",
+  "Expiry and revocation reduce stale exposure on shared private documents.",
+  "Public status, legal, and disclosure surfaces support real buyer review.",
 ];
 
 const DOCUMENTS = [
@@ -88,17 +88,17 @@ export default function TrustPage() {
               <div className="max-w-4xl">
                 <Eyebrow>Trust hub</Eyebrow>
                 <h1 className="mt-6 max-w-4xl text-balance font-editorial text-5xl leading-[0.95] tracking-[-0.05em] text-slate-950 sm:text-6xl lg:text-[5.4rem]">
-                  Trust, made reviewable.
+                  Review the controls behind Doclinks.
                 </h1>
                 <p className="mt-6 max-w-2xl text-base leading-8 text-[var(--text-secondary)] sm:text-lg">
-                  cyang.io makes its security, legal, privacy, status, and procurement surfaces legible enough for real
-                  evaluation instead of hiding them behind a sales process.
+                  Doclinks is easier to trust because the supporting security, legal, privacy, status, and procurement
+                  surfaces are visible now instead of being hidden behind a sales process.
                 </p>
                 <CTAGroup
                   className="mt-8"
                   actions={[
+                    { href: "/doclinks", label: "See Doclinks", tone: "primary" },
                     { href: "/status", label: "View Status", tone: "secondary" },
-                    { href: "/contact", label: "Contact", tone: "primary" },
                   ]}
                 />
               </div>
@@ -108,9 +108,9 @@ export default function TrustPage() {
               <VisualSignalCluster
                 title="Review posture"
                 items={[
-                  { label: "Security", value: "Server-enforced controls and public disclosure routing." },
-                  { label: "Legal", value: "Core policy surfaces preserved as first-class public references." },
-                  { label: "Operations", value: "Status, reporting, and procurement paths remain discoverable." },
+                  { label: "Product", value: "Secure document sharing with visible supporting controls." },
+                  { label: "Buyer review", value: "Legal, privacy, and procurement routes stay easy to reach." },
+                  { label: "Continuity", value: "Status and disclosure remain public when they matter." },
                 ]}
                 className="min-h-[320px]"
               />
@@ -126,7 +126,7 @@ export default function TrustPage() {
           <StoryBand
             eyebrow="Six pillars"
             title="Organized around the questions serious reviewers actually ask."
-            body="Each pillar leads to a concrete operating surface. The trust hub is not a brochure. It is a route map into the evidence, obligations, and current posture behind the product."
+            body="Each pillar leads to a concrete surface that helps a buyer, reviewer, or customer understand how Doclinks is run and what supports the product promise."
             aside={
               <div className="floating-stage relative min-h-[280px] overflow-hidden rounded-sm p-6">
                 <AmbientScene tone="signal" className="opacity-80" />
@@ -160,11 +160,11 @@ export default function TrustPage() {
               <div className="max-w-2xl">
                 <Eyebrow>Operating principles</Eyebrow>
                 <h2 className="mt-5 text-balance text-4xl font-semibold tracking-[-0.04em] text-slate-950 sm:text-5xl lg:text-6xl">
-                  Trust is anchored in visible operating behavior.
+                  The product promise is backed by visible operating behavior.
                 </h2>
                 <p className="mt-5 max-w-xl text-base leading-8 text-[var(--text-secondary)] sm:text-lg">
-                  The underlying ideas are straightforward: enforce the important controls centrally, limit document
-                  lifetime and exposure, and keep public trust surfaces current enough to review with confidence.
+                  The underlying ideas are straightforward: enforce the important rules centrally, limit document
+                  lifetime and exposure, and keep the supporting public surfaces current enough to review with confidence.
                 </p>
               </div>
 
@@ -195,7 +195,7 @@ export default function TrustPage() {
               </h2>
               <p className="mt-5 text-base leading-8 text-[var(--text-secondary)] sm:text-lg">
                 Use this as the fast route into the legal, privacy, security, and reporting documents most often needed
-                during diligence, procurement, or support review.
+                when evaluating Doclinks for real document-sharing workflows.
               </p>
             </div>
 
@@ -212,16 +212,17 @@ export default function TrustPage() {
               <div className="max-w-3xl">
                 <Eyebrow>Next step</Eyebrow>
                 <h2 className="mt-5 text-balance text-4xl font-semibold tracking-[-0.04em] text-slate-950 sm:text-5xl lg:text-6xl">
-                  Need procurement help, support context, or follow-up on the current posture?
+                  Need product context, procurement help, or follow-up on the current review set?
                 </h2>
                 <p className="mt-5 max-w-2xl text-base leading-8 text-[var(--text-secondary)] sm:text-lg">
-                  The public trust shell is designed to answer most questions quickly. For anything specific, route
-                  directly into contact or live operational status.
+                  The public trust shell is designed to answer most product-review questions quickly. For anything
+                  specific, route into contact or live operational status.
                 </p>
               </div>
               <CTAGroup
                 actions={[
-                  { href: "/contact", label: "Contact", tone: "primary" },
+                  { href: "/doclinks", label: "See Doclinks", tone: "primary" },
+                  { href: "/contact", label: "Contact", tone: "secondary" },
                   { href: "/status", label: "View Status", tone: "secondary" },
                 ]}
               />

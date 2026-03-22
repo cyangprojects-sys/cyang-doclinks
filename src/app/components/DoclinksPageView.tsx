@@ -2,12 +2,15 @@ import { BackgroundVideoSection, ScrollRevealFrame } from "./CinematicClient";
 import { AmbientScene, SectionTransition, StoryBand, VisualSignalCluster } from "./CinematicScene";
 import {
   CTAGroup,
+  ComparisonMatrix,
   ContentRail,
   DocumentIndexList,
   DocumentVisual,
   Eyebrow,
   PremiumCard,
+  SenderRecipientProof,
   Section,
+  UseCaseClusterGrid,
 } from "./PublicPrimitives";
 import type { PublicRuntimeConfig } from "@/lib/publicRuntimeConfig";
 
@@ -112,6 +115,37 @@ const TRUST_DOCUMENTS = [
   { href: "/security-disclosure", title: "Security Disclosure", body: "Responsible reporting expectations and security route." },
 ];
 
+const USE_CASE_CLUSTERS = [
+  {
+    title: "Finance and operations",
+    body: "Share statements, invoices, closings, and internal records with more control than an attachment or a loose cloud URL.",
+    points: ["Time-bound delivery", "Clear recipient path"],
+  },
+  {
+    title: "HR and people operations",
+    body: "Deliver onboarding documents, records, and personnel files with bounded access and a more professional experience.",
+    points: ["Private employee records", "Simple recipient flow"],
+  },
+  {
+    title: "Legal and compliance",
+    body: "Send contracts, review packets, and compliance files with revocation, visibility, and scan-gated release.",
+    points: ["Revocation when terms change", "Reviewable delivery activity"],
+  },
+  {
+    title: "Small businesses with client records",
+    body: "Use a safer external-sharing path without needing a heavyweight enterprise deployment or complex file room.",
+    points: ["Professional delivery", "Straightforward setup"],
+  },
+];
+
+const COMPARISON_ROWS = [
+  { label: "Expiry and revocation", values: ["Not built in", "Often limited or secondary", "First-class controls"] },
+  { label: "Download control", values: ["Attachment is already out", "Usually link-only, not workflow-specific", "Policy-driven per share"] },
+  { label: "Visibility after send", values: ["Very limited", "Often basic or absent", "Delivery activity stays visible"] },
+  { label: "Serve-time enforcement", values: ["No", "Often URL-based access", "Checked on every request"] },
+  { label: "Trust reviewability", values: ["Separate from the send path", "Usually weak", "Connected to public trust surfaces"] },
+];
+
 export function DoclinksPageView({ publicConfig }: { publicConfig: PublicRuntimeConfig }) {
   const primaryAccessHref = publicConfig.signupEnabled ? "/signup" : "/signin?intent=admin";
 
@@ -135,13 +169,14 @@ export function DoclinksPageView({ publicConfig }: { publicConfig: PublicRuntime
               </h1>
               <p className="mt-6 max-w-2xl text-base leading-8 text-[var(--text-secondary)] sm:text-xl">
                 Protect contracts, records, financial files, HR documents, and other private files with protected links,
-                server-side controls, and visibility into what happened after delivery.
+                server-side controls, real-time policy enforcement, and visibility into what happened after delivery.
               </p>
               <CTAGroup
                 className="mt-8"
                 actions={[
                   { href: primaryAccessHref, label: publicConfig.signupEnabled ? "Get started" : "Sign in", tone: "primary" },
                   { href: "/trust", label: "Review Trust", tone: "secondary" },
+                  ...(publicConfig.showPricingUi ? [{ href: "/pricing", label: "View pricing", tone: "secondary" as const }] : []),
                 ]}
               />
             </ScrollRevealFrame>
@@ -216,6 +251,51 @@ export function DoclinksPageView({ publicConfig }: { publicConfig: PublicRuntime
         </ContentRail>
       </Section>
 
+      <SectionTransition label="Product proof" />
+
+      <Section className="py-18 sm:py-24">
+        <ContentRail>
+          <ScrollRevealFrame>
+            <div className="max-w-3xl">
+              <div className="text-[11px] uppercase tracking-[0.24em] text-[var(--text-faint)]">Product proof</div>
+              <h2 className="mt-4 text-balance text-4xl font-semibold tracking-[-0.05em] text-slate-950 sm:text-5xl lg:text-6xl">
+                Visible proof for both sides of the send.
+              </h2>
+              <p className="mt-5 max-w-2xl text-base leading-8 text-[var(--text-secondary)] sm:text-lg">
+                Doclinks gives the sender a serious control layer while keeping the recipient experience calm, clear,
+                and professional.
+              </p>
+            </div>
+          </ScrollRevealFrame>
+
+          <ScrollRevealFrame delay={120} className="mt-10">
+            <SenderRecipientProof
+              sender={{
+                title: "Set the sharing rules before the file leaves your workspace.",
+                body: "Choose expiry, revoke access instantly, decide whether download is available, and keep reviewable delivery visibility after send.",
+                chips: ["Expiry", "Revocation", "Bounded views", "Download allowed / blocked", "Delivery activity"],
+                proof: [
+                  "Policy is attached to the share, not delegated to the recipient.",
+                  "Serve-time checks keep current rules active after send.",
+                  "Scan-gated release blocks risky files before public delivery begins.",
+                  "Visibility remains available for follow-up and support.",
+                ],
+              }}
+              recipient={{
+                title: "Give recipients a clean way to receive private files.",
+                body: "Recipients get a focused delivery experience instead of a noisy dashboard or a raw storage link.",
+                chips: ["Protected link", "Professional viewer", "Real-time checks", "No clutter"],
+                proof: [
+                  "Open a simple delivery page rather than a generic storage interface.",
+                  "Access works only while the current policy allows it.",
+                  "Blocked, expired, or revoked states fail closed instead of drifting open.",
+                ],
+              }}
+            />
+          </ScrollRevealFrame>
+        </ContentRail>
+      </Section>
+
       <SectionTransition label="Feature storytelling" />
 
       <Section className="py-18 sm:py-24">
@@ -239,6 +319,31 @@ export function DoclinksPageView({ publicConfig }: { publicConfig: PublicRuntime
         </ContentRail>
       </Section>
 
+      <SectionTransition label="Why not attachments" />
+
+      <Section className="py-18 sm:py-24">
+        <ContentRail>
+          <ScrollRevealFrame>
+            <div className="grid gap-8 lg:grid-cols-[minmax(0,0.72fr)_minmax(0,1.28fr)] lg:items-start">
+              <div className="max-w-2xl">
+                <div className="text-[11px] uppercase tracking-[0.24em] text-[var(--text-faint)]">Comparison</div>
+                <h2 className="mt-4 text-balance text-4xl font-semibold tracking-[-0.05em] text-slate-950 sm:text-5xl">
+                  Why not email attachments or generic file links?
+                </h2>
+                <p className="mt-5 text-base leading-8 text-[var(--text-secondary)] sm:text-lg">
+                  Attachments and ordinary file links are convenient, but they give the sender very little control once
+                  the document starts moving. Doclinks is built for the moment after send.
+                </p>
+              </div>
+              <ComparisonMatrix
+                columns={["Attachments", "Generic links", "Doclinks"]}
+                rows={COMPARISON_ROWS}
+              />
+            </div>
+          </ScrollRevealFrame>
+        </ContentRail>
+      </Section>
+
       <SectionTransition label="Audience and trust" />
 
       <Section className="py-18 sm:py-24">
@@ -248,21 +353,15 @@ export function DoclinksPageView({ publicConfig }: { publicConfig: PublicRuntime
               <PremiumCard strong className="h-full">
                 <div className="text-[11px] uppercase tracking-[0.24em] text-[var(--text-faint)]">Audience and use cases</div>
                 <h2 className="mt-4 text-balance text-4xl font-semibold tracking-[-0.05em] text-slate-950 sm:text-5xl">
-                  Built for teams that still need to send sensitive files outside their workspace.
+                  Built for buyer-friendly use cases, not just abstract controls.
                 </h2>
-                <ul className="mt-6 space-y-4">
-                  {[
-                    "Operations teams sending time-bound external documents.",
-                    "Compliance workflows that need bounded access and reviewable delivery behavior.",
-                    "Sensitive external sharing for finance, HR, and legal workflows.",
-                    "Small businesses that need stronger trust posture without enterprise complexity.",
-                  ].map((item) => (
-                    <li key={item} className="flex gap-3 text-sm leading-7 text-[var(--text-secondary)]">
-                      <span className="mt-3 h-1.5 w-1.5 flex-none rounded-full bg-[var(--accent-primary)]/80" />
-                      <span>{item}</span>
-                    </li>
-                  ))}
-                </ul>
+                <p className="mt-5 max-w-2xl text-base leading-8 text-[var(--text-secondary)]">
+                  The same control layer matters across several concrete workflows where private files still need to be
+                  shared outside the workspace.
+                </p>
+                <div className="mt-8">
+                  <UseCaseClusterGrid items={USE_CASE_CLUSTERS} />
+                </div>
               </PremiumCard>
             </ScrollRevealFrame>
 
@@ -297,17 +396,17 @@ export function DoclinksPageView({ publicConfig }: { publicConfig: PublicRuntime
                 <div className="max-w-3xl">
                   <div className="text-[11px] uppercase tracking-[0.24em] text-[var(--text-faint)]">Final CTA</div>
                   <h2 className="mt-4 text-balance text-4xl font-semibold tracking-[-0.05em] text-slate-950 sm:text-5xl lg:text-6xl">
-                    Start with Doclinks when delivery needs to stay controlled.
+                    Start with Doclinks when sensitive files need more than a link.
                   </h2>
                   <p className="mt-5 text-base leading-8 text-[var(--text-secondary)] sm:text-lg">
-                    It is the clearest expression of the cyang.io approach: calm UX, bounded exposure, and trust
-                    surfaces that are easy to review.
+                    Use the flagship product path, review trust, and check pricing without leaving the public site.
                   </p>
                 </div>
                 <CTAGroup
                   actions={[
                     { href: primaryAccessHref, label: publicConfig.signupEnabled ? "Start with Doclinks" : "Sign in", tone: "primary" },
-                    { href: "/contact", label: "Contact", tone: "secondary" },
+                    { href: "/trust", label: "Review Trust", tone: "secondary" },
+                    ...(publicConfig.showPricingUi ? [{ href: "/pricing", label: "View pricing", tone: "secondary" as const }] : [{ href: "/contact", label: "Contact", tone: "secondary" as const }]),
                   ]}
                 />
               </div>

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { ProductsPageView } from "../components/ProductsPageView";
 import { SiteShell } from "../components/SiteShell";
+import { getPublicRuntimeConfig } from "@/lib/publicRuntimeConfig";
 
 export const revalidate = 900;
 
@@ -14,9 +15,10 @@ export const metadata: Metadata = {
 };
 
 export default function ProductsPage() {
+  const publicConfig = getPublicRuntimeConfig();
   return (
-    <SiteShell maxWidth="full">
-      <ProductsPageView />
+    <SiteShell maxWidth="full" publicConfig={publicConfig}>
+      <ProductsPageView publicConfig={publicConfig} />
     </SiteShell>
   );
 }
