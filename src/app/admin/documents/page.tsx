@@ -116,7 +116,7 @@ export default async function AdminDocumentsPage({
       {data.missingCoreTables ? (
         <div className="surface-panel rounded-sm p-4 text-sm text-[var(--text-secondary)]">
           <div className="font-medium text-[var(--text-primary)]">Files unavailable</div>
-          <div className="mt-1 text-[var(--text-muted)]">The `public.docs` table is missing.</div>
+          <div className="mt-1 text-[var(--text-muted)]">Document storage is not available for this workspace yet.</div>
         </div>
       ) : (
         <DocumentsWorkspaceClient

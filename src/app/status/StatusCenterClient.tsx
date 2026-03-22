@@ -3,7 +3,13 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useConditionalPolling } from "@/hooks/useConditionalPolling";
-import { deriveStatusPageScenario, type PlatformState, type StatusSnapshot } from "@/lib/statusPageScenario";
+import { platformStatusSummary } from "@/lib/statusCopy";
+import {
+  deriveStatusPageScenario,
+  type PlatformState,
+  type StatusPageScenario,
+  type StatusSnapshot,
+} from "@/lib/statusPageScenario";
 
 type ServiceState = PlatformState;
 type IncidentState = "investigating" | "identified" | "monitoring" | "resolved";
@@ -109,14 +115,24 @@ function statusRank(status: PlatformState) {
   return 1;
 }
 
-function statusConfig(status: PlatformState) {
+function statusConfig(status: StatusPageScenario) {
+  if (status === "snapshot_unavailable") {
+    return {
+      label: "Snapshot unavailable",
+      short: "Unavailable",
+      badge: "border-[rgba(186,104,48,0.18)] bg-[rgba(186,104,48,0.08)] text-[#8e4d14]",
+      dot: "bg-[#d97706]",
+      headline: "Public status snapshot is temporarily unavailable.",
+      summary: "This page is withholding system-level health claims until a fresh public readiness snapshot is available.",
+    };
+  }
   if (status === "operational") {
     return {
       label: "Operational",
       short: "Operational",
       badge: "border-[rgba(40,136,88,0.18)] bg-[rgba(40,136,88,0.08)] text-[var(--success)]",
       dot: "bg-[var(--success)]",
-      headline: "All core systems are operating normally.",
+      headline: platformStatusSummary("operational"),
       summary: "Customers can sign in, share protected links, and access documents without disruption.",
     };
   }
@@ -439,7 +455,7 @@ function normalizeLiveSnapshot(args: {
       snapshot: {
         ok: false,
         service: "cyang.io",
-        ts: Date.now(),
+        ts: null,
         error:
           typeof args.payload?.error === "string"
             ? args.payload.error
@@ -453,7 +469,7 @@ function normalizeLiveSnapshot(args: {
     snapshot: {
       ok: Boolean(args.payload?.ok),
       service: typeof args.payload?.service === "string" ? args.payload.service : "cyang.io",
-      ts: Number(args.payload?.ts || Date.now()),
+      ts: typeof args.payload?.ts === "number" && Number.isFinite(args.payload.ts) && args.payload.ts > 0 ? args.payload.ts : null,
       status:
         args.payload?.status === "ok" ||
         args.payload?.status === "degraded" ||
@@ -530,7 +546,7 @@ export default function StatusCenterClient({ preview }: { preview?: StatusPrevie
       applyLiveSnapshot(next.snapshot, next.errorMsg);
       return next.snapshot;
     } catch {
-      const nextSnapshot = { ok: false, service: "cyang.io", ts: Date.now(), error: "NETWORK" } satisfies StatusSnapshot;
+      const nextSnapshot = { ok: false, service: "cyang.io", ts: null, error: "NETWORK" } satisfies StatusSnapshot;
       applyLiveSnapshot(nextSnapshot, "Unable to reach live telemetry right now. Showing fallback service posture.");
       return nextSnapshot;
     } finally {
@@ -616,21 +632,25 @@ export default function StatusCenterClient({ preview }: { preview?: StatusPrevie
     }
   }, [subscriptionEmail]);
 
-  const scenario = useMemo<PlatformState>(() => {
+  const scenario = useMemo<StatusPageScenario>(() => {
     return deriveStatusPageScenario(snapshot, previewMode);
   }, [previewMode, snapshot]);
   const isPreviewScenario = previewMode !== "live" && previewMode !== "loading";
+  const snapshotUnavailable = !isPreviewScenario && scenario === "snapshot_unavailable";
 
-  const services = useMemo(() => buildServices(scenario), [scenario]);
+  const services = useMemo(() => (snapshotUnavailable ? [] : buildServices(scenario as PlatformState)), [scenario, snapshotUnavailable]);
   const incidents = useMemo(
-    () => (isPreviewScenario ? buildIncidents(scenario) : []),
+    () => (isPreviewScenario ? buildIncidents(scenario as PlatformState) : []),
     [isPreviewScenario, scenario]
   );
   const uptime = useMemo(
-    () => (isPreviewScenario ? buildUptime(scenario) : []),
+    () => (isPreviewScenario ? buildUptime(scenario as PlatformState) : []),
     [isPreviewScenario, scenario]
   );
-  const state = useMemo(() => services.reduce<PlatformState>((worst, cur) => (statusRank(cur.status) > statusRank(worst) ? cur.status : worst), "operational"), [services]);
+  const state = useMemo<StatusPageScenario>(
+    () => (snapshotUnavailable ? "snapshot_unavailable" : services.reduce<PlatformState>((worst, cur) => (statusRank(cur.status) > statusRank(worst) ? cur.status : worst), "operational")),
+    [services, snapshotUnavailable]
+  );
   const stateUi = useMemo(() => statusConfig(state), [state]);
   const uptimePercent = useMemo(() => {
     if (!uptime.length) return null;
@@ -641,13 +661,13 @@ export default function StatusCenterClient({ preview }: { preview?: StatusPrevie
 
   const technical = useMemo(() => ({
     service: snapshot?.service ?? "cyang.io",
-    ok: snapshot?.ok ?? false,
+    ok: snapshotUnavailable ? null : snapshot?.ok ?? false,
     timestamp: snapshot?.ts ?? null,
     environment: (typeof process.env.NEXT_PUBLIC_APP_ENV === "string" && process.env.NEXT_PUBLIC_APP_ENV.trim()) || "production",
     build: (typeof process.env.NEXT_PUBLIC_BUILD_SHA === "string" && process.env.NEXT_PUBLIC_BUILD_SHA.trim()) || "current",
-    status: snapshot?.status ?? null,
-    error: snapshot?.error ?? null,
-  }), [snapshot]);
+    status: snapshotUnavailable ? "snapshot_unavailable" : snapshot?.status ?? null,
+    error: snapshotUnavailable ? "PUBLIC_SNAPSHOT_UNAVAILABLE" : snapshot?.error ?? null,
+  }), [snapshot, snapshotUnavailable]);
 
   if (loading && !snapshot) return <LoadingSkeleton />;
 
@@ -665,11 +685,15 @@ export default function StatusCenterClient({ preview }: { preview?: StatusPrevie
               <span className={`h-2 w-2 rounded-full ${stateUi.dot}`} />
               {stateUi.label}
             </span>
-            <div className="text-xs text-[var(--text-faint)]">Last updated {fmtDateTime(snapshot?.ts ?? null)} ({fmtRelative(snapshot?.ts ?? null)})</div>
+            <div className="text-xs text-[var(--text-faint)]">
+              Last updated {fmtDateTime(snapshot?.ts ?? null)} ({fmtRelative(snapshot?.ts ?? null)})
+            </div>
             <div className="flex items-center gap-2">
               <span className="selection-pill px-2.5 py-1 text-[11px] text-[var(--text-secondary)]">
                 {liveMode
-                  ? snapshot?.ok && snapshot.status === "ok"
+                  ? snapshotUnavailable
+                    ? "Auto-refresh retries while the public snapshot is unavailable"
+                    : snapshot?.ok && snapshot.status === "ok"
                     ? "Auto-refresh slows while healthy"
                     : "Auto-refresh accelerates while degraded"
                   : "Preview mode disables live polling"}
@@ -696,9 +720,13 @@ export default function StatusCenterClient({ preview }: { preview?: StatusPrevie
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
             <div className="surface-panel-soft p-4">
               <div className="text-xs uppercase tracking-[0.16em] text-[var(--text-faint)]">30-day uptime</div>
-              <div className="mt-2 text-2xl font-semibold text-slate-950">{uptimePercent != null ? `${uptimePercent.toFixed(2)}%` : "Live snapshot"}</div>
+              <div className="mt-2 text-2xl font-semibold text-slate-950">
+                {snapshotUnavailable ? "Snapshot unavailable" : uptimePercent != null ? `${uptimePercent.toFixed(2)}%` : "Live snapshot"}
+              </div>
               <div className="mt-1 text-sm text-[var(--text-muted)]">
-                {uptimePercent != null
+                {snapshotUnavailable
+                  ? "This public page is waiting for a fresh cached readiness snapshot before publishing service-wide health claims."
+                  : uptimePercent != null
                   ? "Platform availability over the last 30 days."
                   : "Cached public health summary from the current live snapshot."}
               </div>
@@ -719,7 +747,17 @@ export default function StatusCenterClient({ preview }: { preview?: StatusPrevie
           <p className="mt-1 text-sm text-[var(--text-secondary)]">At-a-glance status for key product systems.</p>
         </div>
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {services.map((service) => {
+          {snapshotUnavailable ? (
+            <div className="md:col-span-2 xl:col-span-3 surface-panel-soft border-dashed px-5 py-8 text-center">
+              <div className="text-lg font-semibold text-slate-950">Service-wide snapshot unavailable</div>
+              <p className="mx-auto mt-2 max-w-2xl text-sm text-[var(--text-secondary)]">
+                Public service cards are hidden until a fresh readiness snapshot is available. This avoids showing synthetic per-service states without current backing data.
+              </p>
+              <div className="mt-4 text-xs text-[var(--text-faint)]">
+                Last refresh attempt {fmtDateTime(lastRefreshAt)} ({fmtRelative(lastRefreshAt)})
+              </div>
+            </div>
+          ) : services.map((service) => {
             const ui = statusConfig(service.status);
             return (
               <article key={service.key} className="selection-tile p-4">
@@ -859,12 +897,17 @@ export default function StatusCenterClient({ preview }: { preview?: StatusPrevie
           <p className="mb-3 text-xs text-[var(--text-faint)]">
             This section is intended for engineering review and integration troubleshooting.
           </p>
+          {snapshotUnavailable ? (
+            <div className="mb-3 border border-[rgba(186,104,48,0.18)] bg-[rgba(186,104,48,0.06)] px-3 py-2 text-xs text-[#8e4d14]">
+              The cached public readiness snapshot is unavailable or stale, so this block only shows the current public fallback state.
+            </div>
+          ) : null}
           <pre className="overflow-auto whitespace-pre-wrap text-xs leading-6 text-[var(--text-secondary)]">
 {JSON.stringify(technical, null, 2)}
           </pre>
           <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-[var(--text-faint)]">
             <a href="/api/health/live" target="_blank" rel="noreferrer" className="subtle-link underline">Live</a>
-            <a href="/api/health/ready" target="_blank" rel="noreferrer" className="subtle-link underline">Ready</a>
+            {!snapshotUnavailable ? <a href="/api/health/ready" target="_blank" rel="noreferrer" className="subtle-link underline">Ready</a> : null}
           </div>
         </div>
       </details>

@@ -32,7 +32,16 @@ test.describe("password helpers", () => {
   test("rejects oversized or null-byte password inputs", () => {
     expect(() => hashPassword("x".repeat(4097))).toThrow("INVALID_PASSWORD");
     expect(() => hashPassword("abc\0def")).toThrow("INVALID_PASSWORD");
+    expect(() => hashPassword("abc\tdef")).toThrow("INVALID_PASSWORD");
     expect(verifyPassword("x".repeat(4097), hashPassword("valid-pass-123!"))).toBeFalsy();
     expect(verifyPassword("abc\0def", hashPassword("valid-pass-123!"))).toBeFalsy();
+    expect(verifyPassword("abc\rdef", hashPassword("valid-pass-123!"))).toBeFalsy();
+  });
+
+  test("supports unicode-rich passwords and preserves exact byte-for-byte comparison", () => {
+    const password = "  Strong🔒Пароль漢字123!  ";
+    const hash = hashPassword(password);
+    expect(verifyPassword(password, hash)).toBeTruthy();
+    expect(verifyPassword(password.trim(), hash)).toBeFalsy();
   });
 });

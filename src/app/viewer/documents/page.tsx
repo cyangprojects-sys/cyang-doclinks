@@ -121,7 +121,7 @@ export default async function ViewerDocumentsPage({
       {data.missingCoreTables ? (
         <div className="surface-panel p-4 text-sm text-[var(--text-secondary)]">
           <div className="font-medium text-slate-950">Files unavailable</div>
-          <div className="mt-1 text-[var(--text-secondary)]">The `public.docs` table is missing.</div>
+          <div className="mt-1 text-[var(--text-secondary)]">Document storage is not available for this workspace yet.</div>
         </div>
       ) : (
         <DocumentsWorkspaceClient

@@ -4,6 +4,7 @@ const SCRYPT_KEYLEN = 64;
 const SALT_BYTES = 16;
 const MAX_PASSWORD_LEN = 4096;
 const MAX_STORED_HASH_LEN = 512;
+const PASSWORD_CONTROL_CHAR_RE = /[\u0000-\u001F\u007F]/u;
 
 function b64url(buf: Buffer): string {
   return buf.toString("base64url");
@@ -13,9 +14,22 @@ function fromB64url(value: string): Buffer {
   return Buffer.from(value, "base64url");
 }
 
+export function passwordCharLength(password: string): number {
+  return Array.from(String(password || "")).length;
+}
+
+export function hasUnsupportedPasswordChars(password: string): boolean {
+  return PASSWORD_CONTROL_CHAR_RE.test(String(password || ""));
+}
+
+export function isSafePasswordCandidate(password: string, maxLen = MAX_PASSWORD_LEN): boolean {
+  const raw = String(password || "");
+  return Boolean(raw) && passwordCharLength(raw) <= maxLen && !hasUnsupportedPasswordChars(raw);
+}
+
 export function hashPassword(password: string): string {
   const raw = String(password || "");
-  if (!raw || raw.length > MAX_PASSWORD_LEN || /[\0]/.test(raw)) {
+  if (!isSafePasswordCandidate(raw)) {
     throw new Error("INVALID_PASSWORD");
   }
   const salt = crypto.randomBytes(SALT_BYTES);
@@ -25,7 +39,7 @@ export function hashPassword(password: string): string {
 
 export function verifyPassword(password: string, storedHash: string): boolean {
   const rawPassword = String(password || "");
-  if (!rawPassword || rawPassword.length > MAX_PASSWORD_LEN || /[\0]/.test(rawPassword)) return false;
+  if (!isSafePasswordCandidate(rawPassword)) return false;
   const rawStored = String(storedHash || "").trim();
   if (!rawStored || rawStored.length > MAX_STORED_HASH_LEN || /[\r\n\0]/.test(rawStored)) return false;
 

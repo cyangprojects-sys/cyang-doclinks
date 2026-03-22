@@ -2,6 +2,7 @@ import { sql } from "@/lib/db";
 import { sendMail } from "@/lib/email";
 import { readPreferredEnvText } from "@/lib/envConfig";
 import { logSecurityEvent } from "@/lib/securityTelemetry";
+import { platformStatusSummary, type StatusCopyState } from "@/lib/statusCopy";
 
 const BASIC_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MAX_EMAIL_LEN = 320;
@@ -14,7 +15,7 @@ const DEFAULT_SEND_BATCH = 500;
 const DEFAULT_SEND_HOUR = 6;
 const STATUS_DIGEST_TOPIC = "status_daily";
 
-export type PlatformState = "operational" | "degraded" | "partial_outage" | "major_outage" | "maintenance";
+export type PlatformState = StatusCopyState;
 
 type ContactSubscriberRow = {
   email: string;
@@ -110,14 +111,6 @@ function statusLabel(state: PlatformState): string {
   if (state === "major_outage") return "Major outage";
   if (state === "maintenance") return "Maintenance";
   return "Operational";
-}
-
-function statusSummary(state: PlatformState): string {
-  if (state === "degraded") return "Some services are slower than normal. Core availability remains intact.";
-  if (state === "partial_outage") return "A subset of services is currently unavailable and mitigation is in progress.";
-  if (state === "major_outage") return "Multiple core workflows are impacted. Incident response is active.";
-  if (state === "maintenance") return "Planned maintenance is in progress and some operations may be delayed.";
-  return "All core systems are operating normally.";
 }
 
 export async function subscribeStatusUpdates(args: {
@@ -264,7 +257,7 @@ export async function runStatusDailyDigest(args?: {
 
   const state = args?.platformState || "operational";
   const label = statusLabel(state);
-  const summary = statusSummary(state);
+  const summary = platformStatusSummary(state);
   const dateLabel = new Date(now).toLocaleDateString(undefined, {
     weekday: "short",
     month: "short",

@@ -38,7 +38,7 @@ export default async function ViewerUploadsPage() {
       <main className="space-y-4">
         <h1 className="text-2xl font-semibold">Viewer Upload Moderation</h1>
         <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-4 text-sm text-neutral-300">
-          `public.docs` table is missing.
+          Document storage is not available for this workspace yet.
         </div>
       </main>
     );

@@ -90,9 +90,13 @@ test.describe("api route guardrails", () => {
 
   test("public unauthenticated POST endpoints include abuse throttling", () => {
     const manualSignup = src("src/app/api/auth/manual-signup/route.ts");
+    const manualPasswordResetRequest = src("src/app/api/auth/manual-password-reset/request/route.ts");
+    const manualPasswordResetComplete = src("src/app/api/auth/manual-password-reset/complete/route.ts");
     const signupConsent = src("src/app/api/auth/signup-consent/route.ts");
     const officePreview = src("src/app/api/viewer/office/route.ts");
     expect(manualSignup.includes("enforceGlobalApiRateLimit(")).toBeTruthy();
+    expect(manualPasswordResetRequest.includes("enforceGlobalApiRateLimit(")).toBeTruthy();
+    expect(manualPasswordResetComplete.includes("enforceGlobalApiRateLimit(")).toBeTruthy();
     expect(signupConsent.includes("enforceGlobalApiRateLimit(")).toBeTruthy();
     expect(officePreview.includes("enforceGlobalApiRateLimit(")).toBeTruthy();
   });

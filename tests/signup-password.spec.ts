@@ -17,8 +17,15 @@ test.describe("signup password complexity", () => {
     expect(validatePasswordComplexity("StrongPass123!")).toBeNull();
   });
 
-  test("rejects oversized and null-byte passwords", () => {
+  test("accepts unicode-rich passwords without mutating them", () => {
+    expect(validatePasswordComplexity("Strong🔒Пароль漢字123!")).toBeNull();
+    expect(validatePasswordComplexity("  Strong🔒Pass123!  ")).toBeNull();
+  });
+
+  test("rejects oversized and unsafe control-character passwords", () => {
     expect(validatePasswordComplexity("A".repeat(1025))).toBe("Password is too long.");
     expect(validatePasswordComplexity("Strong\0Pass123!")).toBe("Password contains unsupported characters.");
+    expect(validatePasswordComplexity("StrongPass123!\n")).toBe("Password contains unsupported characters.");
+    expect(validatePasswordComplexity("StrongPass123!\t")).toBe("Password contains unsupported characters.");
   });
 });

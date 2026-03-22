@@ -109,7 +109,7 @@ export default function HomePage() {
             <ScrollRevealFrame className="max-w-5xl">
               <Eyebrow>cyang.io product studio</Eyebrow>
               <h1 className="font-editorial mt-6 text-balance text-[3.25rem] leading-[0.9] tracking-[-0.06em] text-slate-950 sm:text-[4.75rem] lg:text-[7.5rem]">
-                Secure workflow software,
+                Secure workflow software
                 <span className="block text-[var(--text-muted)]">staged like controlled infrastructure.</span>
               </h1>
               <Lead className="mt-6 max-w-2xl text-base sm:text-xl">

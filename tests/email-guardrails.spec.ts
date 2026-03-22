@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { sendAccountActivationEmail, sendMail } from "../src/lib/email";
+import { sendAccountActivationEmail, sendMail, sendManualPasswordResetEmail } from "../src/lib/email";
 
 const SNAP = {
   RESEND_API_KEY: process.env.RESEND_API_KEY,
@@ -30,5 +30,14 @@ test.describe("email helper guardrails", () => {
     await expect(
       sendAccountActivationEmail({ to: "user@example.com", activationUrl: "javascript:alert(1)" })
     ).rejects.toThrow(/INVALID_ACTIVATIONURL/);
+  });
+
+  test("rejects malformed password reset URLs", async () => {
+    process.env.RESEND_API_KEY = "re_test";
+    process.env.EMAIL_FROM = "DocLinks <login@cyang.io>";
+
+    await expect(
+      sendManualPasswordResetEmail({ to: "user@example.com", resetUrl: "javascript:alert(1)" })
+    ).rejects.toThrow(/INVALID_SHAREURL/);
   });
 });

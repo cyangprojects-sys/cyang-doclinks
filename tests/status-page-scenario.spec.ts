@@ -23,6 +23,24 @@ test.describe("status page live scenario mapping", () => {
 
   test("keeps rate-limited telemetry in degraded fallback posture", () => {
     const scenario = deriveStatusPageScenario(snapshot({ error: "RATE_LIMIT" }), "live");
-    expect(scenario).toBe("degraded");
+    expect(scenario).toBe("snapshot_unavailable");
+  });
+
+  test("shows snapshot unavailable when live snapshot is missing", () => {
+    const scenario = deriveStatusPageScenario(null, "live");
+    expect(scenario).toBe("snapshot_unavailable");
+  });
+
+  test("shows snapshot unavailable when freshness timestamp is missing", () => {
+    const scenario = deriveStatusPageScenario(snapshot({ ts: null, status: "ok" }), "live");
+    expect(scenario).toBe("snapshot_unavailable");
+  });
+
+  test("shows snapshot unavailable when the public snapshot is stale", () => {
+    const scenario = deriveStatusPageScenario(
+      snapshot({ ts: Date.now() - 21 * 60 * 1000, status: "ok" }),
+      "live"
+    );
+    expect(scenario).toBe("snapshot_unavailable");
   });
 });

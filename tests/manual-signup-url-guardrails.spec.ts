@@ -14,6 +14,8 @@ test.describe("manual signup URL guardrails", () => {
 
     expect(signupCode.includes("MAX_SIGNUP_BODY_BYTES")).toBeTruthy();
     expect(signupCode.includes("isTermsAccepted(")).toBeTruthy();
+    expect(signupCode.includes("signup_activation.sql")).toBeFalsy();
+    expect(signupCode.includes('error: "SIGNUP_NOT_CONFIGURED"')).toBeTruthy();
     expect(consentCode.includes("MAX_CONSENT_BODY_BYTES")).toBeTruthy();
     expect(consentCode.includes("isTermsAccepted(")).toBeTruthy();
   });

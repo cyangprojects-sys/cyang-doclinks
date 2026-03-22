@@ -2,7 +2,12 @@ import { cookies, headers } from "next/headers";
 import { sql } from "@/lib/db";
 import { hmacSha256Hex, randomToken } from "@/lib/crypto";
 import { readPreferredEnvBoolean } from "@/lib/envConfig";
-import { hashPassword, verifyPassword } from "@/lib/password";
+import {
+  hashPassword,
+  hasUnsupportedPasswordChars,
+  passwordCharLength,
+  verifyPassword,
+} from "@/lib/password";
 
 export const SIGNUP_TERMS_VERSION = "2026-03-01";
 export const SIGNUP_CONSENT_COOKIE = "cy_signup_consent";
@@ -25,6 +30,7 @@ const MAX_SIGNUP_JOB_TITLE_LEN = 160;
 const MAX_SIGNUP_COUNTRY_LEN = 120;
 const MAX_ACCEPTANCE_SOURCE_LEN = 80;
 const MAX_ACTIVATION_TOKEN_LEN = 512;
+const MANUAL_PASSWORD_RESET_TTL_HOURS = 2;
 const BASIC_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export function isSignupEnabled(): boolean {
@@ -80,9 +86,10 @@ async function legalAcceptancesReady(): Promise<boolean> {
 }
 
 export function validatePasswordComplexity(password: string): string | null {
-  if (password.length > MAX_COMPLEXITY_PASSWORD_LEN) return "Password is too long.";
-  if (/[\0]/.test(password)) return "Password contains unsupported characters.";
-  if (password.length < 12) return "Password must be at least 12 characters.";
+  const charLength = passwordCharLength(password);
+  if (charLength > MAX_COMPLEXITY_PASSWORD_LEN) return "Password is too long.";
+  if (hasUnsupportedPasswordChars(password)) return "Password contains unsupported characters.";
+  if (charLength < 12) return "Password must be at least 12 characters.";
   if (!/[a-z]/.test(password)) return "Password must include a lowercase letter.";
   if (!/[A-Z]/.test(password)) return "Password must include an uppercase letter.";
   if (!/[0-9]/.test(password)) return "Password must include a number.";
@@ -150,7 +157,10 @@ export async function createOrRefreshManualSignup(input: ManualSignupInput): Pro
   const jobTitle = normalizeOptionalTextField(input.jobTitle, MAX_SIGNUP_JOB_TITLE_LEN);
   const country = normalizeTextField(input.country, MAX_SIGNUP_COUNTRY_LEN);
   const password = String(input.password || "");
-  if (!email || !firstName || !lastName || !company || !country || !password || password.length > MAX_COMPLEXITY_PASSWORD_LEN) {
+  if (!email || !firstName || !lastName || !company || !country || !password) {
+    throw new Error("INVALID_SIGNUP_INPUT");
+  }
+  if (validatePasswordComplexity(password)) {
     throw new Error("INVALID_SIGNUP_INPUT");
   }
 
@@ -211,7 +221,7 @@ export async function createOrRefreshManualSignup(input: ManualSignupInput): Pro
 
 export async function activateManualSignup(emailRaw: string, tokenRaw: string): Promise<{ ok: true; email: string }> {
   const email = normalizeEmail(emailRaw);
-  const token = String(tokenRaw || "").trim();
+  const token = String(tokenRaw || "");
   if (!email || !token || token.length > MAX_ACTIVATION_TOKEN_LEN || /[\r\n\0]/.test(token)) {
     throw new Error("INVALID_TOKEN");
   }
@@ -276,11 +286,106 @@ export async function activateManualSignup(emailRaw: string, tokenRaw: string): 
   return { ok: true, email };
 }
 
+export async function issueManualPasswordReset(emailRaw: string): Promise<{ email: string; token: string } | null> {
+  const email = normalizeEmail(emailRaw);
+  if (!email) return null;
+
+  if (!(await signupTablesReady())) {
+    throw new Error("SIGNUP_TABLES_MISSING");
+  }
+
+  const rows = (await sql`
+    select
+      email,
+      activated_at::text as activated_at
+    from public.signup_accounts
+    where email = ${email}
+    limit 1
+  `) as unknown as Array<{
+    email: string;
+    activated_at: string | null;
+  }>;
+
+  const row = rows?.[0];
+  if (!row?.activated_at) return null;
+
+  const token = randomToken(32);
+  const tokenHash = hmacSha256Hex(token);
+
+  await sql`
+    update public.signup_accounts
+    set activation_token_hash = ${tokenHash},
+        activation_expires_at = now() + (${MANUAL_PASSWORD_RESET_TTL_HOURS}::text || ' hours')::interval,
+        updated_at = now()
+    where email = ${email}
+      and activated_at is not null
+  `;
+
+  return { email, token };
+}
+
+export async function resetManualPassword(args: {
+  email: string;
+  token: string;
+  password: string;
+}): Promise<{ ok: true; email: string }> {
+  const email = normalizeEmail(args.email);
+  const token = String(args.token || "");
+  const password = String(args.password || "");
+  if (!email || !token || token.length > MAX_ACTIVATION_TOKEN_LEN || /[\r\n\0]/.test(token)) {
+    throw new Error("INVALID_TOKEN");
+  }
+  if (validatePasswordComplexity(password)) {
+    throw new Error("INVALID_PASSWORD");
+  }
+
+  if (!(await signupTablesReady())) {
+    throw new Error("SIGNUP_TABLES_MISSING");
+  }
+
+  const tokenHash = hmacSha256Hex(token);
+  const rows = (await sql`
+    select
+      email,
+      activation_token_hash,
+      activation_expires_at::text as activation_expires_at,
+      activated_at::text as activated_at
+    from public.signup_accounts
+    where email = ${email}
+    limit 1
+  `) as unknown as Array<{
+    email: string;
+    activation_token_hash: string | null;
+    activation_expires_at: string | null;
+    activated_at: string | null;
+  }>;
+
+  const row = rows?.[0];
+  if (!row?.activated_at) throw new Error("INVALID_TOKEN");
+  if (!row.activation_token_hash || row.activation_token_hash !== tokenHash) throw new Error("INVALID_TOKEN");
+  if (!row.activation_expires_at || new Date(row.activation_expires_at).getTime() <= Date.now()) {
+    throw new Error("TOKEN_EXPIRED");
+  }
+
+  const passwordHash = hashPassword(password);
+  await sql`
+    update public.signup_accounts
+    set password_hash = ${passwordHash},
+        activation_token_hash = null,
+        activation_expires_at = null,
+        updated_at = now()
+    where email = ${email}
+      and activated_at is not null
+  `;
+
+  return { ok: true, email };
+}
+
 export async function verifyManualCredentials(emailRaw: string, password: string): Promise<null | { email: string; name: string }> {
   if (!(await signupTablesReady())) return null;
   const email = normalizeEmail(emailRaw);
   const rawPassword = String(password || "");
-  if (!email || !rawPassword || rawPassword.length > MAX_COMPLEXITY_PASSWORD_LEN || /[\0]/.test(rawPassword)) return null;
+  if (!email || !rawPassword || hasUnsupportedPasswordChars(rawPassword) || passwordCharLength(rawPassword) > 4096) return null;
 
   const rows = (await sql`
     select

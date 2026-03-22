@@ -200,6 +200,36 @@ export async function sendAccountActivationEmail(args: { to: string; activationU
   });
 }
 
+export async function sendManualPasswordResetEmail(args: { to: string; resetUrl: string }) {
+  const resetUrl = normalizeHttpUrl(args.resetUrl, "shareUrl");
+
+  const subject = "Reset your cyang.io password";
+  const text =
+    `A password reset was requested for your cyang.io account.\n\n` +
+    `Set a new password by using this link:\n${resetUrl}\n\n` +
+    `This reset link expires in 2 hours. If you did not request it, you can ignore this email.\n`;
+
+  const html = `
+    <div style="font-family:Arial,sans-serif;line-height:1.5">
+      <p>A password reset was requested for your cyang.io account.</p>
+      <p>Set a new password by using the link below:</p>
+      <p><a href="${esc(resetUrl)}">${esc(resetUrl)}</a></p>
+      <p style="color:#666;font-size:12px">This reset link expires in 2 hours. If you did not request it, you can ignore this email.</p>
+    </div>
+  `;
+
+  await sendEmailMessage({
+    to: args.to,
+    subject,
+    text,
+    html,
+    tags: [
+      { name: "template", value: "password_reset" },
+      { name: "channel", value: "account" },
+    ],
+  });
+}
+
 function esc(s: string) {
   return s
     .replaceAll("&", "&amp;")

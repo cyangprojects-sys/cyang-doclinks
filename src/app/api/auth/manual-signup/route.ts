@@ -129,10 +129,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: "INVALID_INPUT" }, { status: 400 });
     }
     if (message.includes("SIGNUP_TABLES_MISSING")) {
-      return NextResponse.json(
-        { ok: false, error: "SIGNUP_NOT_CONFIGURED", message: "Run scripts/sql/signup_activation.sql first." },
-        { status: 500 }
-      );
+      return NextResponse.json({ ok: false, error: "SIGNUP_NOT_CONFIGURED" }, { status: 503 });
     }
     return NextResponse.json({ ok: false, error: "SIGNUP_FAILED" }, { status: 500 });
   }

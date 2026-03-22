@@ -772,11 +772,11 @@ export default async function AnalyticsWidgets({
                 </div>
                 <div className="selection-tile rounded-sm px-3 py-2">
                   Backup destination: {backupUsesGithubReporting || backupStatusWebhookTokenConfigured
-                    ? (backupStatusWebhookTokenConfigured ? "GitHub status webhook configured" : "GitHub status webhook missing app token")
-                    : (backupWebhookConfigured ? "Configured" : "Missing BACKUP_WEBHOOK_URL")}
+                    ? (backupStatusWebhookTokenConfigured ? "GitHub status webhook configured" : "GitHub status webhook awaiting app token")
+                    : (backupWebhookConfigured ? "Configured" : "Not configured")}
                 </div>
                 <div className="selection-tile rounded-sm px-3 py-2">
-                  Backup telemetry table: {hasBackupRuns ? "Ready" : "Missing public.backup_runs"}
+                  Backup telemetry: {hasBackupRuns ? "Ready" : "Unavailable"}
                 </div>
                 <div className="selection-tile rounded-sm px-3 py-2">
                   Recorded runs: {hasBackupRuns ? fmtInt(backupRunCount) : "0"}
@@ -794,10 +794,10 @@ export default async function AnalyticsWidgets({
                   Nightly cron: {nightlyLastOkAt ? `OK (${fmtMinsAgo(nightlyLastOkAt)})` : "No recent nightly cron ok event"}
                 </div>
                 <div className="selection-tile rounded-sm px-3 py-2">
-                  Migration ledger: {hasSchemaMigrations ? "Ready" : "Missing public.schema_migrations"}
+                  Migration ledger: {hasSchemaMigrations ? "Ready" : "Unavailable"}
                 </div>
                 <div className="selection-tile rounded-sm px-3 py-2">
-                  Stripe webhooks: {hasBillingWebhookEvents ? `${fmtInt(stripeWebhookFailures24h)} failed in 24h` : "Telemetry table not ready"}
+                  Stripe webhooks: {hasBillingWebhookEvents ? `${fmtInt(stripeWebhookFailures24h)} failed in 24h` : "Telemetry unavailable"}
                 </div>
               </div>
               <div className="selection-tile mt-3 rounded-sm px-3 py-2 text-[var(--text-secondary)]">

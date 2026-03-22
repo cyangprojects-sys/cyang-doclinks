@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { createOrRefreshManualSignup, isTermsAccepted } from "../src/lib/signup";
+import { createOrRefreshManualSignup, isTermsAccepted, issueManualPasswordReset, resetManualPassword } from "../src/lib/signup";
 
 test.describe("signup input guardrails", () => {
   test("accept-terms parsing is strict and fails closed on unsafe values", () => {
@@ -28,6 +28,30 @@ test.describe("signup input guardrails", () => {
 
     await expect(
       createOrRefreshManualSignup({
+        firstName: "A",
+        lastName: "B",
+        email: "user@example.com",
+        password: "weakpass",
+        company: "Acme",
+        jobTitle: "",
+        country: "US",
+      })
+    ).rejects.toThrow(/INVALID_SIGNUP_INPUT/);
+
+    await expect(
+      createOrRefreshManualSignup({
+        firstName: "A",
+        lastName: "B",
+        email: "user@example.com",
+        password: "StrongPass123!\n",
+        company: "Acme",
+        jobTitle: "",
+        country: "US",
+      })
+    ).rejects.toThrow(/INVALID_SIGNUP_INPUT/);
+
+    await expect(
+      createOrRefreshManualSignup({
         firstName: "A".repeat(130),
         lastName: "B",
         email: "user@example.com",
@@ -37,5 +61,25 @@ test.describe("signup input guardrails", () => {
         country: "US",
       })
     ).rejects.toThrow(/INVALID_SIGNUP_INPUT/);
+  });
+
+  test("manual password reset helpers fail closed on invalid input before DB work", async () => {
+    await expect(issueManualPasswordReset("not-an-email")).resolves.toBeNull();
+
+    await expect(
+      resetManualPassword({
+        email: "user@example.com",
+        token: "bad\n",
+        password: "StrongPass123!",
+      })
+    ).rejects.toThrow(/INVALID_TOKEN/);
+
+    await expect(
+      resetManualPassword({
+        email: "user@example.com",
+        token: "valid-token",
+        password: "weakpass",
+      })
+    ).rejects.toThrow(/INVALID_PASSWORD/);
   });
 });

@@ -115,6 +115,9 @@ export default function ManualSignInClient({ intent }: { intent: "admin" | "view
             <Link href="/signup/manual" className="btn-base btn-secondary px-5 py-2.5 text-sm">
               Create manual account
             </Link>
+            <Link href={`/signin/reset${email.trim() ? `?email=${encodeURIComponent(email.trim())}` : ""}`} className="btn-base btn-secondary px-5 py-2.5 text-sm">
+              Reset password
+            </Link>
           </div>
         </form>
 

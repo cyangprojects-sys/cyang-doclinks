@@ -302,6 +302,9 @@ export default function SignInClient(props: SignInClientProps) {
                 <Link href={emailHref} className="btn-base btn-ghost inline-flex px-4 py-2.5 text-sm">
                   Sign in with email
                 </Link>
+                <Link href="/signin/reset" className="btn-base btn-ghost inline-flex px-4 py-2.5 text-sm">
+                  Reset password
+                </Link>
               </div>
 
               <div className="mt-6 border border-[var(--border-subtle)] bg-white px-4 py-4 shadow-[var(--shadow-soft)]">
