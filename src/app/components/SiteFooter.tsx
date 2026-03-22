@@ -7,6 +7,7 @@ const FOOTER_GROUPS = [
     links: [
       { href: "/doclinks", label: "Doclinks" },
       { href: "/products", label: "Products" },
+      { href: "/pricing", label: "Pricing", when: "pricing" as const },
       { href: "/signup", label: "Get started" },
     ],
   },
@@ -60,10 +61,15 @@ const FOOTER_GROUPS = [
 
 export function SiteFooter({ config }: { config: PublicRuntimeConfig }) {
   const groups = FOOTER_GROUPS.map((group) => {
-    if (group.title !== "Products" || config.signupEnabled) return group;
+    const filteredLinks = group.links.filter((link) => {
+      if (link.href === "/signup" && !config.signupEnabled) return false;
+      if ("when" in link && link.when === "pricing" && !config.showPricingUi) return false;
+      return true;
+    });
+    if (filteredLinks.length === group.links.length) return group;
     return {
       ...group,
-      links: group.links.filter((link) => link.href !== "/signup"),
+      links: filteredLinks,
     };
   });
 

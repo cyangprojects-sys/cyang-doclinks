@@ -6,6 +6,12 @@ import { runCheckPlan } from "./lib/check-runner.mjs";
 
 const SUMMARY_DIR = join(process.cwd(), ".tmp");
 const RELEASE_GATE_SUMMARY_PATH = join(SUMMARY_DIR, "release-gate-summary.json");
+const args = new Set(process.argv.slice(2));
+
+const skipLint = args.has("--skip-lint");
+const skipTypecheck = args.has("--skip-typecheck");
+const skipBuild = args.has("--skip-build");
+const skipBundleBudgets = args.has("--skip-bundle-budgets");
 
 if (!existsSync(SUMMARY_DIR)) {
   mkdirSync(SUMMARY_DIR, { recursive: true });
@@ -19,10 +25,10 @@ const commands = [
   { label: "Public rendering audit", command: "npm", args: ["run", "audit:public-rendering"] },
   { label: "Route-handler audit", command: "npm", args: ["run", "audit:route-handlers"] },
   { label: "Polling audit", command: "npm", args: ["run", "audit:polling"] },
-  { label: "Lint", command: "npm", args: ["run", "lint"] },
-  { label: "Typecheck", command: "npm", args: ["run", "typecheck"] },
-  { label: "Production build", command: "npm", args: ["run", "build"] },
-  { label: "Bundle budget audit", command: "npm", args: ["run", "audit:bundle-budgets"] },
+  ...(skipLint ? [] : [{ label: "Lint", command: "npm", args: ["run", "lint"] }]),
+  ...(skipTypecheck ? [] : [{ label: "Typecheck", command: "npm", args: ["run", "typecheck"] }]),
+  ...(skipBuild ? [] : [{ label: "Production build", command: "npm", args: ["run", "build"] }]),
+  ...(skipBundleBudgets ? [] : [{ label: "Bundle budget audit", command: "npm", args: ["run", "audit:bundle-budgets"] }]),
   { label: "Production dependency audit", command: "npm", args: ["audit", "--omit=dev", "--audit-level=high"] },
   {
     label: "Release gate",
@@ -50,6 +56,15 @@ try {
 
 console.log("\nProduction readiness verdict:");
 console.log("- Repo/build proof: passed");
+if (skipLint || skipTypecheck || skipBuild || skipBundleBudgets) {
+  const reused = [
+    skipLint ? "lint" : null,
+    skipTypecheck ? "typecheck" : null,
+    skipBuild ? "build" : null,
+    skipBundleBudgets ? "bundle-budgets" : null,
+  ].filter(Boolean);
+  console.log(`- Reused prior proof steps: ${reused.join(", ")}`);
+}
 if (!releaseGateSummary) {
   console.log("- Live runtime gate: not reported");
 } else if (releaseGateSummary.runtimeEnvAudit === "skipped") {

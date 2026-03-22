@@ -65,8 +65,8 @@ export default function SignupPage() {
         <div className="text-xs uppercase tracking-[0.16em] text-[var(--accent-primary)]">Sign up</div>
         <h1 className="mt-2 text-3xl font-semibold text-slate-950">Create your Doclinks account in under two minutes</h1>
         <p className="mt-2 text-sm text-[var(--text-secondary)]">
-          For teams and individuals who need secure document delivery with clear controls. New accounts accept Terms and
-          Privacy during signup, then can start sharing immediately after activation.
+          For people who need to share sensitive documents without giving up control after send. New accounts accept
+          Terms and Privacy during signup, then can start using protected links after activation.
         </p>
 
         <div className="mt-4 flex flex-wrap gap-2">
@@ -129,8 +129,8 @@ export default function SignupPage() {
           <div className="text-sm font-medium text-slate-950">What happens after signup?</div>
           <ul className="mt-2 space-y-1 text-xs text-[var(--text-secondary)]">
             <li>1. Confirm your account and sign in.</li>
-            <li>2. Upload documents and apply sharing controls.</li>
-            <li>3. Review status, trust, and policy resources as needed.</li>
+            <li>2. Upload a document and choose the delivery controls.</li>
+            <li>3. Share a protected link and keep visibility after send.</li>
           </ul>
         </div>
 

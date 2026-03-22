@@ -19,16 +19,16 @@ import { getPublicRuntimeConfig } from "@/lib/publicRuntimeConfig";
 export const revalidate = 900;
 
 export const metadata: Metadata = {
-  title: "cyang.io - Cinematic secure workflow software",
+  title: "cyang.io - Secure document sharing with control after send",
   description:
-    "cyang.io is a disciplined product studio for secure workflow software, with Doclinks as the flagship and trust designed into the public operating shell.",
+    "Doclinks helps teams securely share sensitive documents, keep control after sending, and prove trust through real security, legal, and operational surfaces.",
 };
 
 const STUDIO_ITEMS = [
   {
     href: "/doclinks",
     title: "Doclinks",
-    body: "Controlled external document delivery with bounded access, scan-gated serving, and audit visibility.",
+    body: "Securely share sensitive documents with access controls, visibility, and control after send.",
     badge: <MaturityBadge tone="live">Flagship</MaturityBadge>,
     meta: "Live now",
   },
@@ -59,34 +59,59 @@ const TRUST_DOCUMENTS = [
 
 const OPERATING_BANDS = [
   {
-    eyebrow: "Controlled",
-    title: "Control is enforced at the system boundary.",
-    body: "cyang.io products are designed so the important rules still hold after a file leaves your workspace.",
+    eyebrow: "Upload",
+    title: "Start with a secure upload path, not an email attachment.",
+    body: "Files enter a protected path with validation, storage boundaries, and a clean workflow state from the beginning.",
     signal: [
-      { label: "Serve posture", value: "Policy checked at request time" },
-      { label: "Access", value: "Bounded instead of open-ended" },
-      { label: "Lifecycle", value: "Expiration and revocation are first-class" },
+      { label: "Input", value: "Validated before delivery" },
+      { label: "Storage", value: "Private by default" },
+      { label: "Intent", value: "Built for sensitive files" },
     ],
   },
   {
-    eyebrow: "Auditable",
-    title: "Visibility exists to support trust, not noise.",
-    body: "The experience stays calm for recipients while the product keeps the delivery trail legible enough for real operational follow-up.",
+    eyebrow: "Protect",
+    title: "Set access rules before the file ever leaves your hands.",
+    body: "Attach expiration, revocation, download posture, and bounded access rules to the share instead of hoping the recipient handles it carefully.",
     signal: [
-      { label: "Review path", value: "Audit-friendly delivery activity" },
-      { label: "Supportability", value: "Clear events and states" },
-      { label: "Confidence", value: "Evidence over vague claims" },
+      { label: "Access", value: "Tokenized and policy-bound" },
+      { label: "Lifecycle", value: "Expiry and revocation built in" },
+      { label: "Risk posture", value: "Less stale exposure" },
     ],
   },
   {
-    eyebrow: "Operational",
-    title: "Status, legal, and disclosure are part of the product shell.",
-    body: "Trust surfaces are designed into the public architecture so customers and buyers can evaluate the company without hunting through loose links.",
+    eyebrow: "Share",
+    title: "Send a protected link instead of an unbounded file.",
+    body: "Recipients get a calm, professional delivery experience while the system keeps the control layer on the server side.",
     signal: [
-      { label: "Status", value: "Public operating posture" },
-      { label: "Legal", value: "Readable, reviewable document shells" },
-      { label: "Procurement", value: "Buyer-ready continuity" },
+      { label: "Recipient UX", value: "Clear and professional" },
+      { label: "Serving", value: "Checked in real time" },
+      { label: "Experience", value: "Simple for both sides" },
     ],
+  },
+  {
+    eyebrow: "Control",
+    title: "Keep control after sending.",
+    body: "See what happened, revoke when needed, and rely on public trust surfaces that support serious review when buyers or stakeholders ask questions.",
+    signal: [
+      { label: "Visibility", value: "Reviewable delivery activity" },
+      { label: "Trust", value: "Status, legal, and disclosure visible" },
+      { label: "Follow-up", value: "Control does not end at send" },
+    ],
+  },
+];
+
+const AUDIENCE_ITEMS = [
+  {
+    title: "Finance and operations",
+    body: "For invoices, statements, closing documents, and other files that should not bounce around as attachments.",
+  },
+  {
+    title: "HR and people workflows",
+    body: "For onboarding, records, and sensitive personnel documents that need a more deliberate delivery path.",
+  },
+  {
+    title: "Legal and compliance-heavy teams",
+    body: "For contracts, notices, and review materials where control, retention, and follow-up matter.",
   },
 ];
 
@@ -109,36 +134,43 @@ export default function HomePage() {
             <ScrollRevealFrame className="max-w-5xl">
               <Eyebrow>cyang.io product studio</Eyebrow>
               <h1 className="font-editorial mt-6 text-balance text-[3.25rem] leading-[0.9] tracking-[-0.06em] text-slate-950 sm:text-[4.75rem] lg:text-[7.5rem]">
-                Secure workflow software
-                <span className="block text-[var(--text-muted)]">staged like controlled infrastructure.</span>
+                Securely share sensitive documents
+                <span className="block text-[var(--text-muted)]">and keep control after sending.</span>
               </h1>
               <Lead className="mt-6 max-w-2xl text-base sm:text-xl">
-                Products for high-trust sharing, policy-aware delivery, and operational clarity.
+                Doclinks gives teams a safer way to send private files, replace careless attachments, and keep access
+                controls, visibility, and trust intact after send.
               </Lead>
               <CTAGroup
                 className="mt-8"
                 actions={[
-                  { href: "/doclinks", label: "Explore Doclinks", tone: "primary" },
-                  { href: "/products", label: "View Products", tone: "secondary" },
+                  { href: primaryAccessHref, label: publicConfig.signupEnabled ? "Get started" : "Sign in", tone: "primary" },
+                  {
+                    href: publicConfig.showPricingUi ? "/pricing" : "/doclinks",
+                    label: publicConfig.showPricingUi ? "View pricing" : "Explore Doclinks",
+                    tone: "secondary",
+                  },
                 ]}
               />
             </ScrollRevealFrame>
 
             <ScrollRevealFrame delay={120} className="floating-stage p-6 sm:p-7">
               <div className="text-[11px] uppercase tracking-[0.24em] text-[var(--text-faint)]">Launch surface</div>
-              <div className="mt-4 text-2xl font-semibold tracking-[-0.04em] text-slate-950">A public shell built to feel decisive.</div>
+              <div className="mt-4 text-2xl font-semibold tracking-[-0.04em] text-slate-950">
+                A safer way to send files that should stay under control.
+              </div>
               <p className="mt-4 text-sm leading-7 text-[var(--text-secondary)]">
-                cyang.io is positioned as a serious software studio: flagship product first, trust architecture
-                visible, and room to grow without losing discipline.
+                Built for contracts, HR records, financial files, and other documents that are too sensitive for
+                ordinary attachments or casual file links.
               </p>
               <div className="story-seam mt-6 h-28" />
               <VisualSignalCluster
                 className="mt-4"
                 title="Immediate signals"
                 items={[
-                  { label: "Flagship", value: "Doclinks leads the public story." },
-                  { label: "Differentiator", value: "Trust is visible enough to review." },
-                  { label: "Posture", value: "Calm, technical, and security-minded." },
+                  { label: "Use case", value: "Sensitive document sharing" },
+                  { label: "Differentiator", value: "Control stays with the sender" },
+                  { label: "Proof", value: "Trust surfaces are public and reviewable" },
                 ]}
               />
             </ScrollRevealFrame>
@@ -147,16 +179,16 @@ export default function HomePage() {
           <ScrollRevealFrame delay={220} className="mt-10">
             <div className="grid gap-4 border-t border-[var(--border-subtle)] pt-5 sm:grid-cols-3">
               <div>
-                <div className="text-[11px] uppercase tracking-[0.22em] text-[var(--text-faint)]">Current flagship</div>
-                <div className="mt-2 text-lg text-[var(--text-primary)]">Doclinks</div>
+                <div className="text-[11px] uppercase tracking-[0.22em] text-[var(--text-faint)]">What it is</div>
+                <div className="mt-2 text-lg text-[var(--text-primary)]">Secure document sharing for sensitive files</div>
               </div>
               <div>
-                <div className="text-[11px] uppercase tracking-[0.22em] text-[var(--text-faint)]">Public proof</div>
-                <div className="mt-2 text-lg text-[var(--text-primary)]">Status, legal, disclosure, procurement</div>
+                <div className="text-[11px] uppercase tracking-[0.22em] text-[var(--text-faint)]">Why it is better</div>
+                <div className="mt-2 text-lg text-[var(--text-primary)]">More control than email attachments or generic links</div>
               </div>
               <div>
-                <div className="text-[11px] uppercase tracking-[0.22em] text-[var(--text-faint)]">Operating tone</div>
-                <div className="mt-2 text-lg text-[var(--text-primary)]">Controlled, auditable, operational</div>
+                <div className="text-[11px] uppercase tracking-[0.22em] text-[var(--text-faint)]">Why trust it</div>
+                <div className="mt-2 text-lg text-[var(--text-primary)]">Trust, legal, status, and disclosure are visible now</div>
               </div>
             </div>
           </ScrollRevealFrame>
@@ -173,31 +205,35 @@ export default function HomePage() {
                 <div className="editorial-kicker">DOC</div>
               </div>
               <StoryBand
-                eyebrow="Flagship Doclinks"
+                eyebrow="Why this exists"
                 title={
                   <>
-                    Controlled document delivery,
-                    <span className="block text-[var(--text-muted)]">revealed as the center of the studio.</span>
+                    Email attachments end too early.
+                    <span className="block text-[var(--text-muted)]">Sensitive document delivery should not.</span>
                   </>
                 }
-                body="Doclinks is the flagship because it expresses the entire cyang.io thesis in one product: tighter boundaries, better recipient experience, and public trust surfaces that already exist."
+                body="Doclinks exists for teams that still need to send private files outside their workspace but do not want access, timing, or recipient behavior to become guesswork the moment a file is shared."
                 aside={
                   <div className="floating-stage p-5 sm:p-6">
                     <DocumentVisual
                       rows={[
-                        { label: "Access policy", value: "Tokenized + serve-time checked", tone: "accent" },
-                        { label: "Delivery state", value: "Scan-gated before release", tone: "neutral" },
-                        { label: "Lifecycle", value: "Expiration and revocation active", tone: "warm" },
+                        { label: "Private files", value: "Contracts, records, financial docs", tone: "accent" },
+                        { label: "Delivery state", value: "Protected link instead of loose attachment", tone: "neutral" },
+                        { label: "Sender control", value: "Expiration and revocation stay available", tone: "warm" },
                       ]}
-                      footer="No generic dashboard chrome. Just the abstract signals that matter."
+                      footer="The point is simple: send the file, keep the control layer."
                     />
                   </div>
                 }
               >
                 <CTAGroup
                   actions={[
-                    { href: "/doclinks", label: "Learn about Doclinks", tone: "primary" },
-                    { href: "/trust", label: "Review Trust", tone: "secondary" },
+                    { href: "/doclinks", label: "See how Doclinks works", tone: "primary" },
+                    {
+                      href: publicConfig.showPricingUi ? "/pricing" : "/trust",
+                      label: publicConfig.showPricingUi ? "View pricing" : "Review Trust",
+                      tone: "secondary",
+                    },
                   ]}
                 />
               </StoryBand>
@@ -267,6 +303,41 @@ export default function HomePage() {
         </ContentRail>
       </Section>
 
+      <SectionTransition label="Who it is for" />
+
+      <Section className="py-18 sm:py-22">
+        <ContentRail>
+          <div className="grid gap-8 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
+            <ScrollRevealFrame>
+              <div>
+                <div className="text-[11px] uppercase tracking-[0.24em] text-[var(--text-faint)]">Who it is for</div>
+                <h2 className="mt-4 text-balance text-4xl font-semibold tracking-[-0.05em] text-slate-950 sm:text-5xl">
+                  For people who cannot afford careless sharing.
+                </h2>
+                <p className="mt-5 max-w-xl text-base leading-8 text-[var(--text-secondary)] sm:text-lg">
+                  Doclinks is designed for real business workflows where a file still needs to move, but the sender wants
+                  a more controlled path than inbox forwarding or generic file storage links.
+                </p>
+              </div>
+            </ScrollRevealFrame>
+
+            <div className="grid gap-4 md:grid-cols-3">
+              {AUDIENCE_ITEMS.map((item, index) => (
+                <ScrollRevealFrame key={item.title} delay={index * 90}>
+                  <PremiumCard className="h-full">
+                    <div className="text-[11px] uppercase tracking-[0.22em] text-[var(--text-faint)]">
+                      {String(index + 1).padStart(2, "0")}
+                    </div>
+                    <div className="mt-4 text-2xl font-semibold tracking-[-0.04em] text-slate-950">{item.title}</div>
+                    <p className="mt-4 text-sm leading-7 text-[var(--text-secondary)]">{item.body}</p>
+                  </PremiumCard>
+                </ScrollRevealFrame>
+              ))}
+            </div>
+          </div>
+        </ContentRail>
+      </Section>
+
       <SectionTransition label="Proof architecture" />
 
       <Section className="py-20 sm:py-24">
@@ -278,10 +349,11 @@ export default function HomePage() {
                 <div>
                   <div className="text-[11px] uppercase tracking-[0.24em] text-[var(--text-faint)]">Trust and proof</div>
                   <h2 className="mt-4 text-balance text-4xl font-semibold tracking-[-0.05em] text-slate-950 sm:text-5xl lg:text-6xl">
-                    Trust shown as architecture, not a loose link dump.
+                    Trust proof that supports the product story.
                   </h2>
                   <p className="mt-5 max-w-xl text-base leading-8 text-[var(--text-secondary)] sm:text-lg">
-                    Status, legal, disclosure, retention, and procurement are visible enough to signal seriousness within seconds.
+                    Security, legal, status, disclosure, retention, and procurement are all available because secure
+                    sharing only feels credible when the company is reviewable too.
                   </p>
                 </div>
                 <DocumentIndexList items={TRUST_DOCUMENTS} />
@@ -331,18 +403,23 @@ export default function HomePage() {
           <ScrollRevealFrame className="max-w-4xl">
             <div className="text-[11px] uppercase tracking-[0.24em] text-[var(--text-faint)]">Final close</div>
             <h2 className="mt-4 text-balance text-[3rem] font-semibold tracking-[-0.06em] text-slate-950 sm:text-[4.5rem] lg:text-[6rem]">
-              Start with the flagship.
-              <span className="block text-[var(--text-muted)]">Then follow the system outward.</span>
+              Send the document.
+              <span className="block text-[var(--text-muted)]">Keep the control.</span>
             </h2>
             <p className="mt-5 max-w-2xl text-base leading-8 text-[var(--text-secondary)] sm:text-lg">
-              The site is designed so customers, buyers, and future partners can understand the hierarchy quickly and remember it later.
+              Start with Doclinks if you need a clearer, safer way to share sensitive files. Review pricing, trust, and
+              product detail without leaving the public site.
             </p>
             <CTAGroup
               className="mt-8"
               actions={[
-                { href: "/doclinks", label: "Explore Doclinks", tone: "primary" },
-                { href: "/products", label: "Explore the portfolio", tone: "secondary" },
-                { href: primaryAccessHref, label: publicConfig.signupEnabled ? "Get started" : "Sign in", tone: "secondary" },
+                { href: primaryAccessHref, label: publicConfig.signupEnabled ? "Get started" : "Sign in", tone: "primary" },
+                {
+                  href: publicConfig.showPricingUi ? "/pricing" : "/doclinks",
+                  label: publicConfig.showPricingUi ? "View pricing" : "Explore Doclinks",
+                  tone: "secondary",
+                },
+                { href: "/trust", label: "Review Trust", tone: "secondary" },
               ]}
             />
           </ScrollRevealFrame>

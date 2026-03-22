@@ -92,6 +92,14 @@ Preferred local pins are included in:
 - `.node-version`
 - `package.json` engines / packageManager
 
+Windows convenience path:
+
+```bash
+npm run setup:proof:windows
+```
+
+That helper checks the current runtime and, if available, uses Volta or nvm-windows to switch to the pinned proof baseline before you run the full proof path.
+
 ### Local development
 
 ```bash
@@ -149,6 +157,18 @@ If you want the repo to run the post-install proof steps for you:
 
 ```bash
 npm run prove:build
+```
+
+On Windows, if `prove:build` fails fast because Node/npm do not match the pinned baseline, run:
+
+```bash
+npm run setup:proof:windows
+```
+
+If Volta is installed but your current shell has not refreshed PATH yet, you can invoke the proof command through the installed binary directly:
+
+```powershell
+& "C:\Program Files\Volta\volta.exe" run --node 22.16.0 --npm 10.9.2 npm run prove:build
 ```
 
 See [PROVE_BUILD.md](PROVE_BUILD.md) for the container proof path and command-by-command rationale.

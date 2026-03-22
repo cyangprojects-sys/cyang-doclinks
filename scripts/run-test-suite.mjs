@@ -19,10 +19,15 @@ function quoteArg(arg) {
 }
 
 const forwardedArgs = [];
+let requireExistingBuild = false;
 
 for (const arg of process.argv.slice(2)) {
   if (arg === "--runInBand") {
     forwardedArgs.push("--workers=1");
+    continue;
+  }
+  if (arg === "--require-existing-build") {
+    requireExistingBuild = true;
     continue;
   }
   forwardedArgs.push(arg);
@@ -70,8 +75,17 @@ if (!existsSync(".env.local") && existsSync(".env.example")) {
 }
 
 if (!hasUsableProductionBuild()) {
+  if (requireExistingBuild) {
+    console.error(
+      "No reusable production build detected and --require-existing-build was set. " +
+        "Run `npm run build` first so the test run reuses the exact artifact under proof."
+    );
+    process.exit(1);
+  }
   console.log("No reusable production build detected. Running `npm run build` before Playwright.");
   run("npm", ["run", "build"]);
+} else {
+  console.log("Using existing production build for the Playwright-backed test run.");
 }
 
 run("npx", [

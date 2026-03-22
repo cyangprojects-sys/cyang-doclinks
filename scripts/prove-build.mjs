@@ -59,10 +59,24 @@ ensureProofEnv();
 const commands = [
   { label: "Lint", command: "npm", args: ["run", "lint"] },
   { label: "Typecheck", command: "npm", args: ["run", "typecheck"] },
-  { label: "Regression tests", command: "npm", args: ["test", "--", "--runInBand"] },
   { label: "Production build", command: "npm", args: ["run", "build"] },
+  {
+    label: "Regression tests",
+    command: "npm",
+    args: ["test", "--", "--runInBand", "--require-existing-build"],
+  },
   { label: "Bundle budget audit", command: "npm", args: ["run", "audit:bundle-budgets"] },
-  { label: "Production readiness", command: "npm", args: ["run", "production-readiness"] },
+  {
+    label: "Production readiness",
+    command: "node",
+    args: [
+      "scripts/production-readiness.mjs",
+      "--skip-lint",
+      "--skip-typecheck",
+      "--skip-build",
+      "--skip-bundle-budgets",
+    ],
+  },
 ];
 
 runCheckPlan({

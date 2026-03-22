@@ -15,6 +15,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "setup:proof:windows": "powershell -ExecutionPolicy Bypass -File scripts/use-proof-runtime.ps1",
     "test:playwright": "playwright test",
     "test": "node scripts/run-test-suite.mjs",
     "lint": "eslint",
@@ -72,7 +73,8 @@
     "zod": "^4.3.6"
   },
   "overrides": {
-    "fast-xml-parser": "^5.3.8",
+    "@aws-sdk/xml-builder": "^3.972.15",
+    "fast-xml-parser": "^5.5.8",
     "serialize-javascript": "^7.0.0",
     "flatted": "^3.4.1",
     "tmp": "^0.2.5",

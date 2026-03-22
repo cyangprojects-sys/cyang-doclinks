@@ -17,6 +17,30 @@ The repo also declares:
 
 Use the exact baseline above for the cleanest proof result.
 
+## Windows Convenience Path
+
+If you are on Windows and `npm run prove:build` fails immediately because your shell is not on the pinned runtime, use:
+
+```bash
+npm run setup:proof:windows
+```
+
+That helper:
+- checks the active Node/npm versions
+- uses Volta automatically if it is installed
+- otherwise uses nvm-windows if it is installed
+- otherwise prints the exact install/switch commands you need
+
+It does not relax the pinned proof baseline. It is only a convenience path to reach it faster.
+
+If Volta is already installed but your current shell has not picked up the new PATH yet, you can run the full proof path directly through the installed binary:
+
+```powershell
+& "C:\Program Files\Volta\volta.exe" run --node 22.16.0 --npm 10.9.2 npm run prove:build
+```
+
+That command was verified against this repository and cleanly reuses the pinned Node/npm baseline for the full proof sequence.
+
 ## Primary Proof Path
 
 Run the pinned baseline, install from the lockfile, then use the single proof wrapper:
@@ -30,6 +54,7 @@ Notes:
 - `npm run prove:build` now fails fast if the runtime is not exactly Node `22.16.0` and npm `10.9.2`.
 - The wrapper removes any existing `.next` directory first so the proof always rebuilds from a clean production artifact state.
 - If `.env.local` is missing, the wrapper prepares it from the committed `.env.example`.
+- The wrapper now builds before running the Playwright-backed regression suite, and the test step is told to reuse that exact production artifact instead of silently rebuilding.
 - Real production secrets are not required for the proof sequence.
 - `production-readiness` and `release:gate` already degrade safely when real deployment infrastructure is not configured.
 - The proof wrappers now end with an explicit pass/fail step summary so reviewers can see which exact proof stage failed.
@@ -41,10 +66,10 @@ Notes:
 ```bash
 npm run lint
 npm run typecheck
-npm test -- --runInBand
 npm run build
+npm test -- --runInBand --require-existing-build
 npm run audit:bundle-budgets
-npm run production-readiness
+node scripts/production-readiness.mjs --skip-lint --skip-typecheck --skip-build --skip-bundle-budgets
 ```
 
 If you want to inspect the wrapper step-by-step, this is the same sequence after `npm ci`.
@@ -57,13 +82,13 @@ What each command verifies:
 - `npm run typecheck`
   - Next-aware TypeScript correctness, including `next typegen` when route validators have not been generated yet in a clean checkout
 - `npm test -- --runInBand`
-  - Playwright-based regression coverage against a production server
+  - Playwright-based regression coverage against the exact production artifact built earlier in the proof flow
 - `npm run build`
   - Next.js production build correctness
 - `npm run audit:bundle-budgets`
   - route-level client bundle budget checks
 - `npm run production-readiness`
-  - env-template audit, migration manifest verification, route-handler/polling/render audits, lint, typecheck, build, bundle budgets, and release gate checks
+  - env-template audit, migration manifest verification, route-handler/polling/render audits, dependency audit, and release gate checks
 
 Why not raw `npx tsc --noEmit -p tsconfig.json` here:
 - This App Router repo relies on Next-generated route validator types under `.next/types`.

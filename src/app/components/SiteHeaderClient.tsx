@@ -8,6 +8,7 @@ import type { PublicRuntimeConfig } from "@/lib/publicRuntimeConfig";
 const PRIMARY_NAV = [
   { href: "/products", label: "Products" },
   { href: "/doclinks", label: "Doclinks" },
+  { href: "/pricing", label: "Pricing", when: "pricing" as const },
   { href: "/trust", label: "Trust" },
   { href: "/about", label: "About" },
   { href: "/contact", label: "Contact" },
@@ -29,6 +30,7 @@ function isCurrent(pathname: string, href: string) {
 export default function SiteHeaderClient({ config }: { config: PublicRuntimeConfig }) {
   const pathname = usePathname();
   const [hidden, setHidden] = useState(false);
+  const navItems = PRIMARY_NAV.filter((item) => item.when !== "pricing" || config.showPricingUi);
 
   useEffect(() => {
     let lastScroll = 0;
@@ -67,7 +69,7 @@ export default function SiteHeaderClient({ config }: { config: PublicRuntimeConf
           </Link>
 
           <nav className="hidden items-center gap-1.5 lg:flex">
-            {PRIMARY_NAV.map((item) => (
+            {navItems.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
@@ -95,7 +97,7 @@ export default function SiteHeaderClient({ config }: { config: PublicRuntimeConf
         </div>
 
         <nav className="mt-3 flex items-center gap-2 overflow-x-auto pb-1 lg:hidden">
-          {PRIMARY_NAV.map((item) => (
+          {navItems.map((item) => (
             <Link
               key={item.href}
               href={item.href}

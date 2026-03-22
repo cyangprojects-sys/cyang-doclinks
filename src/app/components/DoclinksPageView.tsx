@@ -130,12 +130,12 @@ export function DoclinksPageView({ publicConfig }: { publicConfig: PublicRuntime
             <ScrollRevealFrame className="max-w-5xl">
               <Eyebrow>Flagship product</Eyebrow>
               <h1 className="font-editorial mt-6 text-balance text-[3.15rem] leading-[0.9] tracking-[-0.06em] text-slate-950 sm:text-[4.75rem] lg:text-[7rem]">
-                Secure document delivery
-                <span className="block text-[var(--text-muted)]">with enforced controls.</span>
+                Securely share sensitive documents
+                <span className="block text-[var(--text-muted)]">with control after send.</span>
               </h1>
               <p className="mt-6 max-w-2xl text-base leading-8 text-[var(--text-secondary)] sm:text-xl">
-                Share sensitive files with a professional recipient experience while serve-time enforcement,
-                lifecycle control, and audit visibility stay intact.
+                Protect contracts, records, financial files, HR documents, and other private files with protected links,
+                server-side controls, and visibility into what happened after delivery.
               </p>
               <CTAGroup
                 className="mt-8"
@@ -154,7 +154,7 @@ export function DoclinksPageView({ publicConfig }: { publicConfig: PublicRuntime
                   { label: "Lifecycle", value: "Expiry and revocation active", tone: "warm" },
                   { label: "Recipient flow", value: "Professional by default", tone: "neutral" },
                 ]}
-                footer="Doclinks is built for controlled external delivery rather than generic cloud storage sharing."
+                footer="Built for private file delivery that needs more control than a generic file link."
               />
             </ScrollRevealFrame>
           </div>
@@ -198,7 +198,7 @@ export function DoclinksPageView({ publicConfig }: { publicConfig: PublicRuntime
               <div className="lg:sticky lg:top-28">
                 <div className="text-[11px] uppercase tracking-[0.24em] text-[var(--text-faint)]">How it works</div>
                 <h2 className="mt-4 text-balance text-4xl font-semibold tracking-[-0.05em] text-slate-950 sm:text-5xl">
-                  A secure serving flow in four deliberate steps.
+                  Upload, protect, share, and stay in control.
                 </h2>
               </div>
               <div className="relative border-l border-[var(--border-subtle)] pl-6 sm:pl-8">
@@ -248,7 +248,7 @@ export function DoclinksPageView({ publicConfig }: { publicConfig: PublicRuntime
               <PremiumCard strong className="h-full">
                 <div className="text-[11px] uppercase tracking-[0.24em] text-[var(--text-faint)]">Audience and use cases</div>
                 <h2 className="mt-4 text-balance text-4xl font-semibold tracking-[-0.05em] text-slate-950 sm:text-5xl">
-                  Built for workflows where external sharing still needs discipline.
+                  Built for teams that still need to send sensitive files outside their workspace.
                 </h2>
                 <ul className="mt-6 space-y-4">
                   {[

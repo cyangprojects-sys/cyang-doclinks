@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { SiteShell } from "../components/SiteShell";
 import { getPublicRuntimeConfig } from "@/lib/publicRuntimeConfig";
+import { FREE_PLAN, PRO_PLAN } from "@/lib/monetization";
 
 export const runtime = "nodejs";
 export const revalidate = 300;
@@ -10,7 +11,7 @@ export const revalidate = 300;
 export const metadata: Metadata = {
   title: "Pricing - Doclinks",
   description:
-    "Transparent Free and Pro pricing for Doclinks secure document delivery. Security defaults included, clear limits, and upgrade paths for higher-throughput teams.",
+    "Transparent Free and Pro pricing for Doclinks secure document sharing, with clear limits, security defaults, and straightforward upgrade paths.",
 };
 
 type PlanFeature = {
@@ -31,23 +32,6 @@ const TRUST_CHIPS = [
   "Server-side policy enforcement",
   "Audit-ready controls",
 ];
-
-const PLAN_HIGHLIGHTS = {
-  free: [
-    "25 MB max upload",
-    "100 MB storage",
-    "3 active shares",
-    "100 views/month",
-    "Core controlled delivery workflow",
-  ],
-  pro: [
-    "100 MB max upload",
-    "5 GB storage",
-    "Unlimited active shares (soft monitored)",
-    "Unlimited views (soft monitored)",
-    "Audit export + API + webhooks",
-  ],
-};
 
 const WHY_UPGRADE = [
   {
@@ -73,46 +57,6 @@ const WHY_UPGRADE = [
   {
     title: "Same security posture",
     body: "Security baseline remains strict across plans while Pro adds operating depth.",
-  },
-];
-
-const COMPARISON_GROUPS: ComparisonGroup[] = [
-  {
-    title: "Limits",
-    description: "Capacity and usage boundaries by plan.",
-    rows: [
-      { feature: "Price", free: "$0/month", pro: "$12/month" },
-      { feature: "Max file upload", free: "25 MB", pro: "100 MB" },
-      { feature: "Total storage", free: "100 MB", pro: "5 GB" },
-      { feature: "Active shares", free: "3", pro: "Unlimited (soft cap monitored)" },
-      { feature: "Views", free: "100/month", pro: "Unlimited (soft monitored)" },
-    ],
-  },
-  {
-    title: "Delivery controls",
-    description: "How much control you have over share lifecycle.",
-    rows: [
-      { feature: "Share expiration", free: "Required, up to 7 days", pro: "Custom expiration controls" },
-      { feature: "Permanent shares", free: "Not available", pro: "Available with policy controls" },
-      { feature: "Allow download toggle", free: "Available, policy-enforced", pro: "Available, policy-enforced" },
-    ],
-  },
-  {
-    title: "Visibility and automation",
-    description: "Operational insight and integrations.",
-    rows: [
-      { feature: "Audit visibility", free: "Basic activity visibility", pro: "Audit export + expanded visibility" },
-      { feature: "API + webhooks", free: "Not included", pro: "Included" },
-    ],
-  },
-  {
-    title: "Security and safeguards",
-    description: "Core protection posture across plans.",
-    rows: [
-      { feature: "Abuse throttling", free: "Strict", pro: "Standard (monitored)" },
-      { feature: "Encryption", free: "Required", pro: "Required" },
-      { feature: "Virus scanning", free: "Required before delivery", pro: "Required before delivery" },
-    ],
   },
 ];
 
@@ -165,6 +109,61 @@ export default function PricingPage() {
   }
   const signupEnabled = publicConfig.signupEnabled;
   const primaryAccessHref = signupEnabled ? "/signup" : "/signin?intent=admin";
+  const planHighlights = {
+    free: [
+      `${formatBytesLabel(FREE_PLAN.maxFileSizeBytes)} max upload`,
+      `${formatBytesLabel(FREE_PLAN.maxStorageBytes)} storage`,
+      `${FREE_PLAN.maxActiveShares} active shares`,
+      `${FREE_PLAN.maxViewsPerMonth} views/month`,
+      "Core controlled delivery workflow",
+    ],
+    pro: [
+      `${formatBytesLabel(PRO_PLAN.maxFileSizeBytes)} max upload`,
+      `${formatBytesLabel(PRO_PLAN.maxStorageBytes)} storage`,
+      "Unlimited active shares (soft monitored)",
+      "Unlimited views (soft monitored)",
+      "Audit export + API + webhooks",
+    ],
+  };
+  const comparisonGroups: ComparisonGroup[] = [
+    {
+      title: "Limits",
+      description: "Capacity and usage boundaries by plan.",
+      rows: [
+        { feature: "Price", free: "$0/month", pro: "$12/month" },
+        { feature: "Max file upload", free: formatBytesLabel(FREE_PLAN.maxFileSizeBytes), pro: formatBytesLabel(PRO_PLAN.maxFileSizeBytes) },
+        { feature: "Total storage", free: formatBytesLabel(FREE_PLAN.maxStorageBytes), pro: formatBytesLabel(PRO_PLAN.maxStorageBytes) },
+        { feature: "Active shares", free: String(FREE_PLAN.maxActiveShares ?? "Unlimited"), pro: "Unlimited (soft monitored)" },
+        { feature: "Views", free: `${FREE_PLAN.maxViewsPerMonth}/month`, pro: "Unlimited (soft monitored)" },
+      ],
+    },
+    {
+      title: "Delivery controls",
+      description: "How much control you have over share lifecycle.",
+      rows: [
+        { feature: "Share expiration", free: "Required, up to 7 days", pro: "Custom expiration controls" },
+        { feature: "Permanent shares", free: "Not available", pro: "Available with policy controls" },
+        { feature: "Allow download toggle", free: "Available, policy-enforced", pro: "Available, policy-enforced" },
+      ],
+    },
+    {
+      title: "Visibility and automation",
+      description: "Operational insight and integrations.",
+      rows: [
+        { feature: "Audit visibility", free: "Basic activity visibility", pro: "Audit export + expanded visibility" },
+        { feature: "API + webhooks", free: "Not included", pro: "Included" },
+      ],
+    },
+    {
+      title: "Security and safeguards",
+      description: "Core protection posture across plans.",
+      rows: [
+        { feature: "Abuse throttling", free: "Strict", pro: "Standard (monitored)" },
+        { feature: "Encryption", free: "Required", pro: "Required" },
+        { feature: "Virus scanning", free: "Required before delivery", pro: "Required before delivery" },
+      ],
+    },
+  ];
 
   return (
     <SiteShell maxWidth="full" publicConfig={publicConfig}>
@@ -178,11 +177,11 @@ export default function PricingPage() {
           <span className="ui-badge inline-flex rounded-sm px-3 py-1 text-xs uppercase tracking-[0.16em]">Doclinks pricing</span>
           <h1 className="font-editorial mt-5 max-w-4xl text-4xl leading-[1.04] tracking-tight text-slate-950 sm:text-5xl lg:text-6xl">
             Transparent pricing for
-            <span className="block text-[var(--text-secondary)]">controlled document delivery.</span>
+            <span className="block text-[var(--text-secondary)]">secure document sharing that stays under control.</span>
           </h1>
           <p className="mt-7 max-w-3xl text-base leading-relaxed text-[var(--text-secondary)] sm:text-lg">
-            Free is real and usable. Pro adds room, control depth, and visibility for teams running higher-throughput
-            client and operations workflows.
+            Start on Free to replace risky attachments with protected links. Move to Pro when you need more room,
+            richer control, and stronger operational visibility.
           </p>
 
           <div className="mt-7 flex flex-wrap gap-2">
@@ -231,8 +230,8 @@ export default function PricingPage() {
           <PlanCard
             tier="Free"
             price="$0/month"
-            bestFor="Best for individual testing, light use, and proof of workflow"
-            highlights={PLAN_HIGHLIGHTS.free}
+            bestFor="Best for individual testing, light use, and proving the workflow"
+            highlights={planHighlights.free}
             ctaHref={primaryAccessHref}
             ctaLabel={signupEnabled ? "Start Free" : "Sign in"}
           />
@@ -240,7 +239,7 @@ export default function PricingPage() {
             tier="Pro"
             price="$12/month"
             bestFor="Best for client delivery, teams, higher volume, and audit visibility"
-            highlights={PLAN_HIGHLIGHTS.pro}
+            highlights={planHighlights.pro}
             ctaHref={primaryAccessHref}
             ctaLabel={signupEnabled ? "Start Pro" : "Sign in to upgrade"}
             recommended
@@ -270,7 +269,7 @@ export default function PricingPage() {
         />
 
         <div className="mt-8 space-y-4">
-          {COMPARISON_GROUPS.map((group) => (
+          {comparisonGroups.map((group) => (
             <ComparisonGroupCard key={group.title} group={group} />
           ))}
         </div>
@@ -360,6 +359,12 @@ export default function PricingPage() {
       </section>
     </SiteShell>
   );
+}
+
+function formatBytesLabel(value: number | null): string {
+  if (value == null) return "Unlimited";
+  if (value >= 1024 * 1024 * 1024) return `${Math.round(value / (1024 * 1024 * 1024))} GB`;
+  return `${Math.round(value / (1024 * 1024))} MB`;
 }
 
 function SectionIntro(props: { eyebrow: string; title: string; body: string }) {

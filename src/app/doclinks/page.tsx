@@ -8,7 +8,7 @@ export const revalidate = 900;
 export const metadata: Metadata = {
   title: "Doclinks - cyang.io",
   description:
-    "Doclinks is controlled document delivery with serve-time access enforcement, scan-gated serving, bounded lifecycle controls, and audit visibility.",
+    "Doclinks helps teams securely share sensitive documents with protected links, access controls, lifecycle limits, and visibility after send.",
   alternates: {
     canonical: "/doclinks",
   },

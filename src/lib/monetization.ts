@@ -20,7 +20,7 @@ export type Plan = {
   allowAdvancedAnalytics: boolean;
 };
 
-const FREE_PLAN: Plan = {
+export const FREE_PLAN: Plan = {
   id: "free",
   name: "Free",
   maxViewsPerMonth: 100,
@@ -33,7 +33,7 @@ const FREE_PLAN: Plan = {
   allowAdvancedAnalytics: false,
 };
 
-const PRO_PLAN: Plan = {
+export const PRO_PLAN: Plan = {
   id: "pro",
   name: "Pro",
   maxViewsPerMonth: null, // soft monitored
